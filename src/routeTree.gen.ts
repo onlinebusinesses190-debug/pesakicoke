@@ -15,7 +15,19 @@ import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as KaziRouteImport } from './routes/kazi'
 import { Route as BusinessRouteImport } from './routes/business'
 import { Route as BankingRouteImport } from './routes/banking'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminTradingRouteImport } from './routes/admin.trading'
+import { Route as AdminSupportRouteImport } from './routes/admin.support'
+import { Route as AdminReportsRouteImport } from './routes/admin.reports'
+import { Route as AdminNotificationsRouteImport } from './routes/admin.notifications'
+import { Route as AdminKaziRouteImport } from './routes/admin.kazi'
+import { Route as AdminFinanceRouteImport } from './routes/admin.finance'
+import { Route as AdminCommissionsRouteImport } from './routes/admin.commissions'
+import { Route as AdminBusinessRouteImport } from './routes/admin.business'
+import { Route as AdminBankingRouteImport } from './routes/admin.banking'
 
 const WalletRoute = WalletRouteImport.update({
   id: '/wallet',
@@ -47,20 +59,92 @@ const BankingRoute = BankingRouteImport.update({
   path: '/banking',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminTradingRoute = AdminTradingRouteImport.update({
+  id: '/trading',
+  path: '/trading',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSupportRoute = AdminSupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminReportsRoute = AdminReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminNotificationsRoute = AdminNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminKaziRoute = AdminKaziRouteImport.update({
+  id: '/kazi',
+  path: '/kazi',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminFinanceRoute = AdminFinanceRouteImport.update({
+  id: '/finance',
+  path: '/finance',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCommissionsRoute = AdminCommissionsRouteImport.update({
+  id: '/commissions',
+  path: '/commissions',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminBusinessRoute = AdminBusinessRouteImport.update({
+  id: '/business',
+  path: '/business',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminBankingRoute = AdminBankingRouteImport.update({
+  id: '/banking',
+  path: '/banking',
+  getParentRoute: () => AdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/banking': typeof BankingRoute
   '/business': typeof BusinessRoute
   '/kazi': typeof KaziRoute
   '/profile': typeof ProfileRoute
   '/trading': typeof TradingRoute
   '/wallet': typeof WalletRoute
+  '/admin/banking': typeof AdminBankingRoute
+  '/admin/business': typeof AdminBusinessRoute
+  '/admin/commissions': typeof AdminCommissionsRoute
+  '/admin/finance': typeof AdminFinanceRoute
+  '/admin/kazi': typeof AdminKaziRoute
+  '/admin/notifications': typeof AdminNotificationsRoute
+  '/admin/reports': typeof AdminReportsRoute
+  '/admin/support': typeof AdminSupportRoute
+  '/admin/trading': typeof AdminTradingRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/admin/': typeof AdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -70,27 +154,62 @@ export interface FileRoutesByTo {
   '/profile': typeof ProfileRoute
   '/trading': typeof TradingRoute
   '/wallet': typeof WalletRoute
+  '/admin/banking': typeof AdminBankingRoute
+  '/admin/business': typeof AdminBusinessRoute
+  '/admin/commissions': typeof AdminCommissionsRoute
+  '/admin/finance': typeof AdminFinanceRoute
+  '/admin/kazi': typeof AdminKaziRoute
+  '/admin/notifications': typeof AdminNotificationsRoute
+  '/admin/reports': typeof AdminReportsRoute
+  '/admin/support': typeof AdminSupportRoute
+  '/admin/trading': typeof AdminTradingRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/admin': typeof AdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/banking': typeof BankingRoute
   '/business': typeof BusinessRoute
   '/kazi': typeof KaziRoute
   '/profile': typeof ProfileRoute
   '/trading': typeof TradingRoute
   '/wallet': typeof WalletRoute
+  '/admin/banking': typeof AdminBankingRoute
+  '/admin/business': typeof AdminBusinessRoute
+  '/admin/commissions': typeof AdminCommissionsRoute
+  '/admin/finance': typeof AdminFinanceRoute
+  '/admin/kazi': typeof AdminKaziRoute
+  '/admin/notifications': typeof AdminNotificationsRoute
+  '/admin/reports': typeof AdminReportsRoute
+  '/admin/support': typeof AdminSupportRoute
+  '/admin/trading': typeof AdminTradingRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/admin/': typeof AdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/banking'
     | '/business'
     | '/kazi'
     | '/profile'
     | '/trading'
     | '/wallet'
+    | '/admin/banking'
+    | '/admin/business'
+    | '/admin/commissions'
+    | '/admin/finance'
+    | '/admin/kazi'
+    | '/admin/notifications'
+    | '/admin/reports'
+    | '/admin/support'
+    | '/admin/trading'
+    | '/admin/users'
+    | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -100,19 +219,43 @@ export interface FileRouteTypes {
     | '/profile'
     | '/trading'
     | '/wallet'
+    | '/admin/banking'
+    | '/admin/business'
+    | '/admin/commissions'
+    | '/admin/finance'
+    | '/admin/kazi'
+    | '/admin/notifications'
+    | '/admin/reports'
+    | '/admin/support'
+    | '/admin/trading'
+    | '/admin/users'
+    | '/admin'
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/banking'
     | '/business'
     | '/kazi'
     | '/profile'
     | '/trading'
     | '/wallet'
+    | '/admin/banking'
+    | '/admin/business'
+    | '/admin/commissions'
+    | '/admin/finance'
+    | '/admin/kazi'
+    | '/admin/notifications'
+    | '/admin/reports'
+    | '/admin/support'
+    | '/admin/trading'
+    | '/admin/users'
+    | '/admin/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
   BankingRoute: typeof BankingRoute
   BusinessRoute: typeof BusinessRoute
   KaziRoute: typeof KaziRoute
@@ -165,6 +308,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BankingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -172,11 +322,119 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/trading': {
+      id: '/admin/trading'
+      path: '/trading'
+      fullPath: '/admin/trading'
+      preLoaderRoute: typeof AdminTradingRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/support': {
+      id: '/admin/support'
+      path: '/support'
+      fullPath: '/admin/support'
+      preLoaderRoute: typeof AdminSupportRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/reports': {
+      id: '/admin/reports'
+      path: '/reports'
+      fullPath: '/admin/reports'
+      preLoaderRoute: typeof AdminReportsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/notifications': {
+      id: '/admin/notifications'
+      path: '/notifications'
+      fullPath: '/admin/notifications'
+      preLoaderRoute: typeof AdminNotificationsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/kazi': {
+      id: '/admin/kazi'
+      path: '/kazi'
+      fullPath: '/admin/kazi'
+      preLoaderRoute: typeof AdminKaziRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/finance': {
+      id: '/admin/finance'
+      path: '/finance'
+      fullPath: '/admin/finance'
+      preLoaderRoute: typeof AdminFinanceRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/commissions': {
+      id: '/admin/commissions'
+      path: '/commissions'
+      fullPath: '/admin/commissions'
+      preLoaderRoute: typeof AdminCommissionsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/business': {
+      id: '/admin/business'
+      path: '/business'
+      fullPath: '/admin/business'
+      preLoaderRoute: typeof AdminBusinessRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/banking': {
+      id: '/admin/banking'
+      path: '/banking'
+      fullPath: '/admin/banking'
+      preLoaderRoute: typeof AdminBankingRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
 
+interface AdminRouteChildren {
+  AdminBankingRoute: typeof AdminBankingRoute
+  AdminBusinessRoute: typeof AdminBusinessRoute
+  AdminCommissionsRoute: typeof AdminCommissionsRoute
+  AdminFinanceRoute: typeof AdminFinanceRoute
+  AdminKaziRoute: typeof AdminKaziRoute
+  AdminNotificationsRoute: typeof AdminNotificationsRoute
+  AdminReportsRoute: typeof AdminReportsRoute
+  AdminSupportRoute: typeof AdminSupportRoute
+  AdminTradingRoute: typeof AdminTradingRoute
+  AdminUsersRoute: typeof AdminUsersRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminBankingRoute: AdminBankingRoute,
+  AdminBusinessRoute: AdminBusinessRoute,
+  AdminCommissionsRoute: AdminCommissionsRoute,
+  AdminFinanceRoute: AdminFinanceRoute,
+  AdminKaziRoute: AdminKaziRoute,
+  AdminNotificationsRoute: AdminNotificationsRoute,
+  AdminReportsRoute: AdminReportsRoute,
+  AdminSupportRoute: AdminSupportRoute,
+  AdminTradingRoute: AdminTradingRoute,
+  AdminUsersRoute: AdminUsersRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
   BankingRoute: BankingRoute,
   BusinessRoute: BusinessRoute,
   KaziRoute: KaziRoute,
