@@ -9,8 +9,44 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WalletRouteImport } from './routes/wallet'
+import { Route as TradingRouteImport } from './routes/trading'
+import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as KaziRouteImport } from './routes/kazi'
+import { Route as BusinessRouteImport } from './routes/business'
+import { Route as BankingRouteImport } from './routes/banking'
 import { Route as IndexRouteImport } from './routes/index'
 
+const WalletRoute = WalletRouteImport.update({
+  id: '/wallet',
+  path: '/wallet',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TradingRoute = TradingRouteImport.update({
+  id: '/trading',
+  path: '/trading',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KaziRoute = KaziRouteImport.update({
+  id: '/kazi',
+  path: '/kazi',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BusinessRoute = BusinessRouteImport.update({
+  id: '/business',
+  path: '/business',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BankingRoute = BankingRouteImport.update({
+  id: '/banking',
+  path: '/banking',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -19,28 +55,116 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/banking': typeof BankingRoute
+  '/business': typeof BusinessRoute
+  '/kazi': typeof KaziRoute
+  '/profile': typeof ProfileRoute
+  '/trading': typeof TradingRoute
+  '/wallet': typeof WalletRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/banking': typeof BankingRoute
+  '/business': typeof BusinessRoute
+  '/kazi': typeof KaziRoute
+  '/profile': typeof ProfileRoute
+  '/trading': typeof TradingRoute
+  '/wallet': typeof WalletRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/banking': typeof BankingRoute
+  '/business': typeof BusinessRoute
+  '/kazi': typeof KaziRoute
+  '/profile': typeof ProfileRoute
+  '/trading': typeof TradingRoute
+  '/wallet': typeof WalletRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/banking'
+    | '/business'
+    | '/kazi'
+    | '/profile'
+    | '/trading'
+    | '/wallet'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/banking'
+    | '/business'
+    | '/kazi'
+    | '/profile'
+    | '/trading'
+    | '/wallet'
+  id:
+    | '__root__'
+    | '/'
+    | '/banking'
+    | '/business'
+    | '/kazi'
+    | '/profile'
+    | '/trading'
+    | '/wallet'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  BankingRoute: typeof BankingRoute
+  BusinessRoute: typeof BusinessRoute
+  KaziRoute: typeof KaziRoute
+  ProfileRoute: typeof ProfileRoute
+  TradingRoute: typeof TradingRoute
+  WalletRoute: typeof WalletRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/wallet': {
+      id: '/wallet'
+      path: '/wallet'
+      fullPath: '/wallet'
+      preLoaderRoute: typeof WalletRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/trading': {
+      id: '/trading'
+      path: '/trading'
+      fullPath: '/trading'
+      preLoaderRoute: typeof TradingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/kazi': {
+      id: '/kazi'
+      path: '/kazi'
+      fullPath: '/kazi'
+      preLoaderRoute: typeof KaziRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/business': {
+      id: '/business'
+      path: '/business'
+      fullPath: '/business'
+      preLoaderRoute: typeof BusinessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/banking': {
+      id: '/banking'
+      path: '/banking'
+      fullPath: '/banking'
+      preLoaderRoute: typeof BankingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -53,17 +177,13 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  BankingRoute: BankingRoute,
+  BusinessRoute: BusinessRoute,
+  KaziRoute: KaziRoute,
+  ProfileRoute: ProfileRoute,
+  TradingRoute: TradingRoute,
+  WalletRoute: WalletRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
