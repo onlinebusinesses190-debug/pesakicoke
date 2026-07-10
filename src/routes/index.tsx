@@ -21,6 +21,8 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   const [show, setShow] = useState(true);
+  const { user: authUser } = useAuth();
+  const displayName = authUser?.user_metadata?.full_name?.split(" ")[0] || authUser?.email?.split("@")[0] || user.name;
 
   return (
     <AppShell>
@@ -29,16 +31,25 @@ function HomePage() {
         <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-gold/20 blur-3xl" />
         <div className="relative flex items-start justify-between">
           <div className="min-w-0">
-            <p className="text-xs/4 opacity-80">Welcome back,</p>
-            <h1 className="truncate text-2xl font-bold">{user.name} 👋</h1>
+            <p className="text-xs/4 opacity-80">Welcome{authUser ? " back" : ""},</p>
+            <h1 className="truncate text-2xl font-bold">{displayName} 👋</h1>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <button className="grid h-10 w-10 place-items-center rounded-full bg-white/10 backdrop-blur">
               <Bell className="h-5 w-5" />
             </button>
-            <div className="grid h-10 w-10 place-items-center rounded-full bg-gold text-gold-foreground font-bold">
-              {user.avatar}
-            </div>
+            {authUser ? (
+              <Link to="/profile" className="grid h-10 w-10 place-items-center rounded-full bg-gold text-gold-foreground font-bold">
+                {(displayName[0] ?? "P").toUpperCase()}
+              </Link>
+            ) : (
+              <Link
+                to="/auth"
+                className="inline-flex h-10 items-center gap-1.5 rounded-full bg-white/15 px-3 text-xs font-semibold backdrop-blur"
+              >
+                <LogIn className="h-3.5 w-3.5" /> Sign in
+              </Link>
+            )}
           </div>
         </div>
 
