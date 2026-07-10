@@ -1,11 +1,12 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   User, KeyRound, Phone, Gift, ShieldCheck, Bell,
-  HelpCircle, MessageCircle, FileText, Lock, Info, LogOut, Copy, ChevronRight,
+  HelpCircle, MessageCircle, FileText, Lock, Info, LogOut, LogIn, Copy, ChevronRight,
 } from "lucide-react";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Badge, SectionTitle } from "@/components/ui-bits";
 import { user, fmt } from "@/lib/mock";
+import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({
