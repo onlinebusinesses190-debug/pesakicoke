@@ -150,6 +150,17 @@ function ProfilePage() {
         </section>
       ))}
 
+      {authUser && (
+        <section className="mt-5 px-5">
+          <button
+            onClick={async () => { await signOut(); navigate({ to: "/" }); }}
+            className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-destructive/30 bg-destructive/5 text-sm font-semibold text-destructive hover:bg-destructive/10"
+          >
+            <LogOut className="h-4 w-4" /> Sign out
+          </button>
+        </section>
+      )}
+
       <p className="mt-6 px-5 pb-4 text-center text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
         PESAKI v1.0 · Africa's Digital Wealth Ecosystem
       </p>
