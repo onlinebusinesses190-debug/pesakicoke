@@ -56,6 +56,11 @@ const groups: { title: string; items: { label: string; icon: any; tone?: "destru
 ];
 
 function ProfilePage() {
+  const { user: authUser, signOut } = useAuth();
+  const navigate = useNavigate();
+  const displayName = authUser?.user_metadata?.full_name || authUser?.email?.split("@")[0] || `${user.name} Otieno`;
+  const displayEmail = authUser?.email ?? "+254 7•• ••• 482";
+
   return (
     <AppShell>
       <PageHeader title="Profile" subtitle="Your PESAKI account" />
@@ -64,17 +69,30 @@ function ProfilePage() {
         <Card className="!p-4">
           <div className="flex items-center gap-3">
             <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full gradient-primary text-lg font-bold text-primary-foreground">
-              {user.avatar}
+              {(displayName[0] ?? "P").toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-base font-bold">{user.name} Otieno</p>
-              <p className="truncate text-xs text-muted-foreground">+254 7•• ••• 482</p>
+              <p className="truncate text-base font-bold">{displayName}</p>
+              <p className="truncate text-xs text-muted-foreground">{displayEmail}</p>
               <div className="mt-1 flex gap-1.5">
-                <Badge tone="success"><ShieldCheck className="h-2.5 w-2.5" /> Verified</Badge>
+                {authUser ? (
+                  <Badge tone="success"><ShieldCheck className="h-2.5 w-2.5" /> Signed in</Badge>
+                ) : (
+                  <Badge tone="warning">Guest</Badge>
+                )}
                 <Badge tone="gold">Gold Tier</Badge>
               </div>
             </div>
           </div>
+
+          {!authUser && (
+            <Link
+              to="/auth"
+              className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-lg gradient-primary text-sm font-semibold text-primary-foreground"
+            >
+              <LogIn className="h-4 w-4" /> Sign in or create account
+            </Link>
+          )}
         </Card>
       </section>
 
