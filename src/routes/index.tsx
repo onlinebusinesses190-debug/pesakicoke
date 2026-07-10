@@ -1,12 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight, LineChart,
-  Bell, Eye, EyeOff, TrendingUp, ChevronRight, Sparkles,
+  Bell, Eye, EyeOff, TrendingUp, ChevronRight, Sparkles, LogIn,
 } from "lucide-react";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Card, Stat, SectionTitle, Badge } from "@/components/ui-bits";
 import { user, stats, opportunities, transactions, fmt } from "@/lib/mock";
+import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/")({
   head: () => ({
