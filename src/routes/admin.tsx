@@ -1,44 +1,19 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
 import { AdminShell } from "@/components/AdminShell";
-import { Shield, LogOut } from "lucide-react";
+import { Info } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
   component: AdminLayout,
 });
 
-const STORAGE_KEY = "pesaki_admin_session";
-// Demo credentials — replace with Lovable Cloud auth + role check before going live.
-const DEMO_EMAIL = "admin@pesaki.africa";
-const DEMO_PASSWORD = "pesaki-admin-2026";
-
+// Admin auth + role checks will be added later once the admin role table is wired.
+// For now this is an open preview of the admin surface.
 function AdminLayout() {
-  const [authed, setAuthed] = useState(false);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    setAuthed(typeof window !== "undefined" && sessionStorage.getItem(STORAGE_KEY) === "1");
-    setReady(true);
-  }, []);
-
-  if (!ready) return null;
-
-  if (!authed) {
-    return <AdminLogin onSuccess={() => setAuthed(true)} />;
-  }
-
   return (
     <AdminShell>
-      <div className="mb-4 flex justify-end">
-        <button
-          onClick={() => {
-            sessionStorage.removeItem(STORAGE_KEY);
-            setAuthed(false);
-          }}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground"
-        >
-          <LogOut className="h-3.5 w-3.5" /> Sign out
-        </button>
+      <div className="mb-4 flex items-center gap-2 rounded-lg border border-dashed border-border bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground">
+        <Info className="h-3.5 w-3.5" />
+        Admin preview — role-based access will be added in a later step.
       </div>
       <Outlet />
     </AdminShell>
