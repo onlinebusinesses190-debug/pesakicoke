@@ -51,7 +51,7 @@ const groups: { title: string; items: { label: string; icon: any; tone?: "destru
   },
   {
     title: " ",
-    items: [{ label: "Logout", icon: LogOut, tone: "destructive" }],
+    items: [],
   },
 ];
 
