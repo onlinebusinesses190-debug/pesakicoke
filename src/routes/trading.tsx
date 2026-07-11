@@ -1,5 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { TrendingUp, Zap, Plane, BarChart3, RefreshCw, Play } from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
+import { TrendingUp, Zap, Plane, BarChart3, RefreshCw, Play, DollarSign, AlertTriangle, X, ChevronRight } from "lucide-react";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Badge } from "@/components/ui-bits";
 import { tradingProducts } from "@/lib/mock";
@@ -8,7 +9,7 @@ export const Route = createFileRoute("/trading")({
   head: () => ({
     meta: [
       { title: "Trading — PESAKI" },
-      { name: "description", content: "Binary FX, Up & Down, Avimarket, Invest Prediction and Market Spin — all PESAKI trading products in one place." },
+      { name: "description", content: "Forex, Binary FX, Up & Down, Avimarket, Invest Prediction and Market Spin — all PESAKI trading products in one place." },
     ],
   }),
   component: TradingPage,
