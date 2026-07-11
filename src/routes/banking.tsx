@@ -191,6 +191,7 @@ function BankingPage() {
 function LockFundsCard() {
   const [amount, setAmount] = useState<number>(50000);
   const [months, setMonths] = useState<number>(12);
+  const [confirming, setConfirming] = useState(false);
   const [done, setDone] = useState(false);
 
   const selected = durations.find((d) => d.months === months)!;
@@ -223,6 +224,7 @@ function LockFundsCard() {
   }
 
   return (
+    <>
     <Card className="!p-4">
       {/* Amount */}
       <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Amount to lock</label>
@@ -296,15 +298,78 @@ function LockFundsCard() {
       </div>
 
       <button
-        onClick={() => setDone(true)}
+        onClick={() => setConfirming(true)}
         disabled={amount < 1000}
         className="mt-4 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground shadow hover:opacity-95 disabled:opacity-50"
       >
         <span className="inline-flex items-center gap-2">
-          <Lock className="h-4 w-4" /> Lock {fmt(amount)}
+          <Lock className="h-4 w-4" /> Lock Now
         </span>
       </button>
     </Card>
+
+    {confirming && (
+      <div className="fixed inset-0 z-50 grid place-items-end sm:place-items-center">
+        <div className="absolute inset-0 bg-black/50" onClick={() => setConfirming(false)} />
+        <div className="relative z-10 w-full max-w-md rounded-t-3xl bg-card p-5 shadow-2xl sm:rounded-3xl">
+          <div className="mb-4 flex items-center justify-between">
+            <button
+              onClick={() => setConfirming(false)}
+              className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground"
+              aria-label="Back"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <h3 className="text-base font-bold">Confirm lock</h3>
+            <button onClick={() => setConfirming(false)} className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-primary/10 text-primary">
+            <Lock className="h-6 w-6" />
+          </div>
+          <p className="mt-3 text-center text-xs text-muted-foreground">Please review the details below before locking your funds.</p>
+
+          <div className="mt-4 divide-y divide-border rounded-xl border border-border">
+            <div className="flex items-center justify-between px-4 py-3">
+              <span className="text-xs text-muted-foreground">Amount</span>
+              <span className="text-sm font-bold">{fmt(amount)}</span>
+            </div>
+            <div className="flex items-center justify-between px-4 py-3">
+              <span className="text-xs text-muted-foreground">Duration</span>
+              <span className="text-sm font-bold">{months} months</span>
+            </div>
+            <div className="flex items-center justify-between px-4 py-3">
+              <span className="text-xs text-muted-foreground">APY</span>
+              <span className="text-sm font-bold text-primary">{selected.apy}%</span>
+            </div>
+            <div className="flex items-center justify-between px-4 py-3">
+              <span className="text-xs text-muted-foreground">Interest earned</span>
+              <span className="text-sm font-bold text-success">+ {fmt(interest)}</span>
+            </div>
+            <div className="flex items-center justify-between px-4 py-3">
+              <span className="text-xs text-muted-foreground">Total at maturity</span>
+              <span className="text-sm font-bold text-primary">{fmt(total)}</span>
+            </div>
+          </div>
+
+          <button
+            onClick={() => { setConfirming(false); setDone(true); }}
+            className="mt-5 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground"
+          >
+            <span className="inline-flex items-center gap-2"><Lock className="h-4 w-4" /> Confirm Lock</span>
+          </button>
+          <button
+            onClick={() => setConfirming(false)}
+            className="mt-2 h-11 w-full rounded-xl border border-border text-sm font-semibold"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
