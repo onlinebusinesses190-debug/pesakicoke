@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
   Target, PiggyBank, Plus, ArrowDownToLine, ArrowUpFromLine,
-  TrendingUp, HandCoins, Lock, Info, CheckCircle2, ShieldCheck, Calendar, X,
+  TrendingUp, HandCoins, Lock, Info, CheckCircle2, ShieldCheck, Calendar, X, ArrowLeft,
 } from "lucide-react";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Stat, SectionTitle, Progress, Badge } from "@/components/ui-bits";
