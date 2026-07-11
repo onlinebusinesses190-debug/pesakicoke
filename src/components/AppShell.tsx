@@ -5,13 +5,13 @@ import {
 } from "lucide-react";
 
 const nav = [
-  { to: "/",            label: "Home",     icon: Home },
-  { to: "/trading",     label: "Trading",  icon: LineChart },
-  { to: "/kazi",        label: "KAZI",     icon: Briefcase },
-  { to: "/business",    label: "Business", icon: Building2 },
-  { to: "/banking",     label: "Banking",  icon: Landmark },
-  { to: "/wallet",      label: "Wallet",   icon: Wallet },
-  { to: "/profile",     label: "Profile",  icon: User },
+  { to: "/",         label: "Home",     sub: "",        icon: Home },
+  { to: "/trading",  label: "Trading",  sub: "",        icon: LineChart },
+  { to: "/kazi",     label: "KAZI",     sub: "Link",    icon: Briefcase },
+  { to: "/business", label: "Business", sub: "Funding", icon: Building2 },
+  { to: "/banking",  label: "Banking",  sub: "Hub",     icon: Landmark },
+  { to: "/wallet",   label: "Wallet",   sub: "",        icon: Wallet },
+  { to: "/profile",  label: "Profile",  sub: "",        icon: User },
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -48,7 +48,10 @@ export function AppShell({ children }: { children: ReactNode }) {
                   >
                     <Icon className="h-4 w-4" strokeWidth={active ? 2.5 : 2} />
                   </span>
-                  <span className="truncate">{item.label}</span>
+                  <span className="flex flex-col items-center leading-tight">
+                    <span className="truncate">{item.label}</span>
+                    {item.sub && <span className="truncate text-[9px] opacity-80">{item.sub}</span>}
+                  </span>
                 </Link>
               </li>
             );
