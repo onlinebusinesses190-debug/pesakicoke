@@ -48,7 +48,10 @@ export function AppShell({ children }: { children: ReactNode }) {
                   >
                     <Icon className="h-4 w-4" strokeWidth={active ? 2.5 : 2} />
                   </span>
-                  <span className="truncate">{item.label}</span>
+                  <span className="flex flex-col items-center leading-tight">
+                    <span className="truncate">{item.label}</span>
+                    {item.sub && <span className="truncate text-[9px] opacity-80">{item.sub}</span>}
+                  </span>
                 </Link>
               </li>
             );
