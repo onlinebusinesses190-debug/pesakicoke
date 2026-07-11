@@ -5,13 +5,13 @@ import {
 } from "lucide-react";
 
 const nav = [
-  { to: "/",            label: "Home",            icon: Home },
-  { to: "/trading",     label: "Trading",         icon: LineChart },
-  { to: "/kazi",        label: "KAZI Link",       icon: Briefcase },
-  { to: "/business",    label: "Business Funding",icon: Building2 },
-  { to: "/banking",     label: "Banking Hub",     icon: Landmark },
-  { to: "/wallet",      label: "Wallet",          icon: Wallet },
-  { to: "/profile",     label: "Profile",         icon: User },
+  { to: "/",         label: "Home",     sub: "",        icon: Home },
+  { to: "/trading",  label: "Trading",  sub: "",        icon: LineChart },
+  { to: "/kazi",     label: "KAZI",     sub: "Link",    icon: Briefcase },
+  { to: "/business", label: "Business", sub: "Funding", icon: Building2 },
+  { to: "/banking",  label: "Banking",  sub: "Hub",     icon: Landmark },
+  { to: "/wallet",   label: "Wallet",   sub: "",        icon: Wallet },
+  { to: "/profile",  label: "Profile",  sub: "",        icon: User },
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
