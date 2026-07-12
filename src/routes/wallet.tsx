@@ -1,9 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight, History, Eye, EyeOff, TrendingUp } from "lucide-react";
+import {
+  ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight, History, Eye, EyeOff, TrendingUp,
+  X, ArrowLeft, CheckCircle2,
+} from "lucide-react";
+import { toast } from "sonner";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Stat, SectionTitle, Badge } from "@/components/ui-bits";
-import { transactions, user, fmt } from "@/lib/mock";
+import { user, fmt } from "@/lib/mock";
+import { balanceStore, useBalance, withdrawFee, totalLocked } from "@/lib/balance";
 
 export const Route = createFileRoute("/wallet")({
   head: () => ({
@@ -15,12 +20,20 @@ export const Route = createFileRoute("/wallet")({
   component: WalletPage,
 });
 
+type Action = "deposit" | "withdraw" | "transfer";
+
 function WalletPage() {
+  const state = useBalance();
   const [show, setShow] = useState(true);
   const [filter, setFilter] = useState<string>("All");
+  const [action, setAction] = useState<Action | null>(null);
 
-  const types = ["All", "Deposit", "Withdrawal", "Trading", "Job Earnings", "Business Funding", "Savings"];
-  const filtered = filter === "All" ? transactions : transactions.filter((t) => t.type === filter);
+  const types = ["All", "Deposit", "Withdrawal", "Trading", "Job Earnings", "Business Funding", "Savings", "Transfer"];
+  const filtered = filter === "All" ? state.transactions : state.transactions.filter((t) => t.type.toLowerCase().includes(filter.toLowerCase()));
+
+  const totalDeposits = state.transactions.filter((t) => t.type.startsWith("Deposit")).reduce((s, t) => s + t.amount, 0);
+  const totalWithdrawals = -state.transactions.filter((t) => t.type.startsWith("Withdrawal") && !t.type.includes("fee")).reduce((s, t) => s + t.amount, 0);
+  const pending = state.transactions.filter((t) => t.status === "Pending").length;
 
   return (
     <AppShell>
@@ -36,17 +49,22 @@ function WalletPage() {
             </button>
           </div>
           <p className="relative mt-1 font-display text-4xl font-bold tracking-tight">
-            {show ? fmt(user.balance) : "•••••••"}
+            {show ? fmt(state.available) : "•••••••"}
           </p>
+          <p className="relative mt-1 text-[11px] opacity-80">Locked: {show ? fmt(totalLocked(state)) : "•••"}</p>
           <div className="relative mt-5 grid grid-cols-3 gap-2">
             {[
-              { l: "Deposit",  i: ArrowDownToLine },
-              { l: "Withdraw", i: ArrowUpFromLine },
-              { l: "Transfer", i: ArrowLeftRight  },
-            ].map((a) => (
-              <button key={a.l} className="flex flex-col items-center gap-1 rounded-xl bg-white/15 py-2.5 text-xs font-semibold backdrop-blur">
-                <a.i className="h-4 w-4" />
-                {a.l}
+              { l: "Deposit",  i: ArrowDownToLine, a: "deposit" as const },
+              { l: "Withdraw", i: ArrowUpFromLine, a: "withdraw" as const },
+              { l: "Transfer", i: ArrowLeftRight,  a: "transfer" as const },
+            ].map((it) => (
+              <button
+                key={it.l}
+                onClick={() => setAction(it.a)}
+                className="flex flex-col items-center gap-1 rounded-xl bg-white/15 py-2.5 text-xs font-semibold backdrop-blur hover:bg-white/25"
+              >
+                <it.i className="h-4 w-4" />
+                {it.l}
               </button>
             ))}
           </div>
@@ -54,9 +72,9 @@ function WalletPage() {
       </section>
 
       <section className="mt-5 grid grid-cols-2 gap-3 px-5">
-        <Stat label="Total Deposits"     value={fmt(225000)} tone="success" />
-        <Stat label="Total Withdrawals"  value={fmt(118000)} tone="primary" />
-        <Stat label="Pending"            value="2"           hint="KES 12,500" tone="gold" />
+        <Stat label="Total Deposits"     value={fmt(totalDeposits)} tone="success" />
+        <Stat label="Total Withdrawals"  value={fmt(totalWithdrawals)} tone="primary" />
+        <Stat label="Pending"            value={String(pending)} tone="gold" />
         <Stat label="Referral Earnings"  value={fmt(user.referralEarnings)} tone="gold" />
       </section>
 
@@ -104,6 +122,178 @@ function WalletPage() {
           </ul>
         </Card>
       </section>
+
+      {action === "deposit"  && <DepositModal  onClose={() => setAction(null)} />}
+      {action === "withdraw" && <WithdrawModal onClose={() => setAction(null)} />}
+      {action === "transfer" && <TransferModal onClose={() => setAction(null)} />}
     </AppShell>
+  );
+}
+
+function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-end sm:place-items-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-md rounded-t-3xl bg-card p-5 shadow-2xl sm:rounded-3xl">
+        <div className="mb-4 flex items-center justify-between">
+          <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground" aria-label="Back">
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <h3 className="text-base font-bold">{title}</h3>
+          <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function DepositModal({ onClose }: { onClose: () => void }) {
+  const [amount, setAmount] = useState(5000);
+  const [method, setMethod] = useState<"M-Pesa" | "Bank Transfer">("M-Pesa");
+
+  const submit = () => {
+    if (amount <= 0) return toast.error("Enter an amount");
+    balanceStore.deposit(amount, method);
+    toast.success(`Deposit of ${fmt(amount)} received via ${method}`);
+    onClose();
+  };
+
+  return (
+    <ModalShell title="Deposit funds" onClose={onClose}>
+      <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Amount</label>
+      <div className="mt-1 flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2.5">
+        <span className="text-sm font-semibold text-muted-foreground">KES</span>
+        <input type="number" min={1} value={amount} onChange={(e) => setAmount(Number(e.target.value) || 0)}
+          className="w-full bg-transparent text-lg font-bold outline-none" />
+      </div>
+
+      <label className="mt-4 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Payment method</label>
+      <select value={method} onChange={(e) => setMethod(e.target.value as any)}
+        className="mt-1 h-11 w-full rounded-xl border border-border bg-background px-3 text-sm font-semibold outline-none">
+        <option>M-Pesa</option>
+        <option>Bank Transfer</option>
+      </select>
+
+      <button onClick={submit} className="mt-5 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground">
+        Deposit Now
+      </button>
+    </ModalShell>
+  );
+}
+
+function WithdrawModal({ onClose }: { onClose: () => void }) {
+  const state = useBalance();
+  const [amount, setAmount] = useState(1000);
+  const [method, setMethod] = useState<"M-Pesa" | "Bank">("M-Pesa");
+  const fee = withdrawFee(amount, method);
+  const total = amount + fee;
+  const insufficient = total > state.available;
+
+  const submit = () => {
+    if (amount <= 0) return toast.error("Enter an amount");
+    const res = balanceStore.withdraw(amount, method);
+    if (!res.ok) return toast.error(res.error!);
+    toast.success(`Withdrawal of ${fmt(amount)} to ${method} processed`);
+    onClose();
+  };
+
+  return (
+    <ModalShell title="Withdraw funds" onClose={onClose}>
+      <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Amount</label>
+      <div className="mt-1 flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2.5">
+        <span className="text-sm font-semibold text-muted-foreground">KES</span>
+        <input type="number" min={1} value={amount} onChange={(e) => setAmount(Number(e.target.value) || 0)}
+          className="w-full bg-transparent text-lg font-bold outline-none" />
+      </div>
+      <p className="mt-1.5 text-[11px] text-muted-foreground">Fee: <span className="font-semibold text-foreground">{fmt(fee)}</span> · Total deducted: <span className="font-semibold text-foreground">{fmt(total)}</span></p>
+
+      <label className="mt-4 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Withdrawal method</label>
+      <select value={method} onChange={(e) => setMethod(e.target.value as any)}
+        className="mt-1 h-11 w-full rounded-xl border border-border bg-background px-3 text-sm font-semibold outline-none">
+        <option>M-Pesa</option>
+        <option>Bank</option>
+      </select>
+
+      {insufficient && <p className="mt-3 text-xs font-semibold text-destructive">Insufficient balance (available {fmt(state.available)})</p>}
+
+      <button onClick={submit} disabled={insufficient} className="mt-5 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50">
+        Withdraw Now
+      </button>
+    </ModalShell>
+  );
+}
+
+function TransferModal({ onClose }: { onClose: () => void }) {
+  const state = useBalance();
+  const [phone, setPhone] = useState("");
+  const [amount, setAmount] = useState(500);
+  const [step, setStep] = useState<"form" | "confirm" | "done">("form");
+
+  const insufficient = amount > state.available;
+
+  const confirm = () => {
+    const res = balanceStore.transfer(phone, amount);
+    if (!res.ok) return toast.error(res.error!);
+    toast.success(`Transfer of ${fmt(amount)} to ${phone} was successful`);
+    // Simulate receiver toast
+    setTimeout(() => toast(`Recipient ${phone} received ${fmt(amount)} from you`), 800);
+    setStep("done");
+  };
+
+  return (
+    <ModalShell title={step === "confirm" ? "Confirm transfer" : step === "done" ? "Transfer sent" : "Send money"} onClose={onClose}>
+      {step === "form" && (
+        <>
+          <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Recipient phone (07XXXXXXXX)</label>
+          <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0712345678"
+            className="mt-1 h-11 w-full rounded-xl border border-border bg-background px-3 text-sm font-semibold outline-none" />
+
+          <label className="mt-4 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Amount</label>
+          <div className="mt-1 flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2.5">
+            <span className="text-sm font-semibold text-muted-foreground">KES</span>
+            <input type="number" min={1} value={amount} onChange={(e) => setAmount(Number(e.target.value) || 0)}
+              className="w-full bg-transparent text-lg font-bold outline-none" />
+          </div>
+          {insufficient && <p className="mt-3 text-xs font-semibold text-destructive">Insufficient balance</p>}
+
+          <button
+            onClick={() => {
+              if (!/^0\d{9}$/.test(phone)) return toast.error("Enter a valid 10-digit phone");
+              if (amount <= 0) return toast.error("Enter an amount");
+              if (insufficient) return toast.error("Insufficient balance");
+              setStep("confirm");
+            }}
+            className="mt-5 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground"
+          >
+            Send Money
+          </button>
+        </>
+      )}
+
+      {step === "confirm" && (
+        <>
+          <p className="text-center text-sm">
+            Confirm transfer: send <span className="font-bold">{fmt(amount)}</span> to <span className="font-bold">{phone}</span>?
+          </p>
+          <div className="mt-5 grid grid-cols-2 gap-2">
+            <button onClick={() => setStep("form")} className="h-11 rounded-xl border border-border text-sm font-semibold">Cancel</button>
+            <button onClick={confirm} className="h-11 rounded-xl gradient-primary text-sm font-semibold text-primary-foreground">Confirm</button>
+          </div>
+        </>
+      )}
+
+      {step === "done" && (
+        <div className="text-center">
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-success/15 text-success">
+            <CheckCircle2 className="h-6 w-6" />
+          </div>
+          <p className="mt-3 text-sm font-bold">Transfer of {fmt(amount)} to {phone} was successful.</p>
+          <button onClick={onClose} className="mt-5 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground">Done</button>
+        </div>
+      )}
+    </ModalShell>
   );
 }
