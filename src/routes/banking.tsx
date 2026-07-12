@@ -31,14 +31,17 @@ const actions: { key: ActionKey; label: string; icon: any; tone: string }[] = [
 ];
 
 const durations = [
-  { months: 3,  apy: 8,  label: "3 months",  hint: "Flexible" },
-  { months: 6,  apy: 10, label: "6 months",  hint: "Balanced" },
-  { months: 12, apy: 12, label: "12 months", hint: "Best rate", featured: true },
-  { months: 24, apy: 14, label: "24 months", hint: "Premium" },
+  { months: 3,  apy: 4,  label: "3 months",  hint: "Flexible" },
+  { months: 6,  apy: 6,  label: "6 months",  hint: "Balanced" },
+  { months: 12, apy: 8,  label: "12 months", hint: "Popular", featured: true },
+  { months: 24, apy: 10, label: "24 months", hint: "Best rate" },
 ];
 
 function BankingPage() {
   const [modal, setModal] = useState<ActionKey | null>(null);
+  const state = useBalance();
+  const locked = totalLocked(state);
+
 
   return (
     <AppShell>
