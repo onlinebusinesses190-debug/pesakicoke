@@ -24,7 +24,9 @@ export const Route = createFileRoute("/")({
 function HomePage() {
   const [show, setShow] = useState(true);
   const { user: authUser } = useAuth();
+  const state = useBalance();
   const displayName = authUser?.user_metadata?.full_name?.split(" ")[0] || authUser?.email?.split("@")[0] || user.name;
+
 
   return (
     <AppShell>
