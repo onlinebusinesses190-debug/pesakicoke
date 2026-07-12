@@ -179,7 +179,7 @@ function BankingPage() {
             <div className="min-w-0">
               <p className="text-sm font-semibold">You qualify for up to</p>
               <p className="text-lg font-bold text-primary">{fmt(150000)}</p>
-              <p className="text-[11px] text-muted-foreground">From 4% p.a. · Repay in 3–24 months</p>
+              <p className="text-[11px] text-muted-foreground">5% p.a. · Repay in 3–24 months</p>
             </div>
             <button onClick={() => setModal("loan")} className="rounded-full gradient-primary px-3 py-1.5 text-[11px] font-semibold text-primary-foreground">
               Get loan
