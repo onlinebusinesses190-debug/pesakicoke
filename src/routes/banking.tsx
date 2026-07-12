@@ -103,15 +103,15 @@ function BankingPage() {
       <section className="mt-6 px-5">
         <SectionTitle title="Active locked deposits" />
         <div className="space-y-2.5">
-          {[
-            { name: "12-Month Growth Lock", amount: 120000, apy: 12, days: 214, total: 365 },
-            { name: "6-Month Balanced Lock", amount: 60000, apy: 10, days: 45,  total: 180 },
-          ].map((d) => {
+          {state.locked.length === 0 && (
+            <Card className="!p-4 text-center text-xs text-muted-foreground">No locked deposits yet.</Card>
+          )}
+          {state.locked.map((d) => {
             const pct = Math.round((d.days / d.total) * 100);
             const daysLeft = d.total - d.days;
             const projected = Math.round(d.amount * (d.apy / 100) * (d.total / 365));
             return (
-              <Card key={d.name} className="!p-4">
+              <Card key={d.id} className="!p-4">
                 <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
                   <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary">
                     <Lock className="h-4 w-4" />
@@ -130,6 +130,7 @@ function BankingPage() {
             );
           })}
         </div>
+
       </section>
 
       {/* Financial Goals */}
