@@ -52,7 +52,8 @@ function BankingPage() {
         <div className="relative overflow-hidden rounded-2xl gradient-primary p-5 text-primary-foreground">
           <PiggyBank className="absolute -right-3 -top-3 h-28 w-28 opacity-15" />
           <p className="text-xs uppercase tracking-widest opacity-80">Total Savings</p>
-          <p className="mt-1 font-display text-3xl font-bold">{fmt(430000)}</p>
+          <p className="mt-1 font-display text-3xl font-bold">{fmt(state.available + locked)}</p>
+
           <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
             <div className="rounded-xl bg-white/10 p-2.5">
               <p className="opacity-70">Interest Earned</p>
