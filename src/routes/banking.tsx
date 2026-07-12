@@ -7,6 +7,9 @@ import {
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Stat, SectionTitle, Progress, Badge } from "@/components/ui-bits";
 import { savingsGoals, fmt } from "@/lib/mock";
+import { balanceStore, useBalance, totalLocked } from "@/lib/balance";
+import { toast } from "sonner";
+
 
 export const Route = createFileRoute("/banking")({
   head: () => ({
