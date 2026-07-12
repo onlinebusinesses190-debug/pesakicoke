@@ -87,16 +87,17 @@ function BankingPage() {
 
       {/* KPIs */}
       <section className="mt-5 grid grid-cols-3 gap-3 px-5">
-        <Stat label="Locked" value={fmt(180000)} tone="primary" />
-        <Stat label="Available" value={fmt(250000)} tone="success" />
-        <Stat label="Avg. APY" value="10%" tone="gold" />
+        <Stat label="Locked" value={fmt(locked)} tone="primary" />
+        <Stat label="Available" value={fmt(state.available)} tone="success" />
+        <Stat label="Avg. APY" value="8%" tone="gold" />
       </section>
 
       {/* Lock funds — the star card */}
       <section className="mt-6 px-5">
-        <SectionTitle title="Lock funds & earn" action={<Badge tone="gold">Up to 14% APY</Badge>} />
+        <SectionTitle title="Lock funds & earn" action={<Badge tone="gold">Up to 10% APY</Badge>} />
         <LockFundsCard />
       </section>
+
 
       {/* Active locked deposits */}
       <section className="mt-6 px-5">
