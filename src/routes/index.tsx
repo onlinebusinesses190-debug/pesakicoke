@@ -6,8 +6,10 @@ import {
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Card, Stat, SectionTitle, Badge } from "@/components/ui-bits";
-import { user, stats, opportunities, transactions, fmt } from "@/lib/mock";
+import { user, stats, opportunities, fmt } from "@/lib/mock";
 import { useAuth } from "@/hooks/useAuth";
+import { useBalance } from "@/lib/balance";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
