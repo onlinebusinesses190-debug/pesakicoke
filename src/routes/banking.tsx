@@ -364,11 +364,17 @@ function LockFundsCard() {
           </div>
 
           <button
-            onClick={() => { setConfirming(false); setDone(true); }}
+            onClick={() => {
+              const res = balanceStore.lock(`${months}-Month Lock`, amount, months, selected.apy);
+              if (!res.ok) { toast.error(res.error!); return; }
+              toast.success(`Locked ${fmt(amount)} for ${months} months`);
+              setConfirming(false); setDone(true);
+            }}
             className="mt-5 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground"
           >
             <span className="inline-flex items-center gap-2"><Lock className="h-4 w-4" /> Confirm Lock</span>
           </button>
+
           <button
             onClick={() => setConfirming(false)}
             className="mt-2 h-11 w-full rounded-xl border border-border text-sm font-semibold"
