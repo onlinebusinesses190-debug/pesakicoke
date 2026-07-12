@@ -65,7 +65,8 @@ function HomePage() {
             </button>
           </div>
           <p className="mt-1 font-display text-3xl font-bold tracking-tight">
-            {show ? fmt(user.balance) : "•••••••"}
+            {show ? fmt(state.available) : "•••••••"}
+
           </p>
           <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
             <div className="rounded-xl bg-white/10 p-2.5">
