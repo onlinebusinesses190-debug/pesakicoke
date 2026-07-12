@@ -159,7 +159,8 @@ function HomePage() {
         <SectionTitle title="Recent transactions" action={<Link to="/wallet" className="text-xs font-semibold text-primary">View wallet</Link>} />
         <Card className="!p-2">
           <ul className="divide-y divide-border">
-            {transactions.slice(0, 5).map((t) => {
+            {state.transactions.slice(0, 5).map((t) => {
+
               const positive = t.amount > 0;
               return (
                 <li key={t.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2 py-3">
