@@ -7,6 +7,9 @@ import {
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Stat, SectionTitle, Progress, Badge } from "@/components/ui-bits";
 import { savingsGoals, fmt } from "@/lib/mock";
+import { balanceStore, useBalance, totalLocked } from "@/lib/balance";
+import { toast } from "sonner";
+
 
 export const Route = createFileRoute("/banking")({
   head: () => ({
@@ -28,14 +31,17 @@ const actions: { key: ActionKey; label: string; icon: any; tone: string }[] = [
 ];
 
 const durations = [
-  { months: 3,  apy: 8,  label: "3 months",  hint: "Flexible" },
-  { months: 6,  apy: 10, label: "6 months",  hint: "Balanced" },
-  { months: 12, apy: 12, label: "12 months", hint: "Best rate", featured: true },
-  { months: 24, apy: 14, label: "24 months", hint: "Premium" },
+  { months: 3,  apy: 4,  label: "3 months",  hint: "Flexible" },
+  { months: 6,  apy: 6,  label: "6 months",  hint: "Balanced" },
+  { months: 12, apy: 8,  label: "12 months", hint: "Popular", featured: true },
+  { months: 24, apy: 10, label: "24 months", hint: "Best rate" },
 ];
 
 function BankingPage() {
   const [modal, setModal] = useState<ActionKey | null>(null);
+  const state = useBalance();
+  const locked = totalLocked(state);
+
 
   return (
     <AppShell>
@@ -46,7 +52,8 @@ function BankingPage() {
         <div className="relative overflow-hidden rounded-2xl gradient-primary p-5 text-primary-foreground">
           <PiggyBank className="absolute -right-3 -top-3 h-28 w-28 opacity-15" />
           <p className="text-xs uppercase tracking-widest opacity-80">Total Savings</p>
-          <p className="mt-1 font-display text-3xl font-bold">{fmt(430000)}</p>
+          <p className="mt-1 font-display text-3xl font-bold">{fmt(state.available + locked)}</p>
+
           <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
             <div className="rounded-xl bg-white/10 p-2.5">
               <p className="opacity-70">Interest Earned</p>
@@ -80,30 +87,31 @@ function BankingPage() {
 
       {/* KPIs */}
       <section className="mt-5 grid grid-cols-3 gap-3 px-5">
-        <Stat label="Locked" value={fmt(180000)} tone="primary" />
-        <Stat label="Available" value={fmt(250000)} tone="success" />
-        <Stat label="Avg. APY" value="10%" tone="gold" />
+        <Stat label="Locked" value={fmt(locked)} tone="primary" />
+        <Stat label="Available" value={fmt(state.available)} tone="success" />
+        <Stat label="Avg. APY" value="8%" tone="gold" />
       </section>
 
       {/* Lock funds — the star card */}
       <section className="mt-6 px-5">
-        <SectionTitle title="Lock funds & earn" action={<Badge tone="gold">Up to 14% APY</Badge>} />
+        <SectionTitle title="Lock funds & earn" action={<Badge tone="gold">Up to 10% APY</Badge>} />
         <LockFundsCard />
       </section>
+
 
       {/* Active locked deposits */}
       <section className="mt-6 px-5">
         <SectionTitle title="Active locked deposits" />
         <div className="space-y-2.5">
-          {[
-            { name: "12-Month Growth Lock", amount: 120000, apy: 12, days: 214, total: 365 },
-            { name: "6-Month Balanced Lock", amount: 60000, apy: 10, days: 45,  total: 180 },
-          ].map((d) => {
+          {state.locked.length === 0 && (
+            <Card className="!p-4 text-center text-xs text-muted-foreground">No locked deposits yet.</Card>
+          )}
+          {state.locked.map((d) => {
             const pct = Math.round((d.days / d.total) * 100);
             const daysLeft = d.total - d.days;
             const projected = Math.round(d.amount * (d.apy / 100) * (d.total / 365));
             return (
-              <Card key={d.name} className="!p-4">
+              <Card key={d.id} className="!p-4">
                 <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
                   <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary">
                     <Lock className="h-4 w-4" />
@@ -122,6 +130,7 @@ function BankingPage() {
             );
           })}
         </div>
+
       </section>
 
       {/* Financial Goals */}
@@ -170,7 +179,7 @@ function BankingPage() {
             <div className="min-w-0">
               <p className="text-sm font-semibold">You qualify for up to</p>
               <p className="text-lg font-bold text-primary">{fmt(150000)}</p>
-              <p className="text-[11px] text-muted-foreground">From 4% p.a. · Repay in 3–24 months</p>
+              <p className="text-[11px] text-muted-foreground">5% p.a. · Repay in 3–24 months</p>
             </div>
             <button onClick={() => setModal("loan")} className="rounded-full gradient-primary px-3 py-1.5 text-[11px] font-semibold text-primary-foreground">
               Get loan
@@ -355,11 +364,17 @@ function LockFundsCard() {
           </div>
 
           <button
-            onClick={() => { setConfirming(false); setDone(true); }}
+            onClick={() => {
+              const res = balanceStore.lock(`${months}-Month Lock`, amount, months, selected.apy);
+              if (!res.ok) { toast.error(res.error!); return; }
+              toast.success(`Locked ${fmt(amount)} for ${months} months`);
+              setConfirming(false); setDone(true);
+            }}
             className="mt-5 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground"
           >
             <span className="inline-flex items-center gap-2"><Lock className="h-4 w-4" /> Confirm Lock</span>
           </button>
+
           <button
             onClick={() => setConfirming(false)}
             className="mt-2 h-11 w-full rounded-xl border border-border text-sm font-semibold"

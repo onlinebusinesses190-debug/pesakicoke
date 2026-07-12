@@ -6,8 +6,10 @@ import {
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Card, Stat, SectionTitle, Badge } from "@/components/ui-bits";
-import { user, stats, opportunities, transactions, fmt } from "@/lib/mock";
+import { user, stats, opportunities, fmt } from "@/lib/mock";
 import { useAuth } from "@/hooks/useAuth";
+import { useBalance } from "@/lib/balance";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -22,7 +24,9 @@ export const Route = createFileRoute("/")({
 function HomePage() {
   const [show, setShow] = useState(true);
   const { user: authUser } = useAuth();
+  const state = useBalance();
   const displayName = authUser?.user_metadata?.full_name?.split(" ")[0] || authUser?.email?.split("@")[0] || user.name;
+
 
   return (
     <AppShell>
@@ -61,7 +65,8 @@ function HomePage() {
             </button>
           </div>
           <p className="mt-1 font-display text-3xl font-bold tracking-tight">
-            {show ? fmt(user.balance) : "•••••••"}
+            {show ? fmt(state.available) : "•••••••"}
+
           </p>
           <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
             <div className="rounded-xl bg-white/10 p-2.5">
@@ -154,7 +159,8 @@ function HomePage() {
         <SectionTitle title="Recent transactions" action={<Link to="/wallet" className="text-xs font-semibold text-primary">View wallet</Link>} />
         <Card className="!p-2">
           <ul className="divide-y divide-border">
-            {transactions.slice(0, 5).map((t) => {
+            {state.transactions.slice(0, 5).map((t) => {
+
               const positive = t.amount > 0;
               return (
                 <li key={t.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2 py-3">
