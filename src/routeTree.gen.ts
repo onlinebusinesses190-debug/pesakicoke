@@ -10,7 +10,6 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WalletRouteImport } from './routes/wallet'
-import { Route as TradingRouteImport } from './routes/trading'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as KaziRouteImport } from './routes/kazi'
 import { Route as BusinessRouteImport } from './routes/business'
@@ -18,6 +17,7 @@ import { Route as BankingRouteImport } from './routes/banking'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as TradingIndexRouteImport } from './routes/trading.index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as TradingUpDownRouteImport } from './routes/trading.up-down'
 import { Route as TradingSpinRouteImport } from './routes/trading.spin'
@@ -38,11 +38,6 @@ import { Route as AdminBankingRouteImport } from './routes/admin.banking'
 const WalletRoute = WalletRouteImport.update({
   id: '/wallet',
   path: '/wallet',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TradingRoute = TradingRouteImport.update({
-  id: '/trading',
-  path: '/trading',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProfileRoute = ProfileRouteImport.update({
@@ -80,35 +75,40 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TradingIndexRoute = TradingIndexRouteImport.update({
+  id: '/trading/',
+  path: '/trading/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AdminRoute,
 } as any)
 const TradingUpDownRoute = TradingUpDownRouteImport.update({
-  id: '/up-down',
-  path: '/up-down',
-  getParentRoute: () => TradingRoute,
+  id: '/trading/up-down',
+  path: '/trading/up-down',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const TradingSpinRoute = TradingSpinRouteImport.update({
-  id: '/spin',
-  path: '/spin',
-  getParentRoute: () => TradingRoute,
+  id: '/trading/spin',
+  path: '/trading/spin',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const TradingInvestRoute = TradingInvestRouteImport.update({
-  id: '/invest',
-  path: '/invest',
-  getParentRoute: () => TradingRoute,
+  id: '/trading/invest',
+  path: '/trading/invest',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const TradingFxRoute = TradingFxRouteImport.update({
-  id: '/fx',
-  path: '/fx',
-  getParentRoute: () => TradingRoute,
+  id: '/trading/fx',
+  path: '/trading/fx',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const TradingAviatorRoute = TradingAviatorRouteImport.update({
-  id: '/aviator',
-  path: '/aviator',
-  getParentRoute: () => TradingRoute,
+  id: '/trading/aviator',
+  path: '/trading/aviator',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
   id: '/users',
@@ -169,7 +169,6 @@ export interface FileRoutesByFullPath {
   '/business': typeof BusinessRoute
   '/kazi': typeof KaziRoute
   '/profile': typeof ProfileRoute
-  '/trading': typeof TradingRouteWithChildren
   '/wallet': typeof WalletRoute
   '/admin/banking': typeof AdminBankingRoute
   '/admin/business': typeof AdminBusinessRoute
@@ -187,6 +186,7 @@ export interface FileRoutesByFullPath {
   '/trading/spin': typeof TradingSpinRoute
   '/trading/up-down': typeof TradingUpDownRoute
   '/admin/': typeof AdminIndexRoute
+  '/trading/': typeof TradingIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -195,7 +195,6 @@ export interface FileRoutesByTo {
   '/business': typeof BusinessRoute
   '/kazi': typeof KaziRoute
   '/profile': typeof ProfileRoute
-  '/trading': typeof TradingRouteWithChildren
   '/wallet': typeof WalletRoute
   '/admin/banking': typeof AdminBankingRoute
   '/admin/business': typeof AdminBusinessRoute
@@ -213,6 +212,7 @@ export interface FileRoutesByTo {
   '/trading/spin': typeof TradingSpinRoute
   '/trading/up-down': typeof TradingUpDownRoute
   '/admin': typeof AdminIndexRoute
+  '/trading': typeof TradingIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -223,7 +223,6 @@ export interface FileRoutesById {
   '/business': typeof BusinessRoute
   '/kazi': typeof KaziRoute
   '/profile': typeof ProfileRoute
-  '/trading': typeof TradingRouteWithChildren
   '/wallet': typeof WalletRoute
   '/admin/banking': typeof AdminBankingRoute
   '/admin/business': typeof AdminBusinessRoute
@@ -241,6 +240,7 @@ export interface FileRoutesById {
   '/trading/spin': typeof TradingSpinRoute
   '/trading/up-down': typeof TradingUpDownRoute
   '/admin/': typeof AdminIndexRoute
+  '/trading/': typeof TradingIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -252,7 +252,6 @@ export interface FileRouteTypes {
     | '/business'
     | '/kazi'
     | '/profile'
-    | '/trading'
     | '/wallet'
     | '/admin/banking'
     | '/admin/business'
@@ -270,6 +269,7 @@ export interface FileRouteTypes {
     | '/trading/spin'
     | '/trading/up-down'
     | '/admin/'
+    | '/trading/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -278,7 +278,6 @@ export interface FileRouteTypes {
     | '/business'
     | '/kazi'
     | '/profile'
-    | '/trading'
     | '/wallet'
     | '/admin/banking'
     | '/admin/business'
@@ -296,6 +295,7 @@ export interface FileRouteTypes {
     | '/trading/spin'
     | '/trading/up-down'
     | '/admin'
+    | '/trading'
   id:
     | '__root__'
     | '/'
@@ -305,7 +305,6 @@ export interface FileRouteTypes {
     | '/business'
     | '/kazi'
     | '/profile'
-    | '/trading'
     | '/wallet'
     | '/admin/banking'
     | '/admin/business'
@@ -323,6 +322,7 @@ export interface FileRouteTypes {
     | '/trading/spin'
     | '/trading/up-down'
     | '/admin/'
+    | '/trading/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -333,8 +333,13 @@ export interface RootRouteChildren {
   BusinessRoute: typeof BusinessRoute
   KaziRoute: typeof KaziRoute
   ProfileRoute: typeof ProfileRoute
-  TradingRoute: typeof TradingRouteWithChildren
   WalletRoute: typeof WalletRoute
+  TradingAviatorRoute: typeof TradingAviatorRoute
+  TradingFxRoute: typeof TradingFxRoute
+  TradingInvestRoute: typeof TradingInvestRoute
+  TradingSpinRoute: typeof TradingSpinRoute
+  TradingUpDownRoute: typeof TradingUpDownRoute
+  TradingIndexRoute: typeof TradingIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -344,13 +349,6 @@ declare module '@tanstack/react-router' {
       path: '/wallet'
       fullPath: '/wallet'
       preLoaderRoute: typeof WalletRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/trading': {
-      id: '/trading'
-      path: '/trading'
-      fullPath: '/trading'
-      preLoaderRoute: typeof TradingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/profile': {
@@ -402,6 +400,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/trading/': {
+      id: '/trading/'
+      path: '/trading'
+      fullPath: '/trading/'
+      preLoaderRoute: typeof TradingIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/': {
       id: '/admin/'
       path: '/'
@@ -411,38 +416,38 @@ declare module '@tanstack/react-router' {
     }
     '/trading/up-down': {
       id: '/trading/up-down'
-      path: '/up-down'
+      path: '/trading/up-down'
       fullPath: '/trading/up-down'
       preLoaderRoute: typeof TradingUpDownRouteImport
-      parentRoute: typeof TradingRoute
+      parentRoute: typeof rootRouteImport
     }
     '/trading/spin': {
       id: '/trading/spin'
-      path: '/spin'
+      path: '/trading/spin'
       fullPath: '/trading/spin'
       preLoaderRoute: typeof TradingSpinRouteImport
-      parentRoute: typeof TradingRoute
+      parentRoute: typeof rootRouteImport
     }
     '/trading/invest': {
       id: '/trading/invest'
-      path: '/invest'
+      path: '/trading/invest'
       fullPath: '/trading/invest'
       preLoaderRoute: typeof TradingInvestRouteImport
-      parentRoute: typeof TradingRoute
+      parentRoute: typeof rootRouteImport
     }
     '/trading/fx': {
       id: '/trading/fx'
-      path: '/fx'
+      path: '/trading/fx'
       fullPath: '/trading/fx'
       preLoaderRoute: typeof TradingFxRouteImport
-      parentRoute: typeof TradingRoute
+      parentRoute: typeof rootRouteImport
     }
     '/trading/aviator': {
       id: '/trading/aviator'
-      path: '/aviator'
+      path: '/trading/aviator'
       fullPath: '/trading/aviator'
       preLoaderRoute: typeof TradingAviatorRouteImport
-      parentRoute: typeof TradingRoute
+      parentRoute: typeof rootRouteImport
     }
     '/admin/users': {
       id: '/admin/users'
@@ -547,25 +552,6 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
-interface TradingRouteChildren {
-  TradingAviatorRoute: typeof TradingAviatorRoute
-  TradingFxRoute: typeof TradingFxRoute
-  TradingInvestRoute: typeof TradingInvestRoute
-  TradingSpinRoute: typeof TradingSpinRoute
-  TradingUpDownRoute: typeof TradingUpDownRoute
-}
-
-const TradingRouteChildren: TradingRouteChildren = {
-  TradingAviatorRoute: TradingAviatorRoute,
-  TradingFxRoute: TradingFxRoute,
-  TradingInvestRoute: TradingInvestRoute,
-  TradingSpinRoute: TradingSpinRoute,
-  TradingUpDownRoute: TradingUpDownRoute,
-}
-
-const TradingRouteWithChildren =
-  TradingRoute._addFileChildren(TradingRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
@@ -574,8 +560,13 @@ const rootRouteChildren: RootRouteChildren = {
   BusinessRoute: BusinessRoute,
   KaziRoute: KaziRoute,
   ProfileRoute: ProfileRoute,
-  TradingRoute: TradingRouteWithChildren,
   WalletRoute: WalletRoute,
+  TradingAviatorRoute: TradingAviatorRoute,
+  TradingFxRoute: TradingFxRoute,
+  TradingInvestRoute: TradingInvestRoute,
+  TradingSpinRoute: TradingSpinRoute,
+  TradingUpDownRoute: TradingUpDownRoute,
+  TradingIndexRoute: TradingIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

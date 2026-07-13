@@ -5,7 +5,7 @@ import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Badge } from "@/components/ui-bits";
 import { tradingProducts } from "@/lib/mock";
 
-export const Route = createFileRoute("/trading")({
+export const Route = createFileRoute("/trading/")({
   head: () => ({
     meta: [
       { title: "Trading — PESAKI" },
