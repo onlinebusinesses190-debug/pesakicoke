@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight, LineChart,
   Bell, Eye, EyeOff, TrendingUp, ChevronRight, Sparkles, LogIn,
+  Briefcase, Building2, Landmark,
 } from "lucide-react";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
