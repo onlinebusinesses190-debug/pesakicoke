@@ -19,6 +19,14 @@ const icons: Record<string, React.ComponentType<{ className?: string }>> = {
   binary: BarChart3, updown: TrendingUp, avi: Plane, invest: Zap, spin: RefreshCw,
 };
 
+const routeFor: Record<string, "/trading/fx" | "/trading/up-down" | "/trading/aviator" | "/trading/invest" | "/trading/spin"> = {
+  binary: "/trading/fx",
+  updown: "/trading/up-down",
+  avi:    "/trading/aviator",
+  invest: "/trading/invest",
+  spin:   "/trading/spin",
+};
+
 function TradingPage() {
   const [showForexGate, setShowForexGate] = useState(false);
 
@@ -79,12 +87,12 @@ function TradingPage() {
                   </div>
                   <p className="mt-0.5 text-xs text-muted-foreground">{p.desc}</p>
                   <div className="mt-3 flex gap-2">
-                    <button className="inline-flex flex-1 items-center justify-center gap-1 rounded-full border border-border bg-background px-3 py-2 text-xs font-semibold">
+                    <Link to={routeFor[p.key]} className="inline-flex flex-1 items-center justify-center gap-1 rounded-full border border-border bg-background px-3 py-2 text-xs font-semibold">
                       <Play className="h-3 w-3" /> Demo
-                    </button>
-                    <button className="inline-flex flex-1 items-center justify-center gap-1 rounded-full gradient-primary px-3 py-2 text-xs font-semibold text-primary-foreground">
+                    </Link>
+                    <Link to={routeFor[p.key]} className="inline-flex flex-1 items-center justify-center gap-1 rounded-full gradient-primary px-3 py-2 text-xs font-semibold text-primary-foreground">
                       Real Mode
-                    </button>
+                    </Link>
                   </div>
                 </div>
               </div>
@@ -114,7 +122,7 @@ function TradingPage() {
             <p className="mt-2 text-center text-xs text-muted-foreground">Build up your skills on Binary FX first — it's the safest way to learn market direction.</p>
 
             <Link
-              to="/trading"
+              to="/trading/fx"
               onClick={() => setShowForexGate(false)}
               className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-xl gradient-primary text-sm font-semibold text-primary-foreground"
             >
