@@ -19,12 +19,13 @@ export const Route = createFileRoute("/business")({
   component: BusinessPage,
 });
 
-const sections = [
-  { label: "Apply for Funding",  icon: FileText,    tone: "primary", key: "apply" as const },
-  { label: "My Applications",    icon: Building2,   tone: "gold",    key: "" as const },
-  { label: "My Investments",     icon: TrendingUp,  tone: "success", key: "" as const },
-  { label: "Success Stories",    icon: Award,       tone: "gold",    key: "" as const },
-  { label: "Funding Guidelines", icon: BookOpen,    tone: "primary", key: "" as const },
+type ActionKey = "apply" | "apps" | "invest" | "stories" | "guide";
+const sections: { label: string; icon: any; tone: string; key: ActionKey }[] = [
+  { label: "Apply for Funding",  icon: FileText,    tone: "primary", key: "apply" },
+  { label: "My Applications",    icon: Building2,   tone: "gold",    key: "apps" },
+  { label: "My Investments",     icon: TrendingUp,  tone: "success", key: "invest" },
+  { label: "Success Stories",    icon: Award,       tone: "gold",    key: "stories" },
+  { label: "Funding Guidelines", icon: BookOpen,    tone: "primary", key: "guide" },
 ];
 
 function BusinessPage() {
