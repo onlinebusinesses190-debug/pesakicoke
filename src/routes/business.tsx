@@ -446,3 +446,62 @@ function ExistingForm({ onBack, onClose }: { onBack: () => void; onClose: () => 
     </SheetShell>
   );
 }
+
+function InfoSheet({ which, onClose }: { which: "invest" | "guide"; onClose: () => void }) {
+  const title = which === "invest" ? "My Investments" : "Funding Guidelines";
+  return (
+    <SheetShell title={title} onClose={onClose}>
+      {which === "invest" ? (
+        <div className="space-y-3 text-sm">
+          <p className="text-xs text-muted-foreground">Track businesses you've co-funded through PESAKI and your projected returns.</p>
+          <div className="rounded-2xl gradient-primary p-4 text-primary-foreground">
+            <p className="text-[11px] uppercase tracking-widest opacity-80">Total invested</p>
+            <p className="mt-1 text-2xl font-bold">KES 175,000</p>
+            <p className="mt-1 text-xs opacity-90">Avg. return · +14.2% p.a.</p>
+          </div>
+          <div className="space-y-2">
+            {[
+              { name: "Wanjiku's Bakery", amount: 75000, ret: "+18%" },
+              { name: "Tech4Kids Academy", amount: 100000, ret: "+12%" },
+            ].map((i) => (
+              <div key={i.name} className="flex items-center justify-between rounded-xl border border-border p-3">
+                <div>
+                  <p className="text-sm font-semibold">{i.name}</p>
+                  <p className="text-[11px] text-muted-foreground">{fmt(i.amount)} invested</p>
+                </div>
+                <span className="text-xs font-bold text-success">{i.ret}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3 text-xs text-muted-foreground">
+          <div className="rounded-xl bg-primary/5 p-3 text-foreground">
+            <p className="text-sm font-bold">Who qualifies?</p>
+            <ul className="mt-1 list-disc space-y-1 pl-4">
+              <li>Kenyan resident, 18+ with verified ID and phone</li>
+              <li>Startup: viable idea + attendance of one free training</li>
+              <li>Existing: 12+ months of trading and documented revenue</li>
+            </ul>
+          </div>
+          <div className="rounded-xl border border-border p-3">
+            <p className="text-sm font-bold text-foreground">Funding range</p>
+            <p className="mt-1">Startup: KES 20,000 – 250,000 · Existing: KES 50,000 – 2,000,000.</p>
+          </div>
+          <div className="rounded-xl border border-border p-3">
+            <p className="text-sm font-bold text-foreground">Repayment</p>
+            <p className="mt-1">A negotiated share of monthly profit until the funded amount is fully repaid — no compounding interest.</p>
+          </div>
+          <div className="rounded-xl border border-border p-3">
+            <p className="text-sm font-bold text-foreground">Timeline</p>
+            <p className="mt-1">Startup: 7–10 business days including training. Existing: 3–5 business days after documents are verified.</p>
+          </div>
+          <div className="rounded-xl border border-border p-3">
+            <p className="text-sm font-bold text-foreground">Required documents</p>
+            <p className="mt-1">National ID, KRA PIN, business registration (if any), 6 months of bank/M-Pesa statements, and a short business plan.</p>
+          </div>
+        </div>
+      )}
+    </SheetShell>
+  );
+}
