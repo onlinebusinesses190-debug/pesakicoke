@@ -115,7 +115,7 @@ function BusinessPage() {
         </div>
       </section>
 
-      <section className="mt-6 px-5 pb-2">
+      <section id="stories-section" className="mt-6 px-5 pb-2 scroll-mt-20">
         <SectionTitle title="Success stories" />
         <div className="space-y-2.5">
           {successStories.map((s) => (
