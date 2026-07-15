@@ -135,6 +135,7 @@ function BusinessPage() {
           onClose={() => setMode("none")}
         />
       )}
+      {info && <InfoSheet which={info} onClose={() => setInfo(null)} />}
     </AppShell>
   );
 }
