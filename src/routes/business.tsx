@@ -93,7 +93,7 @@ function BusinessPage() {
         </Card>
       </section>
 
-      <section className="mt-6 px-5">
+      <section id="apps-section" className="mt-6 px-5 scroll-mt-20">
         <SectionTitle title="My applications" />
         <div className="space-y-2.5">
           {businessApps.map((a) => (
