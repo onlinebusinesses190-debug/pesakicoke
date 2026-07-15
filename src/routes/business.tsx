@@ -30,6 +30,15 @@ const sections: { label: string; icon: any; tone: string; key: ActionKey }[] = [
 
 function BusinessPage() {
   const [mode, setMode] = useState<"none" | "picker" | "startup" | "existing">("none");
+  const [info, setInfo] = useState<null | "invest" | "guide">(null);
+
+  const onAction = (k: ActionKey) => {
+    if (k === "apply") return setMode("picker");
+    if (k === "apps") return document.getElementById("apps-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (k === "stories") return document.getElementById("stories-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (k === "invest") return setInfo("invest");
+    if (k === "guide") return setInfo("guide");
+  };
 
   return (
     <AppShell>
