@@ -74,7 +74,7 @@ function BusinessPage() {
             {sections.map((s) => (
               <li key={s.label}>
                 <button
-                  onClick={() => s.key === "apply" && setMode("picker")}
+                  onClick={() => onAction(s.key)}
                   className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-2 py-3 text-left"
                 >
                   <span className={`grid h-9 w-9 place-items-center rounded-xl ${
