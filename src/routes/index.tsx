@@ -10,6 +10,7 @@ import { Card, Stat, SectionTitle, Badge } from "@/components/ui-bits";
 import { user, stats, opportunities, fmt } from "@/lib/mock";
 import { useAuth } from "@/hooks/useAuth";
 import { useBalance } from "@/lib/balance";
+import { useKazi } from "@/lib/kazi-store";
 
 
 export const Route = createFileRoute("/")({
