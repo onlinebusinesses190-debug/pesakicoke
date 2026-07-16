@@ -121,6 +121,7 @@ function HomePage() {
           {stats.map((s) => (
             <Stat key={s.label} label={s.label} value={s.value} hint={s.trend} tone={s.tone} />
           ))}
+        </div>
       </section>
 
       {/* Reminders */}
