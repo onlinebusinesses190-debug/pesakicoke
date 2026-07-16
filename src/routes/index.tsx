@@ -48,12 +48,22 @@ function HomePage() {
                 {(displayName[0] ?? "P").toUpperCase()}
               </Link>
             ) : (
-              <Link
-                to="/auth"
-                className="inline-flex h-10 items-center gap-1.5 rounded-full bg-white/15 px-3 text-xs font-semibold backdrop-blur"
-              >
-                <LogIn className="h-3.5 w-3.5" /> Sign in
-              </Link>
+              <div className="flex items-center gap-1.5">
+                <Link
+                  to="/auth"
+                  search={{ mode: "signin" } as never}
+                  className="inline-flex h-9 items-center gap-1 rounded-full bg-white/15 px-3 text-[11px] font-semibold backdrop-blur"
+                >
+                  <LogIn className="h-3.5 w-3.5" /> Log in
+                </Link>
+                <Link
+                  to="/auth"
+                  search={{ mode: "signup" } as never}
+                  className="inline-flex h-9 items-center rounded-full bg-gold px-3 text-[11px] font-semibold text-gold-foreground"
+                >
+                  Sign up
+                </Link>
+              </div>
             )}
           </div>
         </div>
