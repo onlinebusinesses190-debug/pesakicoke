@@ -131,9 +131,7 @@ export const kaziStore = {
     if (!app) return { ok: false, error: "Applicant not found" };
     const job = state.jobs.find((j) => j.id === app.jobId);
     if (!job) return { ok: false, error: "Job not found" };
-    const res = balanceStore.withdraw(job.payAmount, "M-Pesa");
-    // Use deposit-esque decrement without fee: we prefer a direct debit -> use custom txn via balanceStore.transfer alternative
-    // Fallback: if withdraw fails due to fee, just check available manually.
+    const res = balanceStore.transfer(`Escrow · ${app.applicantName}`, job.payAmount);
     if (!res.ok) return { ok: false, error: res.error };
     const updatedApps = state.applications.map((a) =>
       a.id === applicationId ? { ...a, status: "Hired" as const, paidEscrow: true } : a
