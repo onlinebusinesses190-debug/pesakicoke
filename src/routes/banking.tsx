@@ -461,9 +461,9 @@ function ActionSheet({ action, onClose }: { action: ActionKey; onClose: () => vo
                   ))}
                 </div>
                 <div className="mt-3 rounded-lg bg-muted/60 p-3 text-xs">
-                  <div className="flex justify-between"><span className="text-muted-foreground">Interest rate</span><span className="font-bold">5% p.a.</span></div>
-                  <div className="mt-1 flex justify-between"><span className="text-muted-foreground">Monthly repayment</span><span className="font-bold">{fmt(Math.round((amount * (1 + 0.05 * (months / 12))) / months))}</span></div>
-                  <div className="mt-1 flex justify-between"><span className="text-muted-foreground">Total to repay</span><span className="font-bold text-primary">{fmt(Math.round(amount * (1 + 0.05 * (months / 12))))}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Interest rate</span><span className="font-bold">20% p.a.</span></div>
+                  <div className="mt-1 flex justify-between"><span className="text-muted-foreground">Monthly repayment</span><span className="font-bold">{fmt(Math.round((amount * (1 + 0.20 * (months / 12))) / months))}</span></div>
+                  <div className="mt-1 flex justify-between"><span className="text-muted-foreground">Total to repay</span><span className="font-bold text-primary">{fmt(Math.round(amount * (1 + 0.20 * (months / 12))))}</span></div>
                 </div>
               </>
             )}
