@@ -179,7 +179,7 @@ function BankingPage() {
             <div className="min-w-0">
               <p className="text-sm font-semibold">You qualify for up to</p>
               <p className="text-lg font-bold text-primary">{fmt(150000)}</p>
-              <p className="text-[11px] text-muted-foreground">5% p.a. · Repay in 3–24 months</p>
+              <p className="text-[11px] text-muted-foreground">20% p.a. · Repay in 3–24 months</p>
             </div>
             <button onClick={() => setModal("loan")} className="rounded-full gradient-primary px-3 py-1.5 text-[11px] font-semibold text-primary-foreground">
               Get loan
@@ -461,9 +461,9 @@ function ActionSheet({ action, onClose }: { action: ActionKey; onClose: () => vo
                   ))}
                 </div>
                 <div className="mt-3 rounded-lg bg-muted/60 p-3 text-xs">
-                  <div className="flex justify-between"><span className="text-muted-foreground">Interest rate</span><span className="font-bold">5% p.a.</span></div>
-                  <div className="mt-1 flex justify-between"><span className="text-muted-foreground">Monthly repayment</span><span className="font-bold">{fmt(Math.round((amount * (1 + 0.05 * (months / 12))) / months))}</span></div>
-                  <div className="mt-1 flex justify-between"><span className="text-muted-foreground">Total to repay</span><span className="font-bold text-primary">{fmt(Math.round(amount * (1 + 0.05 * (months / 12))))}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Interest rate</span><span className="font-bold">20% p.a.</span></div>
+                  <div className="mt-1 flex justify-between"><span className="text-muted-foreground">Monthly repayment</span><span className="font-bold">{fmt(Math.round((amount * (1 + 0.20 * (months / 12))) / months))}</span></div>
+                  <div className="mt-1 flex justify-between"><span className="text-muted-foreground">Total to repay</span><span className="font-bold text-primary">{fmt(Math.round(amount * (1 + 0.20 * (months / 12))))}</span></div>
                 </div>
               </>
             )}

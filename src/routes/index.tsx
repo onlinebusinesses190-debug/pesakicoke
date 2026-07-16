@@ -10,6 +10,7 @@ import { Card, Stat, SectionTitle, Badge } from "@/components/ui-bits";
 import { user, stats, opportunities, fmt } from "@/lib/mock";
 import { useAuth } from "@/hooks/useAuth";
 import { useBalance } from "@/lib/balance";
+import { useKazi } from "@/lib/kazi-store";
 
 
 export const Route = createFileRoute("/")({
@@ -48,12 +49,22 @@ function HomePage() {
                 {(displayName[0] ?? "P").toUpperCase()}
               </Link>
             ) : (
-              <Link
-                to="/auth"
-                className="inline-flex h-10 items-center gap-1.5 rounded-full bg-white/15 px-3 text-xs font-semibold backdrop-blur"
-              >
-                <LogIn className="h-3.5 w-3.5" /> Sign in
-              </Link>
+              <div className="flex items-center gap-1.5">
+                <Link
+                  to="/auth"
+                  search={{ mode: "signin" } as never}
+                  className="inline-flex h-9 items-center gap-1 rounded-full bg-white/15 px-3 text-[11px] font-semibold backdrop-blur"
+                >
+                  <LogIn className="h-3.5 w-3.5" /> Log in
+                </Link>
+                <Link
+                  to="/auth"
+                  search={{ mode: "signup" } as never}
+                  className="inline-flex h-9 items-center rounded-full bg-gold px-3 text-[11px] font-semibold text-gold-foreground"
+                >
+                  Sign up
+                </Link>
+              </div>
             )}
           </div>
         </div>
@@ -113,6 +124,11 @@ function HomePage() {
           ))}
         </div>
       </section>
+
+      {/* Reminders */}
+      <RemindersSection />
+
+
 
       {/* Explore hubs */}
       <section className="mt-6 px-5">
@@ -227,5 +243,49 @@ function HomePage() {
         PESAKI · Earn. Invest. Grow.
       </p>
     </AppShell>
+  );
+}
+
+function RemindersSection() {
+  const kazi = useKazi();
+  const bal = useBalance();
+  const items: { title: string; body: string; tone: "primary" | "gold" | "success" | "warning" }[] = [];
+
+  const pending = kazi.applications.filter((a) => a.status === "Pending").length;
+  const hired = kazi.applications.filter((a) => a.status === "Hired").length;
+  const unreadMsgs = kazi.messages.filter((m) => m.from === "employer").length; // heuristic for worker side
+  const unreadNotifs = kazi.notifications.filter((n) => !n.read).length;
+  const pendingWithdrawal = bal.transactions.find((t) => t.status === "Pending");
+
+  if (pending > 0) items.push({ title: `${pending} application${pending > 1 ? "s" : ""} pending`, body: "We'll notify you when an employer responds.", tone: "primary" });
+  if (hired > 0) items.push({ title: `${hired} job${hired > 1 ? "s" : ""} confirmed`, body: "Head to KAZI Link → My Panel to receive your payout.", tone: "success" });
+  if (unreadMsgs > 0) items.push({ title: `New messages`, body: "Employers have messaged you on KAZI Link.", tone: "gold" });
+  if (unreadNotifs > 0) items.push({ title: `${unreadNotifs} new notification${unreadNotifs > 1 ? "s" : ""}`, body: "Open KAZI Link to review.", tone: "warning" });
+  if (pendingWithdrawal) items.push({ title: "Pending wallet activity", body: `${pendingWithdrawal.type} · ${pendingWithdrawal.date}`, tone: "warning" });
+
+  if (items.length === 0) return null;
+
+  return (
+    <section className="mt-6 px-5">
+      <SectionTitle title="Reminders & alerts" action={<Link to="/kazi" className="text-xs font-semibold text-primary">Open</Link>} />
+      <div className="space-y-2">
+        {items.map((it, i) => (
+          <Card key={i} className="!p-3 flex items-start gap-3">
+            <span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg ${
+              it.tone === "success" ? "bg-success/15 text-success" :
+              it.tone === "gold" ? "bg-gold/15 text-gold-foreground" :
+              it.tone === "warning" ? "bg-warning/15 text-warning" :
+              "bg-primary/10 text-primary"
+            }`}>
+              <Bell className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">{it.title}</p>
+              <p className="text-[11px] text-muted-foreground">{it.body}</p>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </section>
   );
 }
