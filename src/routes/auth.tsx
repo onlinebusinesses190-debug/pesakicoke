@@ -1,9 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Landmark, ShieldCheck, Loader2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/auth")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -47,18 +45,6 @@ function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const navigate = useNavigate();
-
-  // --- Manual session check (no useAuth) ---
-  useEffect(() => {
-    const checkSession = async () => {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        navigate({ to: "/" });
-      }
-    };
-    checkSession();
-  }, [navigate]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
