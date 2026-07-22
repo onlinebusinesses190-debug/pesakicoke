@@ -5,7 +5,6 @@ import {
   Briefcase, Building2, Landmark,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { AppShell } from "@/components/AppShell";
 import { Card, Stat, SectionTitle, Badge } from "@/components/ui-bits";
 import { apiRequest } from "../utils/api";
 
@@ -26,13 +25,11 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   const [show, setShow] = useState(true);
-  const authUser = null; // Temporary: user is not used to avoid infinite loop
-
   const [balance, setBalance] = useState(0);
   const [totalEarnings, setTotalEarnings] = useState(0);
   const [referralEarnings, setReferralEarnings] = useState(0);
   const [transactions, setTransactions] = useState<any[]>([]);
-  const [stats, setStats] = useState([
+  const [stats] = useState([
     { label: "Total Trades", value: "0", trend: "–", tone: "default" as const },
     { label: "Winning Rate", value: "0%", trend: "–", tone: "default" as const },
     { label: "Referrals", value: "0", trend: "–", tone: "default" as const },
@@ -63,50 +60,29 @@ function HomePage() {
 
   if (loading) {
     return (
-      <AppShell>
-        <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">Loading dashboard...</p>
-        </div>
-      </AppShell>
+      <div className="min-h-screen flex items-center justify-center bg-muted/40">
+        <p className="text-muted-foreground">Loading dashboard...</p>
+      </div>
     );
   }
 
   return (
-    <AppShell>
+    <div className="min-h-screen bg-muted/40 pb-10">
       {/* Hero */}
       <section className="gradient-primary relative overflow-hidden px-5 pb-8 pt-6 text-primary-foreground">
         <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-gold/20 blur-3xl" />
         <div className="relative flex items-start justify-between">
           <div className="min-w-0">
-            <p className="text-xs/4 opacity-80">Welcome{authUser ? " back" : ""},</p>
-            <h1 className="truncate text-2xl font-bold">Guest 👋</h1>
+            <p className="text-xs/4 opacity-80">Welcome back,</p>
+            <h1 className="truncate text-2xl font-bold">User 👋</h1>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <button className="grid h-10 w-10 place-items-center rounded-full bg-white/10 backdrop-blur">
               <Bell className="h-5 w-5" />
             </button>
-            {authUser ? (
-              <Link to="/profile" className="grid h-10 w-10 place-items-center rounded-full bg-gold text-gold-foreground font-bold">
-                {(authUser?.user_metadata?.full_name?.[0] ?? "P").toUpperCase()}
-              </Link>
-            ) : (
-              <div className="flex items-center gap-1.5">
-                <Link
-                  to="/auth"
-                  search={{ mode: "signin" } as never}
-                  className="inline-flex h-9 items-center gap-1 rounded-full bg-white/15 px-3 text-[11px] font-semibold backdrop-blur"
-                >
-                  <LogIn className="h-3.5 w-3.5" /> Log in
-                </Link>
-                <Link
-                  to="/auth"
-                  search={{ mode: "signup" } as never}
-                  className="inline-flex h-9 items-center rounded-full bg-gold px-3 text-[11px] font-semibold text-gold-foreground"
-                >
-                  Sign up
-                </Link>
-              </div>
-            )}
+            <Link to="/auth" className="grid h-10 w-10 place-items-center rounded-full bg-gold text-gold-foreground font-bold">
+              P
+            </Link>
           </div>
         </div>
 
@@ -137,10 +113,10 @@ function HomePage() {
       <section className="-mt-5 px-5">
         <Card className="grid grid-cols-4 gap-2">
           {[
-            { label: "Deposit",  icon: ArrowDownToLine, to: "/wallet" },
+            { label: "Deposit", icon: ArrowDownToLine, to: "/wallet" },
             { label: "Withdraw", icon: ArrowUpFromLine, to: "/wallet" },
-            { label: "Transfer", icon: ArrowLeftRight,  to: "/wallet" },
-            { label: "Trading",  icon: LineChart,       to: "/trading" },
+            { label: "Transfer", icon: ArrowLeftRight, to: "/wallet" },
+            { label: "Trading", icon: LineChart, to: "/trading" },
           ].map((a) => (
             <Link
               key={a.label}
@@ -165,6 +141,7 @@ function HomePage() {
         </div>
       </section>
 
+      {/* Reminders */}
       <RemindersSection transactions={transactions} />
 
       {/* Explore hubs */}
@@ -284,11 +261,10 @@ function HomePage() {
       <p className="mt-8 px-5 text-center text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
         PESAKI · Earn. Invest. Grow.
       </p>
-    </AppShell>
+    </div>
   );
 }
 
-// Updated RemindersSection – no longer uses useKazi mock
 function RemindersSection({ transactions }: { transactions: any[] }) {
   const items: { title: string; body: string; tone: "primary" | "gold" | "success" | "warning" }[] = [];
 
