@@ -4,11 +4,9 @@ import {
   Bell, Eye, EyeOff, TrendingUp, ChevronRight, Sparkles, LogIn,
   Briefcase, Building2, Landmark,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, Stat, SectionTitle, Badge } from "@/components/ui-bits";
-import { apiRequest } from "../utils/api";
 
-// Helper: format currency
 const fmt = (amount: number) => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', minimumFractionDigits: 0 }).format(amount);
 };
@@ -25,46 +23,17 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   const [show, setShow] = useState(true);
-  const [balance, setBalance] = useState(0);
-  const [totalEarnings, setTotalEarnings] = useState(0);
-  const [referralEarnings, setReferralEarnings] = useState(0);
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [stats] = useState([
+  const balance = 0;
+  const totalEarnings = 0;
+  const referralEarnings = 0;
+  const transactions: any[] = [];
+  const stats = [
     { label: "Total Trades", value: "0", trend: "–", tone: "default" as const },
     { label: "Winning Rate", value: "0%", trend: "–", tone: "default" as const },
     { label: "Referrals", value: "0", trend: "–", tone: "default" as const },
     { label: "Bonus", value: "KES 0", trend: "–", tone: "default" as const },
-  ]);
-  const [opportunities, setOpportunities] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchDashboard = async () => {
-      try {
-        const balanceData = await apiRequest('/wallet/balance');
-        setBalance(balanceData.balance || 0);
-        setTotalEarnings(balanceData.totalEarnings || 0);
-        setReferralEarnings(balanceData.referralEarnings || 0);
-
-        const txData = await apiRequest('/wallet/transactions?limit=5');
-        setTransactions(txData || []);
-
-        setLoading(false);
-      } catch (error) {
-        console.error('Failed to load dashboard data:', error);
-        setLoading(false);
-      }
-    };
-    fetchDashboard();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/40">
-        <p className="text-muted-foreground">Loading dashboard...</p>
-      </div>
-    );
-  }
+  ];
+  const opportunities: any[] = [];
 
   return (
     <div className="min-h-screen bg-muted/40 pb-10">
@@ -74,14 +43,14 @@ function HomePage() {
         <div className="relative flex items-start justify-between">
           <div className="min-w-0">
             <p className="text-xs/4 opacity-80">Welcome back,</p>
-            <h1 className="truncate text-2xl font-bold">User 👋</h1>
+            <h1 className="truncate text-2xl font-bold">Test 👋</h1>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <button className="grid h-10 w-10 place-items-center rounded-full bg-white/10 backdrop-blur">
               <Bell className="h-5 w-5" />
             </button>
             <Link to="/auth" className="grid h-10 w-10 place-items-center rounded-full bg-gold text-gold-foreground font-bold">
-              P
+              T
             </Link>
           </div>
         </div>
@@ -141,7 +110,6 @@ function HomePage() {
         </div>
       </section>
 
-      {/* Reminders */}
       <RemindersSection transactions={transactions} />
 
       {/* Explore hubs */}
