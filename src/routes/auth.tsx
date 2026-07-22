@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { createClient } from "@/utils/supabase/client";
+import { createClient } from "@supabase/supabase-js";
 
 // Helper: format phone
 function formatPhoneNumber(raw: string): string {
@@ -31,12 +31,16 @@ function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // --- Create a FRESH Supabase client for auth only ---
+  const supabase = createClient(
+    import.meta.env.VITE_SUPABASE_URL,
+    import.meta.env.VITE_SUPABASE_ANON_KEY
+  );
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
-
-    const supabase = createClient();
 
     try {
       if (mode === "signup") {
@@ -52,7 +56,7 @@ function AuthPage() {
           ? await supabase.auth.signInWithPassword({ email, password })
           : await supabase.auth.signInWithPassword({ phone: formatPhoneNumber(phone), password });
         if (result.error) throw result.error;
-        // Simple redirect — no router hook
+        // Redirect to dashboard
         window.location.href = "/";
       }
     } catch (err: any) {
