@@ -7,7 +7,6 @@ import {
 import { useState, useEffect } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Card, Stat, SectionTitle, Badge } from "@/components/ui-bits";
-import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "../utils/api";
 
 // Helper: format currency
@@ -27,10 +26,8 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   const [show, setShow] = useState(true);
-  const { user: authUser } = useAuth();
-  const displayName = authUser?.user_metadata?.full_name?.split(" ")[0] || authUser?.email?.split("@")[0] || "Guest";
+  const authUser = null; // Temporary: user is not used to avoid infinite loop
 
-  // --- Real data state ---
   const [balance, setBalance] = useState(0);
   const [totalEarnings, setTotalEarnings] = useState(0);
   const [referralEarnings, setReferralEarnings] = useState(0);
@@ -47,23 +44,13 @@ function HomePage() {
   useEffect(() => {
     const fetchDashboard = async () => {
       try {
-        // Fetch wallet balance
         const balanceData = await apiRequest('/wallet/balance');
         setBalance(balanceData.balance || 0);
         setTotalEarnings(balanceData.totalEarnings || 0);
         setReferralEarnings(balanceData.referralEarnings || 0);
 
-        // Fetch recent transactions
         const txData = await apiRequest('/wallet/transactions?limit=5');
         setTransactions(txData || []);
-
-        // Fetch stats (if you have an endpoint)
-        // const statsData = await apiRequest('/user/stats');
-        // setStats(statsData);
-
-        // Fetch opportunities (if you have an endpoint)
-        // const opps = await apiRequest('/trading/opportunities');
-        // setOpportunities(opps || []);
 
         setLoading(false);
       } catch (error) {
@@ -74,17 +61,25 @@ function HomePage() {
     fetchDashboard();
   }, []);
 
-  // If you want to use real opportunities, uncomment above and replace with real endpoint.
+  if (loading) {
+    return (
+      <AppShell>
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">Loading dashboard...</p>
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell>
-      {/* Hero – same as before, but using real balance */}
+      {/* Hero */}
       <section className="gradient-primary relative overflow-hidden px-5 pb-8 pt-6 text-primary-foreground">
         <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-gold/20 blur-3xl" />
         <div className="relative flex items-start justify-between">
           <div className="min-w-0">
             <p className="text-xs/4 opacity-80">Welcome{authUser ? " back" : ""},</p>
-            <h1 className="truncate text-2xl font-bold">{displayName} 👋</h1>
+            <h1 className="truncate text-2xl font-bold">Guest 👋</h1>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <button className="grid h-10 w-10 place-items-center rounded-full bg-white/10 backdrop-blur">
@@ -92,7 +87,7 @@ function HomePage() {
             </button>
             {authUser ? (
               <Link to="/profile" className="grid h-10 w-10 place-items-center rounded-full bg-gold text-gold-foreground font-bold">
-                {(displayName[0] ?? "P").toUpperCase()}
+                {(authUser?.user_metadata?.full_name?.[0] ?? "P").toUpperCase()}
               </Link>
             ) : (
               <div className="flex items-center gap-1.5">
@@ -138,7 +133,7 @@ function HomePage() {
         </div>
       </section>
 
-      {/* Quick actions – unchanged */}
+      {/* Quick actions */}
       <section className="-mt-5 px-5">
         <Card className="grid grid-cols-4 gap-2">
           {[
@@ -161,7 +156,7 @@ function HomePage() {
         </Card>
       </section>
 
-      {/* Stats – use real data if fetched */}
+      {/* Stats */}
       <section className="mt-5 px-5">
         <div className="grid grid-cols-2 gap-3">
           {stats.map((s) => (
@@ -170,10 +165,9 @@ function HomePage() {
         </div>
       </section>
 
-      {/* Reminders – keep as is, but we'll remove the useKazi dependency */}
       <RemindersSection transactions={transactions} />
 
-      {/* Explore hubs – unchanged */}
+      {/* Explore hubs */}
       <section className="mt-6 px-5">
         <SectionTitle title="Explore hubs" />
         <div className="grid grid-cols-2 gap-3">
@@ -210,7 +204,7 @@ function HomePage() {
         </div>
       </section>
 
-      {/* Promo banner – unchanged */}
+      {/* Promo banner */}
       <section className="mt-6 px-5">
         <div className="relative overflow-hidden rounded-2xl gradient-gold p-5 text-gold-foreground">
           <Sparkles className="absolute -right-2 -top-2 h-24 w-24 opacity-20" />
@@ -230,7 +224,7 @@ function HomePage() {
         </div>
       </section>
 
-      {/* Opportunities – now using real data (if available) */}
+      {/* Opportunities */}
       <section className="mt-7 px-5">
         <SectionTitle title="Latest opportunities" action={<Link to="/kazi" className="text-xs font-semibold text-primary">See all</Link>} />
         <div className="space-y-2.5">
@@ -255,7 +249,7 @@ function HomePage() {
         </div>
       </section>
 
-      {/* Recent transactions – now using real data */}
+      {/* Recent transactions */}
       <section className="mt-7 px-5">
         <SectionTitle title="Recent transactions" action={<Link to="/wallet" className="text-xs font-semibold text-primary">View wallet</Link>} />
         <Card className="!p-2">
@@ -298,7 +292,6 @@ function HomePage() {
 function RemindersSection({ transactions }: { transactions: any[] }) {
   const items: { title: string; body: string; tone: "primary" | "gold" | "success" | "warning" }[] = [];
 
-  // Example: if there's a pending withdrawal in the transactions
   const pendingWithdrawal = transactions.find((t) => t.status === "Pending");
   if (pendingWithdrawal) {
     items.push({
@@ -307,8 +300,6 @@ function RemindersSection({ transactions }: { transactions: any[] }) {
       tone: "warning"
     });
   }
-
-  // You can add more logic here later (e.g., from real notifications API)
 
   if (items.length === 0) return null;
 
