@@ -4,14 +4,16 @@ import {
   Bell, Eye, EyeOff, TrendingUp, ChevronRight, Sparkles, LogIn,
   Briefcase, Building2, Landmark,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Card, Stat, SectionTitle, Badge } from "@/components/ui-bits";
-import { user, stats, opportunities, fmt } from "@/lib/mock";
 import { useAuth } from "@/hooks/useAuth";
-import { useBalance } from "@/lib/balance";
-import { useKazi } from "@/lib/kazi-store";
+import { apiRequest } from "../utils/api";
 
+// Helper: format currency
+const fmt = (amount: number) => {
+  return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', minimumFractionDigits: 0 }).format(amount);
+};
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -26,13 +28,57 @@ export const Route = createFileRoute("/")({
 function HomePage() {
   const [show, setShow] = useState(true);
   const { user: authUser } = useAuth();
-  const state = useBalance();
-  const displayName = authUser?.user_metadata?.full_name?.split(" ")[0] || authUser?.email?.split("@")[0] || user.name;
+  const displayName = authUser?.user_metadata?.full_name?.split(" ")[0] || authUser?.email?.split("@")[0] || "Guest";
 
+  // --- Real data state ---
+  const [balance, setBalance] = useState(0);
+  const [totalEarnings, setTotalEarnings] = useState(0);
+  const [referralEarnings, setReferralEarnings] = useState(0);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [stats, setStats] = useState([
+    { label: "Total Trades", value: "0", trend: "–", tone: "default" as const },
+    { label: "Winning Rate", value: "0%", trend: "–", tone: "default" as const },
+    { label: "Referrals", value: "0", trend: "–", tone: "default" as const },
+    { label: "Bonus", value: "KES 0", trend: "–", tone: "default" as const },
+  ]);
+  const [opportunities, setOpportunities] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        // Fetch wallet balance
+        const balanceData = await apiRequest('/wallet/balance');
+        setBalance(balanceData.balance || 0);
+        setTotalEarnings(balanceData.totalEarnings || 0);
+        setReferralEarnings(balanceData.referralEarnings || 0);
+
+        // Fetch recent transactions
+        const txData = await apiRequest('/wallet/transactions?limit=5');
+        setTransactions(txData || []);
+
+        // Fetch stats (if you have an endpoint)
+        // const statsData = await apiRequest('/user/stats');
+        // setStats(statsData);
+
+        // Fetch opportunities (if you have an endpoint)
+        // const opps = await apiRequest('/trading/opportunities');
+        // setOpportunities(opps || []);
+
+        setLoading(false);
+      } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+        setLoading(false);
+      }
+    };
+    fetchDashboard();
+  }, []);
+
+  // If you want to use real opportunities, uncomment above and replace with real endpoint.
 
   return (
     <AppShell>
-      {/* Hero */}
+      {/* Hero – same as before, but using real balance */}
       <section className="gradient-primary relative overflow-hidden px-5 pb-8 pt-6 text-primary-foreground">
         <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-gold/20 blur-3xl" />
         <div className="relative flex items-start justify-between">
@@ -77,23 +123,22 @@ function HomePage() {
             </button>
           </div>
           <p className="mt-1 font-display text-3xl font-bold tracking-tight">
-            {show ? fmt(state.available) : "•••••••"}
-
+            {show ? fmt(balance) : "•••••••"}
           </p>
           <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
             <div className="rounded-xl bg-white/10 p-2.5">
               <p className="opacity-70">Total Earnings</p>
-              <p className="mt-0.5 font-semibold">{show ? fmt(user.totalEarnings) : "•••"}</p>
+              <p className="mt-0.5 font-semibold">{show ? fmt(totalEarnings) : "•••"}</p>
             </div>
             <div className="rounded-xl bg-white/10 p-2.5">
               <p className="opacity-70">Referral Earnings</p>
-              <p className="mt-0.5 font-semibold">{show ? fmt(user.referralEarnings) : "•••"}</p>
+              <p className="mt-0.5 font-semibold">{show ? fmt(referralEarnings) : "•••"}</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Quick actions */}
+      {/* Quick actions – unchanged */}
       <section className="-mt-5 px-5">
         <Card className="grid grid-cols-4 gap-2">
           {[
@@ -116,7 +161,7 @@ function HomePage() {
         </Card>
       </section>
 
-      {/* Stats */}
+      {/* Stats – use real data if fetched */}
       <section className="mt-5 px-5">
         <div className="grid grid-cols-2 gap-3">
           {stats.map((s) => (
@@ -125,12 +170,10 @@ function HomePage() {
         </div>
       </section>
 
-      {/* Reminders */}
-      <RemindersSection />
+      {/* Reminders – keep as is, but we'll remove the useKazi dependency */}
+      <RemindersSection transactions={transactions} />
 
-
-
-      {/* Explore hubs */}
+      {/* Explore hubs – unchanged */}
       <section className="mt-6 px-5">
         <SectionTitle title="Explore hubs" />
         <div className="grid grid-cols-2 gap-3">
@@ -167,9 +210,7 @@ function HomePage() {
         </div>
       </section>
 
-
-
-      {/* Promo banner */}
+      {/* Promo banner – unchanged */}
       <section className="mt-6 px-5">
         <div className="relative overflow-hidden rounded-2xl gradient-gold p-5 text-gold-foreground">
           <Sparkles className="absolute -right-2 -top-2 h-24 w-24 opacity-20" />
@@ -189,52 +230,59 @@ function HomePage() {
         </div>
       </section>
 
-      {/* Opportunities */}
+      {/* Opportunities – now using real data (if available) */}
       <section className="mt-7 px-5">
         <SectionTitle title="Latest opportunities" action={<Link to="/kazi" className="text-xs font-semibold text-primary">See all</Link>} />
         <div className="space-y-2.5">
-          {opportunities.map((o) => (
-            <Card key={o.title} className="!p-3.5">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{o.category}</p>
-                  <p className="mt-0.5 truncate text-sm font-semibold">{o.title}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{o.pay}</p>
+          {opportunities.length > 0 ? (
+            opportunities.map((o) => (
+              <Card key={o.title} className="!p-3.5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{o.category}</p>
+                    <p className="mt-0.5 truncate text-sm font-semibold">{o.title}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{o.pay}</p>
+                  </div>
+                  <Badge tone={o.tag === "Urgent" ? "destructive" : o.tag === "Hot" ? "warning" : "gold"}>
+                    {o.tag}
+                  </Badge>
                 </div>
-                <Badge tone={o.tag === "Urgent" ? "destructive" : o.tag === "Hot" ? "warning" : "gold"}>
-                  {o.tag}
-                </Badge>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            ))
+          ) : (
+            <p className="text-sm text-muted-foreground">No opportunities available right now.</p>
+          )}
         </div>
       </section>
 
-      {/* Recent transactions */}
+      {/* Recent transactions – now using real data */}
       <section className="mt-7 px-5">
         <SectionTitle title="Recent transactions" action={<Link to="/wallet" className="text-xs font-semibold text-primary">View wallet</Link>} />
         <Card className="!p-2">
           <ul className="divide-y divide-border">
-            {state.transactions.slice(0, 5).map((t) => {
-
-              const positive = t.amount > 0;
-              return (
-                <li key={t.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2 py-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ${positive ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>
-                      <TrendingUp className={`h-4 w-4 ${positive ? "" : "rotate-180"}`} />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold">{t.type}</p>
-                      <p className="truncate text-[11px] text-muted-foreground">{t.date} · {t.status}</p>
+            {transactions.length > 0 ? (
+              transactions.slice(0, 5).map((t) => {
+                const positive = t.amount > 0;
+                return (
+                  <li key={t.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2 py-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ${positive ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>
+                        <TrendingUp className={`h-4 w-4 ${positive ? "" : "rotate-180"}`} />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">{t.type || t.description || "Transaction"}</p>
+                        <p className="truncate text-[11px] text-muted-foreground">{t.date || "Today"} · {t.status || "Completed"}</p>
+                      </div>
                     </div>
-                  </div>
-                  <p className={`text-sm font-bold ${positive ? "text-success" : "text-foreground"}`}>
-                    {positive ? "+" : ""}{fmt(t.amount).replace("KES ", "")}
-                  </p>
-                </li>
-              );
-            })}
+                    <p className={`text-sm font-bold ${positive ? "text-success" : "text-foreground"}`}>
+                      {positive ? "+" : ""}{fmt(t.amount)}
+                    </p>
+                  </li>
+                );
+              })
+            ) : (
+              <li className="py-4 text-center text-sm text-muted-foreground">No recent transactions.</li>
+            )}
           </ul>
         </Card>
       </section>
@@ -246,22 +294,21 @@ function HomePage() {
   );
 }
 
-function RemindersSection() {
-  const kazi = useKazi();
-  const bal = useBalance();
+// Updated RemindersSection – no longer uses useKazi mock
+function RemindersSection({ transactions }: { transactions: any[] }) {
   const items: { title: string; body: string; tone: "primary" | "gold" | "success" | "warning" }[] = [];
 
-  const pending = kazi.applications.filter((a) => a.status === "Pending").length;
-  const hired = kazi.applications.filter((a) => a.status === "Hired").length;
-  const unreadMsgs = kazi.messages.filter((m) => m.from === "employer").length; // heuristic for worker side
-  const unreadNotifs = kazi.notifications.filter((n) => !n.read).length;
-  const pendingWithdrawal = bal.transactions.find((t) => t.status === "Pending");
+  // Example: if there's a pending withdrawal in the transactions
+  const pendingWithdrawal = transactions.find((t) => t.status === "Pending");
+  if (pendingWithdrawal) {
+    items.push({
+      title: "Pending wallet activity",
+      body: `${pendingWithdrawal.type || "Transaction"} · ${pendingWithdrawal.date || "Today"}`,
+      tone: "warning"
+    });
+  }
 
-  if (pending > 0) items.push({ title: `${pending} application${pending > 1 ? "s" : ""} pending`, body: "We'll notify you when an employer responds.", tone: "primary" });
-  if (hired > 0) items.push({ title: `${hired} job${hired > 1 ? "s" : ""} confirmed`, body: "Head to KAZI Link → My Panel to receive your payout.", tone: "success" });
-  if (unreadMsgs > 0) items.push({ title: `New messages`, body: "Employers have messaged you on KAZI Link.", tone: "gold" });
-  if (unreadNotifs > 0) items.push({ title: `${unreadNotifs} new notification${unreadNotifs > 1 ? "s" : ""}`, body: "Open KAZI Link to review.", tone: "warning" });
-  if (pendingWithdrawal) items.push({ title: "Pending wallet activity", body: `${pendingWithdrawal.type} · ${pendingWithdrawal.date}`, tone: "warning" });
+  // You can add more logic here later (e.g., from real notifications API)
 
   if (items.length === 0) return null;
 
