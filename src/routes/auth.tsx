@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Landmark, ShieldCheck, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/auth")({
@@ -11,17 +11,45 @@ export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
       { title: "Sign in — PESAKI" },
-      { name: "description", content: "Sign in or create your PESAKI account to earn, save, invest and grow." },
+      { description: "Sign in or create your PESAKI account to earn, save, invest and grow." },
     ],
   }),
   component: AuthPage,
 });
 
+// Helper: Convert local phone format (07...) to international (+2547...)
+function formatPhoneNumber(raw: string): string {
+  // Remove all non-numeric characters
+  let cleaned = raw.replace(/\D/g, '');
+  
+  // If it starts with 0 and is 10 digits (e.g., 0712345678), convert to +254...
+  if (cleaned.startsWith('0') && cleaned.length === 10) {
+    cleaned = '254' + cleaned.slice(1);
+    return '+' + cleaned;
+  }
+  
+  // If it starts with 7 and is 9 digits (e.g., 712345678), prepend +254
+  if (cleaned.startsWith('7') && cleaned.length === 9) {
+    cleaned = '254' + cleaned;
+    return '+' + cleaned;
+  }
+  
+  // If it already has +254 or is a different format, return it as-is
+  if (raw.startsWith('+')) {
+    return raw;
+  }
+  
+  // If we couldn't format it, return the raw input (Supabase will validate)
+  return raw;
+}
+
 function AuthPage() {
   const initialMode = Route.useSearch().mode;
   const [mode, setMode] = useState<"signin" | "signup">(initialMode);
+  const [loginMethod, setLoginMethod] = useState<"email" | "phone">("email");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,21 +66,46 @@ function AuthPage() {
     setError(null);
     setInfo(null);
     setLoading(true);
+
+    const supabase = createClient();
+
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: window.location.origin,
-            data: { full_name: name },
-          },
-        });
+        const options = {
+          emailRedirectTo: window.location.origin,
+          data: { full_name: name },
+        };
+        let result;
+        if (loginMethod === "email") {
+          result = await supabase.auth.signUp({
+            email,
+            password,
+            options,
+          });
+        } else {
+          // Auto-format phone before sending to Supabase
+          const formattedPhone = formatPhoneNumber(phone);
+          result = await supabase.auth.signUp({
+            phone: formattedPhone,
+            password,
+            options,
+          });
+        }
+        const { error } = result;
         if (error) throw error;
-        setInfo("Account created. Check your email to confirm, then sign in.");
+        setInfo("Account created. Check your email/phone to confirm, then sign in.");
         setMode("signin");
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        // Sign in
+        let result;
+        if (loginMethod === "email") {
+          result = await supabase.auth.signInWithPassword({ email, password });
+        } else {
+          // Auto-format phone before sending to Supabase
+          const formattedPhone = formatPhoneNumber(phone);
+          result = await supabase.auth.signInWithPassword({ phone: formattedPhone, password });
+        }
+        const { error } = result;
         if (error) throw error;
         navigate({ to: "/" });
       }
@@ -101,17 +154,55 @@ function AuthPage() {
                 />
               </Field>
             )}
-            <Field label="Email">
-              <input
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="input"
-                placeholder="you@pesaki.africa"
-              />
-            </Field>
+
+            {/* Login method selector */}
+            <div className="flex gap-2 text-xs">
+              <label className="flex items-center gap-1">
+                <input
+                  type="radio"
+                  value="email"
+                  checked={loginMethod === "email"}
+                  onChange={() => setLoginMethod("email")}
+                />
+                Email
+              </label>
+              <label className="flex items-center gap-1">
+                <input
+                  type="radio"
+                  value="phone"
+                  checked={loginMethod === "phone"}
+                  onChange={() => setLoginMethod("phone")}
+                />
+                Phone
+              </label>
+            </div>
+
+            {loginMethod === "email" ? (
+              <Field label="Email address">
+                <input
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="input"
+                  placeholder="you@pesaki.africa"
+                />
+              </Field>
+            ) : (
+              <Field label="Phone number">
+                <input
+                  type="tel"
+                  autoComplete="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  required
+                  className="input"
+                  placeholder="0712 345 678" // ← Updated to local format
+                />
+              </Field>
+            )}
+
             <Field label="Password">
               <input
                 type="password"
