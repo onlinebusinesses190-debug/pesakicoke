@@ -1,8 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { Landmark, ShieldCheck, Loader2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/auth")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -19,27 +20,18 @@ export const Route = createFileRoute("/auth")({
 
 // Helper: Convert local phone format (07...) to international (+2547...)
 function formatPhoneNumber(raw: string): string {
-  // Remove all non-numeric characters
   let cleaned = raw.replace(/\D/g, '');
-  
-  // If it starts with 0 and is 10 digits (e.g., 0712345678), convert to +254...
   if (cleaned.startsWith('0') && cleaned.length === 10) {
     cleaned = '254' + cleaned.slice(1);
     return '+' + cleaned;
   }
-  
-  // If it starts with 7 and is 9 digits (e.g., 712345678), prepend +254
   if (cleaned.startsWith('7') && cleaned.length === 9) {
     cleaned = '254' + cleaned;
     return '+' + cleaned;
   }
-  
-  // If it already has +254 or is a different format, return it as-is
   if (raw.startsWith('+')) {
     return raw;
   }
-  
-  // If we couldn't format it, return the raw input (Supabase will validate)
   return raw;
 }
 
@@ -54,12 +46,19 @@ function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
-  const { user, ready } = useAuth();
   const navigate = useNavigate();
 
+  // --- Manual session check (no useAuth) ---
   useEffect(() => {
-    if (ready && user) navigate({ to: "/" });
-  }, [ready, user, navigate]);
+    const checkSession = async () => {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        navigate({ to: "/" });
+      }
+    };
+    checkSession();
+  }, [navigate]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -83,7 +82,6 @@ function AuthPage() {
             options,
           });
         } else {
-          // Auto-format phone before sending to Supabase
           const formattedPhone = formatPhoneNumber(phone);
           result = await supabase.auth.signUp({
             phone: formattedPhone,
@@ -101,7 +99,6 @@ function AuthPage() {
         if (loginMethod === "email") {
           result = await supabase.auth.signInWithPassword({ email, password });
         } else {
-          // Auto-format phone before sending to Supabase
           const formattedPhone = formatPhoneNumber(phone);
           result = await supabase.auth.signInWithPassword({ phone: formattedPhone, password });
         }
@@ -155,7 +152,6 @@ function AuthPage() {
               </Field>
             )}
 
-            {/* Login method selector */}
             <div className="flex gap-2 text-xs">
               <label className="flex items-center gap-1">
                 <input
@@ -198,7 +194,7 @@ function AuthPage() {
                   onChange={(e) => setPhone(e.target.value)}
                   required
                   className="input"
-                  placeholder="0712 345 678" // ← Updated to local format
+                  placeholder="0712 345 678"
                 />
               </Field>
             )}
