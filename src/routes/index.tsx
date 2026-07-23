@@ -4,7 +4,7 @@ import {
   Bell, Eye, EyeOff, TrendingUp, ChevronRight, Sparkles, LogIn,
   Briefcase, Building2, Landmark,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Card, Stat, SectionTitle, Badge } from "@/components/ui-bits";
 import { apiRequest } from "../utils/api";
@@ -34,7 +34,6 @@ function HomePage() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Stats (matching your original design)
   const [stats, setStats] = useState([
     { label: "Active Trades", value: "0", hint: "+0", tone: "primary" as const },
     { label: "Jobs Completed", value: "0", hint: "+0", tone: "success" as const },
@@ -44,34 +43,43 @@ function HomePage() {
 
   const [opportunities, setOpportunities] = useState<any[]>([]);
 
-  // --- Fetch user and data once on mount ---
+  // ✅ Mount guard to prevent state updates after unmount
+  const isMounted = useRef(true);
+  useEffect(() => {
+    return () => { isMounted.current = false; };
+  }, []);
+
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        // 1. Get user from session (direct, no listener, safe)
+        // 1. Get user from session (direct, no listener)
         const supabase = createClient(
           import.meta.env.VITE_SUPABASE_URL,
           import.meta.env.VITE_SUPABASE_ANON_KEY
         );
         const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
+        if (isMounted.current && session?.user) {
           const fullName = session.user.user_metadata?.full_name || session.user.email || session.user.phone;
           setUserName(fullName?.split(" ")[0] || "User");
         }
 
         // 2. Fetch real data
         const balanceData = await apiRequest('/wallet/balance');
-        setBalance(balanceData.balance || 0);
-        setTotalEarnings(balanceData.totalEarnings || 0);
-        setReferralEarnings(balanceData.referralEarnings || 0);
+        if (isMounted.current) {
+          setBalance(balanceData.balance || 0);
+          setTotalEarnings(balanceData.totalEarnings || 0);
+          setReferralEarnings(balanceData.referralEarnings || 0);
+        }
 
         const txData = await apiRequest('/wallet/transactions?limit=5');
-        setTransactions(txData || []);
+        if (isMounted.current) {
+          setTransactions(txData || []);
+        }
 
-        // 3. Fetch stats (if your backend has these endpoints)
+        // 3. Fetch stats (optional)
         try {
           const statsData = await apiRequest('/user/stats');
-          if (statsData) {
+          if (isMounted.current && statsData) {
             setStats([
               { label: "Active Trades", value: statsData.activeTrades || "0", hint: `+${statsData.tradesChange || 0}`, tone: "primary" as const },
               { label: "Jobs Completed", value: statsData.jobsCompleted || "0", hint: `+${statsData.jobsChange || 0}`, tone: "success" as const },
@@ -80,21 +88,27 @@ function HomePage() {
             ]);
           }
         } catch (e) {
-          console.log('Stats endpoint not available yet');
+          console.log('Stats endpoint not available');
         }
 
         // 4. Fetch opportunities
         try {
           const opps = await apiRequest('/trading/opportunities');
-          setOpportunities(opps || []);
+          if (isMounted.current) {
+            setOpportunities(opps || []);
+          }
         } catch (e) {
-          console.log('Opportunities endpoint not available yet');
+          console.log('Opportunities endpoint not available');
         }
 
-        setLoading(false);
+        if (isMounted.current) {
+          setLoading(false);
+        }
       } catch (error) {
         console.error('Failed to load dashboard data:', error);
-        setLoading(false);
+        if (isMounted.current) {
+          setLoading(false);
+        }
       }
     };
     fetchAll();
@@ -179,7 +193,7 @@ function HomePage() {
         </Card>
       </section>
 
-      {/* Stats – matches your original design */}
+      {/* Stats */}
       <section className="mt-5 px-5">
         <div className="grid grid-cols-2 gap-3">
           {stats.map((s) => (
@@ -195,6 +209,7 @@ function HomePage() {
       <section className="mt-6 px-5">
         <SectionTitle title="Explore hubs" />
         <div className="grid grid-cols-2 gap-3">
+          {/* (rest of the Explore hubs – unchanged) */}
           <Link to="/trading" className="group relative overflow-hidden rounded-2xl gradient-primary p-4 text-primary-foreground shadow-[var(--shadow-card)]">
             <LineChart className="mb-6 h-5 w-5 opacity-90" />
             <p className="text-sm font-bold">Trading Floor</p>
@@ -323,8 +338,6 @@ function RemindersSection({ transactions }: { transactions: any[] }) {
       tone: "warning"
     });
   }
-
-  // You can add more reminders here
 
   if (items.length === 0) return null;
 
