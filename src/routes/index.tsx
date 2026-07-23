@@ -4,9 +4,13 @@ import {
   Bell, Eye, EyeOff, TrendingUp, ChevronRight, Sparkles, LogIn,
   Briefcase, Building2, Landmark,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { AppShell } from "@/components/AppShell";
 import { Card, Stat, SectionTitle, Badge } from "@/components/ui-bits";
+import { apiRequest } from "../utils/api";
+import { createClient } from "@supabase/supabase-js";
 
+// Helper: format currency
 const fmt = (amount: number) => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', minimumFractionDigits: 0 }).format(amount);
 };
@@ -23,34 +27,108 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   const [show, setShow] = useState(true);
-  const balance = 0;
-  const totalEarnings = 0;
-  const referralEarnings = 0;
-  const transactions: any[] = [];
-  const stats = [
-    { label: "Total Trades", value: "0", trend: "–", tone: "default" as const },
-    { label: "Winning Rate", value: "0%", trend: "–", tone: "default" as const },
-    { label: "Referrals", value: "0", trend: "–", tone: "default" as const },
-    { label: "Bonus", value: "KES 0", trend: "–", tone: "default" as const },
-  ];
-  const opportunities: any[] = [];
+  const [userName, setUserName] = useState("Guest");
+  const [balance, setBalance] = useState(0);
+  const [totalEarnings, setTotalEarnings] = useState(0);
+  const [referralEarnings, setReferralEarnings] = useState(0);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Stats (matching your original design)
+  const [stats, setStats] = useState([
+    { label: "Active Trades", value: "0", hint: "+0", tone: "primary" as const },
+    { label: "Jobs Completed", value: "0", hint: "+0", tone: "success" as const },
+    { label: "Investment Growth", value: "0%", hint: "+0%", tone: "gold" as const },
+    { label: "Businesses Funded", value: "0", hint: "0 Active", tone: "warning" as const },
+  ]);
+
+  const [opportunities, setOpportunities] = useState<any[]>([]);
+
+  // --- Fetch user and data once on mount ---
+  useEffect(() => {
+    const fetchAll = async () => {
+      try {
+        // 1. Get user from session (direct, no listener, safe)
+        const supabase = createClient(
+          import.meta.env.VITE_SUPABASE_URL,
+          import.meta.env.VITE_SUPABASE_ANON_KEY
+        );
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          const fullName = session.user.user_metadata?.full_name || session.user.email || session.user.phone;
+          setUserName(fullName?.split(" ")[0] || "User");
+        }
+
+        // 2. Fetch real data
+        const balanceData = await apiRequest('/wallet/balance');
+        setBalance(balanceData.balance || 0);
+        setTotalEarnings(balanceData.totalEarnings || 0);
+        setReferralEarnings(balanceData.referralEarnings || 0);
+
+        const txData = await apiRequest('/wallet/transactions?limit=5');
+        setTransactions(txData || []);
+
+        // 3. Fetch stats (if your backend has these endpoints)
+        try {
+          const statsData = await apiRequest('/user/stats');
+          if (statsData) {
+            setStats([
+              { label: "Active Trades", value: statsData.activeTrades || "0", hint: `+${statsData.tradesChange || 0}`, tone: "primary" as const },
+              { label: "Jobs Completed", value: statsData.jobsCompleted || "0", hint: `+${statsData.jobsChange || 0}`, tone: "success" as const },
+              { label: "Investment Growth", value: statsData.investmentGrowth || "0%", hint: `+${statsData.growthChange || 0}%`, tone: "gold" as const },
+              { label: "Businesses Funded", value: statsData.businessesFunded || "0", hint: `${statsData.activeBusinesses || 0} Active`, tone: "warning" as const },
+            ]);
+          }
+        } catch (e) {
+          console.log('Stats endpoint not available yet');
+        }
+
+        // 4. Fetch opportunities
+        try {
+          const opps = await apiRequest('/trading/opportunities');
+          setOpportunities(opps || []);
+        } catch (e) {
+          console.log('Opportunities endpoint not available yet');
+        }
+
+        setLoading(false);
+      } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+        setLoading(false);
+      }
+    };
+    fetchAll();
+  }, []);
+
+  if (loading) {
+    return (
+      <AppShell>
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">Loading dashboard...</p>
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-muted/40 pb-10">
+    <AppShell>
       {/* Hero */}
       <section className="gradient-primary relative overflow-hidden px-5 pb-8 pt-6 text-primary-foreground">
         <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-gold/20 blur-3xl" />
         <div className="relative flex items-start justify-between">
           <div className="min-w-0">
-            <p className="text-xs/4 opacity-80">Welcome back,</p>
-            <h1 className="truncate text-2xl font-bold">Test 👋</h1>
+            <p className="text-xs/4 opacity-80">Welcome,</p>
+            <h1 className="truncate text-2xl font-bold">{userName}</h1>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <button className="grid h-10 w-10 place-items-center rounded-full bg-white/10 backdrop-blur">
               <Bell className="h-5 w-5" />
             </button>
-            <Link to="/auth" className="grid h-10 w-10 place-items-center rounded-full bg-gold text-gold-foreground font-bold">
-              T
+            <Link
+              to="/profile"
+              className="grid h-10 w-10 place-items-center rounded-full bg-gold text-gold-foreground font-bold"
+            >
+              {(userName[0] ?? "P").toUpperCase()}
             </Link>
           </div>
         </div>
@@ -101,15 +179,16 @@ function HomePage() {
         </Card>
       </section>
 
-      {/* Stats */}
+      {/* Stats – matches your original design */}
       <section className="mt-5 px-5">
         <div className="grid grid-cols-2 gap-3">
           {stats.map((s) => (
-            <Stat key={s.label} label={s.label} value={s.value} hint={s.trend} tone={s.tone} />
+            <Stat key={s.label} label={s.label} value={s.value} hint={s.hint} tone={s.tone} />
           ))}
         </div>
       </section>
 
+      {/* Reminders */}
       <RemindersSection transactions={transactions} />
 
       {/* Explore hubs */}
@@ -229,7 +308,7 @@ function HomePage() {
       <p className="mt-8 px-5 text-center text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
         PESAKI · Earn. Invest. Grow.
       </p>
-    </div>
+    </AppShell>
   );
 }
 
@@ -244,6 +323,8 @@ function RemindersSection({ transactions }: { transactions: any[] }) {
       tone: "warning"
     });
   }
+
+  // You can add more reminders here
 
   if (items.length === 0) return null;
 
