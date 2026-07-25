@@ -1,5 +1,4 @@
-import { createChart, ColorType, IChartApi, ISeriesApi } from 'lightweight-charts';
-import { CandlestickSeries } from 'lightweight-charts/plugins';
+import { createChart, ColorType, IChartApi, ISeriesApi, CandlestickSeries } from 'lightweight-charts';
 import { useEffect, useRef } from 'react';
 
 export const TradingChart = ({
