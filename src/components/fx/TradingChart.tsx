@@ -1,4 +1,4 @@
-import { createChart, ColorType, IChartApi, ISeriesApi, CandlestickSeries } from 'lightweight-charts';
+import { createChart, ColorType, IChartApi, ISeriesApi } from 'lightweight-charts';
 import { useEffect, useRef } from 'react';
 
 export const TradingChart = ({
@@ -38,7 +38,8 @@ export const TradingChart = ({
             });
             chartRef.current = chart;
 
-            const newSeries = chart.addSeries(CandlestickSeries, {
+            // ✅ v3 API – use addCandlestickSeries directly (no import needed)
+            const newSeries = chart.addCandlestickSeries({
                 upColor: '#26a69a',
                 downColor: '#ef5350',
                 borderVisible: false,
