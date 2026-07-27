@@ -33,7 +33,7 @@ const generateData = (count: number, basePrice: number) => {
   return data;
 };
 
-export const Route = createFileRoute("/trading")({
+export const Route = createFileRoute("/trading/fx")({
   validateSearch: (search: Record<string, unknown>) => ({
     mode: (search.mode as string) === "real" ? "real" : "demo",
   }),
@@ -45,14 +45,12 @@ function TradingPage() {
   const navigate = useNavigate();
   const mode = search.mode === "real" ? "real" : "demo";
 
-  // --- Chart data ---
   const [data, setData] = useState<any[]>([]);
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
   const [pair, setPair] = useState("USD/KES");
   const [loading, setLoading] = useState(false);
   const targetPriceRef = useRef<number | null>(null);
 
-  // --- Trade state ---
   const [stake, setStake] = useState<number>(10);
   const [selectedDuration, setSelectedDuration] = useState<{ label: string; value: number; unit: string }>(
     DURATIONS[0]
@@ -66,16 +64,14 @@ function TradingPage() {
   const [tradeError, setTradeError] = useState<string | null>(null);
   const [openPositions, setOpenPositions] = useState<any[]>([]);
 
-  // --- Ref for timer ---
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const tradeIdRef = useRef<string | null>(null);
+  const tradeActiveRef = useRef(false);
 
-  // --- Prices ---
   const spread = currentPrice && currentPrice > 50 ? 0.1 : 0.0002;
   const ask = currentPrice ? currentPrice + spread / 2 : 0;
   const bid = currentPrice ? currentPrice - spread / 2 : 0;
 
-  // --- Auth check ---
   useEffect(() => {
     const checkAuth = async () => {
       const supabase = createClient(
@@ -90,7 +86,6 @@ function TradingPage() {
     checkAuth();
   }, [navigate]);
 
-  // --- API calls ---
   const fetchPrice = useCallback(async (isInitial = false) => {
     try {
       if (isInitial) setLoading(true);
@@ -120,7 +115,6 @@ function TradingPage() {
     }
   }, []);
 
-  // --- Initial data and intervals ---
   useEffect(() => {
     fetchPrice(true);
     fetchOpenPositions();
@@ -134,7 +128,6 @@ function TradingPage() {
     };
   }, [fetchPrice, fetchOpenPositions]);
 
-  // --- Local tick simulation ---
   useEffect(() => {
     const tickInterval = setInterval(() => {
       setData((prev) => {
@@ -174,7 +167,6 @@ function TradingPage() {
     return () => clearInterval(tickInterval);
   }, []);
 
-  // --- Timer logic ---
   const startTimer = (durationInSeconds: number) => {
     setTimeRemaining(durationInSeconds);
     tradeActiveRef.current = true;
@@ -186,7 +178,6 @@ function TradingPage() {
         if (prev === null || prev <= 0) {
           clearInterval(timerIntervalRef.current!);
           timerIntervalRef.current = null;
-          // Auto-close trade when timer hits 0
           if (tradeActiveRef.current && tradeIdRef.current) {
             closeTradeAutomatically(tradeIdRef.current);
           }
@@ -201,18 +192,15 @@ function TradingPage() {
     if (!tradeActiveRef.current) return;
     tradeActiveRef.current = false;
 
-    // Get the current price at expiry
     const exit = currentPrice || 0;
     setExitPrice(exit);
 
-    // Determine if win or loss based on direction and price movement
     if (entryPrice !== null && tradeDirection) {
       const diff = tradeDirection === "UP" ? exit - entryPrice : entryPrice - exit;
       const won = diff > 0;
 
       setTradeResult(won ? "won" : "lost");
 
-      // Show result for 3 seconds then reset
       setTimeout(() => {
         setTradeResult(null);
         setEntryPrice(null);
@@ -222,29 +210,17 @@ function TradingPage() {
         tradeIdRef.current = null;
       }, 3000);
 
-      // Update balance (you can also call an API endpoint here)
       if (won) {
-        // Profit: 20% of stake
         const profit = stake * 0.2;
         console.log(`🎉 Won! +KES ${profit.toFixed(2)}`);
-        // You can call a backend endpoint to credit the user
-        // await apiRequest('/wallet/credit', { method: 'POST', body: JSON.stringify({ amount: profit }) });
       } else {
-        // Loss: 100% of stake
         console.log(`💀 Lost! -KES ${stake.toFixed(2)}`);
-        // You can call a backend endpoint to debit the user
-        // await apiRequest('/wallet/debit', { method: 'POST', body: JSON.stringify({ amount: stake }) });
       }
     }
 
-    // Reset trade state
     setTradeActive(false);
   };
 
-  // Ref to track trade activity
-  const tradeActiveRef = useRef(false);
-
-  // --- Place trade ---
   const handleTrade = async (direction: "buy" | "sell") => {
     if (!currentPrice || tradeActive) return;
     if (stake < 10) {
@@ -259,14 +235,12 @@ function TradingPage() {
     setExitPrice(null);
     setTradeResult(null);
 
-    // Calculate duration in seconds
     let durationSeconds = selectedDuration.value;
     if (selectedDuration.unit === "minutes") {
       durationSeconds = selectedDuration.value * 60;
     }
 
     try {
-      // Place trade via backend
       const res = await apiRequest("/games/prediction/place", {
         method: "POST",
         body: JSON.stringify({
@@ -293,7 +267,6 @@ function TradingPage() {
     }
   };
 
-  // --- Close trade manually ---
   const handleCloseTrade = async (predictionId: string) => {
     if (tradeActiveRef.current) return;
     try {
@@ -311,18 +284,14 @@ function TradingPage() {
     }
   };
 
-  // --- Format time display ---
   const formatTime = (seconds: number | null) => {
     if (seconds === null) return "--:--";
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    if (mins > 0) {
-      return `${mins}m ${secs}s`;
-    }
+    if (mins > 0) return `${mins}m ${secs}s`;
     return `${secs}s`;
   };
 
-  // --- Render result badge ---
   const renderResultBadge = () => {
     if (tradeResult === "won") {
       return (
@@ -341,10 +310,8 @@ function TradingPage() {
     return null;
   };
 
-  // --- UI ---
   return (
     <div className="space-y-4 max-w-5xl mx-auto pb-20 lg:pb-6">
-      {/* Header */}
       <div className="flex items-center justify-between px-2">
         <div>
           <h1 className="text-xl lg:text-3xl font-bold text-white flex items-center gap-2">
@@ -365,21 +332,13 @@ function TradingPage() {
               <option value="XAU/USD">XAU/USD</option>
             </select>
             <span className="text-muted-foreground text-sm">•</span>
-            <span
-              className={`text-xs font-mono font-bold ${
-                currentPrice ? "text-emerald-400" : "text-zinc-500"
-              }`}
-            >
+            <span className={`text-xs font-mono font-bold ${currentPrice ? "text-emerald-400" : "text-zinc-500"}`}>
               {currentPrice ? currentPrice.toFixed(currentPrice > 50 ? 2 : 4) : "Loading..."}
             </span>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => fetchPrice(true)}
-            className="p-2 hover:bg-white/5 rounded-lg transition-colors text-muted-foreground mr-1"
-            title="Refresh"
-          >
+          <button onClick={() => fetchPrice(true)} className="p-2 hover:bg-white/5 rounded-lg transition-colors text-muted-foreground mr-1" title="Refresh">
             <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
           </button>
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-500 rounded border border-emerald-500/20 text-xs font-semibold tracking-wide">
@@ -394,10 +353,9 @@ function TradingPage() {
 
       <ModeToggle />
 
-      {/* Chart + Controls */}
       <div className="flex flex-col lg:flex-row gap-6">
-        {/* Chart */}
-        <div className="flex-1 bg-[#151924] border border-[#2b313f] rounded-xl overflow-hidden p-2 lg:p-4 min-h-[350px] lg:min-h-[500px] relative">
+        {/* Chart area – height reduced */}
+        <div className="flex-1 bg-[#151924] border border-[#2b313f] rounded-xl overflow-hidden p-2 lg:p-4 min-h-[200px] lg:min-h-[320px] relative">
           {loading && !currentPrice ? (
             <div className="w-full h-full flex items-center justify-center">
               <Activity className="animate-pulse text-primary" size={32} />
@@ -406,17 +364,13 @@ function TradingPage() {
             <TradingChart data={data} colors={{ backgroundColor: "#151924" }} />
           )}
 
-          {/* Timer overlay */}
           {tradeActive && timeRemaining !== null && timeRemaining > 0 && (
             <div className="absolute top-4 right-4 bg-black/80 backdrop-blur-sm border border-[#dcb13c]/30 rounded-lg px-4 py-2 flex items-center gap-2">
               <Timer className="h-4 w-4 text-[#dcb13c]" />
-              <span className="text-white font-mono text-sm font-bold">
-                {formatTime(timeRemaining)}
-              </span>
+              <span className="text-white font-mono text-sm font-bold">{formatTime(timeRemaining)}</span>
             </div>
           )}
 
-          {/* Result overlay */}
           {tradeResult && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm">
               {renderResultBadge()}
@@ -424,13 +378,9 @@ function TradingPage() {
           )}
         </div>
 
-        {/* Controls */}
         <div className="w-full lg:w-[380px] shrink-0 bg-[#0b0e14] border border-[#1e2330] rounded-xl p-4 flex flex-col gap-4">
-          {/* Stake */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-widest block">
-              Stake (KES)
-            </label>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-widest block">Stake (KES)</label>
             <input
               type="number"
               min="10"
@@ -454,11 +404,8 @@ function TradingPage() {
             </div>
           </div>
 
-          {/* Duration */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-widest block">
-              Duration
-            </label>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-widest block">Duration</label>
             <div className="grid grid-cols-3 gap-2">
               {DURATIONS.map((d) => (
                 <button
@@ -477,20 +424,12 @@ function TradingPage() {
             </div>
           </div>
 
-          {/* Ask / Spread / Bid */}
           <div className="flex justify-between items-center text-sm font-mono px-2">
-            <div className="text-gray-400">
-              Ask: <span className="text-gray-200">{ask.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}</span>
-            </div>
-            <div className="text-gray-500 text-xs">
-              Spread: {spread.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}
-            </div>
-            <div className="text-gray-400">
-              Bid: <span className="text-gray-200">{bid.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}</span>
-            </div>
+            <div className="text-gray-400">Ask: <span className="text-gray-200">{ask.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}</span></div>
+            <div className="text-gray-500 text-xs">Spread: {spread.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}</div>
+            <div className="text-gray-400">Bid: <span className="text-gray-200">{bid.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}</span></div>
           </div>
 
-          {/* Entry/Exit prices */}
           {entryPrice !== null && (
             <div className="flex justify-between text-xs text-gray-500 px-2">
               <span>Entry: <span className="text-white font-mono">{entryPrice.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}</span></span>
@@ -500,7 +439,6 @@ function TradingPage() {
             </div>
           )}
 
-          {/* Buy / Sell */}
           <div className="flex gap-4">
             <button
               onClick={() => handleTrade("buy")}
@@ -524,23 +462,17 @@ function TradingPage() {
             </button>
           </div>
 
-          {tradeError && (
-            <div className="text-center text-red-500 text-sm font-medium">{tradeError}</div>
-          )}
+          {tradeError && <div className="text-center text-red-500 text-sm font-medium">{tradeError}</div>}
 
+          {/* 🚀 Removed the Win/Loss percentage text */}
           <div className="text-center text-xs text-gray-500">
-            Mode: <span className="text-gray-300 font-medium capitalize">{mode}</span> •{" "}
-            <span className="text-[#dcb13c] font-medium">Win: +20%</span> •{" "}
-            <span className="text-red-500 font-medium">Loss: -100%</span>
+            Mode: <span className="text-gray-300 font-medium capitalize">{mode}</span>
           </div>
         </div>
       </div>
 
-      {/* Open Positions */}
       <div className="bg-[#0b0e14] border border-[#1e2330] rounded-xl p-4 flex flex-col gap-3">
-        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-widest block">
-          Open Positions ({openPositions.length})
-        </h2>
+        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-widest block">Open Positions ({openPositions.length})</h2>
         <div className="flex flex-col gap-2">
           {openPositions.length === 0 ? (
             <p className="text-sm text-gray-600 text-center py-4">No open positions.</p>
@@ -550,25 +482,14 @@ function TradingPage() {
               let profitMock = 0;
               if (pos.market === pair && currentPrice) {
                 const diff = isBuy ? currentPrice - pos.entry_price : pos.entry_price - currentPrice;
-                if (diff > 0) {
-                  profitMock = pos.amount * 0.2;
-                } else if (diff < 0) {
-                  profitMock = -pos.amount;
-                }
+                if (diff > 0) profitMock = pos.amount * 0.2;
+                else if (diff < 0) profitMock = -pos.amount;
               }
               const profitColor = profitMock >= 0 ? "text-emerald-500" : "text-red-500";
-
               return (
-                <div
-                  key={pos.id}
-                  className="flex items-center justify-between p-3 bg-[#131720] rounded-lg border border-[#1e2330]"
-                >
+                <div key={pos.id} className="flex items-center justify-between p-3 bg-[#131720] rounded-lg border border-[#1e2330]">
                   <div className="flex items-center gap-3">
-                    <div
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                        isBuy ? "bg-[#236e40] text-emerald-100" : "bg-[#6e2525] text-red-100"
-                      } uppercase`}
-                    >
+                    <div className={`text-[10px] font-bold px-2 py-0.5 rounded ${isBuy ? "bg-[#236e40] text-emerald-100" : "bg-[#6e2525] text-red-100"} uppercase`}>
                       {isBuy ? "Buy" : "Sell"}
                     </div>
                     <div className="font-semibold text-sm text-gray-200">{pos.market}</div>
@@ -576,8 +497,7 @@ function TradingPage() {
                   </div>
                   <div className="flex items-center gap-4">
                     <div className={`text-sm font-mono font-medium ${profitColor} w-20 text-right`}>
-                      {profitMock > 0 ? "+" : ""}
-                      {profitMock.toFixed(2)} KES
+                      {profitMock > 0 ? "+" : ""}{profitMock.toFixed(2)} KES
                     </div>
                     <button
                       onClick={() => handleCloseTrade(pos.id)}
