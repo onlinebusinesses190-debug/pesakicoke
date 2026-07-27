@@ -179,20 +179,16 @@ function UpDownGame() {
         setSecondsLeft(0);
       });
 
-      // ── 🚀 NEW MINORITY WINS LOGIC ──────────────────────────────────────────
-      socket.on("UPDOWN_ROUND_RESULT", (data: {
-        roundId: string;
-        entryPrice: number;
-        closePrice: number;
-        direction: "up" | "down" | null;
-        totalUp: number;
-        totalDown: number;
-        winners: number;
-        payoutMultiplier: number;
-      }) => {
-        // Compare total stakes: the side with the LOWER total wins
-        const minorityIsUp = data.totalUp < data.totalDown;
-        const winningDirection = minorityIsUp ? "up" : "down";
+      // ── 🚀 MINORITY WINS LOGIC (with fallback) ──────────────────────────────
+      socket.on("UPDOWN_ROUND_RESULT", (data: any) => {
+        // Determine winning direction based on available data
+        let winningDirection: "up" | "down" | null = data.direction || null;
+
+        // If totalUp and totalDown are present, use minority logic
+        if (data.totalUp !== undefined && data.totalDown !== undefined) {
+          const minorityIsUp = data.totalUp < data.totalDown;
+          winningDirection = minorityIsUp ? "up" : "down";
+        }
 
         setRound((prev) =>
           prev
@@ -205,8 +201,8 @@ function UpDownGame() {
             : null
         );
 
-        const userWon = myPosition && myPosition.direction === winningDirection;
-        const profit = userWon ? myPosition.amount * 0.5 : null; // 50% profit
+        const userWon = myPosition && winningDirection ? myPosition.direction === winningDirection : false;
+        const profit = userWon && myPosition ? myPosition.amount * 0.5 : null; // 50% profit
 
         setLastResult({
           direction: winningDirection,
@@ -216,8 +212,10 @@ function UpDownGame() {
           profit: profit ?? null,
         });
 
-        setFlash(winningDirection);
-        setTimeout(() => setFlash(null), 1800);
+        if (winningDirection) {
+          setFlash(winningDirection);
+          setTimeout(() => setFlash(null), 1800);
+        }
 
         setHistory((prev) => {
           const entry: HistoryEntry = {
@@ -356,7 +354,7 @@ function UpDownGame() {
               {round?.entryPrice != null ? round.entryPrice.toFixed(4) : "—"}
             </div>
 
-            {/* RESULT: show minority win */}
+            {/* RESULT */}
             {round?.state === "result" && lastResult && (
               <div
                 className={`flex flex-col items-center gap-1 ${
@@ -495,7 +493,7 @@ function UpDownGame() {
             />
           </div>
 
-          {/* Info footer - Updated to reflect new logic */}
+          {/* Info footer */}
           <div className="px-6 pb-5 flex items-center justify-between text-xs text-zinc-600">
             <span>Minority wins 50% profit • Majority loses 100%</span>
             {balance !== null && <span>Balance: KES {balance.toFixed(2)}</span>}
