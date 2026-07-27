@@ -1,15 +1,21 @@
-import { Link, useSearch } from "@tanstack/react-router";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 
 export function ModeToggle() {
-  const search = useSearch({ from: "/trading/fx" }) as { mode?: string };
+  const search = useSearch() as { mode?: string };
   const currentMode = search?.mode === "real" ? "real" : "demo";
+  const navigate = useNavigate();
+
+  const setMode = (mode: "demo" | "real") => {
+    navigate({
+      search: (prev: any) => ({ ...prev, mode }),
+    });
+  };
 
   return (
     <div className="flex items-center gap-1 rounded-lg bg-[#181d29] p-1 text-xs font-medium">
-      <Link
-        to="/trading/fx"
-        search={{ mode: "demo" }}
+      <button
+        onClick={() => setMode("demo")}
         className={cn(
           "px-3 py-1.5 rounded-md transition-all",
           currentMode === "demo"
@@ -18,10 +24,9 @@ export function ModeToggle() {
         )}
       >
         Demo
-      </Link>
-      <Link
-        to="/trading/fx"
-        search={{ mode: "real" }}
+      </button>
+      <button
+        onClick={() => setMode("real")}
         className={cn(
           "px-3 py-1.5 rounded-md transition-all",
           currentMode === "real"
@@ -30,7 +35,7 @@ export function ModeToggle() {
         )}
       >
         Real
-      </Link>
+      </button>
     </div>
   );
 }
