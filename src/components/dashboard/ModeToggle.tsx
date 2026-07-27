@@ -2,13 +2,13 @@ import { useNavigate, useSearch } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 
 export function ModeToggle() {
-  const search = useSearch() as { mode?: string };
+  const search = useSearch() as { mode?: string } | undefined;
   const currentMode = search?.mode === "real" ? "real" : "demo";
   const navigate = useNavigate();
 
   const setMode = (mode: "demo" | "real") => {
     navigate({
-      search: (prev: any) => ({ ...prev, mode }),
+      search: (prev: any) => ({ ...(prev || {}), mode }),
     });
   };
 
