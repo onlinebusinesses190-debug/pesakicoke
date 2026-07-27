@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState, useEffect, useRef } from "react";
-import { Plane, Loader2, Trophy, TrendingUp } from "lucide-react";
+import { useState, useEffect, useRef, Component, ReactNode } from "react";
+import { Plane, Loader2 } from "lucide-react";
 import { io, Socket } from "socket.io-client";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@supabase/supabase-js";
@@ -12,11 +12,35 @@ type GameStatus = "WAITING" | "FLYING" | "CRASHED";
 
 const API_URL = import.meta.env.VITE_PESAKI_API_URL || "https://pesaki-server.onrender.com";
 
+// ── Error Boundary ──────────────────────────────────────────────────────────────
+class ErrorBoundary extends Component<{ children: ReactNode }> {
+  state = { error: null as Error | null };
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="p-4 text-white bg-red-900/50 border border-red-500 rounded-xl m-4">
+          <h2 className="text-xl font-bold">Something went wrong:</h2>
+          <pre className="text-sm whitespace-pre-wrap mt-2">{this.state.error.message}</pre>
+          <pre className="text-xs text-gray-400 mt-2">{this.state.error.stack}</pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export const Route = createFileRoute("/trading/aviator")({
   validateSearch: (search: Record<string, unknown>) => ({
     mode: (search.mode as string) === "real" ? "real" : "demo",
   }),
-  component: AviatorPage,
+  component: () => (
+    <ErrorBoundary>
+      <AviatorPage />
+    </ErrorBoundary>
+  ),
 });
 
 function AviatorPage() {
@@ -40,13 +64,17 @@ function AviatorPage() {
   // ── Auth check ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const checkAuth = async () => {
-      const supabase = createClient(
-        import.meta.env.VITE_SUPABASE_URL,
-        import.meta.env.VITE_SUPABASE_ANON_KEY
-      );
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        navigate({ to: "/auth" });
+      try {
+        const supabase = createClient(
+          import.meta.env.VITE_SUPABASE_URL,
+          import.meta.env.VITE_SUPABASE_ANON_KEY
+        );
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          navigate({ to: "/auth" });
+        }
+      } catch (err) {
+        console.error("Auth check failed", err);
       }
     };
     checkAuth();
@@ -81,66 +109,66 @@ function AviatorPage() {
     );
 
     const initGame = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
 
-      const socket = io(`${API_URL}/aviator`, {
-        transports: ["websocket"],
-        reconnection: true,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000,
-        auth: { token: session.access_token },
-      });
+        const socket = io(`${API_URL}/aviator`, {
+          transports: ["websocket"],
+          reconnection: true,
+          reconnectionAttempts: 5,
+          reconnectionDelay: 1000,
+          auth: { token: session.access_token },
+        });
 
-      socketRef.current = socket;
+        socketRef.current = socket;
 
-      socket.on("connect", () => console.log("Aviator socket connected"));
-      socket.on("connect_error", (err) => console.error("Aviator socket error:", err));
-      socket.on("disconnect", (reason) => console.warn("Aviator socket disconnected:", reason));
+        socket.on("connect", () => console.log("Aviator socket connected"));
+        socket.on("connect_error", (err) => console.error("Aviator socket error:", err));
+        socket.on("disconnect", (reason) => console.warn("Aviator socket disconnected:", reason));
 
-      socket.on("ROUND_WAITING", (data) => {
-        setStatus("WAITING");
-        setMultiplier(1.0);
-        multiplierRef.current = 1.0;
-        setWaitTime(data.waitTime / 1000);
-        setCashedOut(false);
-        setIsBetting(false);
-        // Update balance after round
+        socket.on("ROUND_WAITING", (data) => {
+          setStatus("WAITING");
+          setMultiplier(1.0);
+          multiplierRef.current = 1.0;
+          setWaitTime(data.waitTime / 1000);
+          setCashedOut(false);
+          setIsBetting(false);
+          apiRequest("/wallet/balance").then(res => setBalance(res.balance)).catch(() => {});
+        });
+
+        socket.on("ROUND_START", () => {
+          setStatus("FLYING");
+          setWaitTime(0);
+        });
+
+        socket.on("MULTIPLIER_TICK", (data) => {
+          const newMult = parseFloat(data.multiplier);
+          setMultiplier(newMult);
+          multiplierRef.current = newMult;
+        });
+
+        socket.on("ROUND_CRASHED", (data) => {
+          setStatus("CRASHED");
+          const finalMult = parseFloat(data.multiplier);
+          setMultiplier(finalMult);
+          multiplierRef.current = finalMult;
+          setHistory((prev) => [finalMult, ...prev.slice(0, 19)]);
+          apiRequest("/wallet/balance").then(res => setBalance(res.balance)).catch(() => {});
+        });
+
+        socket.on("CASHED_OUT", (data) => {
+          setCashedOut(true);
+          setCashOutMultiplier(data.multiplier);
+          apiRequest("/wallet/balance").then(res => setBalance(res.balance)).catch(() => {});
+        });
+
+        socket.on("error", (err) => console.error("Socket error:", err));
+
         apiRequest("/wallet/balance").then(res => setBalance(res.balance)).catch(() => {});
-      });
-
-      socket.on("ROUND_START", () => {
-        setStatus("FLYING");
-        setWaitTime(0);
-      });
-
-      socket.on("MULTIPLIER_TICK", (data) => {
-        const newMult = parseFloat(data.multiplier);
-        setMultiplier(newMult);
-        multiplierRef.current = newMult;
-      });
-
-      socket.on("ROUND_CRASHED", (data) => {
-        setStatus("CRASHED");
-        const finalMult = parseFloat(data.multiplier);
-        setMultiplier(finalMult);
-        multiplierRef.current = finalMult;
-        setHistory((prev) => [finalMult, ...prev.slice(0, 19)]);
-        // Update balance after crash
-        apiRequest("/wallet/balance").then(res => setBalance(res.balance)).catch(() => {});
-      });
-
-      socket.on("CASHED_OUT", (data) => {
-        setCashedOut(true);
-        setCashOutMultiplier(data.multiplier);
-        // Update balance after cashout
-        apiRequest("/wallet/balance").then(res => setBalance(res.balance)).catch(() => {});
-      });
-
-      socket.on("error", (err) => console.error("Socket error:", err));
-
-      // Initial balance
-      apiRequest("/wallet/balance").then(res => setBalance(res.balance)).catch(() => {});
+      } catch (err) {
+        console.error("Failed to initialize game", err);
+      }
     };
 
     initGame();
@@ -151,7 +179,6 @@ function AviatorPage() {
   }, []);
 
   // ── Render ────────────────────────────────────────────────────────────────────
-
   const recentHistory = history.slice(0, 6);
   const isFlying = status === "FLYING";
   const isWaiting = status === "WAITING";
@@ -159,7 +186,6 @@ function AviatorPage() {
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-8">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-white flex items-center gap-3">
           <Plane className="text-red-500" /> Aviator
@@ -167,31 +193,20 @@ function AviatorPage() {
         <ModeToggle />
       </div>
 
-      {/* Main game area */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Canvas + multiplier display */}
         <div className="lg:col-span-2 relative bg-[#0f0f1a] border border-white/10 rounded-3xl overflow-hidden">
           <div className="relative" style={{ height: "480px" }}>
-            {/* Multiplier overlay */}
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 text-6xl font-black text-white drop-shadow-lg">
               {displayMultiplier}x
             </div>
-
-            {/* History chips (top right) */}
             <div className="absolute top-4 right-4 z-20 flex gap-2">
               {recentHistory.map((val, i) => (
-                <div
-                  key={i}
-                  className="bg-black/50 backdrop-blur-sm px-2 py-1 rounded text-xs font-bold text-white border border-white/10"
-                >
+                <div key={i} className="bg-black/50 backdrop-blur-sm px-2 py-1 rounded text-xs font-bold text-white border border-white/10">
                   {val.toFixed(2)}x
                 </div>
               ))}
             </div>
-
             <AviatorCanvas multiplier={multiplier} gameState={status} roundHistory={history} />
-
-            {/* Cashout flash overlay */}
             <AnimatePresence>
               {cashedOut && (
                 <motion.div
@@ -211,9 +226,7 @@ function AviatorPage() {
           </div>
         </div>
 
-        {/* Right: Controls */}
         <div className="space-y-4">
-          {/* Status / Timer */}
           <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-4 text-center">
             <div className="text-sm text-gray-400 uppercase tracking-wider">
               {isWaiting ? "Next round in" : isFlying ? "Round in progress" : "Crashed"}
@@ -223,7 +236,6 @@ function AviatorPage() {
             </div>
           </div>
 
-          {/* Balance display */}
           {balance !== null && (
             <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-3 text-center">
               <span className="text-sm text-gray-400">Balance: </span>
@@ -231,7 +243,6 @@ function AviatorPage() {
             </div>
           )}
 
-          {/* Stake presets */}
           <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-4">
             <label className="text-xs uppercase tracking-wider text-gray-400 block mb-2">Allocation Amount</label>
             <div className="flex flex-wrap gap-2 mb-3">
@@ -241,9 +252,7 @@ function AviatorPage() {
                   onClick={() => setBetAmount(v)}
                   disabled={isBetting || isFlying}
                   className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${
-                    betAmount === v
-                      ? "bg-[#dcb13c] text-black"
-                      : "bg-white/5 text-gray-300 hover:bg-white/10"
+                    betAmount === v ? "bg-[#dcb13c] text-black" : "bg-white/5 text-gray-300 hover:bg-white/10"
                   } disabled:opacity-50`}
                 >
                   {v}
@@ -259,7 +268,6 @@ function AviatorPage() {
             />
           </div>
 
-          {/* Action button */}
           <div className="mt-auto">
             {isFlying && !cashedOut && isBetting ? (
               <button
@@ -267,9 +275,7 @@ function AviatorPage() {
                 className="w-full h-16 bg-orange-500 hover:bg-orange-400 text-black font-black text-xl rounded-xl shadow-[0_0_30px_rgba(249,115,22,0.4)] transition-all active:scale-95 flex flex-col items-center justify-center"
               >
                 <span>REALIZE GAIN</span>
-                <span className="text-sm font-medium opacity-80">
-                  {(betAmount * multiplier).toFixed(2)} KES
-                </span>
+                <span className="text-sm font-medium opacity-80">{(betAmount * multiplier).toFixed(2)} KES</span>
               </button>
             ) : (
               <button
@@ -282,7 +288,6 @@ function AviatorPage() {
             )}
           </div>
 
-          {/* Quick stats */}
           <div className="grid grid-cols-2 gap-2 text-xs text-gray-500">
             <div className="bg-[#0f0f1a] border border-white/10 rounded-xl p-2 text-center">
               <span className="block">This round</span>
@@ -296,10 +301,8 @@ function AviatorPage() {
         </div>
       </div>
 
-      {/* Footer: history (optional) */}
       <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-4">
         <div className="flex items-center gap-2 text-sm text-gray-400">
-          <Trophy className="w-4 h-4" />
           <span>Recent crashes: </span>
           <div className="flex gap-2 flex-wrap">
             {history.slice(0, 10).map((val, i) => (
