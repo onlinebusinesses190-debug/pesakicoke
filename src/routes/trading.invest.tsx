@@ -11,24 +11,13 @@ import {
   CircleDot,
   AlertCircle,
   Wifi,
+  WifiOff,
   Moon,
   Clock,
 } from "lucide-react";
 import { apiRequest } from "@/utils/api";
 import { createClient } from "@supabase/supabase-js";
 import { toast } from "sonner";
-
-// ─── Mock Data (fallback) ──────────────────────────────────────────────────
-const MOCK_STOCKS: NseStock[] = [
-  { id: "1", name: "Safaricom", symbol: "SCOM", sector: "Telecom", price: 28.50, change: 0.75, changePercent: 2.70, volume: 1250000, high: 29.00, low: 27.80, open: 27.90 },
-  { id: "2", name: "Equity Group", symbol: "EQTY", sector: "Banking", price: 48.25, change: -0.50, changePercent: -1.03, volume: 850000, high: 49.00, low: 47.80, open: 48.75 },
-  { id: "3", name: "KCB Group", symbol: "KCB", sector: "Banking", price: 38.00, change: 0.20, changePercent: 0.53, volume: 620000, high: 38.50, low: 37.60, open: 37.80 },
-  { id: "4", name: "EABL", symbol: "EABL", sector: "Beverages", price: 162.00, change: 1.50, changePercent: 0.93, volume: 210000, high: 163.50, low: 160.00, open: 160.50 },
-  { id: "5", name: "Kenya Power", symbol: "KPLC", sector: "Energy", price: 6.85, change: -0.10, changePercent: -1.44, volume: 980000, high: 7.00, low: 6.75, open: 6.95 },
-  { id: "6", name: "Co-operative Bank", symbol: "COOP", sector: "Banking", price: 18.50, change: 0.30, changePercent: 1.65, volume: 430000, high: 18.80, low: 18.20, open: 18.20 },
-  { id: "7", name: "BAT Kenya", symbol: "BAT", sector: "Tobacco", price: 420.00, change: 2.00, changePercent: 0.48, volume: 98000, high: 425.00, low: 418.00, open: 418.00 },
-  { id: "8", name: "KenGen", symbol: "KEGN", sector: "Energy", price: 4.25, change: -0.05, changePercent: -1.16, volume: 2150000, high: 4.35, low: 4.20, open: 4.30 },
-];
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface NseStock {
@@ -45,21 +34,27 @@ interface NseStock {
   open?: number;
 }
 
+interface ApiResponse {
+  stocks: NseStock[];
+  updatedAt: string;
+  marketOpen: boolean;
+}
+
 // ─── Skeleton Card ──────────────────────────────────────────────────────────
 function SkeletonCard() {
   return (
-    <div className="rounded-xl border border-border bg-card p-3 animate-pulse">
-      <div className="flex justify-between items-start">
+    <div className="rounded-xl border border-border bg-card p-4 animate-pulse">
+      <div className="flex justify-between items-start mb-3">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-white/10" />
-          <div className="space-y-1.5">
-            <div className="h-3 w-28 rounded bg-white/10" />
-            <div className="h-2 w-16 rounded bg-white/8" />
+          <div className="w-10 h-10 rounded-full bg-white/10" />
+          <div className="space-y-2">
+            <div className="h-4 w-32 rounded bg-white/10" />
+            <div className="h-3 w-20 rounded bg-white/8" />
           </div>
         </div>
-        <div className="text-right space-y-1.5">
-          <div className="h-3 w-14 rounded bg-white/10" />
-          <div className="h-2 w-10 rounded bg-white/8" />
+        <div className="text-right space-y-2">
+          <div className="h-4 w-16 rounded bg-white/10" />
+          <div className="h-3 w-12 rounded bg-white/8" />
         </div>
       </div>
     </div>
@@ -98,17 +93,17 @@ function StockCard({
       tabIndex={0}
       onClick={onClick}
       onKeyDown={(e) => e.key === "Enter" && onClick()}
-      className={`cursor-pointer rounded-xl border p-3 transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-primary/50
+      className={`cursor-pointer rounded-xl border p-4 transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-primary/50
         ${
           selected
-            ? "bg-primary/10 border-primary shadow-[0_0_20px_rgba(59,130,246,0.15)]"
+            ? "bg-primary/10 border-primary shadow-[0_0_24px_rgba(59,130,246,0.2)]"
             : "bg-card border-border hover:border-primary/50"
         }`}
     >
-      <div className="flex justify-between items-center gap-2">
-        <div className="flex items-center gap-2.5 min-w-0">
+      <div className="flex justify-between items-start gap-2">
+        <div className="flex items-center gap-3 min-w-0">
           <div
-            className={`w-8 h-8 flex-shrink-0 rounded-full bg-gradient-to-br ${grad} flex items-center justify-center font-bold text-[10px] text-white shadow`}
+            className={`w-10 h-10 flex-shrink-0 rounded-full bg-gradient-to-br ${grad} flex items-center justify-center font-bold text-xs text-white shadow`}
           >
             {initials}
           </div>
@@ -116,11 +111,11 @@ function StockCard({
             <h3 className="font-bold text-white text-sm truncate leading-tight">
               {stock.name}
             </h3>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="text-[10px] font-mono text-blue-400">
+            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+              <span className="text-xs font-mono text-blue-400">
                 {stock.symbol}
               </span>
-              <span className="text-[9px] text-muted-foreground bg-white/5 px-1.5 py-0.5 rounded truncate max-w-[70px]">
+              <span className="text-[10px] text-muted-foreground bg-white/5 px-1.5 py-0.5 rounded truncate max-w-[100px]">
                 {stock.sector}
               </span>
             </div>
@@ -131,11 +126,18 @@ function StockCard({
           <div className="font-mono font-bold text-white text-sm">
             KES {stock.price.toFixed(2)}
           </div>
-          <div className={`text-[10px] flex items-center justify-end gap-1 ${changeColor}`}>
-            <ChangeIcon size={10} />
+          <div className={`text-xs flex items-center justify-end gap-1 mt-0.5 ${changeColor}`}>
+            <ChangeIcon size={11} />
             <span>{isPositive ? "+" : ""}{stock.change.toFixed(2)}</span>
-            <span className="opacity-70">({isPositive ? "+" : ""}{stock.changePercent.toFixed(2)}%)</span>
+            <span className="opacity-70">
+              ({isPositive ? "+" : ""}{stock.changePercent.toFixed(2)}%)
+            </span>
           </div>
+          {stock.volume !== undefined && (
+            <div className="text-[10px] text-muted-foreground mt-0.5">
+              Vol: {(stock.volume / 1000).toFixed(0)}K
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -157,14 +159,15 @@ function InvestmentPage() {
 
   const [stocks, setStocks] = useState<NseStock[]>([]);
   const [loading, setLoading] = useState(true);
-  const [apiError, setApiError] = useState<string | null>(null);
+  const [apiError, setApiError] = useState<{ error: string; message: string } | null>(null);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [marketOpen, setMarketOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStock, setSelectedStock] = useState<NseStock | null>(null);
   const [prediction, setPrediction] = useState<"HIGH" | "LOW" | null>(null);
-  const [amount, setAmount] = useState("100");
+  const [amount, setAmount] = useState("1000");
   const [isPlacing, setIsPlacing] = useState(false);
 
   // ── Auth check ─────────────────────────────────────────────────────────────
@@ -176,7 +179,9 @@ function InvestmentPage() {
           import.meta.env.VITE_SUPABASE_ANON_KEY
         );
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) navigate({ to: "/auth" });
+        if (!session) {
+          navigate({ to: "/auth" });
+        }
       } catch (err) {
         console.error("Auth check failed", err);
       }
@@ -191,25 +196,27 @@ function InvestmentPage() {
     setApiError(null);
 
     try {
-      // Try to fetch from backend
+      // Replace Next.js API route with apiRequest to your backend
       const data = await apiRequest("/games/nse/stocks");
+      // The backend response might be { stocks, updatedAt, marketOpen }
+      // Adjust if the structure differs.
       if (data && data.stocks) {
         setStocks(data.stocks);
-        setUpdatedAt(data.updatedAt || new Date().toISOString());
+        setUpdatedAt(data.updatedAt || null);
         setMarketOpen(data.marketOpen ?? false);
       } else {
-        // If response doesn't match, use mock data
-        setStocks(MOCK_STOCKS);
+        // Fallback if response format is different
+        setStocks(data);
         setUpdatedAt(new Date().toISOString());
         setMarketOpen(true);
-        setApiError("Using demo data – backend not available yet.");
       }
-    } catch (err) {
-      console.error("Failed to fetch stocks, using mock data:", err);
-      setStocks(MOCK_STOCKS);
-      setUpdatedAt(new Date().toISOString());
-      setMarketOpen(true);
-      setApiError("Using demo data – backend not available yet.");
+    } catch (err: any) {
+      console.error("[Invest] Fetch error:", err);
+      setApiError({
+        error: err.message || "NETWORK_ERROR",
+        message: err.message || "Could not load stock data.",
+      });
+      setStocks([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -236,6 +243,7 @@ function InvestmentPage() {
           entryPrice: selectedStock.price,
         }),
       });
+
       toast.success(`Prediction placed for ${selectedStock.symbol}!`);
       setSelectedStock(null);
       setPrediction(null);
@@ -255,7 +263,7 @@ function InvestmentPage() {
     }
   };
 
-  // ── Toggle mode ──────────────────────────────────────────────────────────
+  // ── Toggle mode (safe) ────────────────────────────────────────────────────
   const setMode = (newMode: "demo" | "real") => {
     const url = new URL(window.location.href);
     url.searchParams.set("mode", newMode);
@@ -279,42 +287,43 @@ function InvestmentPage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-4 max-w-7xl mx-auto px-4 pb-8">
+    <div className="space-y-6 max-w-7xl mx-auto px-4 pb-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Building2 className="text-blue-500" size={24} />
+          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+            <Building2 className="text-blue-500" />
             NSE Market Predict
           </h1>
-          <div className="flex items-center gap-3 mt-0.5">
-            <p className="text-xs text-muted-foreground">
+          <div className="flex items-center gap-3 mt-1">
+            <p className="text-sm text-muted-foreground">
               Daily HIGH/LOW predictions on Nairobi Securities Exchange
             </p>
             <span
-              className={`inline-flex items-center gap-1.5 text-[10px] font-medium px-2 py-0.5 rounded-full border
+              className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-0.5 rounded-full border
                 ${
                   marketOpen
                     ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
                     : "bg-white/5 border-white/10 text-muted-foreground"
                 }`}
             >
-              <CircleDot size={8} className={marketOpen ? "animate-pulse" : ""} />
-              {marketOpen ? "Open" : "Closed"}
+              <CircleDot size={10} className={marketOpen ? "animate-pulse" : ""} />
+              {marketOpen ? "Market Open" : "Market Closed"}
             </span>
           </div>
           {formattedTime && (
-            <p className="text-[10px] text-muted-foreground mt-0.5">
+            <p className="text-xs text-muted-foreground mt-1">
               <span className="opacity-60">Last updated:</span> {formattedTime} EAT
             </p>
           )}
         </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto">
-          <div className="flex items-center gap-1 rounded-lg bg-[#181d29] p-0.5 text-[10px] font-medium">
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          {/* Mode toggle */}
+          <div className="flex items-center gap-1 rounded-lg bg-[#181d29] p-1 text-xs font-medium">
             <button
               onClick={() => setMode("demo")}
-              className={`px-2.5 py-1 rounded-md transition-all ${
+              className={`px-3 py-1.5 rounded-md transition-all ${
                 mode === "demo"
                   ? "bg-[#dcb13c] text-black"
                   : "text-gray-400 hover:text-white hover:bg-[#202636]"
@@ -324,7 +333,7 @@ function InvestmentPage() {
             </button>
             <button
               onClick={() => setMode("real")}
-              className={`px-2.5 py-1 rounded-md transition-all ${
+              className={`px-3 py-1.5 rounded-md transition-all ${
                 mode === "real"
                   ? "bg-[#dcb13c] text-black"
                   : "text-gray-400 hover:text-white hover:bg-[#202636]"
@@ -337,19 +346,19 @@ function InvestmentPage() {
           <button
             onClick={() => fetchStocks(true)}
             disabled={loading || refreshing}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[11px] text-muted-foreground hover:text-white hover:border-white/20 transition-all disabled:opacity-40"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-muted-foreground hover:text-white hover:border-white/20 transition-all disabled:opacity-40"
             title="Refresh data"
           >
-            <RefreshCw size={12} className={refreshing ? "animate-spin" : ""} />
+            <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
             <span className="hidden sm:inline">Refresh</span>
           </button>
 
-          <div className="relative flex-1 md:w-48">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />
+          <div className="relative flex-1 md:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
             <input
               type="text"
               placeholder="Search stocks..."
-              className="w-full bg-card border border-border rounded-lg pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary/60"
+              className="w-full bg-card border border-border rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/60"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -357,37 +366,58 @@ function InvestmentPage() {
         </div>
       </div>
 
-      {/* Error / Demo notice */}
+      {/* Error Banner */}
       {apiError && (
-        <div className="flex items-center gap-2 p-2 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs">
-          <AlertCircle size={14} />
-          <span>{apiError}</span>
+        <div className="flex items-start gap-3 p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-300">
+          {apiError.error === "API_KEY_MISSING" ? (
+            <WifiOff size={20} className="mt-0.5 flex-shrink-0" />
+          ) : (
+            <AlertCircle size={20} className="mt-0.5 flex-shrink-0" />
+          )}
+          <div>
+            <p className="font-semibold text-sm">
+              {apiError.error === "API_KEY_MISSING"
+                ? "API key not configured"
+                : "Could not load live data"}
+            </p>
+            <p className="text-xs mt-0.5 opacity-80">{apiError.message}</p>
+          </div>
         </div>
       )}
 
       {/* Market Closed Notice */}
       {!loading && !marketOpen && (
-        <div className="flex items-start gap-2 p-3 rounded-xl border border-blue-500/20 bg-blue-500/5 text-blue-300 text-xs">
-          <Moon size={14} className="mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="font-semibold text-sm">NSE Market is Currently Closed</p>
-            <p className="opacity-70">Trades Monday–Friday, 9:00 AM – 3:00 PM EAT.</p>
+        <div className="flex items-start gap-3 p-4 rounded-xl border border-blue-500/20 bg-blue-500/5">
+          <Moon size={18} className="mt-0.5 flex-shrink-0 text-blue-400" />
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-sm text-blue-300">
+              NSE Market is Currently Closed
+            </p>
+            <p className="text-xs mt-0.5 text-blue-400/70 leading-relaxed">
+              The Nairobi Securities Exchange trades{" "}
+              <strong>Monday – Friday, 9:00 AM – 3:00 PM EAT</strong>.
+              Stock prices shown are the most recent closing prices — some counters may not display if they had no activity on the last trading day.
+            </p>
+            <div className="flex items-center gap-1.5 mt-2 text-xs text-blue-400/60">
+              <Clock size={11} />
+              <span>Prices will update live when the market reopens on the next trading day.</span>
+            </div>
           </div>
         </div>
       )}
 
       {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Stock list */}
         <div className="lg:col-span-2">
           {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {Array.from({ length: 8 }).map((_, i) => (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {Array.from({ length: 10 }).map((_, i) => (
                 <SkeletonCard key={i} />
               ))}
             </div>
           ) : filtered.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {filtered.map((stock) => (
                 <StockCard
                   key={stock.id}
@@ -396,84 +426,119 @@ function InvestmentPage() {
                   onClick={() => {
                     setSelectedStock(stock);
                     setPrediction(null);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
                   }}
                 />
               ))}
             </div>
+          ) : !apiError ? (
+            <div className="text-center py-16 text-muted-foreground border-2 border-dashed border-white/5 rounded-xl">
+              <Wifi size={32} className="mx-auto mb-3 opacity-20" />
+              <p>No stocks match your search.</p>
+            </div>
           ) : (
-            <div className="text-center py-12 text-muted-foreground border-2 border-dashed border-white/5 rounded-xl">
-              <Wifi size={24} className="mx-auto mb-2 opacity-20" />
-              <p className="text-sm">No stocks match your search.</p>
+            <div className="text-center py-16 text-muted-foreground border-2 border-dashed border-white/5 rounded-xl">
+              <AlertCircle size={32} className="mx-auto mb-3 opacity-20" />
+              <p>Live data unavailable.</p>
+              <button
+                onClick={() => fetchStocks()}
+                className="mt-4 text-sm text-blue-400 hover:text-blue-300 underline underline-offset-2"
+              >
+                Retry
+              </button>
             </div>
           )}
         </div>
 
         {/* Prediction Slip */}
         <div className="lg:col-span-1">
-          <div className="bg-card border border-border rounded-2xl p-4 sticky top-4">
-            <h2 className="text-base font-bold text-white mb-4">Prediction Slip</h2>
+          <div className="bg-card border border-border rounded-2xl p-6 sticky top-6">
+            <h2 className="text-xl font-bold text-white mb-6">Prediction Slip</h2>
 
             {selectedStock ? (
-              <div className="space-y-4">
+              <div className="space-y-5">
                 {/* Selected stock */}
-                <div className="p-3 bg-white/5 rounded-xl border border-white/10">
-                  <div className="text-[10px] text-muted-foreground mb-0.5">Selected Asset</div>
-                  <div className="font-bold text-base text-white leading-tight">
+                <div className="p-4 bg-white/5 rounded-xl border border-white/10">
+                  <div className="text-xs text-muted-foreground mb-1">Selected Asset</div>
+                  <div className="font-bold text-lg text-white leading-tight">
                     {selectedStock.name}
                   </div>
-                  <div className="text-[10px] font-mono text-blue-400">
+                  <div className="text-xs font-mono text-blue-400 mt-1">
                     {selectedStock.symbol} • KES {selectedStock.price.toFixed(2)}
                   </div>
                   <div
-                    className={`text-[10px] mt-1 flex items-center gap-1 ${
+                    className={`text-xs mt-1.5 flex items-center gap-1 ${
                       selectedStock.change >= 0 ? "text-emerald-400" : "text-red-400"
                     }`}
                   >
-                    {selectedStock.change >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                    {selectedStock.change >= 0 ? (
+                      <TrendingUp size={11} />
+                    ) : (
+                      <TrendingDown size={11} />
+                    )}
                     Today: {selectedStock.change >= 0 ? "+" : ""}
                     {selectedStock.change.toFixed(2)}&nbsp;(
                     {selectedStock.changePercent.toFixed(2)}%)
                   </div>
+                  {(selectedStock.open || selectedStock.high || selectedStock.low) && (
+                    <div className="mt-3 pt-3 border-t border-white/5 grid grid-cols-3 gap-2 text-center">
+                      {[
+                        { label: "Open", val: selectedStock.open },
+                        { label: "High", val: selectedStock.high },
+                        { label: "Low", val: selectedStock.low },
+                      ].map(
+                        ({ label, val }) =>
+                          val !== undefined && (
+                            <div key={label}>
+                              <div className="text-[10px] text-muted-foreground">{label}</div>
+                              <div className="text-xs font-mono font-bold text-white">
+                                {val.toFixed(2)}
+                              </div>
+                            </div>
+                          )
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* HIGH / LOW picker */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-medium text-muted-foreground">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">
                     Price Direction at Market Close
                   </label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-3">
                     <button
                       onClick={() => setPrediction("HIGH")}
-                      className={`h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 border transition-all
+                      className={`h-14 rounded-xl font-bold text-sm flex items-center justify-center gap-2 border transition-all
                         ${
                           prediction === "HIGH"
                             ? "bg-emerald-500 text-black border-emerald-500 shadow-lg shadow-emerald-900/40"
                             : "bg-transparent border-white/10 text-muted-foreground hover:border-emerald-500/50 hover:text-emerald-400"
                         }`}
                     >
-                      <ArrowUp size={14} /> HIGH
+                      <ArrowUp size={16} /> HIGH
                     </button>
                     <button
                       onClick={() => setPrediction("LOW")}
-                      className={`h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 border transition-all
+                      className={`h-14 rounded-xl font-bold text-sm flex items-center justify-center gap-2 border transition-all
                         ${
                           prediction === "LOW"
                             ? "bg-red-500 text-black border-red-500 shadow-lg shadow-red-900/40"
                             : "bg-transparent border-white/10 text-muted-foreground hover:border-red-500/50 hover:text-red-400"
                         }`}
                     >
-                      <ArrowDown size={14} /> LOW
+                      <ArrowDown size={16} /> LOW
                     </button>
                   </div>
                 </div>
 
                 {/* Amount */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-medium text-muted-foreground">
-                    Allocation Amount <span className="text-[8px] opacity-60">(Min 10)</span>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Allocation Amount <span className="text-xs opacity-60">(Min KSh 10)</span>
                   </label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-mono">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-mono">
                       KSh
                     </span>
                     <input
@@ -481,7 +546,46 @@ function InvestmentPage() {
                       min={10}
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
-                      className="w-full bg-black/40 border border-white/10 rounded-lg pl-11 pr-3 py-2 font-mono text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      className="w-full bg-black/40 border border-white/10 rounded-lg pl-12 pr-4 py-3 font-bold font-mono text-white focus:outline-none focus:ring-2 focus:ring-primary/50"
                     />
                   </div>
-                  <div className="flex justify-
+                  <div className="flex justify-between text-xs text-muted-foreground px-1">
+                    <span>Potential Payout (30% Profit):</span>
+                    <span className="text-emerald-400 font-bold">
+                      {amount
+                        ? `KES ${(Number(amount) * 1.3).toFixed(2)}`
+                        : "KES 0.00"}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handlePlacePrediction}
+                  disabled={
+                    !prediction || Number(amount) < 10 || isPlacing || !marketOpen
+                  }
+                  className="w-full py-4 text-base font-black rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:scale-100"
+                >
+                  {isPlacing
+                    ? "PLACING..."
+                    : !marketOpen
+                    ? "MARKET CLOSED"
+                    : "PLACE PREDICTION →"}
+                </button>
+
+                <p className="text-[11px] text-center text-muted-foreground leading-relaxed">
+                  Results are settled against official NSE closing prices. Market closes at 15:00 EAT.
+                </p>
+              </div>
+            ) : (
+              <div className="text-center py-12 text-muted-foreground border-2 border-dashed border-white/5 rounded-xl">
+                <Building2 size={32} className="mx-auto mb-3 opacity-20" />
+                <p className="text-sm">Select a stock from the list to start predicting.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
