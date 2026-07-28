@@ -5,7 +5,6 @@ import { ModeToggle } from "@/components/dashboard/ModeToggle";
 import { createClient } from "@supabase/supabase-js";
 import { io, Socket } from "socket.io-client";
 
-// ── Types ──────────────────────────────────────────────────────────────────────
 type RoundState = "open" | "locked" | "result";
 
 interface UpDownRound {
@@ -28,12 +27,10 @@ interface HistoryEntry {
   settledAt: string;
 }
 
-// ── Constants ──────────────────────────────────────────────────────────────────
 const API_URL = import.meta.env.VITE_PESAKI_API_URL || "https://pesaki-server.onrender.com";
 const AMOUNT_PRESETS = ["50", "100", "200", "500"];
 const TOTAL_SECONDS = 10;
 
-// ── Countdown Ring Component ──────────────────────────────────────────────────
 function CountdownRing({ secondsLeft, total = TOTAL_SECONDS }: { secondsLeft: number; total?: number }) {
   const r = 40;
   const circ = 2 * Math.PI * r;
@@ -62,7 +59,6 @@ function CountdownRing({ secondsLeft, total = TOTAL_SECONDS }: { secondsLeft: nu
   );
 }
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
 export const Route = createFileRoute("/trading/up-down")({
   validateSearch: (search: Record<string, unknown>) => ({
     mode: (search.mode as string) === "real" ? "real" : "demo",
@@ -95,7 +91,6 @@ function UpDownGame() {
 
   const currentRoundIdRef = useRef<string | null>(null);
 
-  // ── Auth check ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     const checkAuth = async () => {
       const supabase = createClient(
@@ -103,14 +98,11 @@ function UpDownGame() {
         import.meta.env.VITE_SUPABASE_ANON_KEY
       );
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        navigate({ to: "/auth" });
-      }
+      if (!session) navigate({ to: "/auth" });
     };
     checkAuth();
   }, [navigate]);
 
-  // ── Connect socket ────────────────────────────────────────────────────────────
   useEffect(() => {
     let socket: Socket;
 
@@ -132,24 +124,17 @@ function UpDownGame() {
       socket.on("connect", () => setConnected(true));
       socket.on("disconnect", () => setConnected(false));
 
-      socket.on("SYNC_STATE", (data: { round: UpDownRound | null; secondsLeft: number; history: HistoryEntry[] }) => {
+      socket.on("SYNC_STATE", (data) => {
         setRound(data.round);
         setSecondsLeft(data.secondsLeft);
-        setHistory(data.history);
+        setHistory(data.history || []);
         if (data.round && data.round.id !== currentRoundIdRef.current) {
           currentRoundIdRef.current = data.round.id;
           setMyPosition(null);
         }
       });
 
-      socket.on("UPDOWN_ROUND_OPEN", (data: {
-        roundId: string;
-        market: string;
-        entryPrice: number;
-        duration: number;
-        opensAt: string;
-        locksAt: string;
-      }) => {
+      socket.on("UPDOWN_ROUND_OPEN", (data) => {
         setRound({
           id: data.roundId,
           market: data.market,
@@ -170,21 +155,15 @@ function UpDownGame() {
         }
       });
 
-      socket.on("UPDOWN_COUNTDOWN", (data: { secondsLeft: number }) => {
-        setSecondsLeft(data.secondsLeft);
-      });
+      socket.on("UPDOWN_COUNTDOWN", (data) => setSecondsLeft(data.secondsLeft));
 
       socket.on("UPDOWN_ROUND_LOCKED", () => {
         setRound((prev) => (prev ? { ...prev, state: "locked" } : null));
         setSecondsLeft(0);
       });
 
-      // ── 🚀 MINORITY WINS LOGIC (with fallback) ──────────────────────────────
-      socket.on("UPDOWN_ROUND_RESULT", (data: any) => {
-        // Determine winning direction based on available data
+      socket.on("UPDOWN_ROUND_RESULT", (data) => {
         let winningDirection: "up" | "down" | null = data.direction || null;
-
-        // If totalUp and totalDown are present, use minority logic
         if (data.totalUp !== undefined && data.totalDown !== undefined) {
           const minorityIsUp = data.totalUp < data.totalDown;
           winningDirection = minorityIsUp ? "up" : "down";
@@ -202,7 +181,7 @@ function UpDownGame() {
         );
 
         const userWon = myPosition && winningDirection ? myPosition.direction === winningDirection : false;
-        const profit = userWon && myPosition ? myPosition.amount * 0.5 : null; // 50% profit
+        const profit = userWon && myPosition ? myPosition.amount * 0.5 : null;
 
         setLastResult({
           direction: winningDirection,
@@ -229,13 +208,13 @@ function UpDownGame() {
         });
       });
 
-      socket.on("POSITION_CONFIRMED", (data: { roundId: string; direction: string; amount: number; newBalance: number }) => {
+      socket.on("POSITION_CONFIRMED", (data) => {
         setMyPosition({ direction: data.direction as "up" | "down", amount: data.amount });
         setBalance(data.newBalance);
         setExecutingOrder(false);
       });
 
-      socket.on("ORDER_REJECTED", (data: { error: string }) => {
+      socket.on("ORDER_REJECTED", (data) => {
         alert(data.error || "Order rejected");
         setExecutingOrder(false);
       });
@@ -243,13 +222,9 @@ function UpDownGame() {
 
     connect();
 
-    return () => {
-      socket?.disconnect();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => socket?.disconnect();
   }, []);
 
-  // ── Order handler ───────────────────────────────────────────────────────────
   const handleOrder = useCallback(
     (direction: "up" | "down") => {
       if (!socketRef.current || !round || round.state !== "open" || myPosition || executingOrder) return;
@@ -273,7 +248,6 @@ function UpDownGame() {
 
   return (
     <>
-      {/* Background flash */}
       <div
         className="fixed inset-0 pointer-events-none z-10 transition-opacity duration-700"
         style={{
@@ -288,7 +262,6 @@ function UpDownGame() {
       />
 
       <div className="space-y-4 max-w-2xl mx-auto pb-8">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-black text-white flex items-center gap-2">
             <TrendingUp className="text-emerald-400" size={24} /> Up & Down
@@ -299,7 +272,6 @@ function UpDownGame() {
           </div>
         </div>
 
-        {/* History Pills */}
         <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
           {history.length === 0 && (
             <span className="text-xs text-zinc-600 italic px-1">No results yet</span>
@@ -323,9 +295,7 @@ function UpDownGame() {
             ))}
         </div>
 
-        {/* Main Game Card */}
         <div className="bg-[#0f0f1a] border border-white/10 rounded-3xl overflow-hidden shadow-2xl">
-          {/* State Banner */}
           <div
             className={`px-4 py-2 text-center text-xs font-bold uppercase tracking-widest ${
               round?.state === "open"
@@ -344,7 +314,6 @@ function UpDownGame() {
               : "⏳ Waiting for round..."}
           </div>
 
-          {/* Price + Timer */}
           <div className="p-6 flex flex-col items-center gap-4">
             <div className="text-xs uppercase tracking-widest text-zinc-500 font-bold">
               {round?.market ?? "USD/KES"}
@@ -354,7 +323,6 @@ function UpDownGame() {
               {round?.entryPrice != null ? round.entryPrice.toFixed(4) : "—"}
             </div>
 
-            {/* RESULT */}
             {round?.state === "result" && lastResult && (
               <div
                 className={`flex flex-col items-center gap-1 ${
@@ -387,17 +355,15 @@ function UpDownGame() {
                     }`}
                   >
                     {lastResult.userWon
-                      ? `🎉 Minority wins! Profit: KES ${lastResult.profit?.toFixed(2) || "0"}`
-                      : `😔 Majority loses: KES ${myPosition?.amount || 0}`}
+                      ? `🎉 Profit: KES ${lastResult.profit?.toFixed(2) || "0"}`
+                      : `😔 Loss: KES ${myPosition?.amount || 0}`}
                   </div>
                 )}
               </div>
             )}
 
-            {/* OPEN: countdown ring */}
             {round?.state === "open" && <CountdownRing secondsLeft={secondsLeft} total={TOTAL_SECONDS} />}
 
-            {/* LOCKED: spinner */}
             {round?.state === "locked" && (
               <div className="flex items-center gap-2 text-amber-400 animate-pulse">
                 <Loader2 className="animate-spin" size={20} />
@@ -405,7 +371,6 @@ function UpDownGame() {
               </div>
             )}
 
-            {/* My position badge */}
             {myPosition && (
               <div
                 className={`px-4 py-1.5 rounded-full text-sm font-bold border ${
@@ -419,7 +384,6 @@ function UpDownGame() {
             )}
           </div>
 
-          {/* Order Buttons */}
           <div className="grid grid-cols-2 gap-3 px-6 pb-4">
             <button
               onClick={() => handleOrder("up")}
@@ -459,7 +423,6 @@ function UpDownGame() {
             </button>
           </div>
 
-          {/* Amount Panel */}
           <div className="px-6 pb-6 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">Amount (KES)</span>
@@ -493,9 +456,9 @@ function UpDownGame() {
             />
           </div>
 
-          {/* Info footer */}
+          {/* ✅ Footer – removed the discouraging text, replaced with something neutral */}
           <div className="px-6 pb-5 flex items-center justify-between text-xs text-zinc-600">
-            <span>Minority wins 50% profit • Majority loses 100%</span>
+            <span>Round outcome</span>
             {balance !== null && <span>Balance: KES {balance.toFixed(2)}</span>}
           </div>
         </div>
