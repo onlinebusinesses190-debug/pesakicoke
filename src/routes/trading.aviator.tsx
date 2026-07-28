@@ -5,7 +5,7 @@ import { io, Socket } from "socket.io-client";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@supabase/supabase-js";
 import { apiRequest } from "@/utils/api";
-import { ModeToggle } from "@/components/dashboard/ModeToggle";
+// import { ModeToggle } from "@/components/dashboard/ModeToggle";  // ⬅️ COMMENTED OUT
 import { AviatorCanvas } from "@/components/aviator/AviatorCanvas";
 
 type GameStatus = "WAITING" | "FLYING" | "CRASHED";
@@ -190,7 +190,7 @@ function AviatorPage() {
         <h1 className="text-3xl font-bold text-white flex items-center gap-3">
           <Plane className="text-red-500" /> Aviator
         </h1>
-        <ModeToggle />
+        {/* <ModeToggle />  ⬅️ COMMENTED OUT */}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
