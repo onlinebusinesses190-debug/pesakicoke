@@ -5,7 +5,6 @@ import { io, Socket } from "socket.io-client";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@supabase/supabase-js";
 import { apiRequest } from "@/utils/api";
-// import { ModeToggle } from "@/components/dashboard/ModeToggle";  // ⬅️ COMMENTED OUT
 import { AviatorCanvas } from "@/components/aviator/AviatorCanvas";
 
 type GameStatus = "WAITING" | "FLYING" | "CRASHED";
@@ -50,13 +49,21 @@ function AviatorPage() {
 
   const [status, setStatus] = useState<GameStatus>("WAITING");
   const [multiplier, setMultiplier] = useState(1.0);
-  const [betAmount, setBetAmount] = useState(10);
-  const [cashedOut, setCashedOut] = useState(false);
-  const [cashOutMultiplier, setCashOutMultiplier] = useState(0);
   const [history, setHistory] = useState<number[]>([]);
-  const [isBetting, setIsBetting] = useState(false);
   const [waitTime, setWaitTime] = useState(0);
   const [balance, setBalance] = useState<number | null>(null);
+
+  // ── Allocation 1 state ──────────────────────────────────────────────────────
+  const [betAmount1, setBetAmount1] = useState(10);
+  const [isBetting1, setIsBetting1] = useState(false);
+  const [cashedOut1, setCashedOut1] = useState(false);
+  const [cashOutMultiplier1, setCashOutMultiplier1] = useState(0);
+
+  // ── Allocation 2 state ──────────────────────────────────────────────────────
+  const [betAmount2, setBetAmount2] = useState(10);
+  const [isBetting2, setIsBetting2] = useState(false);
+  const [cashedOut2, setCashedOut2] = useState(false);
+  const [cashOutMultiplier2, setCashOutMultiplier2] = useState(0);
 
   const socketRef = useRef<Socket | null>(null);
   const multiplierRef = useRef(1.0);
@@ -80,24 +87,45 @@ function AviatorPage() {
     checkAuth();
   }, [navigate]);
 
-  // ── Place bet (Allocation) ────────────────────────────────────────────────
-  const placeBet = async () => {
-    if (status !== "WAITING" || isBetting) return;
-    setIsBetting(true);
+  // ── Place bet (Allocation 1) ──────────────────────────────────────────────
+  const placeBet1 = async () => {
+    if (status !== "WAITING" || isBetting1) return;
+    setIsBetting1(true);
     try {
       await apiRequest("/games/aviator/bet", {
         method: "POST",
-        body: JSON.stringify({ amount: betAmount, mode }),
+        body: JSON.stringify({ amount: betAmount1, mode }),
       });
     } catch (err: any) {
-      alert(err.message || "Failed to place allocation");
-      setIsBetting(false);
+      alert(err.message || "Failed to place allocation 1");
+      setIsBetting1(false);
     }
   };
 
-  // ── Cash out ───────────────────────────────────────────────────────────────
-  const handleCashOut = () => {
-    if (status !== "FLYING" || cashedOut || !socketRef.current) return;
+  // ── Place bet (Allocation 2) ──────────────────────────────────────────────
+  const placeBet2 = async () => {
+    if (status !== "WAITING" || isBetting2) return;
+    setIsBetting2(true);
+    try {
+      await apiRequest("/games/aviator/bet", {
+        method: "POST",
+        body: JSON.stringify({ amount: betAmount2, mode }),
+      });
+    } catch (err: any) {
+      alert(err.message || "Failed to place allocation 2");
+      setIsBetting2(false);
+    }
+  };
+
+  // ── Cash out 1 ─────────────────────────────────────────────────────────────
+  const handleCashOut1 = () => {
+    if (status !== "FLYING" || cashedOut1 || !socketRef.current) return;
+    socketRef.current.emit("CASHOUT");
+  };
+
+  // ── Cash out 2 ─────────────────────────────────────────────────────────────
+  const handleCashOut2 = () => {
+    if (status !== "FLYING" || cashedOut2 || !socketRef.current) return;
     socketRef.current.emit("CASHOUT");
   };
 
@@ -132,8 +160,13 @@ function AviatorPage() {
           setMultiplier(1.0);
           multiplierRef.current = 1.0;
           setWaitTime(data.waitTime / 1000);
-          setCashedOut(false);
-          setIsBetting(false);
+          // Reset both allocations for new round
+          setCashedOut1(false);
+          setCashedOut2(false);
+          setIsBetting1(false);
+          setIsBetting2(false);
+          setCashOutMultiplier1(0);
+          setCashOutMultiplier2(0);
           apiRequest("/wallet/balance").then(res => setBalance(res.balance)).catch(() => {});
         });
 
@@ -158,8 +191,16 @@ function AviatorPage() {
         });
 
         socket.on("CASHED_OUT", (data) => {
-          setCashedOut(true);
-          setCashOutMultiplier(data.multiplier);
+          // Since backend doesn't specify which bet, cash out both (or only the active one)
+          // We'll set cashOut on both, but only the one that was actually placed will show correct value
+          if (isBetting1 && !cashedOut1) {
+            setCashedOut1(true);
+            setCashOutMultiplier1(data.multiplier);
+          }
+          if (isBetting2 && !cashedOut2) {
+            setCashedOut2(true);
+            setCashOutMultiplier2(data.multiplier);
+          }
           apiRequest("/wallet/balance").then(res => setBalance(res.balance)).catch(() => {});
         });
 
@@ -178,6 +219,13 @@ function AviatorPage() {
     };
   }, []);
 
+  // ── Toggle mode (plain JS, no router hooks) ─────────────────────────────
+  const setMode = (newMode: "demo" | "real") => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("mode", newMode);
+    window.location.href = url.toString();
+  };
+
   // ── Render ────────────────────────────────────────────────────────────────────
   const recentHistory = history.slice(0, 6);
   const isFlying = status === "FLYING";
@@ -185,17 +233,45 @@ function AviatorPage() {
   const displayMultiplier = multiplier.toFixed(2);
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-8">
+    <div className="space-y-4 max-w-6xl mx-auto pb-8">
+      {/* Header with mode toggle */}
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-white flex items-center gap-3">
           <Plane className="text-red-500" /> Aviator
         </h1>
-        {/* <ModeToggle />  ⬅️ COMMENTED OUT */}
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-gray-400 font-medium">
+            {mode === "demo" ? "🎮 FUN MODE" : "🔴 REAL MODE"}
+          </span>
+          <div className="flex items-center gap-1 rounded-lg bg-[#181d29] p-1 text-xs font-medium">
+            <button
+              onClick={() => setMode("demo")}
+              className={`px-3 py-1.5 rounded-md transition-all ${
+                mode === "demo"
+                  ? "bg-[#dcb13c] text-black"
+                  : "text-gray-400 hover:text-white hover:bg-[#202636]"
+              }`}
+            >
+              Demo
+            </button>
+            <button
+              onClick={() => setMode("real")}
+              className={`px-3 py-1.5 rounded-md transition-all ${
+                mode === "real"
+                  ? "bg-[#dcb13c] text-black"
+                  : "text-gray-400 hover:text-white hover:bg-[#202636]"
+              }`}
+            >
+              Real
+            </button>
+          </div>
+        </div>
       </div>
 
+      {/* Main game area – height reduced */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 relative bg-[#0f0f1a] border border-white/10 rounded-3xl overflow-hidden">
-          <div className="relative" style={{ height: "480px" }}>
+          <div className="relative" style={{ height: "340px" }}>
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 text-6xl font-black text-white drop-shadow-lg">
               {displayMultiplier}x
             </div>
@@ -208,7 +284,7 @@ function AviatorPage() {
             </div>
             <AviatorCanvas multiplier={multiplier} gameState={status} roundHistory={history} />
             <AnimatePresence>
-              {cashedOut && (
+              {(cashedOut1 || cashedOut2) && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -217,7 +293,7 @@ function AviatorPage() {
                 >
                   <div className="bg-green-500/20 backdrop-blur-sm px-8 py-4 rounded-2xl border border-green-500/50">
                     <span className="text-4xl font-black text-green-400">
-                      🎉 +{(betAmount * cashOutMultiplier).toFixed(2)} KES
+                      🎉 +{(betAmount1 * cashOutMultiplier1 || betAmount2 * cashOutMultiplier2).toFixed(2)} KES
                     </span>
                   </div>
                 </motion.div>
@@ -226,6 +302,7 @@ function AviatorPage() {
           </div>
         </div>
 
+        {/* Right column: Two allocation panels side-by-side */}
         <div className="space-y-4">
           <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-4 text-center">
             <div className="text-sm text-gray-400 uppercase tracking-wider">
@@ -243,49 +320,103 @@ function AviatorPage() {
             </div>
           )}
 
-          <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-4">
-            <label className="text-xs uppercase tracking-wider text-gray-400 block mb-2">Allocation Amount</label>
-            <div className="flex flex-wrap gap-2 mb-3">
-              {[10, 100, 500, 200, 10000].map((v) => (
+          {/* Two allocation panels */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* Allocation 1 */}
+            <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-3">
+              <div className="text-xs text-gray-400 mb-1">Allocation 1</div>
+              <div className="flex flex-wrap gap-1 mb-2">
+                {[10, 100, 500, 200, 10000].map((v) => (
+                  <button
+                    key={v}
+                    onClick={() => setBetAmount1(v)}
+                    disabled={isBetting1 || isFlying}
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                      betAmount1 === v ? "bg-[#dcb13c] text-black" : "bg-white/5 text-gray-300 hover:bg-white/10"
+                    } disabled:opacity-50`}
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="number"
+                value={betAmount1}
+                onChange={(e) => setBetAmount1(Number(e.target.value) || 0)}
+                disabled={isBetting1 || isFlying}
+                className="w-full bg-black/50 border border-white/10 rounded-lg px-2 py-1.5 text-center text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#dcb13c] disabled:opacity-40 mb-2"
+              />
+              {isFlying && !cashedOut1 && isBetting1 ? (
                 <button
-                  key={v}
-                  onClick={() => setBetAmount(v)}
-                  disabled={isBetting || isFlying}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${
-                    betAmount === v ? "bg-[#dcb13c] text-black" : "bg-white/5 text-gray-300 hover:bg-white/10"
-                  } disabled:opacity-50`}
+                  onClick={handleCashOut1}
+                  className="w-full h-10 bg-orange-500 hover:bg-orange-400 text-black font-bold text-sm rounded-lg transition-all active:scale-95 flex flex-col items-center justify-center"
                 >
-                  {v}
+                  <span>CASH OUT</span>
+                  <span className="text-[10px] opacity-80">{(betAmount1 * multiplier).toFixed(2)} KES</span>
                 </button>
-              ))}
+              ) : (
+                <button
+                  onClick={placeBet1}
+                  disabled={!isWaiting || isBetting1}
+                  className="w-full h-10 bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm rounded-lg flex items-center justify-center gap-2"
+                >
+                  {isBetting1 ? <Loader2 className="animate-spin w-4 h-4" /> : "ALLOCATE"}
+                </button>
+              )}
+              {cashedOut1 && (
+                <div className="text-center text-xs text-green-400 mt-1">
+                  Cashed out @ {cashOutMultiplier1.toFixed(2)}x
+                </div>
+              )}
             </div>
-            <input
-              type="number"
-              value={betAmount}
-              onChange={(e) => setBetAmount(Number(e.target.value) || 0)}
-              disabled={isBetting || isFlying}
-              className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2.5 text-center text-lg font-bold text-white focus:outline-none focus:ring-2 focus:ring-[#dcb13c] disabled:opacity-40"
-            />
-          </div>
 
-          <div className="mt-auto">
-            {isFlying && !cashedOut && isBetting ? (
-              <button
-                onClick={handleCashOut}
-                className="w-full h-16 bg-orange-500 hover:bg-orange-400 text-black font-black text-xl rounded-xl shadow-[0_0_30px_rgba(249,115,22,0.4)] transition-all active:scale-95 flex flex-col items-center justify-center"
-              >
-                <span>REALIZE GAIN</span>
-                <span className="text-sm font-medium opacity-80">{(betAmount * multiplier).toFixed(2)} KES</span>
-              </button>
-            ) : (
-              <button
-                onClick={placeBet}
-                disabled={!isWaiting || isBetting}
-                className="w-full h-16 bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-xl rounded-xl shadow-[0_0_30px_rgba(22,163,74,0.4)] transition-all active:scale-95 flex items-center justify-center gap-2"
-              >
-                {isBetting ? <Loader2 className="animate-spin" /> : "ALLOCATE"}
-              </button>
-            )}
+            {/* Allocation 2 */}
+            <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-3">
+              <div className="text-xs text-gray-400 mb-1">Allocation 2</div>
+              <div className="flex flex-wrap gap-1 mb-2">
+                {[10, 100, 500, 200, 10000].map((v) => (
+                  <button
+                    key={v}
+                    onClick={() => setBetAmount2(v)}
+                    disabled={isBetting2 || isFlying}
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                      betAmount2 === v ? "bg-[#dcb13c] text-black" : "bg-white/5 text-gray-300 hover:bg-white/10"
+                    } disabled:opacity-50`}
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="number"
+                value={betAmount2}
+                onChange={(e) => setBetAmount2(Number(e.target.value) || 0)}
+                disabled={isBetting2 || isFlying}
+                className="w-full bg-black/50 border border-white/10 rounded-lg px-2 py-1.5 text-center text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#dcb13c] disabled:opacity-40 mb-2"
+              />
+              {isFlying && !cashedOut2 && isBetting2 ? (
+                <button
+                  onClick={handleCashOut2}
+                  className="w-full h-10 bg-orange-500 hover:bg-orange-400 text-black font-bold text-sm rounded-lg transition-all active:scale-95 flex flex-col items-center justify-center"
+                >
+                  <span>CASH OUT</span>
+                  <span className="text-[10px] opacity-80">{(betAmount2 * multiplier).toFixed(2)} KES</span>
+                </button>
+              ) : (
+                <button
+                  onClick={placeBet2}
+                  disabled={!isWaiting || isBetting2}
+                  className="w-full h-10 bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm rounded-lg flex items-center justify-center gap-2"
+                >
+                  {isBetting2 ? <Loader2 className="animate-spin w-4 h-4" /> : "ALLOCATE"}
+                </button>
+              )}
+              {cashedOut2 && (
+                <div className="text-center text-xs text-green-400 mt-1">
+                  Cashed out @ {cashOutMultiplier2.toFixed(2)}x
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2 text-xs text-gray-500">
