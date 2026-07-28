@@ -160,7 +160,6 @@ function AviatorPage() {
           setMultiplier(1.0);
           multiplierRef.current = 1.0;
           setWaitTime(data.waitTime / 1000);
-          // Reset both allocations for new round
           setCashedOut1(false);
           setCashedOut2(false);
           setIsBetting1(false);
@@ -191,8 +190,6 @@ function AviatorPage() {
         });
 
         socket.on("CASHED_OUT", (data) => {
-          // Since backend doesn't specify which bet, cash out both (or only the active one)
-          // We'll set cashOut on both, but only the one that was actually placed will show correct value
           if (isBetting1 && !cashedOut1) {
             setCashedOut1(true);
             setCashOutMultiplier1(data.multiplier);
@@ -268,16 +265,16 @@ function AviatorPage() {
         </div>
       </div>
 
-      {/* Main game area – height reduced */}
+      {/* Main game area – height reduced to 180px */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 relative bg-[#0f0f1a] border border-white/10 rounded-3xl overflow-hidden">
-          <div className="relative" style={{ height: "340px" }}>
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 text-6xl font-black text-white drop-shadow-lg">
+          <div className="relative" style={{ height: "180px" }}> {/* ⬅️ REDUCED TO 180px */}
+            <div className="absolute top-1 left-1/2 -translate-x-1/2 z-20 text-3xl font-black text-white drop-shadow-lg">
               {displayMultiplier}x
             </div>
-            <div className="absolute top-4 right-4 z-20 flex gap-2">
+            <div className="absolute top-1 right-1 z-20 flex gap-1">
               {recentHistory.map((val, i) => (
-                <div key={i} className="bg-black/50 backdrop-blur-sm px-2 py-1 rounded text-xs font-bold text-white border border-white/10">
+                <div key={i} className="bg-black/50 backdrop-blur-sm px-1 py-0.5 rounded text-[8px] font-bold text-white border border-white/10">
                   {val.toFixed(2)}x
                 </div>
               ))}
@@ -291,8 +288,8 @@ function AviatorPage() {
                   exit={{ opacity: 0 }}
                   className="absolute inset-0 flex items-center justify-center pointer-events-none z-30"
                 >
-                  <div className="bg-green-500/20 backdrop-blur-sm px-8 py-4 rounded-2xl border border-green-500/50">
-                    <span className="text-4xl font-black text-green-400">
+                  <div className="bg-green-500/20 backdrop-blur-sm px-4 py-2 rounded-2xl border border-green-500/50">
+                    <span className="text-2xl font-black text-green-400">
                       🎉 +{(betAmount1 * cashOutMultiplier1 || betAmount2 * cashOutMultiplier2).toFixed(2)} KES
                     </span>
                   </div>
@@ -304,11 +301,11 @@ function AviatorPage() {
 
         {/* Right column: Two allocation panels side-by-side */}
         <div className="space-y-4">
-          <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-4 text-center">
-            <div className="text-sm text-gray-400 uppercase tracking-wider">
+          <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-3 text-center">
+            <div className="text-xs text-gray-400 uppercase tracking-wider">
               {isWaiting ? "Next round in" : isFlying ? "Round in progress" : "Crashed"}
             </div>
-            <div className="text-2xl font-bold text-white">
+            <div className="text-xl font-bold text-white">
               {isWaiting ? `${Math.ceil(waitTime)}s` : isFlying ? "🔴 LIVE" : "💥 CRASHED"}
             </div>
           </div>
@@ -320,7 +317,6 @@ function AviatorPage() {
             </div>
           )}
 
-          {/* Two allocation panels */}
           <div className="grid grid-cols-2 gap-3">
             {/* Allocation 1 */}
             <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-3">
@@ -349,7 +345,7 @@ function AviatorPage() {
               {isFlying && !cashedOut1 && isBetting1 ? (
                 <button
                   onClick={handleCashOut1}
-                  className="w-full h-10 bg-orange-500 hover:bg-orange-400 text-black font-bold text-sm rounded-lg transition-all active:scale-95 flex flex-col items-center justify-center"
+                  className="w-full h-9 bg-orange-500 hover:bg-orange-400 text-black font-bold text-sm rounded-lg transition-all active:scale-95 flex flex-col items-center justify-center"
                 >
                   <span>CASH OUT</span>
                   <span className="text-[10px] opacity-80">{(betAmount1 * multiplier).toFixed(2)} KES</span>
@@ -358,7 +354,7 @@ function AviatorPage() {
                 <button
                   onClick={placeBet1}
                   disabled={!isWaiting || isBetting1}
-                  className="w-full h-10 bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm rounded-lg flex items-center justify-center gap-2"
+                  className="w-full h-9 bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm rounded-lg flex items-center justify-center gap-2"
                 >
                   {isBetting1 ? <Loader2 className="animate-spin w-4 h-4" /> : "ALLOCATE"}
                 </button>
@@ -397,7 +393,7 @@ function AviatorPage() {
               {isFlying && !cashedOut2 && isBetting2 ? (
                 <button
                   onClick={handleCashOut2}
-                  className="w-full h-10 bg-orange-500 hover:bg-orange-400 text-black font-bold text-sm rounded-lg transition-all active:scale-95 flex flex-col items-center justify-center"
+                  className="w-full h-9 bg-orange-500 hover:bg-orange-400 text-black font-bold text-sm rounded-lg transition-all active:scale-95 flex flex-col items-center justify-center"
                 >
                   <span>CASH OUT</span>
                   <span className="text-[10px] opacity-80">{(betAmount2 * multiplier).toFixed(2)} KES</span>
@@ -406,7 +402,7 @@ function AviatorPage() {
                 <button
                   onClick={placeBet2}
                   disabled={!isWaiting || isBetting2}
-                  className="w-full h-10 bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm rounded-lg flex items-center justify-center gap-2"
+                  className="w-full h-9 bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm rounded-lg flex items-center justify-center gap-2"
                 >
                   {isBetting2 ? <Loader2 className="animate-spin w-4 h-4" /> : "ALLOCATE"}
                 </button>
@@ -432,7 +428,7 @@ function AviatorPage() {
         </div>
       </div>
 
-      <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-4">
+      <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-3">
         <div className="flex items-center gap-2 text-sm text-gray-400">
           <span>Recent crashes: </span>
           <div className="flex gap-2 flex-wrap">
