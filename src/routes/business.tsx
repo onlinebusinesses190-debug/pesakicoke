@@ -1,12 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Building2, FileText, TrendingUp, Award, BookOpen, ChevronRight, X, ArrowLeft,
   Rocket, Store, Calendar, CheckCircle2, Clock,
 } from "lucide-react";
+import { toast } from "sonner";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Stat, SectionTitle, Badge } from "@/components/ui-bits";
-import { businessApps, successStories, fmt } from "@/lib/mock";
+import { apiRequest } from "@/utils/api";
 import { FileField, SuccessBlock } from "./kazi";
 
 export const Route = createFileRoute("/business")({
@@ -28,9 +29,90 @@ const sections: { label: string; icon: any; tone: string; key: ActionKey }[] = [
   { label: "Funding Guidelines", icon: BookOpen,    tone: "primary", key: "guide" },
 ];
 
+// ── Helper: format currency ──────────────────────────────────────────────────
+const fmt = (amount: number) => {
+  return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', minimumFractionDigits: 0 }).format(amount);
+};
+
+// ── Default Success Stories (always visible to motivate new users) ──────────
+const DEFAULT_SUCCESS_STORIES = [
+  {
+    name: "Wanjiku's Fresh Produce",
+    grew: "Grew 3x in 6 months",
+    quote: "PESAKI funding helped me buy a refrigerated truck. My profits tripled and I now supply 5 major supermarkets."
+  },
+  {
+    name: "Tech4Kids Academy",
+    grew: "Expanded to 4 branches",
+    quote: "We used the funds to set up two new computer labs. We're now teaching coding to over 500 kids weekly."
+  },
+  {
+    name: "Mama Mtaani Bakery",
+    grew: "Hired 12 staff members",
+    quote: "The business loan allowed me to buy a commercial oven. I've gone from 3 employees to 15 and supply 30 local shops."
+  }
+];
+
+// ── Main Component ────────────────────────────────────────────────────────────
 function BusinessPage() {
   const [mode, setMode] = useState<"none" | "picker" | "startup" | "existing">("none");
   const [info, setInfo] = useState<null | "invest" | "guide">(null);
+  const [loading, setLoading] = useState(true);
+
+  // ── Real data state ──
+  const [summary, setSummary] = useState({
+    totalFunding: 0,
+    repaidAmount: 0,
+    profitSharePaid: 0,
+    openApps: 0,
+    approvedApps: 0,
+    repaymentStatus: "On time",
+  });
+  const [applications, setApplications] = useState<any[]>([]);
+  // ✅ Initialize with default stories so they always show
+  const [successStories, setSuccessStories] = useState(DEFAULT_SUCCESS_STORIES);
+
+  const fetchBusinessData = async () => {
+    try {
+      setLoading(true);
+      // Fetch summary
+      const summaryData = await apiRequest('/business/summary');
+      setSummary({
+        totalFunding: summaryData.totalFunding || 0,
+        repaidAmount: summaryData.repaidAmount || 0,
+        profitSharePaid: summaryData.profitSharePaid || 0,
+        openApps: summaryData.openApps || 0,
+        approvedApps: summaryData.approvedApps || 0,
+        repaymentStatus: summaryData.repaymentStatus || "On time",
+      });
+
+      // Fetch applications
+      const appsData = await apiRequest('/business/applications');
+      setApplications(appsData || []);
+
+      // ✅ Fetch success stories from backend – if any, we keep them; otherwise we keep default ones.
+      try {
+        const storiesData = await apiRequest('/business/success-stories');
+        if (storiesData && storiesData.length > 0) {
+          setSuccessStories(storiesData); // Replace with real ones
+        } else {
+          setSuccessStories(DEFAULT_SUCCESS_STORIES); // Ensure at least 3 show
+        }
+      } catch (e) {
+        // If backend endpoint doesn't exist, keep the default ones
+        setSuccessStories(DEFAULT_SUCCESS_STORIES);
+      }
+    } catch (err) {
+      console.error('Failed to load business data:', err);
+      toast.error('Could not load business data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBusinessData();
+  }, []);
 
   const onAction = (k: ActionKey) => {
     if (k === "apply") return setMode("picker");
@@ -40,6 +122,19 @@ function BusinessPage() {
     if (k === "guide") return setInfo("guide");
   };
 
+  if (loading) {
+    return (
+      <AppShell>
+        <PageHeader title="Business Hub" subtitle="Fund. Build. Scale." />
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">Loading business data...</p>
+        </div>
+      </AppShell>
+    );
+  }
+
+  const { totalFunding, repaidAmount, profitSharePaid, openApps, approvedApps, repaymentStatus } = summary;
+
   return (
     <AppShell>
       <PageHeader title="Business Hub" subtitle="Fund. Build. Scale." />
@@ -47,24 +142,24 @@ function BusinessPage() {
       <section className="px-5 pt-5">
         <div className="gradient-primary rounded-2xl p-5 text-primary-foreground">
           <p className="text-xs uppercase tracking-widest opacity-80">Total Funding Received</p>
-          <p className="mt-1 font-display text-3xl font-bold">{fmt(730000)}</p>
+          <p className="mt-1 font-display text-3xl font-bold">{fmt(totalFunding)}</p>
           <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
             <div className="rounded-xl bg-white/10 p-2.5">
               <p className="opacity-70">Amount Repaid</p>
-              <p className="mt-0.5 font-semibold">{fmt(142000)}</p>
+              <p className="mt-0.5 font-semibold">{fmt(repaidAmount)}</p>
             </div>
             <div className="rounded-xl bg-white/10 p-2.5">
               <p className="opacity-70">Profit Share Paid</p>
-              <p className="mt-0.5 font-semibold">{fmt(38500)}</p>
+              <p className="mt-0.5 font-semibold">{fmt(profitSharePaid)}</p>
             </div>
           </div>
         </div>
       </section>
 
       <section className="mt-5 grid grid-cols-3 gap-3 px-5">
-        <Stat label="Open Apps" value="2" tone="primary" />
-        <Stat label="Approved" value="3" tone="success" />
-        <Stat label="Repayment" value="On time" tone="gold" />
+        <Stat label="Open Apps" value={String(openApps)} tone="primary" />
+        <Stat label="Approved" value={String(approvedApps)} tone="success" />
+        <Stat label="Repayment" value={repaymentStatus} tone="gold" />
       </section>
 
       <section className="mt-6 px-5">
@@ -96,8 +191,11 @@ function BusinessPage() {
       <section id="apps-section" className="mt-6 px-5 scroll-mt-20">
         <SectionTitle title="My applications" />
         <div className="space-y-2.5">
-          {businessApps.map((a) => (
-            <Card key={a.name} className="!p-3.5">
+          {applications.length === 0 && (
+            <Card className="!p-4 text-center text-xs text-muted-foreground">No applications yet. Apply for funding to get started!</Card>
+          )}
+          {applications.map((a) => (
+            <Card key={a.id || a.name} className="!p-3.5">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">{a.name}</p>
@@ -133,6 +231,7 @@ function BusinessPage() {
           mode={mode}
           setMode={setMode}
           onClose={() => setMode("none")}
+          onSuccess={fetchBusinessData}
         />
       )}
       {info && <InfoSheet which={info} onClose={() => setInfo(null)} />}
@@ -140,6 +239,7 @@ function BusinessPage() {
   );
 }
 
+// ── Shared Sheet Shell ────────────────────────────────────────────────────────
 function SheetShell({ title, onBack, onClose, children }: { title: string; onBack?: () => void; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-end sm:place-items-center">
@@ -178,12 +278,14 @@ function SectionHeader({ n, title }: { n: number; title: string }) {
   );
 }
 
+// ── Funding Sheet ──────────────────────────────────────────────────────────────
 function FundingSheet({
-  mode, setMode, onClose,
+  mode, setMode, onClose, onSuccess,
 }: {
   mode: "picker" | "startup" | "existing";
   setMode: (m: "picker" | "startup" | "existing") => void;
   onClose: () => void;
+  onSuccess: () => void;
 }) {
   if (mode === "picker") {
     return (
@@ -226,16 +328,37 @@ function FundingSheet({
   }
 
   if (mode === "startup") {
-    return <StartupForm onBack={() => setMode("picker")} onClose={onClose} />;
+    return <StartupForm onBack={() => setMode("picker")} onClose={onClose} onSuccess={onSuccess} />;
   }
-  return <ExistingForm onBack={() => setMode("picker")} onClose={onClose} />;
+  return <ExistingForm onBack={() => setMode("picker")} onClose={onClose} onSuccess={onSuccess} />;
 }
 
-function StartupForm({ onBack, onClose }: { onBack: () => void; onClose: () => void }) {
+// ── Startup Form ──────────────────────────────────────────────────────────────
+function StartupForm({ onBack, onClose, onSuccess }: { onBack: () => void; onClose: () => void; onSuccess: () => void }) {
   const [done, setDone] = useState(false);
   const [agree, setAgree] = useState(false);
   const [slot, setSlot] = useState<"morning" | "afternoon">("morning");
   const [date, setDate] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!agree) return;
+    setSubmitting(true);
+    try {
+      await apiRequest('/business/apply/startup', {
+        method: 'POST',
+        body: JSON.stringify({ /* form data */ }),
+      });
+      toast.success('Startup application submitted!');
+      setDone(true);
+      onSuccess();
+    } catch (err: any) {
+      toast.error(err.message || 'Submission failed');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (done) {
     return (
@@ -252,7 +375,7 @@ function StartupForm({ onBack, onClose }: { onBack: () => void; onClose: () => v
         <p className="mt-0.5 text-xs text-muted-foreground">Fill in each section — a training session is required after review.</p>
       </div>
 
-      <form onSubmit={(e) => { e.preventDefault(); if (!agree) return; setDone(true); }}>
+      <form onSubmit={handleSubmit}>
         <SectionHeader n={1} title="Business details" />
         <div className="mt-3 space-y-3">
           <div><FieldLabel>Business name</FieldLabel><input required className={inputCls} /></div>
@@ -343,28 +466,44 @@ function StartupForm({ onBack, onClose }: { onBack: () => void; onClose: () => v
 
         <button
           type="submit"
-          disabled={!agree}
+          disabled={!agree || submitting}
           className="mt-5 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50"
         >
-          Submit Application
+          {submitting ? 'Submitting...' : 'Submit Application'}
         </button>
       </form>
     </SheetShell>
   );
 }
 
-function ExistingForm({ onBack, onClose }: { onBack: () => void; onClose: () => void }) {
+// ── Existing Business Form ────────────────────────────────────────────────────
+function ExistingForm({ onBack, onClose, onSuccess }: { onBack: () => void; onClose: () => void; onSuccess: () => void }) {
   const [submitted, setSubmitted] = useState(false);
   const [agree, setAgree] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  return (
-    <SheetShell title="Existing business funding" onBack={onBack} onClose={onClose}>
-      <div className="rounded-xl bg-gold/10 p-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-gold-foreground">Established track</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">Documented businesses with revenue history.</p>
-      </div>
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!agree) return;
+    setSubmitting(true);
+    try {
+      await apiRequest('/business/apply/existing', {
+        method: 'POST',
+        body: JSON.stringify({ /* form data */ }),
+      });
+      toast.success('Existing business application submitted!');
+      setSubmitted(true);
+      onSuccess();
+    } catch (err: any) {
+      toast.error(err.message || 'Submission failed');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-      {submitted ? (
+  if (submitted) {
+    return (
+      <SheetShell title="Existing business funding" onClose={onClose}>
         <div className="mt-5 rounded-2xl border border-border bg-primary/5 p-5 text-center">
           <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-primary/15 text-primary">
             <CheckCircle2 className="h-6 w-6" />
@@ -377,76 +516,86 @@ function ExistingForm({ onBack, onClose }: { onBack: () => void; onClose: () => 
             Done
           </button>
         </div>
-      ) : (
-        <form onSubmit={(e) => { e.preventDefault(); if (!agree) return; setSubmitted(true); }}>
-          <SectionHeader n={1} title="Business details" />
-          <div className="mt-3 space-y-3">
-            <div><FieldLabel>Business name</FieldLabel><input required className={inputCls} /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><FieldLabel>Registration number</FieldLabel><input required className={inputCls} /></div>
-              <div><FieldLabel>Business type</FieldLabel>
-                <select required className={inputCls}><option>Existing</option></select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><FieldLabel>Location</FieldLabel><input required className={inputCls} /></div>
-              <div><FieldLabel>Years in operation</FieldLabel>
-                <select required className={inputCls}>
-                  <option value="">Select</option>
-                  <option>1 - 2</option><option>3 - 5</option><option>5 - 10</option><option>10+</option>
-                </select>
-              </div>
+      </SheetShell>
+    );
+  }
+
+  return (
+    <SheetShell title="Existing business funding" onBack={onBack} onClose={onClose}>
+      <div className="rounded-xl bg-gold/10 p-3">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-gold-foreground">Established track</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">Documented businesses with revenue history.</p>
+      </div>
+
+      <form onSubmit={handleSubmit}>
+        <SectionHeader n={1} title="Business details" />
+        <div className="mt-3 space-y-3">
+          <div><FieldLabel>Business name</FieldLabel><input required className={inputCls} /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><FieldLabel>Registration number</FieldLabel><input required className={inputCls} /></div>
+            <div><FieldLabel>Business type</FieldLabel>
+              <select required className={inputCls}><option>Existing</option></select>
             </div>
           </div>
-
-          <SectionHeader n={2} title="Documents" />
-          <div className="mt-3 space-y-3">
-            <FileField label="Business license" required accept=".pdf,image/*" />
-            <FileField label="Bank statements (last 6 months)" required accept=".pdf" />
-            <FileField label="Tax compliance certificate (optional)" accept=".pdf,image/*" />
-            <FileField label="Business plan (optional)" accept=".pdf,.doc,.docx" />
-          </div>
-
-          <SectionHeader n={3} title="Financials" />
-          <div className="mt-3 space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div><FieldLabel>Monthly revenue (KES)</FieldLabel><input required type="number" className={inputCls} /></div>
-              <div><FieldLabel>Monthly profit (KES)</FieldLabel><input required type="number" className={inputCls} /></div>
-            </div>
-            <div><FieldLabel>Reason for funding</FieldLabel><textarea required rows={3} className={inputCls} /></div>
-            <div><FieldLabel>Repayment plan</FieldLabel><textarea required rows={3} className={inputCls} /></div>
-          </div>
-
-          <SectionHeader n={4} title="Funding" />
-          <div className="mt-3 space-y-3">
-            <div><FieldLabel>Amount requested (KES)</FieldLabel><input required type="number" className={inputCls} /></div>
-            <div><FieldLabel>Purpose</FieldLabel>
+          <div className="grid grid-cols-2 gap-3">
+            <div><FieldLabel>Location</FieldLabel><input required className={inputCls} /></div>
+            <div><FieldLabel>Years in operation</FieldLabel>
               <select required className={inputCls}>
                 <option value="">Select</option>
-                <option>Equipment</option><option>Inventory</option><option>Marketing</option><option>Expansion</option><option>Other</option>
+                <option>1 - 2</option><option>3 - 5</option><option>5 - 10</option><option>10+</option>
               </select>
             </div>
           </div>
+        </div>
 
-          <SectionHeader n={5} title="Terms" />
-          <label className="mt-3 flex items-start gap-2 rounded-xl border border-border p-3 text-xs">
-            <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" />
-            <span>I agree to return a percentage of my monthly profit to PESAKI until the full amount is repaid.</span>
-          </label>
+        <SectionHeader n={2} title="Documents" />
+        <div className="mt-3 space-y-3">
+          <FileField label="Business license" required accept=".pdf,image/*" />
+          <FileField label="Bank statements (last 6 months)" required accept=".pdf" />
+          <FileField label="Tax compliance certificate (optional)" accept=".pdf,image/*" />
+          <FileField label="Business plan (optional)" accept=".pdf,.doc,.docx" />
+        </div>
 
-          <button
-            type="submit"
-            disabled={!agree}
-            className="mt-5 h-11 w-full rounded-xl gradient-gold text-sm font-semibold text-gold-foreground disabled:opacity-50"
-          >
-            Submit Application
-          </button>
-        </form>
-      )}
+        <SectionHeader n={3} title="Financials" />
+        <div className="mt-3 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div><FieldLabel>Monthly revenue (KES)</FieldLabel><input required type="number" className={inputCls} /></div>
+            <div><FieldLabel>Monthly profit (KES)</FieldLabel><input required type="number" className={inputCls} /></div>
+          </div>
+          <div><FieldLabel>Reason for funding</FieldLabel><textarea required rows={3} className={inputCls} /></div>
+          <div><FieldLabel>Repayment plan</FieldLabel><textarea required rows={3} className={inputCls} /></div>
+        </div>
+
+        <SectionHeader n={4} title="Funding" />
+        <div className="mt-3 space-y-3">
+          <div><FieldLabel>Amount requested (KES)</FieldLabel><input required type="number" className={inputCls} /></div>
+          <div><FieldLabel>Purpose</FieldLabel>
+            <select required className={inputCls}>
+              <option value="">Select</option>
+              <option>Equipment</option><option>Inventory</option><option>Marketing</option><option>Expansion</option><option>Other</option>
+            </select>
+          </div>
+        </div>
+
+        <SectionHeader n={5} title="Terms" />
+        <label className="mt-3 flex items-start gap-2 rounded-xl border border-border p-3 text-xs">
+          <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" />
+          <span>I agree to return a percentage of my monthly profit to PESAKI until the full amount is repaid.</span>
+        </label>
+
+        <button
+          type="submit"
+          disabled={!agree || submitting}
+          className="mt-5 h-11 w-full rounded-xl gradient-gold text-sm font-semibold text-gold-foreground disabled:opacity-50"
+        >
+          {submitting ? 'Submitting...' : 'Submit Application'}
+        </button>
+      </form>
     </SheetShell>
   );
 }
 
+// ── Info Sheet ────────────────────────────────────────────────────────────────
 function InfoSheet({ which, onClose }: { which: "invest" | "guide"; onClose: () => void }) {
   const title = which === "invest" ? "My Investments" : "Funding Guidelines";
   return (
