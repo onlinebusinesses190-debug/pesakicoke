@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight, History, Eye, EyeOff, TrendingUp,
   X, ArrowLeft, CheckCircle2,
@@ -7,9 +7,14 @@ import {
 import { toast } from "sonner";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Stat, SectionTitle, Badge } from "@/components/ui-bits";
-import { user, fmt } from "@/lib/mock";
-import { balanceStore, useBalance, withdrawFee, totalLocked } from "@/lib/balance";
+import { apiRequest } from "@/utils/api";
 
+// ── Helper: format currency ──────────────────────────────────────────────────
+const fmt = (amount: number) => {
+  return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', minimumFractionDigits: 0 }).format(amount);
+};
+
+// ── Route ─────────────────────────────────────────────────────────────────────
 export const Route = createFileRoute("/wallet")({
   head: () => ({
     meta: [
@@ -22,19 +27,66 @@ export const Route = createFileRoute("/wallet")({
 
 type Action = "deposit" | "withdraw" | "transfer";
 
+// ── Main Component ────────────────────────────────────────────────────────────
 function WalletPage() {
-  const state = useBalance();
+  const [balance, setBalance] = useState(0);
+  const [locked, setLocked] = useState(0);
+  const [totalEarnings, setTotalEarnings] = useState(0);
+  const [referralEarnings, setReferralEarnings] = useState(0);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const [show, setShow] = useState(true);
   const [filter, setFilter] = useState<string>("All");
   const [action, setAction] = useState<Action | null>(null);
 
   const types = ["All", "Deposit", "Withdrawal", "Trading", "Job Earnings", "Business Funding", "Savings", "Transfer"];
-  const filtered = filter === "All" ? state.transactions : state.transactions.filter((t) => t.type.toLowerCase().includes(filter.toLowerCase()));
+  const filtered = filter === "All" ? transactions : transactions.filter((t) => t.type.toLowerCase().includes(filter.toLowerCase()));
 
-  const totalDeposits = state.transactions.filter((t) => t.type.startsWith("Deposit")).reduce((s, t) => s + t.amount, 0);
-  const totalWithdrawals = -state.transactions.filter((t) => t.type.startsWith("Withdrawal") && !t.type.includes("fee")).reduce((s, t) => s + t.amount, 0);
-  const pending = state.transactions.filter((t) => t.status === "Pending").length;
+  // ── Fetch wallet data ──────────────────────────────────────────────────────
+  const fetchWalletData = async () => {
+    try {
+      setLoading(true);
+      const balanceData = await apiRequest('/wallet/balance');
+      setBalance(balanceData.balance || 0);
+      setLocked(balanceData.locked || 0);
+      setTotalEarnings(balanceData.totalEarnings || 0);
+      setReferralEarnings(balanceData.referralEarnings || 0);
 
+      const txData = await apiRequest('/wallet/transactions');
+      setTransactions(txData || []);
+    } catch (err) {
+      console.error('Failed to fetch wallet data:', err);
+      toast.error('Could not load wallet data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchWalletData();
+  }, []);
+
+  // ── Derived stats ──────────────────────────────────────────────────────────
+  const totalDeposits = transactions.filter((t) => t.type.startsWith("Deposit")).reduce((s, t) => s + t.amount, 0);
+  const totalWithdrawals = -transactions.filter((t) => t.type.startsWith("Withdrawal") && !t.type.includes("fee")).reduce((s, t) => s + t.amount, 0);
+  const pending = transactions.filter((t) => t.status === "Pending").length;
+
+  const available = balance - locked;
+
+  // ── Loading state ──────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <AppShell>
+        <PageHeader title="Wallet" subtitle="Your PESAKI money center" />
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">Loading wallet...</p>
+        </div>
+      </AppShell>
+    );
+  }
+
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <AppShell>
       <PageHeader title="Wallet" subtitle="Your PESAKI money center" />
@@ -49,9 +101,9 @@ function WalletPage() {
             </button>
           </div>
           <p className="relative mt-1 font-display text-4xl font-bold tracking-tight">
-            {show ? fmt(state.available) : "•••••••"}
+            {show ? fmt(available) : "•••••••"}
           </p>
-          <p className="relative mt-1 text-[11px] opacity-80">Locked: {show ? fmt(totalLocked(state)) : "•••"}</p>
+          <p className="relative mt-1 text-[11px] opacity-80">Locked: {show ? fmt(locked) : "•••"}</p>
           <div className="relative mt-5 grid grid-cols-3 gap-2">
             {[
               { l: "Deposit",  i: ArrowDownToLine, a: "deposit" as const },
@@ -75,7 +127,7 @@ function WalletPage() {
         <Stat label="Total Deposits"     value={fmt(totalDeposits)} tone="success" />
         <Stat label="Total Withdrawals"  value={fmt(totalWithdrawals)} tone="primary" />
         <Stat label="Pending"            value={String(pending)} tone="gold" />
-        <Stat label="Referral Earnings"  value={fmt(user.referralEarnings)} tone="gold" />
+        <Stat label="Referral Earnings"  value={fmt(referralEarnings)} tone="gold" />
       </section>
 
       <section className="mt-6 px-5">
@@ -123,13 +175,14 @@ function WalletPage() {
         </Card>
       </section>
 
-      {action === "deposit"  && <DepositModal  onClose={() => setAction(null)} />}
-      {action === "withdraw" && <WithdrawModal onClose={() => setAction(null)} />}
-      {action === "transfer" && <TransferModal onClose={() => setAction(null)} />}
+      {action === "deposit"  && <DepositModal  onClose={() => setAction(null)} onSuccess={fetchWalletData} />}
+      {action === "withdraw" && <WithdrawModal onClose={() => setAction(null)} onSuccess={fetchWalletData} />}
+      {action === "transfer" && <TransferModal onClose={() => setAction(null)} onSuccess={fetchWalletData} />}
     </AppShell>
   );
 }
 
+// ── Shared Modal Shell ────────────────────────────────────────────────────────
 function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-end sm:place-items-center">
@@ -150,15 +203,28 @@ function ModalShell({ title, onClose, children }: { title: string; onClose: () =
   );
 }
 
-function DepositModal({ onClose }: { onClose: () => void }) {
+// ── Deposit Modal ─────────────────────────────────────────────────────────────
+function DepositModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [amount, setAmount] = useState(5000);
   const [method, setMethod] = useState<"M-Pesa" | "Bank Transfer">("M-Pesa");
+  const [submitting, setSubmitting] = useState(false);
 
-  const submit = () => {
+  const submit = async () => {
     if (amount <= 0) return toast.error("Enter an amount");
-    balanceStore.deposit(amount, method);
-    toast.success(`Deposit of ${fmt(amount)} received via ${method}`);
-    onClose();
+    setSubmitting(true);
+    try {
+      await apiRequest('/wallet/deposit', {
+        method: 'POST',
+        body: JSON.stringify({ amount, method }),
+      });
+      toast.success(`Deposit of ${fmt(amount)} initiated via ${method}`);
+      onSuccess();
+      onClose();
+    } catch (err: any) {
+      toast.error(err.message || 'Deposit failed');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -177,28 +243,57 @@ function DepositModal({ onClose }: { onClose: () => void }) {
         <option>Bank Transfer</option>
       </select>
 
-      <button onClick={submit} className="mt-5 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground">
-        Deposit Now
+      <button onClick={submit} disabled={submitting} className="mt-5 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50">
+        {submitting ? 'Processing...' : 'Deposit Now'}
       </button>
     </ModalShell>
   );
 }
 
-function WithdrawModal({ onClose }: { onClose: () => void }) {
-  const state = useBalance();
+// ── Withdraw Modal ────────────────────────────────────────────────────────────
+function WithdrawModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [amount, setAmount] = useState(1000);
   const [method, setMethod] = useState<"M-Pesa" | "Bank">("M-Pesa");
-  const fee = withdrawFee(amount, method);
-  const total = amount + fee;
-  const insufficient = total > state.available;
+  const [submitting, setSubmitting] = useState(false);
 
-  const submit = () => {
+  // Simple fee calculation (you can replace with real backend logic later)
+  const fee = method === "M-Pesa" ? Math.min(amount * 0.01, 50) : Math.min(amount * 0.02, 100);
+  const total = amount + fee;
+  const [availableBalance, setAvailableBalance] = useState(0);
+  const [insufficient, setInsufficient] = useState(false);
+
+  // We'll fetch balance on mount – but we can use the parent's data if we pass it down.
+  // For simplicity, we'll fetch it again.
+  useEffect(() => {
+    apiRequest('/wallet/balance').then(data => {
+      const bal = data.balance || 0;
+      const locked = data.locked || 0;
+      setAvailableBalance(bal - locked);
+    }).catch(() => {});
+  }, []);
+
+  const submit = async () => {
     if (amount <= 0) return toast.error("Enter an amount");
-    const res = balanceStore.withdraw(amount, method);
-    if (!res.ok) return toast.error(res.error!);
-    toast.success(`Withdrawal of ${fmt(amount)} to ${method} processed`);
-    onClose();
+    if (total > availableBalance) return toast.error("Insufficient balance");
+    setSubmitting(true);
+    try {
+      await apiRequest('/wallet/withdraw', {
+        method: 'POST',
+        body: JSON.stringify({ amount, method, fee }),
+      });
+      toast.success(`Withdrawal of ${fmt(amount)} to ${method} processed`);
+      onSuccess();
+      onClose();
+    } catch (err: any) {
+      toast.error(err.message || 'Withdrawal failed');
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  useEffect(() => {
+    setInsufficient(total > availableBalance);
+  }, [amount, method, availableBalance]);
 
   return (
     <ModalShell title="Withdraw funds" onClose={onClose}>
@@ -217,30 +312,54 @@ function WithdrawModal({ onClose }: { onClose: () => void }) {
         <option>Bank</option>
       </select>
 
-      {insufficient && <p className="mt-3 text-xs font-semibold text-destructive">Insufficient balance (available {fmt(state.available)})</p>}
+      {insufficient && <p className="mt-3 text-xs font-semibold text-destructive">Insufficient balance (available {fmt(availableBalance)})</p>}
 
-      <button onClick={submit} disabled={insufficient} className="mt-5 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50">
-        Withdraw Now
+      <button onClick={submit} disabled={insufficient || submitting} className="mt-5 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50">
+        {submitting ? 'Processing...' : 'Withdraw Now'}
       </button>
     </ModalShell>
   );
 }
 
-function TransferModal({ onClose }: { onClose: () => void }) {
-  const state = useBalance();
+// ── Transfer Modal ─────────────────────────────────────────────────────────────
+function TransferModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [phone, setPhone] = useState("");
   const [amount, setAmount] = useState(500);
   const [step, setStep] = useState<"form" | "confirm" | "done">("form");
+  const [submitting, setSubmitting] = useState(false);
+  const [availableBalance, setAvailableBalance] = useState(0);
+  const [insufficient, setInsufficient] = useState(false);
 
-  const insufficient = amount > state.available;
+  useEffect(() => {
+    apiRequest('/wallet/balance').then(data => {
+      const bal = data.balance || 0;
+      const locked = data.locked || 0;
+      setAvailableBalance(bal - locked);
+    }).catch(() => {});
+  }, []);
 
-  const confirm = () => {
-    const res = balanceStore.transfer(phone, amount);
-    if (!res.ok) return toast.error(res.error!);
-    toast.success(`Transfer of ${fmt(amount)} to ${phone} was successful`);
-    // Simulate receiver toast
-    setTimeout(() => toast(`Recipient ${phone} received ${fmt(amount)} from you`), 800);
-    setStep("done");
+  useEffect(() => {
+    setInsufficient(amount > availableBalance);
+  }, [amount, availableBalance]);
+
+  const submitTransfer = async () => {
+    if (!/^0\d{9}$/.test(phone)) return toast.error("Enter a valid 10-digit phone");
+    if (amount <= 0) return toast.error("Enter an amount");
+    if (insufficient) return toast.error("Insufficient balance");
+    setSubmitting(true);
+    try {
+      await apiRequest('/wallet/transfer', {
+        method: 'POST',
+        body: JSON.stringify({ recipientPhone: phone, amount }),
+      });
+      toast.success(`Transfer of ${fmt(amount)} to ${phone} was successful`);
+      onSuccess();
+      setStep("done");
+    } catch (err: any) {
+      toast.error(err.message || 'Transfer failed');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -266,9 +385,10 @@ function TransferModal({ onClose }: { onClose: () => void }) {
               if (insufficient) return toast.error("Insufficient balance");
               setStep("confirm");
             }}
-            className="mt-5 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground"
+            disabled={submitting}
+            className="mt-5 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50"
           >
-            Send Money
+            {submitting ? 'Processing...' : 'Send Money'}
           </button>
         </>
       )}
@@ -280,7 +400,9 @@ function TransferModal({ onClose }: { onClose: () => void }) {
           </p>
           <div className="mt-5 grid grid-cols-2 gap-2">
             <button onClick={() => setStep("form")} className="h-11 rounded-xl border border-border text-sm font-semibold">Cancel</button>
-            <button onClick={confirm} className="h-11 rounded-xl gradient-primary text-sm font-semibold text-primary-foreground">Confirm</button>
+            <button onClick={submitTransfer} disabled={submitting} className="h-11 rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50">
+              {submitting ? 'Processing...' : 'Confirm'}
+            </button>
           </div>
         </>
       )}
