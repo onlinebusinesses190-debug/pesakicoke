@@ -19,7 +19,7 @@ export const Route = createFileRoute("/profile")({
   component: ProfilePage,
 });
 
-const WHATSAPP_URL = "https://wa.me/254740399389";
+const WHATSAPP_URL = "https://wa.me/254140399389";
 
 type ModalKey =
   | "personal" | "password" | "phone" | "verification"
@@ -591,7 +591,7 @@ function AboutBlock() {
       </p>
       <div className="rounded-xl border border-border p-3">
         <p className="font-semibold">Contact</p>
-        <p className="mt-1 text-muted-foreground">WhatsApp: +254 740 399 389</p>
+        <p className="mt-1 text-muted-foreground">WhatsApp: +254 140 399 389</p>
         <p className="text-muted-foreground">Email: hello@pesaki.app</p>
       </div>
     </div>
@@ -623,7 +623,7 @@ const PRIVACY = [
   { heading: "6. Your Rights", text: "Under the Kenya Data Protection Act 2019 you may access, correct, delete or port your data, object to processing, and lodge a complaint with the Office of the Data Protection Commissioner." },
   { heading: "7. Security", text: "Data is encrypted in transit (TLS 1.2+) and at rest (AES-256). Access is restricted, logged and reviewed. Passwords are hashed with industry-standard algorithms." },
   { heading: "8. Cookies", text: "Our web app uses strictly necessary cookies for authentication and preferences. Analytics cookies are optional and disabled by default." },
-  { heading: "9. Contact", text: "Data protection queries: privacy@pesaki.app · WhatsApp +254 740 399 389." },
+  { heading: "9. Contact", text: "Data protection queries: privacy@pesaki.app · WhatsApp +254 140 399 389." },
 ];
 
 const AGREEMENT = [
@@ -634,6 +634,6 @@ const AGREEMENT = [
   { heading: "5. Business Funding Repayment", text: "Approved businesses agree to remit the agreed profit share on the agreed schedule until fully repaid. Missed instalments may lead to collection action." },
   { heading: "6. Trading Responsibility", text: "You confirm that you understand each product's risk and that gains are not guaranteed. PESAKI does not provide financial advice." },
   { heading: "7. Communications", text: "We may contact you by SMS, email, WhatsApp and in-app notifications for account, security, transactional and (with your consent) marketing purposes." },
-  { heading: "8. Dispute Resolution", text: "Raise disputes first with support@pesaki.app or WhatsApp +254 740 399 389. Unresolved matters may be escalated to the courts of Nairobi." },
+  { heading: "8. Dispute Resolution", text: "Raise disputes first with support@pesaki.app or WhatsApp +254 140 399 389. Unresolved matters may be escalated to the courts of Nairobi." },
   { heading: "9. Modification", text: "We may update this User Agreement. Material changes will be notified in-app at least 14 days before taking effect." },
 ];
