@@ -7,7 +7,6 @@ import {
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Badge, SectionTitle } from "@/components/ui-bits";
 import { toast } from "sonner";
-import { apiRequest } from "@/utils/api";
 import { createClient } from "@supabase/supabase-js";
 
 export const Route = createFileRoute("/profile")({
@@ -74,7 +73,7 @@ function ProfilePage() {
   const [modal, setModal] = useState<ModalKey>(null);
   const [loading, setLoading] = useState(true);
 
-  // ── Real data state ──────────────────────────────────────────────────────
+  // ── Data state ──────────────────────────────────────────────────────────────
   const [profile, setProfile] = useState({
     name: "",
     phone: "",
@@ -91,21 +90,40 @@ function ProfilePage() {
   const fetchProfileData = async () => {
     try {
       setLoading(true);
-      const profileData = await apiRequest('/user/profile');
-      setProfile({
-        name: profileData.name || "Guest",
-        phone: profileData.phone || "",
-        email: profileData.email || "",
-        tier: profileData.tier || "Guest",
-        guest: profileData.guest ?? true,
-      });
+      // Use Supabase session directly (same as dashboard)
+      const supabase = createClient(
+        import.meta.env.VITE_SUPABASE_URL,
+        import.meta.env.VITE_SUPABASE_ANON_KEY
+      );
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
 
-      const referralData = await apiRequest('/user/referrals');
-      setReferrals({
-        count: referralData.count || 0,
-        earnings: referralData.earnings || 0,
-        code: referralData.code || "PESAKI-" + (profileData.name?.slice(0, 4).toUpperCase() || "USER"),
-      });
+      if (user) {
+        const fullName = user.user_metadata?.full_name || user.email?.split('@')[0] || "User";
+        const phone = user.phone || user.user_metadata?.phone || "";
+        const email = user.email || "";
+        const tier = user.user_metadata?.tier || "Gold";
+
+        setProfile({
+          name: fullName,
+          phone: phone,
+          email: email,
+          tier: tier,
+          guest: false,
+        });
+
+        // Generate referral code from user's name or ID
+        const code = "PESAKI-" + (fullName.slice(0, 4).toUpperCase() || user.id.slice(0, 4).toUpperCase());
+        setReferrals({
+          count: 0, // TODO: fetch from /user/referrals when backend is ready
+          earnings: 0,
+          code: code,
+        });
+      } else {
+        // No user logged in
+        setProfile({ name: "", phone: "", email: "", tier: "Guest", guest: true });
+        setReferrals({ count: 0, earnings: 0, code: "" });
+      }
     } catch (err) {
       console.error('Failed to load profile:', err);
       toast.error('Could not load profile data');
@@ -534,7 +552,7 @@ function SupportBlock() {
       </a>
       <div className="rounded-xl border border-border p-3 text-xs">
         <p className="font-semibold">Direct number</p>
-        <p className="mt-0.5 text-muted-foreground">+254 140 399 389</p>
+        <p className="mt-0.5 text-muted-foreground">+254 740 399 389</p>
       </div>
       <div className="rounded-xl border border-border p-3 text-xs">
         <p className="font-semibold">Email</p>
@@ -573,7 +591,7 @@ function AboutBlock() {
       </p>
       <div className="rounded-xl border border-border p-3">
         <p className="font-semibold">Contact</p>
-        <p className="mt-1 text-muted-foreground">WhatsApp: +254 140 399 389</p>
+        <p className="mt-1 text-muted-foreground">WhatsApp: +254 740 399 389</p>
         <p className="text-muted-foreground">Email: hello@pesaki.app</p>
       </div>
     </div>
@@ -605,7 +623,7 @@ const PRIVACY = [
   { heading: "6. Your Rights", text: "Under the Kenya Data Protection Act 2019 you may access, correct, delete or port your data, object to processing, and lodge a complaint with the Office of the Data Protection Commissioner." },
   { heading: "7. Security", text: "Data is encrypted in transit (TLS 1.2+) and at rest (AES-256). Access is restricted, logged and reviewed. Passwords are hashed with industry-standard algorithms." },
   { heading: "8. Cookies", text: "Our web app uses strictly necessary cookies for authentication and preferences. Analytics cookies are optional and disabled by default." },
-  { heading: "9. Contact", text: "Data protection queries: privacy@pesaki.app · WhatsApp +254 140 399 389." },
+  { heading: "9. Contact", text: "Data protection queries: privacy@pesaki.app · WhatsApp +254 740 399 389." },
 ];
 
 const AGREEMENT = [
