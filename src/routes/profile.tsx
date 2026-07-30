@@ -1,14 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   User, KeyRound, Phone, Gift, ShieldCheck, Bell,
   HelpCircle, MessageCircle, FileText, Lock, Info, LogOut, LogIn, Copy, ChevronRight, X, ArrowLeft, CheckCircle2, ExternalLink,
 } from "lucide-react";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Badge, SectionTitle } from "@/components/ui-bits";
-import { user, fmt } from "@/lib/mock";
-import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { apiRequest } from "@/utils/api";
+import { createClient } from "@supabase/supabase-js";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({
@@ -63,22 +63,114 @@ const groups: { title: string; items: { label: string; icon: any; key: Exclude<M
   },
 ];
 
+// ── Helper: format currency ──────────────────────────────────────────────────
+const fmt = (amount: number) => {
+  return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', minimumFractionDigits: 0 }).format(amount);
+};
+
+// ── Main Component ────────────────────────────────────────────────────────────
 function ProfilePage() {
-  const { user: authUser, signOut } = useAuth();
   const navigate = useNavigate();
   const [modal, setModal] = useState<ModalKey>(null);
-  const displayName = authUser?.user_metadata?.full_name || authUser?.email?.split("@")[0] || `${user.name} Otieno`;
-  const displayEmail = authUser?.email ?? "+254 7•• ••• 482";
+  const [loading, setLoading] = useState(true);
 
+  // ── Real data state ──────────────────────────────────────────────────────
+  const [profile, setProfile] = useState({
+    name: "",
+    phone: "",
+    email: "",
+    tier: "Guest",
+    guest: true,
+  });
+  const [referrals, setReferrals] = useState({
+    count: 0,
+    earnings: 0,
+    code: "",
+  });
+
+  const fetchProfileData = async () => {
+    try {
+      setLoading(true);
+      const profileData = await apiRequest('/user/profile');
+      setProfile({
+        name: profileData.name || "Guest",
+        phone: profileData.phone || "",
+        email: profileData.email || "",
+        tier: profileData.tier || "Guest",
+        guest: profileData.guest ?? true,
+      });
+
+      const referralData = await apiRequest('/user/referrals');
+      setReferrals({
+        count: referralData.count || 0,
+        earnings: referralData.earnings || 0,
+        code: referralData.code || "PESAKI-" + (profileData.name?.slice(0, 4).toUpperCase() || "USER"),
+      });
+    } catch (err) {
+      console.error('Failed to load profile:', err);
+      toast.error('Could not load profile data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProfileData();
+  }, []);
+
+  // ── Sign out ──────────────────────────────────────────────────────────────
+  const signOut = async () => {
+    try {
+      const supabase = createClient(
+        import.meta.env.VITE_SUPABASE_URL,
+        import.meta.env.VITE_SUPABASE_ANON_KEY
+      );
+      await supabase.auth.signOut();
+      toast.success("Signed out");
+      navigate({ to: "/auth" });
+    } catch (err) {
+      toast.error("Sign out failed");
+    }
+  };
+
+  // ── Copy referral code ────────────────────────────────────────────────────
   const copyRef = async () => {
-    try { await navigator.clipboard.writeText(user.referralCode); toast.success("Referral code copied"); }
-    catch { toast.error("Could not copy code"); }
+    try {
+      await navigator.clipboard.writeText(referrals.code);
+      toast.success("Referral code copied");
+    } catch {
+      toast.error("Could not copy code");
+    }
   };
+
+  // ── Share referral code ────────────────────────────────────────────────────
   const shareRef = async () => {
-    const text = `Join me on PESAKI — Africa's digital wealth ecosystem. Use my code ${user.referralCode} to sign up.`;
-    if (navigator.share) { try { await navigator.share({ title: "PESAKI", text }); } catch {} }
-    else { await navigator.clipboard.writeText(text); toast.success("Invite copied to clipboard"); }
+    const text = `Join me on PESAKI — Africa's digital wealth ecosystem. Use my code ${referrals.code} to sign up.`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "PESAKI", text });
+      } catch {}
+    } else {
+      await navigator.clipboard.writeText(text);
+      toast.success("Invite copied to clipboard");
+    }
   };
+
+  if (loading) {
+    return (
+      <AppShell>
+        <PageHeader title="Profile" subtitle="Your PESAKI account" />
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">Loading profile...</p>
+        </div>
+      </AppShell>
+    );
+  }
+
+  const { name, phone, email, tier, guest } = profile;
+  const { count, earnings, code } = referrals;
+  const displayName = name || "Guest";
+  const displayEmail = email || "+254 7•• ••• 482";
 
   return (
     <AppShell>
@@ -94,17 +186,17 @@ function ProfilePage() {
               <p className="truncate text-base font-bold">{displayName}</p>
               <p className="truncate text-xs text-muted-foreground">{displayEmail}</p>
               <div className="mt-1 flex gap-1.5">
-                {authUser ? (
+                {!guest ? (
                   <Badge tone="success"><ShieldCheck className="h-2.5 w-2.5" /> Signed in</Badge>
                 ) : (
                   <Badge tone="warning">Guest</Badge>
                 )}
-                <Badge tone="gold">Gold Tier</Badge>
+                <Badge tone={tier === "Gold" ? "gold" : "primary"}>{tier}</Badge>
               </div>
             </div>
           </div>
 
-          {!authUser && (
+          {guest && (
             <Link
               to="/auth"
               className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-lg gradient-primary text-sm font-semibold text-primary-foreground"
@@ -125,16 +217,16 @@ function ProfilePage() {
           <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
             <div className="rounded-xl bg-foreground/10 p-2.5">
               <p className="opacity-70">Referrals</p>
-              <p className="mt-0.5 font-bold">{user.referrals}</p>
+              <p className="mt-0.5 font-bold">{count}</p>
             </div>
             <div className="rounded-xl bg-foreground/10 p-2.5">
               <p className="opacity-70">Earnings</p>
-              <p className="mt-0.5 font-bold">{fmt(user.referralEarnings)}</p>
+              <p className="mt-0.5 font-bold">{fmt(earnings)}</p>
             </div>
           </div>
 
           <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 rounded-xl bg-foreground/10 px-3 py-2.5">
-            <p className="truncate font-mono text-sm font-bold">{user.referralCode}</p>
+            <p className="truncate font-mono text-sm font-bold">{code}</p>
             <button onClick={copyRef} className="inline-flex items-center gap-1 rounded-full bg-foreground px-3 py-1.5 text-[11px] font-semibold text-background">
               <Copy className="h-3 w-3" /> Copy
             </button>
@@ -169,10 +261,10 @@ function ProfilePage() {
         </section>
       ))}
 
-      {authUser && (
+      {!guest && (
         <section className="mt-5 px-5">
           <button
-            onClick={async () => { await signOut(); toast.success("Signed out"); navigate({ to: "/" }); }}
+            onClick={signOut}
             className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-destructive/30 bg-destructive/5 text-sm font-semibold text-destructive hover:bg-destructive/10"
           >
             <LogOut className="h-4 w-4" /> Sign out
@@ -442,7 +534,7 @@ function SupportBlock() {
       </a>
       <div className="rounded-xl border border-border p-3 text-xs">
         <p className="font-semibold">Direct number</p>
-        <p className="mt-0.5 text-muted-foreground">+254 740 399 389</p>
+        <p className="mt-0.5 text-muted-foreground">+254 140 399 389</p>
       </div>
       <div className="rounded-xl border border-border p-3 text-xs">
         <p className="font-semibold">Email</p>
@@ -481,7 +573,7 @@ function AboutBlock() {
       </p>
       <div className="rounded-xl border border-border p-3">
         <p className="font-semibold">Contact</p>
-        <p className="mt-1 text-muted-foreground">WhatsApp: +254 740 399 389</p>
+        <p className="mt-1 text-muted-foreground">WhatsApp: +254 140 399 389</p>
         <p className="text-muted-foreground">Email: hello@pesaki.app</p>
       </div>
     </div>
@@ -513,7 +605,7 @@ const PRIVACY = [
   { heading: "6. Your Rights", text: "Under the Kenya Data Protection Act 2019 you may access, correct, delete or port your data, object to processing, and lodge a complaint with the Office of the Data Protection Commissioner." },
   { heading: "7. Security", text: "Data is encrypted in transit (TLS 1.2+) and at rest (AES-256). Access is restricted, logged and reviewed. Passwords are hashed with industry-standard algorithms." },
   { heading: "8. Cookies", text: "Our web app uses strictly necessary cookies for authentication and preferences. Analytics cookies are optional and disabled by default." },
-  { heading: "9. Contact", text: "Data protection queries: privacy@pesaki.app · WhatsApp +254 740 399 389." },
+  { heading: "9. Contact", text: "Data protection queries: privacy@pesaki.app · WhatsApp +254 140 399 389." },
 ];
 
 const AGREEMENT = [
