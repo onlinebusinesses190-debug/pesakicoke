@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect, useRef, Component, ReactNode } from "react";
-import { Plane, Loader2, PlusCircle } from "lucide-react";
+import { Plane, Loader2, PlusCircle, ArrowLeft } from "lucide-react";
 import { io, Socket } from "socket.io-client";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@supabase/supabase-js";
@@ -55,6 +55,9 @@ function AviatorPage() {
   const [balance, setBalance] = useState<number | null>(null);
   const [updatingBalance, setUpdatingBalance] = useState(false);
 
+  // ── Live countdown state ──────────────────────────────────────────────────
+  const [countdown, setCountdown] = useState<number | null>(null);
+
   // ── Allocation 1 state ──────────────────────────────────────────────────────
   const [betAmount1, setBetAmount1] = useState(10);
   const [isBetting1, setIsBetting1] = useState(false);
@@ -69,6 +72,8 @@ function AviatorPage() {
 
   const socketRef = useRef<Socket | null>(null);
   const multiplierRef = useRef(1.0);
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isFetchingBalanceRef = useRef(false);
 
   // ── Auth check ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -89,10 +94,11 @@ function AviatorPage() {
     checkAuth();
   }, [navigate]);
 
-  // ── Fetch balance (automatic) ──────────────────────────────────────────────
+  // ── Fetch balance (with lock to prevent multiple calls) ──────────────────
   const fetchBalance = async () => {
-    if (updatingBalance) return; // prevent multiple concurrent requests
+    if (isFetchingBalanceRef.current) return;
     try {
+      isFetchingBalanceRef.current = true;
       setUpdatingBalance(true);
       const data = await apiRequest("/wallet/balance");
       setBalance(data.balance || 0);
@@ -100,10 +106,11 @@ function AviatorPage() {
       console.error("Failed to fetch balance:", err);
     } finally {
       setUpdatingBalance(false);
+      isFetchingBalanceRef.current = false;
     }
   };
 
-  // Initial balance fetch
+  // ── Initial balance fetch ─────────────────────────────────────────────────
   useEffect(() => {
     fetchBalance();
   }, []);
@@ -120,7 +127,7 @@ function AviatorPage() {
       if (res.newBalance !== undefined) {
         setBalance(res.newBalance);
       } else {
-        fetchBalance(); // fallback
+        fetchBalance();
       }
     } catch (err: any) {
       alert(err.message || "Failed to place allocation 1");
@@ -160,6 +167,36 @@ function AviatorPage() {
     socketRef.current.emit("CASHOUT");
   };
 
+  // ── Live countdown timer ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (status === "WAITING" && waitTime > 0) {
+      setCountdown(Math.ceil(waitTime));
+      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev === null || prev <= 1) {
+            clearInterval(countdownIntervalRef.current!);
+            countdownIntervalRef.current = null;
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      setCountdown(null);
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+    }
+    return () => {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+    };
+  }, [status, waitTime]);
+
   // ── WebSocket connection ──────────────────────────────────────────────────
   useEffect(() => {
     const supabase = createClient(
@@ -197,12 +234,13 @@ function AviatorPage() {
           setIsBetting2(false);
           setCashOutMultiplier1(0);
           setCashOutMultiplier2(0);
-          fetchBalance(); // automatic refresh on new round
+          fetchBalance();
         });
 
         socket.on("ROUND_START", () => {
           setStatus("FLYING");
           setWaitTime(0);
+          setCountdown(null);
         });
 
         socket.on("MULTIPLIER_TICK", (data) => {
@@ -217,7 +255,7 @@ function AviatorPage() {
           setMultiplier(finalMult);
           multiplierRef.current = finalMult;
           setHistory((prev) => [finalMult, ...prev.slice(0, 19)]);
-          fetchBalance(); // automatic refresh on crash
+          fetchBalance();
         });
 
         socket.on("CASHED_OUT", (data) => {
@@ -229,15 +267,13 @@ function AviatorPage() {
             setCashedOut2(true);
             setCashOutMultiplier2(data.multiplier);
           }
-          fetchBalance(); // automatic refresh on cashout
+          fetchBalance();
         });
 
         socket.on("POSITION_CONFIRMED", (data) => {
-          // Update balance immediately after bet placement
           if (data.newBalance !== undefined) {
             setBalance(data.newBalance);
           }
-          // Reset betting states if needed
           setIsBetting1(false);
           setIsBetting2(false);
         });
@@ -250,7 +286,7 @@ function AviatorPage() {
 
         socket.on("error", (err) => console.error("Socket error:", err));
 
-        fetchBalance(); // initial fetch
+        fetchBalance();
       } catch (err) {
         console.error("Failed to initialize game", err);
       }
@@ -275,14 +311,24 @@ function AviatorPage() {
   const isFlying = status === "FLYING";
   const isWaiting = status === "WAITING";
   const displayMultiplier = multiplier.toFixed(2);
+  const displayCountdown = countdown !== null ? countdown : Math.ceil(waitTime);
 
   return (
     <div className="space-y-4 max-w-6xl mx-auto pb-8">
-      {/* Header with mode toggle and Deposit button */}
+      {/* Header with back arrow, mode toggle, and Deposit button */}
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-          <Plane className="text-red-500" /> Aviator
-        </h1>
+        <div className="flex items-center gap-3">
+          <Link
+            to="/trading"
+            className="text-gray-400 hover:text-white transition-colors"
+            title="Back to Trading Hub"
+          >
+            <ArrowLeft size={24} />
+          </Link>
+          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+            <Plane className="text-red-500" /> Aviator
+          </h1>
+        </div>
         <div className="flex items-center gap-3">
           {/* Balance display with Deposit button */}
           <div className="flex items-center gap-2">
@@ -376,7 +422,13 @@ function AviatorPage() {
               {isWaiting ? "Next round in" : isFlying ? "Round in progress" : "Crashed"}
             </div>
             <div className="text-xl font-bold text-white">
-              {isWaiting ? `${Math.ceil(waitTime)}s` : isFlying ? "🔴 LIVE" : "💥 CRASHED"}
+              {isWaiting ? (
+                displayCountdown > 0 ? `${displayCountdown}s` : "⏳"
+              ) : isFlying ? (
+                "🔴 LIVE"
+              ) : (
+                "💥 CRASHED"
+              )}
             </div>
           </div>
 
