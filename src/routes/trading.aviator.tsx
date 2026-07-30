@@ -293,7 +293,6 @@ function AviatorPage() {
           setCashOutMultiplier1(0);
           setCashOutMultiplier2(0);
           fetchBalance();
-          // Reset demo betting flags (no need to reset demo balance)
         });
 
         socket.on("ROUND_START", () => {
@@ -315,8 +314,6 @@ function AviatorPage() {
           multiplierRef.current = finalMult;
           setHistory((prev) => [finalMult, ...prev.slice(0, 19)]);
           fetchBalance();
-          // Demo: if there are active bets that didn't cash out, they are already deducted, no extra action needed.
-          // We just reset the betting flags if they are still active (they should be false after cashout attempts or already reset)
           setIsBetting1(false);
           setIsBetting2(false);
         });
@@ -333,7 +330,6 @@ function AviatorPage() {
             }
             fetchBalance();
           }
-          // Demo cashout is handled in handleCashOut functions (we don't rely on socket)
         });
 
         socket.on("POSITION_CONFIRMED", (data) => {
@@ -365,8 +361,13 @@ function AviatorPage() {
     };
   }, []);
 
-  // ── Toggle mode (plain JS) ───────────────────────────────────────────────
+  // ── Toggle mode ───────────────────────────────────────────────────────────
   const setMode = (newMode: "demo" | "real") => {
+    // Reset betting states when switching mode to avoid carrying over bets
+    setIsBetting1(false);
+    setIsBetting2(false);
+    setCashedOut1(false);
+    setCashedOut2(false);
     const url = new URL(window.location.href);
     url.searchParams.set("mode", newMode);
     window.location.href = url.toString();
@@ -451,7 +452,7 @@ function AviatorPage() {
         </div>
       </div>
 
-      {/* Main game area – unchanged */}
+      {/* Main game area */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 relative bg-[#0f0f1a] border border-white/10 rounded-3xl overflow-hidden">
           <div className="relative" style={{ height: "180px" }}>
@@ -485,7 +486,7 @@ function AviatorPage() {
           </div>
         </div>
 
-        {/* Right column – unchanged */}
+        {/* Right column – NO DUPLICATE BALANCE CARD */}
         <div className="space-y-4">
           <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-3 text-center">
             <div className="text-xs text-gray-400 uppercase tracking-wider">
@@ -502,16 +503,8 @@ function AviatorPage() {
             </div>
           </div>
 
-          {/* Balance display (duplicate) */}
-          {currentBalance !== null && (
-            <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-3 text-center">
-              <span className="text-sm text-gray-400">{isDemo ? "Demo" : "Balance"}: </span>
-              <span className="text-lg font-bold text-white">{currentBalance.toFixed(2)} KES</span>
-            </div>
-          )}
-
           <div className="grid grid-cols-2 gap-3">
-            {/* Allocation 1 – unchanged */}
+            {/* Allocation 1 */}
             <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-3">
               <div className="text-xs text-gray-400 mb-1">Allocation 1</div>
               <div className="flex flex-wrap gap-1 mb-2">
@@ -559,7 +552,7 @@ function AviatorPage() {
               )}
             </div>
 
-            {/* Allocation 2 – unchanged */}
+            {/* Allocation 2 */}
             <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-3">
               <div className="text-xs text-gray-400 mb-1">Allocation 2</div>
               <div className="flex flex-wrap gap-1 mb-2">
