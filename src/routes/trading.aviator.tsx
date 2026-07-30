@@ -108,9 +108,8 @@ function AviatorPage() {
     checkAuth();
   }, [navigate]);
 
-  // ── Fetch real balance (only when in real mode) ─────────────────────────
+  // ── Fetch real balance ──────────────────────────────────────────────────
   const fetchRealBalance = async () => {
-    if (mode !== "real") return;
     if (isFetchingBalanceRef.current) return;
     try {
       isFetchingBalanceRef.current = true;
@@ -125,17 +124,18 @@ function AviatorPage() {
     }
   };
 
-  // ── Fetch balance when mode changes ─────────────────────────────────────
+  // ── Fetch balance when mode changes to real ──────────────────────────────
   useEffect(() => {
     if (mode === "real") {
       fetchRealBalance();
     }
-    // When switching to demo, we keep the demoBalance as is (no need to fetch)
   }, [mode]);
 
   // ── Initial balance fetch ─────────────────────────────────────────────────
   useEffect(() => {
-    if (mode === "real") fetchRealBalance();
+    if (mode === "real") {
+      fetchRealBalance();
+    }
   }, []);
 
   // ── Place bet (Allocation 1) ──────────────────────────────────────────────
@@ -366,7 +366,7 @@ function AviatorPage() {
     };
   }, [mode]);
 
-  // ── Toggle mode using TanStack Router (no page reload) ──────────────────
+  // ── Toggle mode using TanStack Router ──────────────────────────────────
   const setMode = (newMode: "demo" | "real") => {
     navigate({
       search: (prev: any) => ({ ...prev, mode: newMode }),
@@ -399,7 +399,7 @@ function AviatorPage() {
           </h1>
         </div>
         <div className="flex items-center gap-3">
-          {/* Balance display with Deposit button (only for real mode) */}
+          {/* ✅ Balance display (only here – removed from the right panel) */}
           <div className="flex items-center gap-2">
             {currentBalance !== null ? (
               <div className="flex items-center gap-1 text-sm text-gray-300 bg-[#181d29] px-3 py-1.5 rounded-lg">
@@ -452,7 +452,7 @@ function AviatorPage() {
         </div>
       </div>
 
-      {/* Main game area – unchanged */}
+      {/* Main game area */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 relative bg-[#0f0f1a] border border-white/10 rounded-3xl overflow-hidden">
           <div className="relative" style={{ height: "180px" }}>
@@ -486,7 +486,7 @@ function AviatorPage() {
           </div>
         </div>
 
-        {/* Right column – unchanged */}
+        {/* Right column – NO duplicate balance here */}
         <div className="space-y-4">
           <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-3 text-center">
             <div className="text-xs text-gray-400 uppercase tracking-wider">
@@ -503,16 +503,8 @@ function AviatorPage() {
             </div>
           </div>
 
-          {/* Balance display (duplicate) */}
-          {currentBalance !== null && (
-            <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-3 text-center">
-              <span className="text-sm text-gray-400">{isDemo ? "Demo" : "Balance"}: </span>
-              <span className="text-lg font-bold text-white">{currentBalance.toFixed(2)} KES</span>
-            </div>
-          )}
-
           <div className="grid grid-cols-2 gap-3">
-            {/* Allocation 1 – unchanged */}
+            {/* Allocation 1 */}
             <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-3">
               <div className="text-xs text-gray-400 mb-1">Allocation 1</div>
               <div className="flex flex-wrap gap-1 mb-2">
@@ -560,7 +552,7 @@ function AviatorPage() {
               )}
             </div>
 
-            {/* Allocation 2 – unchanged */}
+            {/* Allocation 2 */}
             <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-3">
               <div className="text-xs text-gray-400 mb-1">Allocation 2</div>
               <div className="flex flex-wrap gap-1 mb-2">
