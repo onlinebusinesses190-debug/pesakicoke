@@ -55,11 +55,13 @@ function AviatorPage() {
   const [history, setHistory] = useState<number[]>([]);
   const [waitTime, setWaitTime] = useState(0);
   const [balance, setBalance] = useState<number | null>(null);
+  const [updatingBalance, setUpdatingBalance] = useState(false);
+
+  // ── Demo balance ──────────────────────────────────────────────────────────
   const [demoBalance, setDemoBalance] = useState<number>(() => {
     const saved = localStorage.getItem(DEMO_BALANCE_KEY);
     return saved ? parseFloat(saved) : INITIAL_DEMO_BALANCE;
   });
-  const [updatingBalance, setUpdatingBalance] = useState(false);
 
   // ── Live countdown state ──────────────────────────────────────────────────
   const [countdown, setCountdown] = useState<number | null>(null);
@@ -81,6 +83,12 @@ function AviatorPage() {
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isFetchingBalanceRef = useRef(false);
 
+  // ── Update demo balance ──────────────────────────────────────────────────
+  const updateDemoBalance = (newBalance: number) => {
+    setDemoBalance(newBalance);
+    localStorage.setItem(DEMO_BALANCE_KEY, String(newBalance));
+  };
+
   // ── Auth check ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const checkAuth = async () => {
@@ -100,9 +108,8 @@ function AviatorPage() {
     checkAuth();
   }, [navigate]);
 
-  // ── Fetch real balance (only when mode is 'real') ──────────────────────────
-  const fetchRealBalance = async () => {
-    if (mode !== "real") return;
+  // ── Fetch balance (with lock to prevent multiple calls) ──────────────────
+  const fetchBalance = async () => {
     if (isFetchingBalanceRef.current) return;
     try {
       isFetchingBalanceRef.current = true;
@@ -110,143 +117,143 @@ function AviatorPage() {
       const data = await apiRequest("/wallet/balance");
       setBalance(data.balance || 0);
     } catch (err) {
-      console.error("Failed to fetch real balance:", err);
+      console.error("Failed to fetch balance:", err);
     } finally {
       setUpdatingBalance(false);
       isFetchingBalanceRef.current = false;
     }
   };
 
-  // ── Update demo balance in localStorage ──────────────────────────────────
-  const updateDemoBalance = (newBalance: number) => {
-    setDemoBalance(newBalance);
-    localStorage.setItem(DEMO_BALANCE_KEY, String(newBalance));
-  };
-
-  // ── Fetch initial balance ─────────────────────────────────────────────────
+  // ── Initial balance fetch ─────────────────────────────────────────────────
   useEffect(() => {
-    if (mode === "real") {
-      fetchRealBalance();
-    } else {
-      // demo mode: ensure demo balance is loaded from localStorage
-      const saved = localStorage.getItem(DEMO_BALANCE_KEY);
-      if (saved) {
-        setDemoBalance(parseFloat(saved));
-      } else {
-        setDemoBalance(INITIAL_DEMO_BALANCE);
-        localStorage.setItem(DEMO_BALANCE_KEY, String(INITIAL_DEMO_BALANCE));
-      }
-    }
-  }, [mode]);
+    fetchBalance();
+  }, []);
 
   // ── Place bet (Allocation 1) ──────────────────────────────────────────────
   const placeBet1 = async () => {
     if (status !== "WAITING" || isBetting1) return;
-    const amount = betAmount1;
-    if (amount <= 0) return;
+    setIsBetting1(true);
 
-    if (mode === "real") {
-      // Real mode: call backend
-      setIsBetting1(true);
+    if (mode === "demo") {
+      // Demo mode: deduct from demo balance immediately
+      if (demoBalance < betAmount1) {
+        alert("Insufficient demo balance!");
+        setIsBetting1(false);
+        return;
+      }
+      updateDemoBalance(demoBalance - betAmount1);
+      // The rest (cashout) will be handled in the cashout handlers
+    } else {
+      // Real mode: use backend
       try {
         const res = await apiRequest("/games/aviator/bet", {
           method: "POST",
-          body: JSON.stringify({ amount, mode }),
+          body: JSON.stringify({ amount: betAmount1, mode }),
         });
         if (res.newBalance !== undefined) {
           setBalance(res.newBalance);
         } else {
-          fetchRealBalance();
+          fetchBalance();
         }
       } catch (err: any) {
         alert(err.message || "Failed to place allocation 1");
         setIsBetting1(false);
       }
-    } else {
-      // Demo mode: deduct from demo balance
-      if (demoBalance < amount) {
-        alert("Insufficient demo balance!");
-        return;
-      }
-      setIsBetting1(true);
-      // We'll manage cashout/profit via socket events – but for demo we'll handle locally.
-      // We'll just set a flag that this bet is active.
-      // We'll use the same cashout handlers but update demoBalance instead.
-      // To differentiate, we'll store the bet amount and direction (we only have UP/DOWN in Aviator? Actually it's just allocation).
-      // We'll just store the bet amount for demo.
-      // We'll handle cashout in the socket event.
-      // Deduct now
-      updateDemoBalance(demoBalance - amount);
-      // The rest will be handled by the cashout/crash events (they will add profit)
-      // We'll keep a flag to know that demo bet is placed
     }
   };
 
-  // ── Place bet (Allocation 2) ── similar logic
+  // ── Place bet (Allocation 2) ──────────────────────────────────────────────
   const placeBet2 = async () => {
     if (status !== "WAITING" || isBetting2) return;
-    const amount = betAmount2;
-    if (amount <= 0) return;
+    setIsBetting2(true);
 
-    if (mode === "real") {
-      setIsBetting2(true);
+    if (mode === "demo") {
+      if (demoBalance < betAmount2) {
+        alert("Insufficient demo balance!");
+        setIsBetting2(false);
+        return;
+      }
+      updateDemoBalance(demoBalance - betAmount2);
+    } else {
       try {
         const res = await apiRequest("/games/aviator/bet", {
           method: "POST",
-          body: JSON.stringify({ amount, mode }),
+          body: JSON.stringify({ amount: betAmount2, mode }),
         });
         if (res.newBalance !== undefined) {
           setBalance(res.newBalance);
         } else {
-          fetchRealBalance();
+          fetchBalance();
         }
       } catch (err: any) {
         alert(err.message || "Failed to place allocation 2");
         setIsBetting2(false);
       }
-    } else {
-      if (demoBalance < amount) {
-        alert("Insufficient demo balance!");
-        return;
-      }
-      setIsBetting2(true);
-      updateDemoBalance(demoBalance - amount);
     }
   };
 
   // ── Cash out 1 ─────────────────────────────────────────────────────────────
   const handleCashOut1 = () => {
     if (status !== "FLYING" || cashedOut1 || !socketRef.current) return;
-    if (mode === "real") {
-      socketRef.current.emit("CASHOUT");
-    } else {
-      // Demo mode: calculate profit based on current multiplier and update demo balance
-      const amount = betAmount1;
-      const profit = amount * multiplierRef.current;
-      const newDemoBalance = demoBalance + profit - amount; // we already deducted amount, so add profit
-      updateDemoBalance(newDemoBalance);
+    if (mode === "demo") {
+      // Demo cashout: calculate profit and update demo balance
+      const currentMultiplier = multiplierRef.current;
+      const profit = betAmount1 * currentMultiplier;
+      const newBalance = demoBalance + profit - betAmount1; // we already deducted betAmount1 earlier, so add profit
+      updateDemoBalance(newBalance);
       setCashedOut1(true);
-      setCashOutMultiplier1(multiplierRef.current);
-      // also disable betting states
+      setCashOutMultiplier1(currentMultiplier);
       setIsBetting1(false);
+    } else {
+      socketRef.current.emit("CASHOUT");
     }
   };
 
   // ── Cash out 2 ─────────────────────────────────────────────────────────────
   const handleCashOut2 = () => {
     if (status !== "FLYING" || cashedOut2 || !socketRef.current) return;
-    if (mode === "real") {
-      socketRef.current.emit("CASHOUT");
-    } else {
-      const amount = betAmount2;
-      const profit = amount * multiplierRef.current;
-      const newDemoBalance = demoBalance + profit - amount;
-      updateDemoBalance(newDemoBalance);
+    if (mode === "demo") {
+      const currentMultiplier = multiplierRef.current;
+      const profit = betAmount2 * currentMultiplier;
+      const newBalance = demoBalance + profit - betAmount2;
+      updateDemoBalance(newBalance);
       setCashedOut2(true);
-      setCashOutMultiplier2(multiplierRef.current);
+      setCashOutMultiplier2(currentMultiplier);
       setIsBetting2(false);
+    } else {
+      socketRef.current.emit("CASHOUT");
     }
   };
+
+  // ── Live countdown timer ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (status === "WAITING" && waitTime > 0) {
+      setCountdown(Math.ceil(waitTime));
+      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev === null || prev <= 1) {
+            clearInterval(countdownIntervalRef.current!);
+            countdownIntervalRef.current = null;
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      setCountdown(null);
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+    }
+    return () => {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+    };
+  }, [status, waitTime]);
 
   // ── WebSocket connection ──────────────────────────────────────────────────
   useEffect(() => {
@@ -285,7 +292,8 @@ function AviatorPage() {
           setIsBetting2(false);
           setCashOutMultiplier1(0);
           setCashOutMultiplier2(0);
-          if (mode === "real") fetchRealBalance();
+          fetchBalance();
+          // Reset demo betting flags (no need to reset demo balance)
         });
 
         socket.on("ROUND_START", () => {
@@ -306,10 +314,9 @@ function AviatorPage() {
           setMultiplier(finalMult);
           multiplierRef.current = finalMult;
           setHistory((prev) => [finalMult, ...prev.slice(0, 19)]);
-          // If in demo mode and we had active bets (not cashed out), they lose everything (already deducted)
-          // No need to update balance again – it was deducted at bet placement.
-          if (mode === "real") fetchRealBalance();
-          // Reset demo betting flags if they were still active
+          fetchBalance();
+          // Demo: if there are active bets that didn't cash out, they are already deducted, no extra action needed.
+          // We just reset the betting flags if they are still active (they should be false after cashout attempts or already reset)
           setIsBetting1(false);
           setIsBetting2(false);
         });
@@ -319,25 +326,22 @@ function AviatorPage() {
             if (isBetting1 && !cashedOut1) {
               setCashedOut1(true);
               setCashOutMultiplier1(data.multiplier);
-              fetchRealBalance();
             }
             if (isBetting2 && !cashedOut2) {
               setCashedOut2(true);
               setCashOutMultiplier2(data.multiplier);
-              fetchRealBalance();
             }
+            fetchBalance();
           }
-          // Demo cashout is handled in handleCashOut functions (we don't rely on socket for demo)
+          // Demo cashout is handled in handleCashOut functions (we don't rely on socket)
         });
 
         socket.on("POSITION_CONFIRMED", (data) => {
-          if (mode === "real") {
-            if (data.newBalance !== undefined) {
-              setBalance(data.newBalance);
-            }
-            setIsBetting1(false);
-            setIsBetting2(false);
+          if (data.newBalance !== undefined) {
+            setBalance(data.newBalance);
           }
+          setIsBetting1(false);
+          setIsBetting2(false);
         });
 
         socket.on("ORDER_REJECTED", (data) => {
@@ -348,7 +352,7 @@ function AviatorPage() {
 
         socket.on("error", (err) => console.error("Socket error:", err));
 
-        if (mode === "real") fetchRealBalance();
+        fetchBalance();
       } catch (err) {
         console.error("Failed to initialize game", err);
       }
@@ -359,7 +363,7 @@ function AviatorPage() {
     return () => {
       socketRef.current?.disconnect();
     };
-  }, [mode]);
+  }, []);
 
   // ── Toggle mode (plain JS) ───────────────────────────────────────────────
   const setMode = (newMode: "demo" | "real") => {
@@ -374,7 +378,7 @@ function AviatorPage() {
   const isWaiting = status === "WAITING";
   const displayMultiplier = multiplier.toFixed(2);
   const displayCountdown = countdown !== null ? countdown : Math.ceil(waitTime);
-  const currentBalance = mode === "real" ? balance : demoBalance;
+  const currentBalance = mode === "demo" ? demoBalance : balance;
   const isDemo = mode === "demo";
 
   return (
@@ -394,7 +398,7 @@ function AviatorPage() {
           </h1>
         </div>
         <div className="flex items-center gap-3">
-          {/* Balance display with Deposit button (only show deposit in real mode) */}
+          {/* Balance display with Deposit button (only for real mode) */}
           <div className="flex items-center gap-2">
             {currentBalance !== null ? (
               <div className="flex items-center gap-1 text-sm text-gray-300 bg-[#181d29] px-3 py-1.5 rounded-lg">
@@ -447,7 +451,7 @@ function AviatorPage() {
         </div>
       </div>
 
-      {/* Main game area – same as before */}
+      {/* Main game area – unchanged */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 relative bg-[#0f0f1a] border border-white/10 rounded-3xl overflow-hidden">
           <div className="relative" style={{ height: "180px" }}>
@@ -507,7 +511,7 @@ function AviatorPage() {
           )}
 
           <div className="grid grid-cols-2 gap-3">
-            {/* Allocation 1 */}
+            {/* Allocation 1 – unchanged */}
             <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-3">
               <div className="text-xs text-gray-400 mb-1">Allocation 1</div>
               <div className="flex flex-wrap gap-1 mb-2">
@@ -555,7 +559,7 @@ function AviatorPage() {
               )}
             </div>
 
-            {/* Allocation 2 */}
+            {/* Allocation 2 – unchanged */}
             <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-3">
               <div className="text-xs text-gray-400 mb-1">Allocation 2</div>
               <div className="flex flex-wrap gap-1 mb-2">
