@@ -28,6 +28,7 @@ export const Route = createFileRoute("/")({
 function HomePage() {
   const [show, setShow] = useState(true);
   const [userName, setUserName] = useState("Guest");
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [balance, setBalance] = useState(0);
   const [totalEarnings, setTotalEarnings] = useState(0);
   const [referralEarnings, setReferralEarnings] = useState(0);
@@ -61,6 +62,10 @@ function HomePage() {
         if (isMounted.current && session?.user) {
           const fullName = session.user.user_metadata?.full_name || session.user.email || session.user.phone;
           setUserName(fullName?.split(" ")[0] || "User");
+          setIsLoggedIn(true);
+        } else {
+          setUserName("Guest");
+          setIsLoggedIn(false);
         }
 
         // 2. Fetch real data
@@ -131,19 +136,38 @@ function HomePage() {
         <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-gold/20 blur-3xl" />
         <div className="relative flex items-start justify-between">
           <div className="min-w-0">
-            <p className="text-xs/4 opacity-80">Welcome,</p>
-            <h1 className="truncate text-2xl font-bold">{userName}</h1>
+            <p className="text-xs/4 opacity-80">Welcome{isLoggedIn ? " back" : ""},</p>
+            <h1 className="truncate text-2xl font-bold">{userName} 👋</h1>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <button className="grid h-10 w-10 place-items-center rounded-full bg-white/10 backdrop-blur">
               <Bell className="h-5 w-5" />
             </button>
-            <Link
-              to="/profile"
-              className="grid h-10 w-10 place-items-center rounded-full bg-gold text-gold-foreground font-bold"
-            >
-              {(userName[0] ?? "P").toUpperCase()}
-            </Link>
+            {isLoggedIn ? (
+              <Link
+                to="/profile"
+                className="grid h-10 w-10 place-items-center rounded-full bg-gold text-gold-foreground font-bold"
+              >
+                {(userName[0] ?? "P").toUpperCase()}
+              </Link>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <Link
+                  to="/auth"
+                  search={{ mode: "signin" } as never}
+                  className="inline-flex h-9 items-center gap-1 rounded-full bg-white/15 px-3 text-[11px] font-semibold backdrop-blur"
+                >
+                  <LogIn className="h-3.5 w-3.5" /> Log in
+                </Link>
+                <Link
+                  to="/auth"
+                  search={{ mode: "signup" } as never}
+                  className="inline-flex h-9 items-center rounded-full bg-gold px-3 text-[11px] font-semibold text-gold-foreground"
+                >
+                  Sign up
+                </Link>
+              </div>
+            )}
           </div>
         </div>
 
@@ -209,7 +233,6 @@ function HomePage() {
       <section className="mt-6 px-5">
         <SectionTitle title="Explore hubs" />
         <div className="grid grid-cols-2 gap-3">
-          {/* (rest of the Explore hubs – unchanged) */}
           <Link to="/trading" className="group relative overflow-hidden rounded-2xl gradient-primary p-4 text-primary-foreground shadow-[var(--shadow-card)]">
             <LineChart className="mb-6 h-5 w-5 opacity-90" />
             <p className="text-sm font-bold">Trading Floor</p>
