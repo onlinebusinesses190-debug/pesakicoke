@@ -1,6 +1,6 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect, useRef, Component, ReactNode } from "react";
-import { Plane, Loader2 } from "lucide-react";
+import { Plane, Loader2, PlusCircle } from "lucide-react";
 import { io, Socket } from "socket.io-client";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@supabase/supabase-js";
@@ -10,6 +10,7 @@ import { AviatorCanvas } from "@/components/aviator/AviatorCanvas";
 type GameStatus = "WAITING" | "FLYING" | "CRASHED";
 
 const API_URL = import.meta.env.VITE_PESAKI_API_URL || "https://pesaki-server.onrender.com";
+const WS_URL = import.meta.env.VITE_WEBSOCKET_URL || "https://pesaki-server.onrender.com";
 
 // ── Error Boundary ──────────────────────────────────────────────────────────────
 class ErrorBoundary extends Component<{ children: ReactNode }> {
@@ -52,6 +53,7 @@ function AviatorPage() {
   const [history, setHistory] = useState<number[]>([]);
   const [waitTime, setWaitTime] = useState(0);
   const [balance, setBalance] = useState<number | null>(null);
+  const [updatingBalance, setUpdatingBalance] = useState(false);
 
   // ── Allocation 1 state ──────────────────────────────────────────────────────
   const [betAmount1, setBetAmount1] = useState(10);
@@ -87,15 +89,39 @@ function AviatorPage() {
     checkAuth();
   }, [navigate]);
 
+  // ── Fetch balance (automatic) ──────────────────────────────────────────────
+  const fetchBalance = async () => {
+    if (updatingBalance) return; // prevent multiple concurrent requests
+    try {
+      setUpdatingBalance(true);
+      const data = await apiRequest("/wallet/balance");
+      setBalance(data.balance || 0);
+    } catch (err) {
+      console.error("Failed to fetch balance:", err);
+    } finally {
+      setUpdatingBalance(false);
+    }
+  };
+
+  // Initial balance fetch
+  useEffect(() => {
+    fetchBalance();
+  }, []);
+
   // ── Place bet (Allocation 1) ──────────────────────────────────────────────
   const placeBet1 = async () => {
     if (status !== "WAITING" || isBetting1) return;
     setIsBetting1(true);
     try {
-      await apiRequest("/games/aviator/bet", {
+      const res = await apiRequest("/games/aviator/bet", {
         method: "POST",
         body: JSON.stringify({ amount: betAmount1, mode }),
       });
+      if (res.newBalance !== undefined) {
+        setBalance(res.newBalance);
+      } else {
+        fetchBalance(); // fallback
+      }
     } catch (err: any) {
       alert(err.message || "Failed to place allocation 1");
       setIsBetting1(false);
@@ -107,10 +133,15 @@ function AviatorPage() {
     if (status !== "WAITING" || isBetting2) return;
     setIsBetting2(true);
     try {
-      await apiRequest("/games/aviator/bet", {
+      const res = await apiRequest("/games/aviator/bet", {
         method: "POST",
         body: JSON.stringify({ amount: betAmount2, mode }),
       });
+      if (res.newBalance !== undefined) {
+        setBalance(res.newBalance);
+      } else {
+        fetchBalance();
+      }
     } catch (err: any) {
       alert(err.message || "Failed to place allocation 2");
       setIsBetting2(false);
@@ -141,7 +172,7 @@ function AviatorPage() {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
 
-        const socket = io(`${API_URL}/aviator`, {
+        const socket = io(`${WS_URL}/aviator`, {
           transports: ["websocket"],
           reconnection: true,
           reconnectionAttempts: 5,
@@ -166,7 +197,7 @@ function AviatorPage() {
           setIsBetting2(false);
           setCashOutMultiplier1(0);
           setCashOutMultiplier2(0);
-          apiRequest("/wallet/balance").then(res => setBalance(res.balance)).catch(() => {});
+          fetchBalance(); // automatic refresh on new round
         });
 
         socket.on("ROUND_START", () => {
@@ -186,7 +217,7 @@ function AviatorPage() {
           setMultiplier(finalMult);
           multiplierRef.current = finalMult;
           setHistory((prev) => [finalMult, ...prev.slice(0, 19)]);
-          apiRequest("/wallet/balance").then(res => setBalance(res.balance)).catch(() => {});
+          fetchBalance(); // automatic refresh on crash
         });
 
         socket.on("CASHED_OUT", (data) => {
@@ -198,12 +229,28 @@ function AviatorPage() {
             setCashedOut2(true);
             setCashOutMultiplier2(data.multiplier);
           }
-          apiRequest("/wallet/balance").then(res => setBalance(res.balance)).catch(() => {});
+          fetchBalance(); // automatic refresh on cashout
+        });
+
+        socket.on("POSITION_CONFIRMED", (data) => {
+          // Update balance immediately after bet placement
+          if (data.newBalance !== undefined) {
+            setBalance(data.newBalance);
+          }
+          // Reset betting states if needed
+          setIsBetting1(false);
+          setIsBetting2(false);
+        });
+
+        socket.on("ORDER_REJECTED", (data) => {
+          alert(data.error || "Order rejected");
+          setIsBetting1(false);
+          setIsBetting2(false);
         });
 
         socket.on("error", (err) => console.error("Socket error:", err));
 
-        apiRequest("/wallet/balance").then(res => setBalance(res.balance)).catch(() => {});
+        fetchBalance(); // initial fetch
       } catch (err) {
         console.error("Failed to initialize game", err);
       }
@@ -216,7 +263,7 @@ function AviatorPage() {
     };
   }, []);
 
-  // ── Toggle mode (plain JS, no router hooks) ─────────────────────────────
+  // ── Toggle mode (plain JS) ───────────────────────────────────────────────
   const setMode = (newMode: "demo" | "real") => {
     const url = new URL(window.location.href);
     url.searchParams.set("mode", newMode);
@@ -231,12 +278,35 @@ function AviatorPage() {
 
   return (
     <div className="space-y-4 max-w-6xl mx-auto pb-8">
-      {/* Header with mode toggle */}
+      {/* Header with mode toggle and Deposit button */}
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-white flex items-center gap-3">
           <Plane className="text-red-500" /> Aviator
         </h1>
         <div className="flex items-center gap-3">
+          {/* Balance display with Deposit button */}
+          <div className="flex items-center gap-2">
+            {balance !== null ? (
+              <div className="flex items-center gap-1 text-sm text-gray-300 bg-[#181d29] px-3 py-1.5 rounded-lg">
+                <span className="text-gray-500">Bal:</span>
+                <span className="font-bold text-white">{balance.toFixed(2)} KES</span>
+                {updatingBalance && (
+                  <span className="text-gray-400 text-xs animate-pulse">⋯</span>
+                )}
+              </div>
+            ) : (
+              <div className="text-sm text-gray-500 bg-[#181d29] px-3 py-1.5 rounded-lg animate-pulse">
+                Loading…
+              </div>
+            )}
+            <Link
+              to="/wallet"
+              className="flex items-center gap-1 bg-green-600 hover:bg-green-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <PlusCircle size={14} /> Deposit
+            </Link>
+          </div>
+
           <span className="text-xs text-gray-400 font-medium">
             {mode === "demo" ? "🎮 FUN MODE" : "🔴 REAL MODE"}
           </span>
@@ -265,10 +335,10 @@ function AviatorPage() {
         </div>
       </div>
 
-      {/* Main game area – height reduced to 180px */}
+      {/* Main game area */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 relative bg-[#0f0f1a] border border-white/10 rounded-3xl overflow-hidden">
-          <div className="relative" style={{ height: "180px" }}> {/* ⬅️ REDUCED TO 180px */}
+          <div className="relative" style={{ height: "180px" }}>
             <div className="absolute top-1 left-1/2 -translate-x-1/2 z-20 text-3xl font-black text-white drop-shadow-lg">
               {displayMultiplier}x
             </div>
@@ -299,7 +369,7 @@ function AviatorPage() {
           </div>
         </div>
 
-        {/* Right column: Two allocation panels side-by-side */}
+        {/* Right column */}
         <div className="space-y-4">
           <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-3 text-center">
             <div className="text-xs text-gray-400 uppercase tracking-wider">
@@ -310,6 +380,7 @@ function AviatorPage() {
             </div>
           </div>
 
+          {/* Balance is in header, but we keep a duplicate here */}
           {balance !== null && (
             <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-3 text-center">
               <span className="text-sm text-gray-400">Balance: </span>
