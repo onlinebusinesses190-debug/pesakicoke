@@ -108,8 +108,9 @@ function AviatorPage() {
     checkAuth();
   }, [navigate]);
 
-  // ── Fetch balance (with lock to prevent multiple calls) ──────────────────
-  const fetchBalance = async () => {
+  // ── Fetch real balance (only when in real mode) ─────────────────────────
+  const fetchRealBalance = async () => {
+    if (mode !== "real") return;
     if (isFetchingBalanceRef.current) return;
     try {
       isFetchingBalanceRef.current = true;
@@ -117,16 +118,24 @@ function AviatorPage() {
       const data = await apiRequest("/wallet/balance");
       setBalance(data.balance || 0);
     } catch (err) {
-      console.error("Failed to fetch balance:", err);
+      console.error("Failed to fetch real balance:", err);
     } finally {
       setUpdatingBalance(false);
       isFetchingBalanceRef.current = false;
     }
   };
 
+  // ── Fetch balance when mode changes ─────────────────────────────────────
+  useEffect(() => {
+    if (mode === "real") {
+      fetchRealBalance();
+    }
+    // When switching to demo, we keep the demoBalance as is (no need to fetch)
+  }, [mode]);
+
   // ── Initial balance fetch ─────────────────────────────────────────────────
   useEffect(() => {
-    fetchBalance();
+    if (mode === "real") fetchRealBalance();
   }, []);
 
   // ── Place bet (Allocation 1) ──────────────────────────────────────────────
@@ -135,16 +144,13 @@ function AviatorPage() {
     setIsBetting1(true);
 
     if (mode === "demo") {
-      // Demo mode: deduct from demo balance immediately
       if (demoBalance < betAmount1) {
         alert("Insufficient demo balance!");
         setIsBetting1(false);
         return;
       }
       updateDemoBalance(demoBalance - betAmount1);
-      // The rest (cashout) will be handled in the cashout handlers
     } else {
-      // Real mode: use backend
       try {
         const res = await apiRequest("/games/aviator/bet", {
           method: "POST",
@@ -153,7 +159,7 @@ function AviatorPage() {
         if (res.newBalance !== undefined) {
           setBalance(res.newBalance);
         } else {
-          fetchBalance();
+          fetchRealBalance();
         }
       } catch (err: any) {
         alert(err.message || "Failed to place allocation 1");
@@ -183,7 +189,7 @@ function AviatorPage() {
         if (res.newBalance !== undefined) {
           setBalance(res.newBalance);
         } else {
-          fetchBalance();
+          fetchRealBalance();
         }
       } catch (err: any) {
         alert(err.message || "Failed to place allocation 2");
@@ -196,10 +202,9 @@ function AviatorPage() {
   const handleCashOut1 = () => {
     if (status !== "FLYING" || cashedOut1 || !socketRef.current) return;
     if (mode === "demo") {
-      // Demo cashout: calculate profit and update demo balance
       const currentMultiplier = multiplierRef.current;
       const profit = betAmount1 * currentMultiplier;
-      const newBalance = demoBalance + profit - betAmount1; // we already deducted betAmount1 earlier, so add profit
+      const newBalance = demoBalance + profit - betAmount1;
       updateDemoBalance(newBalance);
       setCashedOut1(true);
       setCashOutMultiplier1(currentMultiplier);
@@ -292,7 +297,7 @@ function AviatorPage() {
           setIsBetting2(false);
           setCashOutMultiplier1(0);
           setCashOutMultiplier2(0);
-          fetchBalance();
+          if (mode === "real") fetchRealBalance();
         });
 
         socket.on("ROUND_START", () => {
@@ -313,7 +318,7 @@ function AviatorPage() {
           setMultiplier(finalMult);
           multiplierRef.current = finalMult;
           setHistory((prev) => [finalMult, ...prev.slice(0, 19)]);
-          fetchBalance();
+          if (mode === "real") fetchRealBalance();
           setIsBetting1(false);
           setIsBetting2(false);
         });
@@ -328,7 +333,7 @@ function AviatorPage() {
               setCashedOut2(true);
               setCashOutMultiplier2(data.multiplier);
             }
-            fetchBalance();
+            fetchRealBalance();
           }
         });
 
@@ -348,7 +353,7 @@ function AviatorPage() {
 
         socket.on("error", (err) => console.error("Socket error:", err));
 
-        fetchBalance();
+        if (mode === "real") fetchRealBalance();
       } catch (err) {
         console.error("Failed to initialize game", err);
       }
@@ -359,18 +364,13 @@ function AviatorPage() {
     return () => {
       socketRef.current?.disconnect();
     };
-  }, []);
+  }, [mode]);
 
-  // ── Toggle mode ───────────────────────────────────────────────────────────
+  // ── Toggle mode using TanStack Router (no page reload) ──────────────────
   const setMode = (newMode: "demo" | "real") => {
-    // Reset betting states when switching mode to avoid carrying over bets
-    setIsBetting1(false);
-    setIsBetting2(false);
-    setCashedOut1(false);
-    setCashedOut2(false);
-    const url = new URL(window.location.href);
-    url.searchParams.set("mode", newMode);
-    window.location.href = url.toString();
+    navigate({
+      search: (prev: any) => ({ ...prev, mode: newMode }),
+    });
   };
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -452,7 +452,7 @@ function AviatorPage() {
         </div>
       </div>
 
-      {/* Main game area */}
+      {/* Main game area – unchanged */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 relative bg-[#0f0f1a] border border-white/10 rounded-3xl overflow-hidden">
           <div className="relative" style={{ height: "180px" }}>
@@ -486,7 +486,7 @@ function AviatorPage() {
           </div>
         </div>
 
-        {/* Right column – NO DUPLICATE BALANCE CARD */}
+        {/* Right column – unchanged */}
         <div className="space-y-4">
           <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-3 text-center">
             <div className="text-xs text-gray-400 uppercase tracking-wider">
@@ -503,8 +503,16 @@ function AviatorPage() {
             </div>
           </div>
 
+          {/* Balance display (duplicate) */}
+          {currentBalance !== null && (
+            <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-3 text-center">
+              <span className="text-sm text-gray-400">{isDemo ? "Demo" : "Balance"}: </span>
+              <span className="text-lg font-bold text-white">{currentBalance.toFixed(2)} KES</span>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
-            {/* Allocation 1 */}
+            {/* Allocation 1 – unchanged */}
             <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-3">
               <div className="text-xs text-gray-400 mb-1">Allocation 1</div>
               <div className="flex flex-wrap gap-1 mb-2">
@@ -552,7 +560,7 @@ function AviatorPage() {
               )}
             </div>
 
-            {/* Allocation 2 */}
+            {/* Allocation 2 – unchanged */}
             <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-3">
               <div className="text-xs text-gray-400 mb-1">Allocation 2</div>
               <div className="flex flex-wrap gap-1 mb-2">
