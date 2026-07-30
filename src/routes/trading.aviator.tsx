@@ -118,13 +118,14 @@ function AviatorPage() {
       setBalance(data.balance || 0);
     } catch (err) {
       console.error("Failed to fetch real balance:", err);
+      setBalance(0); // fallback
     } finally {
       setUpdatingBalance(false);
       isFetchingBalanceRef.current = false;
     }
   };
 
-  // ── Fetch balance when mode changes to real ──────────────────────────────
+  // ── Fetch balance when mode changes ──────────────────────────────────────
   useEffect(() => {
     if (mode === "real") {
       fetchRealBalance();
@@ -384,7 +385,7 @@ function AviatorPage() {
 
   return (
     <div className="space-y-4 max-w-6xl mx-auto pb-8">
-      {/* Header with back arrow, mode toggle, and Deposit button */}
+      {/* ✅ Header with mode toggle moved to the LEFT */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link
@@ -397,9 +398,32 @@ function AviatorPage() {
           <h1 className="text-3xl font-bold text-white flex items-center gap-3">
             <Plane className="text-red-500" /> Aviator
           </h1>
+          {/* ✅ Mode toggle moved HERE – left side, visible */}
+          <div className="flex items-center gap-1 rounded-lg bg-[#181d29] p-1 text-xs font-medium ml-2">
+            <button
+              onClick={() => setMode("demo")}
+              className={`px-3 py-1.5 rounded-md transition-all ${
+                isDemo
+                  ? "bg-[#dcb13c] text-black"
+                  : "text-gray-400 hover:text-white hover:bg-[#202636]"
+              }`}
+            >
+              Demo
+            </button>
+            <button
+              onClick={() => setMode("real")}
+              className={`px-3 py-1.5 rounded-md transition-all ${
+                !isDemo
+                  ? "bg-[#dcb13c] text-black"
+                  : "text-gray-400 hover:text-white hover:bg-[#202636]"
+              }`}
+            >
+              Real
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-3">
-          {/* ✅ Balance display (only here – removed from the right panel) */}
+          {/* Balance display with Deposit button */}
           <div className="flex items-center gap-2">
             {currentBalance !== null ? (
               <div className="flex items-center gap-1 text-sm text-gray-300 bg-[#181d29] px-3 py-1.5 rounded-lg">
@@ -423,36 +447,13 @@ function AviatorPage() {
               </Link>
             )}
           </div>
-
           <span className="text-xs text-gray-400 font-medium">
             {isDemo ? "🎮 FUN MODE" : "🔴 REAL MODE"}
           </span>
-          <div className="flex items-center gap-1 rounded-lg bg-[#181d29] p-1 text-xs font-medium">
-            <button
-              onClick={() => setMode("demo")}
-              className={`px-3 py-1.5 rounded-md transition-all ${
-                isDemo
-                  ? "bg-[#dcb13c] text-black"
-                  : "text-gray-400 hover:text-white hover:bg-[#202636]"
-              }`}
-            >
-              Demo
-            </button>
-            <button
-              onClick={() => setMode("real")}
-              className={`px-3 py-1.5 rounded-md transition-all ${
-                !isDemo
-                  ? "bg-[#dcb13c] text-black"
-                  : "text-gray-400 hover:text-white hover:bg-[#202636]"
-              }`}
-            >
-              Real
-            </button>
-          </div>
         </div>
       </div>
 
-      {/* Main game area */}
+      {/* Main game area – unchanged */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 relative bg-[#0f0f1a] border border-white/10 rounded-3xl overflow-hidden">
           <div className="relative" style={{ height: "180px" }}>
@@ -486,7 +487,7 @@ function AviatorPage() {
           </div>
         </div>
 
-        {/* Right column – NO duplicate balance here */}
+        {/* Right column – NO duplicate balance */}
         <div className="space-y-4">
           <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-3 text-center">
             <div className="text-xs text-gray-400 uppercase tracking-wider">
