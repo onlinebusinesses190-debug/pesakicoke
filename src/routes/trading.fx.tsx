@@ -1,10 +1,10 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { TradingChart } from "@/components/fx/TradingChart";
-import { Activity, RefreshCw, Timer } from "lucide-react";
+import { Activity, RefreshCw, Timer, ArrowLeft, PlusCircle } from "lucide-react";
 import { apiRequest } from "@/utils/api";
-import { ModeToggle } from "@/components/dashboard/ModeToggle";
 import { createClient } from "@supabase/supabase-js";
+import { io, Socket } from "socket.io-client";
 
 // --- Constants ---
 const DURATIONS = [
@@ -15,6 +15,9 @@ const DURATIONS = [
   { label: "5m", value: 5, unit: "minutes" },
   { label: "30m", value: 30, unit: "minutes" },
 ];
+
+const API_URL = import.meta.env.VITE_PESAKI_API_URL || "https://pesaki-server.onrender.com";
+const WS_URL = import.meta.env.VITE_WEBSOCKET_URL || "https://pesaki-server.onrender.com";
 
 // Helper to generate initial chart data
 const generateData = (count: number, basePrice: number) => {
@@ -50,6 +53,7 @@ function TradingPage() {
   const [pair, setPair] = useState("USD/KES");
   const [loading, setLoading] = useState(false);
   const targetPriceRef = useRef<number | null>(null);
+  const socketRef = useRef<Socket | null>(null);
 
   const [stake, setStake] = useState<number>(10);
   const [selectedDuration, setSelectedDuration] = useState<{ label: string; value: number; unit: string }>(
@@ -64,6 +68,9 @@ function TradingPage() {
   const [tradeError, setTradeError] = useState<string | null>(null);
   const [openPositions, setOpenPositions] = useState<any[]>([]);
 
+  const [balance, setBalance] = useState<number | null>(null);
+  const [updatingBalance, setUpdatingBalance] = useState(false);
+
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const tradeIdRef = useRef<string | null>(null);
   const tradeActiveRef = useRef(false);
@@ -72,6 +79,7 @@ function TradingPage() {
   const ask = currentPrice ? currentPrice + spread / 2 : 0;
   const bid = currentPrice ? currentPrice - spread / 2 : 0;
 
+  // ── Auth check ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const checkAuth = async () => {
       const supabase = createClient(
@@ -86,6 +94,54 @@ function TradingPage() {
     checkAuth();
   }, [navigate]);
 
+  // ── Fetch balance ──────────────────────────────────────────────────────────
+  const fetchBalance = async () => {
+    try {
+      setUpdatingBalance(true);
+      const data = await apiRequest("/wallet/balance");
+      setBalance(data.balance || 0);
+    } catch (err) {
+      console.error("Failed to fetch balance:", err);
+      setBalance(0);
+    } finally {
+      setUpdatingBalance(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBalance();
+  }, []);
+
+  // ── WebSocket connection (optional, for price updates) ──────────────────
+  useEffect(() => {
+    const supabase = createClient(
+      import.meta.env.VITE_SUPABASE_URL,
+      import.meta.env.VITE_SUPABASE_ANON_KEY
+    );
+    const initSocket = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      // Use WS_URL for WebSocket
+      const socket = io(`${WS_URL}/prediction`, {
+        transports: ["websocket"],
+        auth: { token: session.access_token },
+      });
+      socketRef.current = socket;
+      socket.on("connect", () => console.log("FX socket connected"));
+      socket.on("connect_error", (err) => console.error("FX socket error:", err));
+      socket.on("disconnect", (reason) => console.warn("FX socket disconnected:", reason));
+      socket.on("PRICE_UPDATE", (data) => {
+        if (data.price) setCurrentPrice(data.price);
+        // Optionally update chart
+      });
+    };
+    initSocket();
+    return () => {
+      socketRef.current?.disconnect();
+    };
+  }, []);
+
+  // ── API calls for price and positions ──────────────────────────────────────
   const fetchPrice = useCallback(async (isInitial = false) => {
     try {
       if (isInitial) setLoading(true);
@@ -128,6 +184,7 @@ function TradingPage() {
     };
   }, [fetchPrice, fetchOpenPositions]);
 
+  // ── Tick simulation ──────────────────────────────────────────────────────
   useEffect(() => {
     const tickInterval = setInterval(() => {
       setData((prev) => {
@@ -167,6 +224,7 @@ function TradingPage() {
     return () => clearInterval(tickInterval);
   }, []);
 
+  // ── Timer and trade logic ──────────────────────────────────────────────────
   const startTimer = (durationInSeconds: number) => {
     setTimeRemaining(durationInSeconds);
     tradeActiveRef.current = true;
@@ -213,8 +271,10 @@ function TradingPage() {
       if (won) {
         const profit = stake * 0.2;
         console.log(`🎉 Won! +KES ${profit.toFixed(2)}`);
+        fetchBalance(); // update balance after win
       } else {
         console.log(`💀 Lost! -KES ${stake.toFixed(2)}`);
+        fetchBalance(); // update balance after loss
       }
     }
 
@@ -257,6 +317,7 @@ function TradingPage() {
         tradeIdRef.current = res.data?.id || `trade_${Date.now()}`;
         startTimer(durationSeconds);
         fetchOpenPositions();
+        fetchBalance();
       } else {
         setTradeError(res.error || "Failed to place trade");
         setTradeActive(false);
@@ -276,6 +337,7 @@ function TradingPage() {
       });
       if (res.success) {
         fetchOpenPositions();
+        fetchBalance();
       } else {
         alert(res.error || "Failed to close trade");
       }
@@ -310,51 +372,114 @@ function TradingPage() {
     return null;
   };
 
+  // ── Toggle mode ────────────────────────────────────────────────────────────
+  const setMode = (newMode: "demo" | "real") => {
+    navigate({
+      search: (prev: any) => ({ ...prev, mode: newMode }),
+    });
+  };
+
+  const isDemo = mode === "demo";
+  const currentBalance = isDemo ? 10000 : balance;
+
   return (
-    <div className="space-y-4 max-w-5xl mx-auto pb-20 lg:pb-6">
-      <div className="flex items-center justify-between px-2">
-        <div>
-          <h1 className="text-xl lg:text-3xl font-bold text-white flex items-center gap-2">
-            <Activity className="text-primary w-5 h-5 lg:w-8 lg:h-8" /> Binary FX
+    <div className="space-y-4 max-w-5xl mx-auto pb-20 lg:pb-6 px-4">
+      {/* Header with back arrow, mode toggle, balance, deposit */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Link
+            to="/trading"
+            className="text-gray-400 hover:text-white transition-colors"
+            title="Back to Trading Hub"
+          >
+            <ArrowLeft size={24} />
+          </Link>
+          <h1 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2">
+            <Activity className="text-primary w-5 h-5" /> Binary FX
           </h1>
-          <div className="flex items-center gap-2 mt-1">
-            <select
-              value={pair}
-              onChange={(e) => setPair(e.target.value)}
-              className="bg-transparent border-none text-sm text-muted-foreground focus:ring-0 p-0 cursor-pointer"
+          {/* Inline mode toggle on the left */}
+          <div className="flex items-center gap-0.5 bg-[#181d29] p-0.5 rounded-lg text-[10px] md:text-xs font-medium ml-1">
+            <button
+              onClick={() => setMode("demo")}
+              className={`px-2 py-0.5 md:px-3 md:py-1 rounded-md transition-all ${
+                isDemo
+                  ? "bg-[#dcb13c] text-black"
+                  : "text-gray-400 hover:text-white hover:bg-[#202636]"
+              }`}
             >
-              <option value="EUR/USD">EUR/USD</option>
-              <option value="GBP/USD">GBP/USD</option>
-              <option value="USD/JPY">USD/JPY</option>
-              <option value="USD/KES">USD/KES</option>
-              <option value="EUR/KES">EUR/KES</option>
-              <option value="GBP/KES">GBP/KES</option>
-              <option value="XAU/USD">XAU/USD</option>
-            </select>
-            <span className="text-muted-foreground text-sm">•</span>
-            <span className={`text-xs font-mono font-bold ${currentPrice ? "text-emerald-400" : "text-zinc-500"}`}>
-              {currentPrice ? currentPrice.toFixed(currentPrice > 50 ? 2 : 4) : "Loading..."}
-            </span>
+              Demo
+            </button>
+            <button
+              onClick={() => setMode("real")}
+              className={`px-2 py-0.5 md:px-3 md:py-1 rounded-md transition-all ${
+                !isDemo
+                  ? "bg-[#dcb13c] text-black"
+                  : "text-gray-400 hover:text-white hover:bg-[#202636]"
+              }`}
+            >
+              Real
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => fetchPrice(true)} className="p-2 hover:bg-white/5 rounded-lg transition-colors text-muted-foreground mr-1" title="Refresh">
-            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1 bg-[#181d29] px-2 py-1 rounded-lg text-xs">
+            <span className="text-gray-500">{isDemo ? "Demo" : "Bal"}:</span>
+            <span className="font-bold text-white">
+              {currentBalance !== null ? currentBalance.toFixed(2) : "0.00"} KES
+            </span>
+            {updatingBalance && <span className="text-gray-400 text-[8px] animate-pulse">⋯</span>}
+          </div>
+          {!isDemo && (
+            <Link
+              to="/wallet"
+              className="flex items-center gap-0.5 bg-green-600 hover:bg-green-500 text-white text-[10px] md:text-xs font-bold px-2 py-1 rounded-lg transition-colors"
+            >
+              <PlusCircle size={14} className="h-3 w-3 md:h-4 md:w-4" /> Deposit
+            </Link>
+          )}
+          <span className="text-[8px] md:text-[10px] text-gray-400 hidden sm:inline">
+            {isDemo ? "🎮 FUN" : "🔴 REAL"}
+          </span>
+          <button
+            onClick={() => fetchPrice(true)}
+            className="p-1 hover:bg-white/5 rounded-lg transition-colors text-muted-foreground"
+            title="Refresh"
+          >
+            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
           </button>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-500 rounded border border-emerald-500/20 text-xs font-semibold tracking-wide">
-            <span className="relative flex h-2 w-2">
+          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/10 text-emerald-500 rounded border border-emerald-500/20 text-[10px] font-semibold tracking-wide">
+            <span className="relative flex h-1.5 w-1.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
             </span>
             Live
           </div>
         </div>
       </div>
 
-      <ModeToggle />
+      {/* Pair selector */}
+      <div className="flex items-center gap-2">
+        <select
+          value={pair}
+          onChange={(e) => setPair(e.target.value)}
+          className="bg-transparent border-none text-sm text-muted-foreground focus:ring-0 p-0 cursor-pointer"
+        >
+          <option value="EUR/USD">EUR/USD</option>
+          <option value="GBP/USD">GBP/USD</option>
+          <option value="USD/JPY">USD/JPY</option>
+          <option value="USD/KES">USD/KES</option>
+          <option value="EUR/KES">EUR/KES</option>
+          <option value="GBP/KES">GBP/KES</option>
+          <option value="XAU/USD">XAU/USD</option>
+        </select>
+        <span className="text-muted-foreground text-sm">•</span>
+        <span className={`text-xs font-mono font-bold ${currentPrice ? "text-emerald-400" : "text-zinc-500"}`}>
+          {currentPrice ? currentPrice.toFixed(currentPrice > 50 ? 2 : 4) : "Loading..."}
+        </span>
+      </div>
 
       <div className="flex flex-col lg:flex-row gap-6">
-        {/* Chart area – height reduced */}
+        {/* Chart area */}
         <div className="flex-1 bg-[#151924] border border-[#2b313f] rounded-xl overflow-hidden p-2 lg:p-4 min-h-[200px] lg:min-h-[320px] relative">
           {loading && !currentPrice ? (
             <div className="w-full h-full flex items-center justify-center">
@@ -413,106 +538,3 @@ function TradingPage() {
                   onClick={() => setSelectedDuration(d)}
                   disabled={tradeActive}
                   className={`py-2 rounded-lg text-sm font-medium transition-colors ${
-                    selectedDuration.label === d.label
-                      ? "bg-[#dcb13c] text-black"
-                      : "bg-[#181d29] text-gray-400 hover:bg-[#202636]"
-                  } disabled:opacity-50`}
-                >
-                  {d.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex justify-between items-center text-sm font-mono px-2">
-            <div className="text-gray-400">Ask: <span className="text-gray-200">{ask.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}</span></div>
-            <div className="text-gray-500 text-xs">Spread: {spread.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}</div>
-            <div className="text-gray-400">Bid: <span className="text-gray-200">{bid.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}</span></div>
-          </div>
-
-          {entryPrice !== null && (
-            <div className="flex justify-between text-xs text-gray-500 px-2">
-              <span>Entry: <span className="text-white font-mono">{entryPrice.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}</span></span>
-              {exitPrice !== null && (
-                <span>Exit: <span className="text-white font-mono">{exitPrice.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}</span></span>
-              )}
-            </div>
-          )}
-
-          <div className="flex gap-4">
-            <button
-              onClick={() => handleTrade("buy")}
-              disabled={loading || !currentPrice || tradeActive}
-              className="flex-1 py-4 bg-[#236e40] hover:bg-[#28814a] text-white font-bold rounded-lg flex flex-col items-center justify-center transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span className="uppercase tracking-wider text-sm mb-1">Buy</span>
-              <span className="font-mono opacity-80 font-normal">
-                {ask.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}
-              </span>
-            </button>
-            <button
-              onClick={() => handleTrade("sell")}
-              disabled={loading || !currentPrice || tradeActive}
-              className="flex-1 py-4 bg-[#6e2525] hover:bg-[#852c2c] text-white font-bold rounded-lg flex flex-col items-center justify-center transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span className="uppercase tracking-wider text-sm mb-1">Sell</span>
-              <span className="font-mono opacity-80 font-normal">
-                {bid.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}
-              </span>
-            </button>
-          </div>
-
-          {tradeError && <div className="text-center text-red-500 text-sm font-medium">{tradeError}</div>}
-
-          {/* 🚀 Removed the Win/Loss percentage text */}
-          <div className="text-center text-xs text-gray-500">
-            Mode: <span className="text-gray-300 font-medium capitalize">{mode}</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-[#0b0e14] border border-[#1e2330] rounded-xl p-4 flex flex-col gap-3">
-        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-widest block">Open Positions ({openPositions.length})</h2>
-        <div className="flex flex-col gap-2">
-          {openPositions.length === 0 ? (
-            <p className="text-sm text-gray-600 text-center py-4">No open positions.</p>
-          ) : (
-            openPositions.map((pos) => {
-              const isBuy = pos.direction === "up" || pos.direction === "UP";
-              let profitMock = 0;
-              if (pos.market === pair && currentPrice) {
-                const diff = isBuy ? currentPrice - pos.entry_price : pos.entry_price - currentPrice;
-                if (diff > 0) profitMock = pos.amount * 0.2;
-                else if (diff < 0) profitMock = -pos.amount;
-              }
-              const profitColor = profitMock >= 0 ? "text-emerald-500" : "text-red-500";
-              return (
-                <div key={pos.id} className="flex items-center justify-between p-3 bg-[#131720] rounded-lg border border-[#1e2330]">
-                  <div className="flex items-center gap-3">
-                    <div className={`text-[10px] font-bold px-2 py-0.5 rounded ${isBuy ? "bg-[#236e40] text-emerald-100" : "bg-[#6e2525] text-red-100"} uppercase`}>
-                      {isBuy ? "Buy" : "Sell"}
-                    </div>
-                    <div className="font-semibold text-sm text-gray-200">{pos.market}</div>
-                    <div className="text-xs text-gray-500">&times;{pos.amount / 10000}</div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className={`text-sm font-mono font-medium ${profitColor} w-20 text-right`}>
-                      {profitMock > 0 ? "+" : ""}{profitMock.toFixed(2)} KES
-                    </div>
-                    <button
-                      onClick={() => handleCloseTrade(pos.id)}
-                      disabled={tradeActive}
-                      className="text-[10px] uppercase font-bold bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded transition-colors disabled:opacity-50"
-                    >
-                      Close
-                    </button>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
