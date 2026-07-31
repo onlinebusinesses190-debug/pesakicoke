@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect, useCallback } from "react";
 import {
   TrendingUp,
@@ -14,6 +14,8 @@ import {
   WifiOff,
   Moon,
   Clock,
+  ArrowLeft,
+  PlusCircle,
 } from "lucide-react";
 import { apiRequest } from "@/utils/api";
 import { createClient } from "@supabase/supabase-js";
@@ -32,12 +34,6 @@ interface NseStock {
   high?: number;
   low?: number;
   open?: number;
-}
-
-interface ApiResponse {
-  stocks: NseStock[];
-  updatedAt: string;
-  marketOpen: boolean;
 }
 
 // ─── Skeleton Card ──────────────────────────────────────────────────────────
@@ -169,6 +165,8 @@ function InvestmentPage() {
   const [prediction, setPrediction] = useState<"HIGH" | "LOW" | null>(null);
   const [amount, setAmount] = useState("1000");
   const [isPlacing, setIsPlacing] = useState(false);
+  const [balance, setBalance] = useState<number | null>(null);
+  const [updatingBalance, setUpdatingBalance] = useState(false);
 
   // ── Auth check ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -189,6 +187,24 @@ function InvestmentPage() {
     checkAuth();
   }, [navigate]);
 
+  // ── Fetch balance ────────────────────────────────────────────────────────
+  const fetchBalance = async () => {
+    try {
+      setUpdatingBalance(true);
+      const data = await apiRequest("/wallet/balance");
+      setBalance(data.balance || 0);
+    } catch (err) {
+      console.error("Failed to fetch balance:", err);
+      setBalance(0);
+    } finally {
+      setUpdatingBalance(false);
+    }
+  };
+
+  useEffect(() => {
+    if (mode === "real") fetchBalance();
+  }, [mode]);
+
   // ── Fetch stocks ──────────────────────────────────────────────────────────
   const fetchStocks = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -196,16 +212,12 @@ function InvestmentPage() {
     setApiError(null);
 
     try {
-      // Replace Next.js API route with apiRequest to your backend
       const data = await apiRequest("/games/nse/stocks");
-      // The backend response might be { stocks, updatedAt, marketOpen }
-      // Adjust if the structure differs.
       if (data && data.stocks) {
         setStocks(data.stocks);
         setUpdatedAt(data.updatedAt || null);
         setMarketOpen(data.marketOpen ?? false);
       } else {
-        // Fallback if response format is different
         setStocks(data);
         setUpdatedAt(new Date().toISOString());
         setMarketOpen(true);
@@ -263,11 +275,11 @@ function InvestmentPage() {
     }
   };
 
-  // ── Toggle mode (safe) ────────────────────────────────────────────────────
+  // ── Toggle mode ────────────────────────────────────────────────────────────
   const setMode = (newMode: "demo" | "real") => {
-    const url = new URL(window.location.href);
-    url.searchParams.set("mode", newMode);
-    window.location.href = url.toString();
+    navigate({
+      search: (prev: any) => ({ ...prev, mode: newMode }),
+    });
   };
 
   // ── Derived ────────────────────────────────────────────────────────────────
@@ -285,46 +297,32 @@ function InvestmentPage() {
       })
     : null;
 
+  const isDemo = mode === "demo";
+  const currentBalance = isDemo ? 10000 : balance; // demo balance fixed at 10k for this page
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6 max-w-7xl mx-auto px-4 pb-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-            <Building2 className="text-blue-500" />
+      {/* Header with back arrow, mode toggle, balance, deposit */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+        <div className="flex items-center gap-2">
+          <Link
+            to="/trading"
+            className="text-gray-400 hover:text-white transition-colors"
+            title="Back to Trading Hub"
+          >
+            <ArrowLeft size={24} />
+          </Link>
+          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <Building2 className="text-blue-500" size={24} />
             NSE Market Predict
           </h1>
-          <div className="flex items-center gap-3 mt-1">
-            <p className="text-sm text-muted-foreground">
-              Daily HIGH/LOW predictions on Nairobi Securities Exchange
-            </p>
-            <span
-              className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-0.5 rounded-full border
-                ${
-                  marketOpen
-                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-                    : "bg-white/5 border-white/10 text-muted-foreground"
-                }`}
-            >
-              <CircleDot size={10} className={marketOpen ? "animate-pulse" : ""} />
-              {marketOpen ? "Market Open" : "Market Closed"}
-            </span>
-          </div>
-          {formattedTime && (
-            <p className="text-xs text-muted-foreground mt-1">
-              <span className="opacity-60">Last updated:</span> {formattedTime} EAT
-            </p>
-          )}
-        </div>
-
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          {/* Mode toggle */}
-          <div className="flex items-center gap-1 rounded-lg bg-[#181d29] p-1 text-xs font-medium">
+          {/* Mode toggle on the left */}
+          <div className="flex items-center gap-0.5 bg-[#181d29] p-0.5 rounded-lg text-[10px] md:text-xs font-medium ml-2">
             <button
               onClick={() => setMode("demo")}
-              className={`px-3 py-1.5 rounded-md transition-all ${
-                mode === "demo"
+              className={`px-2 py-0.5 md:px-3 md:py-1 rounded-md transition-all ${
+                isDemo
                   ? "bg-[#dcb13c] text-black"
                   : "text-gray-400 hover:text-white hover:bg-[#202636]"
               }`}
@@ -333,8 +331,8 @@ function InvestmentPage() {
             </button>
             <button
               onClick={() => setMode("real")}
-              className={`px-3 py-1.5 rounded-md transition-all ${
-                mode === "real"
+              className={`px-2 py-0.5 md:px-3 md:py-1 rounded-md transition-all ${
+                !isDemo
                   ? "bg-[#dcb13c] text-black"
                   : "text-gray-400 hover:text-white hover:bg-[#202636]"
               }`}
@@ -342,27 +340,71 @@ function InvestmentPage() {
               Real
             </button>
           </div>
-
-          <button
-            onClick={() => fetchStocks(true)}
-            disabled={loading || refreshing}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-muted-foreground hover:text-white hover:border-white/20 transition-all disabled:opacity-40"
-            title="Refresh data"
-          >
-            <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
-            <span className="hidden sm:inline">Refresh</span>
-          </button>
-
-          <div className="relative flex-1 md:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-            <input
-              type="text"
-              placeholder="Search stocks..."
-              className="w-full bg-card border border-border rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/60"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Balance + Deposit */}
+          <div className="flex items-center gap-1 bg-[#181d29] px-2 py-1 rounded-lg text-xs">
+            <span className="text-gray-500">{isDemo ? "Demo" : "Bal"}:</span>
+            <span className="font-bold text-white">
+              {currentBalance !== null ? currentBalance.toFixed(2) : "0.00"} KES
+            </span>
+            {updatingBalance && <span className="text-gray-400 text-[8px] animate-pulse">⋯</span>}
           </div>
+          {!isDemo && (
+            <Link
+              to="/wallet"
+              className="flex items-center gap-0.5 bg-green-600 hover:bg-green-500 text-white text-[10px] md:text-xs font-bold px-2 py-1 rounded-lg transition-colors"
+            >
+              <PlusCircle size={14} className="h-3 w-3 md:h-4 md:w-4" /> Deposit
+            </Link>
+          )}
+          <span className="text-[8px] md:text-[10px] text-gray-400 hidden sm:inline">
+            {isDemo ? "🎮 FUN" : "🔴 REAL"}
+          </span>
+        </div>
+      </div>
+
+      {/* Market status and updated time */}
+      <div className="flex items-center gap-3 mt-1">
+        <span
+          className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-0.5 rounded-full border
+            ${
+              marketOpen
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                : "bg-white/5 border-white/10 text-muted-foreground"
+            }`}
+        >
+          <CircleDot size={10} className={marketOpen ? "animate-pulse" : ""} />
+          {marketOpen ? "Market Open" : "Market Closed"}
+        </span>
+        {formattedTime && (
+          <p className="text-xs text-muted-foreground">
+            <span className="opacity-60">Last updated:</span> {formattedTime} EAT
+          </p>
+        )}
+      </div>
+
+      {/* Refresh button and search */}
+      <div className="flex items-center gap-3 w-full md:w-auto">
+        <button
+          onClick={() => fetchStocks(true)}
+          disabled={loading || refreshing}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-muted-foreground hover:text-white hover:border-white/20 transition-all disabled:opacity-40"
+          title="Refresh data"
+        >
+          <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+          <span className="hidden sm:inline">Refresh</span>
+        </button>
+
+        <div className="relative flex-1 md:w-64">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+          <input
+            type="text"
+            placeholder="Search stocks..."
+            className="w-full bg-card border border-border rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/60"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
       </div>
 
