@@ -90,8 +90,11 @@ function UpDownGame() {
   const [amount, setAmount] = useState("100");
   const [executingOrder, setExecutingOrder] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
-  const [flash, setFlash] = useState<"up" | "down" | null>(null);
   const [updatingBalance, setUpdatingBalance] = useState(false);
+  const [flash, setFlash] = useState<"up" | "down" | null>(null);
+
+  const currentRoundIdRef = useRef<string | null>(null);
+  const isDemo = mode === "demo";
 
   // ── Demo balance ──────────────────────────────────────────────────────────
   const [demoBalance, setDemoBalance] = useState<number>(() => {
@@ -103,9 +106,6 @@ function UpDownGame() {
     setDemoBalance(newBalance);
     localStorage.setItem(DEMO_BALANCE_KEY, String(newBalance));
   };
-
-  const currentRoundIdRef = useRef<string | null>(null);
-  const isDemo = mode === "demo";
 
   // ── Auth check ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -139,7 +139,7 @@ function UpDownGame() {
     if (mode === "real") fetchRealBalance();
   }, [mode]);
 
-  // ── WebSocket connection ──────────────────────────────────────────────────
+  // ── WebSocket connection (using WS_URL) ──────────────────────────────────
   useEffect(() => {
     let socket: Socket;
 
@@ -151,6 +151,7 @@ function UpDownGame() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) return;
 
+      // ✅ Use WS_URL for WebSocket
       socket = io(`${WS_URL}/updown`, {
         transports: ["websocket"],
         auth: { token: session.access_token },
@@ -227,6 +228,12 @@ function UpDownGame() {
           userWon: userWon ?? null,
           profit: profit ?? null,
         });
+
+        // ✅ Update demo balance if in demo mode
+        if (isDemo && myPosition) {
+          const newBalance = demoBalance + (userWon ? profit || 0 : 0);
+          updateDemoBalance(newBalance);
+        }
 
         if (winningDirection) {
           setFlash(winningDirection);
@@ -252,9 +259,6 @@ function UpDownGame() {
         setMyPosition({ direction: data.direction as "up" | "down", amount: data.amount });
         if (mode === "real") {
           setBalance(data.newBalance);
-        } else {
-          // Demo: we'll handle balance update manually (deduct already done)
-          // The position is confirmed; we don't need to update demo balance here.
         }
         setExecutingOrder(false);
       });
@@ -270,357 +274,6 @@ function UpDownGame() {
     return () => socket?.disconnect();
   }, [mode]);
 
-  // ── Handle order (real or demo) ──────────────────────────────────────────
-  const handleOrder = useCallback(
-    (direction: "up" | "down") => {
-      if (!socketRef.current || !round || round.state !== "open" || myPosition || executingOrder) return;
-      const stake = Number(amount);
-      if (isNaN(stake) || stake <= 0) return;
-
-      if (isDemo) {
-        // Demo mode: deduct from demo balance immediately
-        if (demoBalance < stake) {
-          alert("Insufficient demo balance!");
-          return;
-        }
-        updateDemoBalance(demoBalance - stake);
-        // Simulate a position (we won't rely on backend for demo)
-        // We'll set a temporary myPosition for UI feedback.
-        // But we still need to wait for the round result to adjust balance.
-        // For demo, we will just use the backend result but we already deducted.
-        // Actually, we need to handle the result: if user wins, add profit; if loses, nothing.
-        // We'll track the position via a local state.
-        setMyPosition({ direction, amount: stake });
-        setExecutingOrder(false);
-        // We'll listen to UPDOWN_ROUND_RESULT to adjust demo balance accordingly.
-        // But we need to know if user won. We'll check the result in the socket event.
-        // We'll modify the UPDOWN_ROUND_RESULT handler to also handle demo balance.
-        // However, we can also handle it in the existing socket.on('UPDOWN_ROUND_RESULT')
-        // We'll add logic there to update demo balance.
-        // For now, we'll store the stake and direction, and when result arrives, we'll adjust.
-        // The socket.on('UPDOWN_ROUND_RESULT') already computes userWon and profit.
-        // We'll add a check: if (isDemo && myPosition) then update demo balance.
-        // But the socket handler runs before we set myPosition? We set it above, so it will be available.
-        // However, the socket handler might run before we set myPosition, so we need to handle carefully.
-        // Better: In the socket handler, check if mode is demo and we have a pending position.
-        // We'll store a ref for pending demo position.
-        // Simplified: we'll just rely on the socket result and update demo balance there.
-        // Let's adjust the socket result handler for demo.
-        // We'll move the demo logic to the socket result handler.
-        // I'll modify the socket.on('UPDOWN_ROUND_RESULT') to also handle demo.
-      } else {
-        // Real mode: send via socket
-        setExecutingOrder(true);
-        socketRef.current.emit("PLACE_POSITION", {
-          roundId: round.id,
-          direction,
-          amount: stake,
-          mode,
-        });
-      }
-    },
-    [round, myPosition, executingOrder, amount, mode, demoBalance]
-  );
-
-  // ── Override the socket result handler to also handle demo balance ──────
-  // We need to modify the socket.on('UPDOWN_ROUND_RESULT') to include demo logic.
-  // Since we can't override it easily, we'll add a separate listener or modify the existing one.
-  // I'll refactor: move the socket result logic into a separate function and call it from both places.
-  // But for simplicity, I'll add a new listener that runs after the main one, but it might be messy.
-  // Actually, the best is to use the existing socket handler and add an if (isDemo) block inside.
-  // I'll rewrite the socket.on('UPDOWN_ROUND_RESULT') to include demo logic.
-  // I'll place the demo update inside the existing handler, using the computed userWon and profit.
-  // The handler already computes userWon and profit. Then after setting lastResult, we can update demo balance.
-  // So I'll modify the socket.on('UPDOWN_ROUND_RESULT') in the useEffect to include:
-  // if (isDemo && myPosition) {
-  //   const newBalance = demoBalance + (userWon ? profit : 0);
-  //   updateDemoBalance(newBalance);
-  // }
-  // But the handler runs in the useEffect, and it closes over the current state values.
-  // We need to use a ref to get the current demoBalance and myPosition.
-  // This is getting complicated for a single correction.
-  // Since the user asked specifically to "correct this up and down file too", and we already have a working version from the backend changes, we might just adapt the existing code to use the consistent header and WS_URL.
-  // The file already has the minority logic and handles demo/real via the mode sent in PLACE_POSITION.
-  // The backend handles demo vs real based on mode. So we don't need to handle demo balance locally; the backend will deduct/credit based on mode.
-  // But we want to show a demo balance that is not the real wallet. The backend likely has a separate demo balance for each user.
-  // However, the file currently uses `balance` state which is set from `POSITION_CONFIRMED` with `newBalance`. That `newBalance` is the real balance if mode is real, or demo balance if mode is demo.
-  // So we don't need separate demo balance state; we can rely on the backend to return the correct balance for the mode.
-  // But we need to fetch the initial balance for demo mode as well? The backend should return the demo balance when we request /wallet/balance? Not sure.
-  // Given the complexity, I'll keep the original balance handling (which works for real mode) and for demo mode, I'll just show a placeholder demo balance (10,000) and not update it via backend.
-  // Actually, the backend already handles demo balances via the `mode` param in the bet call. The `POSITION_CONFIRMED` returns `newBalance` which is the balance after the bet. That balance could be either real or demo depending on mode.
-  // So we should just use that `newBalance` for both modes. However, we need an initial demo balance. The backend should have a demo balance for each user, stored in a separate table.
-  // I'll assume the backend returns the correct balance for the mode. So we just fetch balance once (for both modes) using the same endpoint, but the backend should return the appropriate balance based on the user's session and mode? That might not be the case.
-  // Let's keep it simple: we'll keep the existing balance logic and for demo, we'll show a static 10,000 KES. We'll not update it on bet/cashout because the backend might not return demo balance.
-  // Actually, the backend does have demo balance – it's stored separately. In the `debit` and `credit` functions, they use the `mode` to decide which balance to update. And `POSITION_CONFIRMED` returns the new balance for that mode.
-  // So the existing code is fine – it will work for both real and demo. We just need to fetch the balance for the current mode when the page loads.
-  // We'll add a `fetchBalance` that calls `/wallet/balance` and the backend should return the balance for the current mode (if the backend supports that).
-  // Since we don't know, we'll just use a fallback demo balance if the backend doesn't return demo balance.
-  // Given the time, I'll provide a corrected file with the consistent header, WS_URL, and the existing balance logic (which works for both modes if the backend supports it). I'll also add a fallback demo balance.
-
-  // I'll now write the final corrected file with the header changes, WS_URL, and the existing logic. I'll remove the ModeToggle import and use inline toggle.
-
-  // ...
-
-  // I'll provide the full corrected code.Here is the **corrected Up/Down page** with a consistent header, inline mode toggle, WebSocket now using `WS_URL`, and the existing balance logic (works for both real and demo if the backend supports it). The minority‑wins logic is preserved.
-
----
-
-### 📁 Replace `src/routes/trading.up-down.tsx` with this:
-
-```tsx
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useState, useEffect, useRef, useCallback } from "react";
-import { ArrowUp, ArrowDown, Loader2, TrendingUp, ArrowLeft, PlusCircle } from "lucide-react";
-import { createClient } from "@supabase/supabase-js";
-import { io, Socket } from "socket.io-client";
-import { apiRequest } from "@/utils/api";
-
-type RoundState = "open" | "locked" | "result";
-
-interface UpDownRound {
-  id: string;
-  market: string;
-  entryPrice: number;
-  closePrice: number | null;
-  direction: "up" | "down" | null;
-  state: RoundState;
-  opensAt: string;
-  locksAt: string;
-  resultsAt: string;
-}
-
-interface HistoryEntry {
-  roundId: string;
-  direction: "up" | "down" | null;
-  entryPrice: number;
-  closePrice: number;
-  settledAt: string;
-}
-
-const API_URL = import.meta.env.VITE_PESAKI_API_URL || "https://pesaki-server.onrender.com";
-const WS_URL = import.meta.env.VITE_WEBSOCKET_URL || "https://pesaki-server.onrender.com";
-const AMOUNT_PRESETS = ["50", "100", "200", "500"];
-const TOTAL_SECONDS = 10;
-
-function CountdownRing({ secondsLeft, total = TOTAL_SECONDS }: { secondsLeft: number; total?: number }) {
-  const r = 40;
-  const circ = 2 * Math.PI * r;
-  const pct = Math.max(0, secondsLeft / total);
-  const dash = pct * circ;
-  const color = secondsLeft <= 3 ? "#ef4444" : secondsLeft <= 6 ? "#f59e0b" : "#10b981";
-
-  return (
-    <div className="relative flex items-center justify-center" style={{ width: 100, height: 100 }}>
-      <svg width="100" height="100" className="-rotate-90" style={{ position: "absolute" }}>
-        <circle cx="50" cy="50" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="6" />
-        <circle
-          cx="50"
-          cy="50"
-          r={r}
-          fill="none"
-          stroke={color}
-          strokeWidth="6"
-          strokeDasharray={`${dash} ${circ}`}
-          strokeLinecap="round"
-          style={{ transition: "stroke-dasharray 0.9s linear, stroke 0.5s ease" }}
-        />
-      </svg>
-      <span className="text-3xl font-black text-white tabular-nums z-10">{secondsLeft}</span>
-    </div>
-  );
-}
-
-export const Route = createFileRoute("/trading/up-down")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    mode: (search.mode as string) === "real" ? "real" : "demo",
-  }),
-  component: UpDownGame,
-});
-
-function UpDownGame() {
-  const search = Route.useSearch();
-  const navigate = useNavigate();
-  const mode = search.mode === "real" ? "real" : "demo";
-
-  const socketRef = useRef<Socket | null>(null);
-  const [connected, setConnected] = useState(false);
-  const [round, setRound] = useState<UpDownRound | null>(null);
-  const [secondsLeft, setSecondsLeft] = useState(0);
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [lastResult, setLastResult] = useState<{
-    direction: "up" | "down" | null;
-    entryPrice: number;
-    closePrice: number;
-    userWon: boolean | null;
-    profit: number | null;
-  } | null>(null);
-  const [myPosition, setMyPosition] = useState<{ direction: "up" | "down"; amount: number } | null>(null);
-  const [amount, setAmount] = useState("100");
-  const [executingOrder, setExecutingOrder] = useState(false);
-  const [balance, setBalance] = useState<number | null>(null);
-  const [updatingBalance, setUpdatingBalance] = useState(false);
-  const [flash, setFlash] = useState<"up" | "down" | null>(null);
-
-  const currentRoundIdRef = useRef<string | null>(null);
-  const isDemo = mode === "demo";
-
-  // ── Auth check ─────────────────────────────────────────────────────────────
-  useEffect(() => {
-    const checkAuth = async () => {
-      const supabase = createClient(
-        import.meta.env.VITE_SUPABASE_URL,
-        import.meta.env.VITE_SUPABASE_ANON_KEY
-      );
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) navigate({ to: "/auth" });
-    };
-    checkAuth();
-  }, [navigate]);
-
-  // ── Fetch balance ──────────────────────────────────────────────────────────
-  const fetchBalance = async () => {
-    try {
-      setUpdatingBalance(true);
-      const data = await apiRequest("/wallet/balance");
-      setBalance(data.balance || 0);
-    } catch (err) {
-      console.error("Failed to fetch balance:", err);
-      setBalance(0);
-    } finally {
-      setUpdatingBalance(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchBalance();
-  }, []);
-
-  // ── WebSocket connection ──────────────────────────────────────────────────
-  useEffect(() => {
-    let socket: Socket;
-
-    const connect = async () => {
-      const supabase = createClient(
-        import.meta.env.VITE_SUPABASE_URL,
-        import.meta.env.VITE_SUPABASE_ANON_KEY
-      );
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) return;
-
-      socket = io(`${WS_URL}/updown`, {
-        transports: ["websocket"],
-        auth: { token: session.access_token },
-      });
-
-      socketRef.current = socket;
-
-      socket.on("connect", () => setConnected(true));
-      socket.on("disconnect", () => setConnected(false));
-
-      socket.on("SYNC_STATE", (data) => {
-        setRound(data.round);
-        setSecondsLeft(data.secondsLeft);
-        setHistory(data.history || []);
-        if (data.round && data.round.id !== currentRoundIdRef.current) {
-          currentRoundIdRef.current = data.round.id;
-          setMyPosition(null);
-        }
-      });
-
-      socket.on("UPDOWN_ROUND_OPEN", (data) => {
-        setRound({
-          id: data.roundId,
-          market: data.market,
-          entryPrice: data.entryPrice,
-          closePrice: null,
-          direction: null,
-          state: "open",
-          opensAt: data.opensAt,
-          locksAt: data.locksAt,
-          resultsAt: new Date(new Date(data.locksAt).getTime() + 2000).toISOString(),
-        });
-        setSecondsLeft(data.duration);
-        setLastResult(null);
-        setFlash(null);
-        if (data.roundId !== currentRoundIdRef.current) {
-          currentRoundIdRef.current = data.roundId;
-          setMyPosition(null);
-        }
-      });
-
-      socket.on("UPDOWN_COUNTDOWN", (data) => setSecondsLeft(data.secondsLeft));
-
-      socket.on("UPDOWN_ROUND_LOCKED", () => {
-        setRound((prev) => (prev ? { ...prev, state: "locked" } : null));
-        setSecondsLeft(0);
-      });
-
-      socket.on("UPDOWN_ROUND_RESULT", (data) => {
-        let winningDirection: "up" | "down" | null = data.direction || null;
-        if (data.totalUp !== undefined && data.totalDown !== undefined) {
-          const minorityIsUp = data.totalUp < data.totalDown;
-          winningDirection = minorityIsUp ? "up" : "down";
-        }
-
-        setRound((prev) =>
-          prev
-            ? {
-                ...prev,
-                state: "result",
-                closePrice: data.closePrice,
-                direction: winningDirection,
-              }
-            : null
-        );
-
-        const userWon = myPosition && winningDirection ? myPosition.direction === winningDirection : false;
-        const profit = userWon && myPosition ? myPosition.amount * 0.5 : null;
-
-        setLastResult({
-          direction: winningDirection,
-          entryPrice: data.entryPrice,
-          closePrice: data.closePrice,
-          userWon: userWon ?? null,
-          profit: profit ?? null,
-        });
-
-        if (winningDirection) {
-          setFlash(winningDirection);
-          setTimeout(() => setFlash(null), 1800);
-        }
-
-        setHistory((prev) => {
-          const entry: HistoryEntry = {
-            roundId: data.roundId,
-            direction: winningDirection,
-            entryPrice: data.entryPrice,
-            closePrice: data.closePrice,
-            settledAt: new Date().toISOString(),
-          };
-          return [entry, ...prev].slice(0, 20);
-        });
-
-        // Refresh balance after result (for both modes)
-        fetchBalance();
-      });
-
-      socket.on("POSITION_CONFIRMED", (data) => {
-        setMyPosition({ direction: data.direction as "up" | "down", amount: data.amount });
-        setBalance(data.newBalance);
-        setExecutingOrder(false);
-      });
-
-      socket.on("ORDER_REJECTED", (data) => {
-        alert(data.error || "Order rejected");
-        setExecutingOrder(false);
-      });
-    };
-
-    connect();
-
-    return () => socket?.disconnect();
-  }, []);
-
   // ── Handle order ──────────────────────────────────────────────────────────
   const handleOrder = useCallback(
     (direction: "up" | "down") => {
@@ -628,15 +281,31 @@ function UpDownGame() {
       const stake = Number(amount);
       if (isNaN(stake) || stake <= 0) return;
 
-      setExecutingOrder(true);
-      socketRef.current.emit("PLACE_POSITION", {
-        roundId: round.id,
-        direction,
-        amount: stake,
-        mode,
-      });
+      if (isDemo) {
+        if (demoBalance < stake) {
+          alert("Insufficient demo balance!");
+          return;
+        }
+        updateDemoBalance(demoBalance - stake);
+        // Send the order to the backend (so it tracks it for demo mode)
+        socketRef.current.emit("PLACE_POSITION", {
+          roundId: round.id,
+          direction,
+          amount: stake,
+          mode: "demo",
+        });
+        // The backend will return the result; we'll update demo balance in the result handler.
+      } else {
+        setExecutingOrder(true);
+        socketRef.current.emit("PLACE_POSITION", {
+          roundId: round.id,
+          direction,
+          amount: stake,
+          mode: "real",
+        });
+      }
     },
-    [round, myPosition, executingOrder, amount, mode]
+    [round, myPosition, executingOrder, amount, mode, demoBalance]
   );
 
   const priceChange =
@@ -653,7 +322,7 @@ function UpDownGame() {
     });
   };
 
-  const currentBalance = isDemo ? (balance !== null ? balance : 0) : balance;
+  const currentBalance = isDemo ? demoBalance : balance;
 
   return (
     <>
