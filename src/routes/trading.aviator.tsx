@@ -118,7 +118,7 @@ function AviatorPage() {
       setBalance(data.balance || 0);
     } catch (err) {
       console.error("Failed to fetch real balance:", err);
-      setBalance(0); // fallback
+      setBalance(0);
     } finally {
       setUpdatingBalance(false);
       isFetchingBalanceRef.current = false;
@@ -385,24 +385,22 @@ function AviatorPage() {
 
   return (
     <div className="space-y-4 max-w-6xl mx-auto pb-8">
-      {/* ✅ Header with mode toggle moved to the LEFT */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      {/* ✅ Full header – everything fits in one row */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-1 md:gap-2">
           <Link
             to="/trading"
             className="text-gray-400 hover:text-white transition-colors"
             title="Back to Trading Hub"
           >
-            <ArrowLeft size={24} />
+            <ArrowLeft size={20} />
           </Link>
-          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-            <Plane className="text-red-500" /> Aviator
-          </h1>
-          {/* ✅ Mode toggle moved HERE – left side, visible */}
-          <div className="flex items-center gap-1 rounded-lg bg-[#181d29] p-1 text-xs font-medium ml-2">
+          <Plane className="text-red-500 h-5 w-5" />
+          {/* Mode toggle – clearly visible on the left */}
+          <div className="flex items-center gap-0.5 bg-[#181d29] p-0.5 rounded-lg text-[10px] md:text-xs font-medium">
             <button
               onClick={() => setMode("demo")}
-              className={`px-3 py-1.5 rounded-md transition-all ${
+              className={`px-2 py-0.5 md:px-3 md:py-1 rounded-md transition-all ${
                 isDemo
                   ? "bg-[#dcb13c] text-black"
                   : "text-gray-400 hover:text-white hover:bg-[#202636]"
@@ -412,7 +410,7 @@ function AviatorPage() {
             </button>
             <button
               onClick={() => setMode("real")}
-              className={`px-3 py-1.5 rounded-md transition-all ${
+              className={`px-2 py-0.5 md:px-3 md:py-1 rounded-md transition-all ${
                 !isDemo
                   ? "bg-[#dcb13c] text-black"
                   : "text-gray-400 hover:text-white hover:bg-[#202636]"
@@ -422,33 +420,26 @@ function AviatorPage() {
             </button>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          {/* Balance display with Deposit button */}
-          <div className="flex items-center gap-2">
-            {currentBalance !== null ? (
-              <div className="flex items-center gap-1 text-sm text-gray-300 bg-[#181d29] px-3 py-1.5 rounded-lg">
-                <span className="text-gray-500">{isDemo ? "Demo" : "Bal"}:</span>
-                <span className="font-bold text-white">{currentBalance.toFixed(2)} KES</span>
-                {updatingBalance && (
-                  <span className="text-gray-400 text-xs animate-pulse">⋯</span>
-                )}
-              </div>
-            ) : (
-              <div className="text-sm text-gray-500 bg-[#181d29] px-3 py-1.5 rounded-lg animate-pulse">
-                Loading…
-              </div>
-            )}
-            {!isDemo && (
-              <Link
-                to="/wallet"
-                className="flex items-center gap-1 bg-green-600 hover:bg-green-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
-              >
-                <PlusCircle size={14} /> Deposit
-              </Link>
-            )}
+        <div className="flex items-center gap-1 md:gap-2">
+          {/* Balance display */}
+          <div className="flex items-center gap-0.5 text-[10px] md:text-xs bg-[#181d29] px-1.5 md:px-3 py-0.5 md:py-1.5 rounded-lg">
+            <span className="text-gray-500">{isDemo ? "Demo" : "Bal"}:</span>
+            <span className="font-bold text-white">
+              {currentBalance !== null ? currentBalance.toFixed(2) : "0.00"} KES
+            </span>
+            {updatingBalance && <span className="text-gray-400 text-[8px] animate-pulse">⋯</span>}
           </div>
-          <span className="text-xs text-gray-400 font-medium">
-            {isDemo ? "🎮 FUN MODE" : "🔴 REAL MODE"}
+          {/* Deposit button (only for real mode) */}
+          {!isDemo && (
+            <Link
+              to="/wallet"
+              className="flex items-center gap-0.5 bg-green-600 hover:bg-green-500 text-white text-[10px] md:text-xs font-bold px-1.5 md:px-3 py-0.5 md:py-1.5 rounded-lg transition-colors"
+            >
+              <PlusCircle size={14} className="h-3 w-3 md:h-4 md:w-4" /> Deposit
+            </Link>
+          )}
+          <span className="text-[8px] md:text-[10px] text-gray-400 hidden sm:inline">
+            {isDemo ? "🎮 FUN" : "🔴 REAL"}
           </span>
         </div>
       </div>
@@ -487,7 +478,7 @@ function AviatorPage() {
           </div>
         </div>
 
-        {/* Right column – NO duplicate balance */}
+        {/* Right column */}
         <div className="space-y-4">
           <div className="bg-[#0f0f1a] border border-white/10 rounded-2xl p-3 text-center">
             <div className="text-xs text-gray-400 uppercase tracking-wider">
