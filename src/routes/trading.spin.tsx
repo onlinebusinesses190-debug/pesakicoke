@@ -1,6 +1,6 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { Disc, Sparkles, Loader2 } from "lucide-react";
+import { Disc, Sparkles, Loader2, ArrowLeft, PlusCircle } from "lucide-react";
 import { apiRequest } from "@/utils/api";
 import { createClient } from "@supabase/supabase-js";
 
@@ -35,7 +35,10 @@ function MarketGrowthPage() {
   const [rotation, setRotation] = useState(0);
   const [allocation, setAllocation] = useState("100");
   const [lastAdjustment, setLastAdjustment] = useState<{ name: string; amount: number } | null>(null);
+  const [balance, setBalance] = useState<number | null>(null);
+  const [updatingBalance, setUpdatingBalance] = useState(false);
 
+  // ── Auth check ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -52,6 +55,26 @@ function MarketGrowthPage() {
     checkAuth();
   }, [navigate]);
 
+  // ── Fetch balance ────────────────────────────────────────────────────────
+  const fetchBalance = async () => {
+    if (mode !== "real") return;
+    try {
+      setUpdatingBalance(true);
+      const data = await apiRequest("/wallet/balance");
+      setBalance(data.balance || 0);
+    } catch (err) {
+      console.error("Failed to fetch balance:", err);
+      setBalance(0);
+    } finally {
+      setUpdatingBalance(false);
+    }
+  };
+
+  useEffect(() => {
+    if (mode === "real") fetchBalance();
+  }, [mode]);
+
+  // ── Fetch outcomes ──────────────────────────────────────────────────────
   useEffect(() => {
     const fetchOutcomes = async () => {
       try {
@@ -66,6 +89,7 @@ function MarketGrowthPage() {
     fetchOutcomes();
   }, []);
 
+  // ── Execute spin ─────────────────────────────────────────────────────────
   const executeSelection = async () => {
     if (executing || outcomes.length === 0) return;
     setLastAdjustment(null);
@@ -90,6 +114,7 @@ function MarketGrowthPage() {
       setTimeout(() => {
         setExecuting(false);
         setLastAdjustment({ name: result.prizeName, amount: result.winAmount });
+        if (mode === "real") fetchBalance();
       }, 5000);
     } catch (err: any) {
       alert(err.message || "Execution failed");
@@ -107,10 +132,11 @@ function MarketGrowthPage() {
     return `conic-gradient(${stops.join(", ")})`;
   };
 
+  // ── Toggle mode with navigate ──────────────────────────────────────────
   const setMode = (newMode: "demo" | "real") => {
-    const url = new URL(window.location.href);
-    url.searchParams.set("mode", newMode);
-    window.location.href = url.toString();
+    navigate({
+      search: (prev: any) => ({ ...prev, mode: newMode }),
+    });
   };
 
   if (loadingOutcomes) {
@@ -121,22 +147,30 @@ function MarketGrowthPage() {
     );
   }
 
+  const isDemo = mode === "demo";
+  const currentBalance = isDemo ? 10000 : balance;
+
   return (
     <div className="space-y-4 max-w-5xl mx-auto pb-8 px-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-          <Disc className="text-purple-500" size={24} /> Market Growth Selector
-        </h1>
+      {/* Header with back arrow, mode toggle, balance, deposit */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-gray-400 font-medium">
-            {mode === "demo" ? "🎮 FUN MODE" : "🔴 REAL MODE"}
-          </span>
-          <div className="flex items-center gap-1 rounded-lg bg-[#181d29] p-1 text-[10px] font-medium">
+          <Link
+            to="/trading"
+            className="text-gray-400 hover:text-white transition-colors"
+            title="Back to Trading Hub"
+          >
+            <ArrowLeft size={24} />
+          </Link>
+          <h1 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2">
+            <Disc className="text-purple-500" size={24} /> Market Growth Selector
+          </h1>
+          {/* Mode toggle on the left */}
+          <div className="flex items-center gap-0.5 bg-[#181d29] p-0.5 rounded-lg text-[10px] md:text-xs font-medium ml-1">
             <button
               onClick={() => setMode("demo")}
-              className={`px-2.5 py-1 rounded-md transition-all ${
-                mode === "demo"
+              className={`px-2 py-0.5 md:px-3 md:py-1 rounded-md transition-all ${
+                isDemo
                   ? "bg-[#dcb13c] text-black"
                   : "text-gray-400 hover:text-white hover:bg-[#202636]"
               }`}
@@ -145,8 +179,8 @@ function MarketGrowthPage() {
             </button>
             <button
               onClick={() => setMode("real")}
-              className={`px-2.5 py-1 rounded-md transition-all ${
-                mode === "real"
+              className={`px-2 py-0.5 md:px-3 md:py-1 rounded-md transition-all ${
+                !isDemo
                   ? "bg-[#dcb13c] text-black"
                   : "text-gray-400 hover:text-white hover:bg-[#202636]"
               }`}
@@ -155,11 +189,32 @@ function MarketGrowthPage() {
             </button>
           </div>
         </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Balance + Deposit */}
+          <div className="flex items-center gap-1 bg-[#181d29] px-2 py-1 rounded-lg text-xs">
+            <span className="text-gray-500">{isDemo ? "Demo" : "Bal"}:</span>
+            <span className="font-bold text-white">
+              {currentBalance !== null ? currentBalance.toFixed(2) : "0.00"} KES
+            </span>
+            {updatingBalance && <span className="text-gray-400 text-[8px] animate-pulse">⋯</span>}
+          </div>
+          {!isDemo && (
+            <Link
+              to="/wallet"
+              className="flex items-center gap-0.5 bg-green-600 hover:bg-green-500 text-white text-[10px] md:text-xs font-bold px-2 py-1 rounded-lg transition-colors"
+            >
+              <PlusCircle size={14} className="h-3 w-3 md:h-4 md:w-4" /> Deposit
+            </Link>
+          )}
+          <span className="text-[8px] md:text-[10px] text-gray-400 hidden sm:inline">
+            {isDemo ? "🎮 FUN" : "🔴 REAL"}
+          </span>
+        </div>
       </div>
 
-      {/* Main content - reduced sizes */}
+      {/* Main content */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-        {/* Wheel - smaller */}
+        {/* Wheel */}
         <div className="relative flex justify-center items-center py-4">
           <div className="absolute top-0 z-20 w-0 h-0 border-l-[14px] border-l-transparent border-t-[28px] border-t-white border-r-[14px] border-r-transparent drop-shadow-lg" />
 
@@ -197,7 +252,7 @@ function MarketGrowthPage() {
           </div>
         </div>
 
-        {/* Controls - compact */}
+        {/* Controls */}
         <div className="bg-card border border-border rounded-2xl p-4 space-y-4">
           <div className="text-center space-y-1">
             {lastAdjustment !== null && (
@@ -244,7 +299,7 @@ function MarketGrowthPage() {
             />
           </div>
 
-          {/* Legend - smaller */}
+          {/* Legend */}
           <div className="space-y-0.5">
             <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Returns</div>
             {outcomes.slice(0, 4).map((p, i) => (
