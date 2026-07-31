@@ -16,8 +16,9 @@ export async function apiRequest(path: string, options: RequestInit = {}) {
         throw new Error('apiRequest can only be called from client components');
     }
     const supabase = createBrowserClient();
-    let { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
+    // --- Get session (with hydration wait) ---
+    let { data: { session }, error: sessionError } = await supabase.auth.getSession();
     if (sessionError) {
         console.error('[API] getSession error:', sessionError);
     }
@@ -25,7 +26,7 @@ export async function apiRequest(path: string, options: RequestInit = {}) {
     // If no session immediately, wait a moment and try again (Supabase hydration)
     if (!session?.access_token) {
         console.log('[API] No session found, waiting for hydration...');
-        await new Promise(resolve => setTimeout(resolve, 300)); // Increased delay for stability
+        await new Promise(resolve => setTimeout(resolve, 300));
         const { data: { session: hydratedSession } } = await supabase.auth.getSession();
         session = hydratedSession;
     }
@@ -46,26 +47,34 @@ export async function apiRequest(path: string, options: RequestInit = {}) {
         throw new Error(errorMsg);
     }
 
+    // --- Build headers ---
     const headers = new Headers(options.headers);
     headers.set('Authorization', `Bearer ${session.access_token}`);
     headers.set('Content-Type', 'application/json');
 
     const fetchUrl = (path.startsWith('http') || path.startsWith('/api/')) ? path : `${API_URL}${path}`;
 
+    // --- First request attempt ---
     let response = await fetch(fetchUrl, {
         ...options,
         headers,
         cache: 'no-store',
     });
 
-    // Auto-refresh on 401 and log event for debugging
+    // --- Auto-refresh on 401, but prevent infinite loops ---
     if (response.status === 401) {
+        // If we already retried once (x-retry header exists), stop the loop.
+        if (options.headers?.['x-retry'] === 'true') {
+            console.error('[API] Retry already attempted, but 401 persists.');
+            throw new Error('Authentication failed after retry. Please log in again.');
+        }
+
         try {
-            const key = 'pesaki_api_events'
-            const prev = JSON.parse(localStorage.getItem(key) || '[]')
-            prev.push({ ts: Date.now(), url: fetchUrl, status: response.status, note: 'initial_401' })
-            if (prev.length > 50) prev.shift()
-            localStorage.setItem(key, JSON.stringify(prev))
+            const key = 'pesaki_api_events';
+            const prev = JSON.parse(localStorage.getItem(key) || '[]');
+            prev.push({ ts: Date.now(), url: fetchUrl, status: response.status, note: 'initial_401' });
+            if (prev.length > 50) prev.shift();
+            localStorage.setItem(key, JSON.stringify(prev));
         } catch (e) {}
 
         console.log('[API] 401 detected, refreshing session...');
@@ -73,36 +82,41 @@ export async function apiRequest(path: string, options: RequestInit = {}) {
         if (!refreshError2) {
             ({ data: { session } } = await supabase.auth.getSession());
             if (session?.access_token) {
-                headers.set('Authorization', `Bearer ${session.access_token}`);
+                // Create a new headers object with the new token
+                const retryHeaders = new Headers(options.headers);
+                retryHeaders.set('Authorization', `Bearer ${session.access_token}`);
+                retryHeaders.set('Content-Type', 'application/json');
+                // Add the retry flag
+                retryHeaders.set('x-retry', 'true');
+
                 console.log('[API] Retry with new token, length:', session.access_token.length);
                 response = await fetch(fetchUrl, {
                     ...options,
-                    headers,
+                    headers: retryHeaders,
                     cache: 'no-store',
                 });
             }
         }
     }
 
+    // --- Handle non-200 responses ---
     if (!response.ok) {
         let errorMsg = `HTTP error! status: ${response.status}`;
         try {
             const error = await response.json();
-            // Look for 'error' or 'message' in the JSON body
             errorMsg = error.error || error.message || errorMsg;
         } catch (e) {
-            // If not JSON, try text
             try {
                 const text = await response.text();
                 if (text) errorMsg = text;
             } catch (innerE) {}
         }
         try {
-            const key = 'pesaki_api_events'
-            const prev = JSON.parse(localStorage.getItem(key) || '[]')
-            prev.push({ ts: Date.now(), url: fetchUrl, status: response.status, message: errorMsg })
-            if (prev.length > 50) prev.shift()
-            localStorage.setItem(key, JSON.stringify(prev))
+            const key = 'pesaki_api_events';
+            const prev = JSON.parse(localStorage.getItem(key) || '[]');
+            prev.push({ ts: Date.now(), url: fetchUrl, status: response.status, message: errorMsg });
+            if (prev.length > 50) prev.shift();
+            localStorage.setItem(key, JSON.stringify(prev));
         } catch (e) {
             // ignore
         }
