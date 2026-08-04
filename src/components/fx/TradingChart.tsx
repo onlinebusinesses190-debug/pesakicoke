@@ -13,11 +13,12 @@ export const TradingChart = ({
     const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
 
     useEffect(() => {
-        if (!data || data.length === 0) return; // ⬅️ Skip if no data
+        if (!data || data.length === 0) return;
 
         const handleResize = () => {
             if (chartRef.current && chartContainerRef.current) {
                 chartRef.current.applyOptions({ width: chartContainerRef.current.clientWidth });
+                chartRef.current.timeScale().fitContent();
             }
         };
 
@@ -28,7 +29,7 @@ export const TradingChart = ({
                     textColor,
                 },
                 width: chartContainerRef.current.clientWidth,
-                height: chartContainerRef.current.clientHeight || 280, // ⬅️ Smaller height
+                height: chartContainerRef.current.clientHeight || 280,
                 grid: {
                     vertLines: { color: 'rgba(255, 255, 255, 0.05)' },
                     horzLines: { color: 'rgba(255, 255, 255, 0.05)' },
@@ -49,6 +50,7 @@ export const TradingChart = ({
             });
             seriesRef.current = newSeries;
             newSeries.setData(data);
+            chart.timeScale().fitContent();
 
             window.addEventListener('resize', handleResize);
 
@@ -62,10 +64,12 @@ export const TradingChart = ({
     useEffect(() => {
         if (seriesRef.current && data && data.length > 0) {
             seriesRef.current.setData(data);
+            if (chartRef.current) {
+                chartRef.current.timeScale().fitContent();
+            }
         }
     }, [data]);
 
-    // ⬅️ Show fallback if no data
     if (!data || data.length === 0) {
         return (
             <div className="w-full h-[280px] flex items-center justify-center text-gray-500 text-sm bg-[#151924] rounded-xl">
@@ -77,7 +81,7 @@ export const TradingChart = ({
     return (
         <div
             ref={chartContainerRef}
-            className="w-full h-[280px]" // ⬅️ Smaller height
+            className="w-full h-[280px]"
         />
     );
 };
