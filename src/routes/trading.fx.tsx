@@ -71,7 +71,10 @@ function TradingPage() {
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const tradeIdRef = useRef<string | null>(null);
   const tradeActiveRef = useRef(false);
-  const isMountedRef = useRef(true);
+
+  const spread = currentPrice && currentPrice > 50 ? 0.1 : 0.0002;
+  const ask = currentPrice ? currentPrice + spread / 2 : 0;
+  const bid = currentPrice ? currentPrice - spread / 2 : 0;
 
   // ── Auth check ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -90,27 +93,24 @@ function TradingPage() {
 
   // ── Fetch balance ──────────────────────────────────────────────────────────
   const fetchBalance = async () => {
-    if (!isMountedRef.current) return;
     try {
       setUpdatingBalance(true);
       const data = await apiRequest("/wallet/balance");
-      if (isMountedRef.current) setBalance(data.balance || 0);
+      setBalance(data.balance || 0);
     } catch (err) {
       console.error("Failed to fetch balance:", err);
-      if (isMountedRef.current) setBalance(0);
+      setBalance(0);
     } finally {
-      if (isMountedRef.current) setUpdatingBalance(false);
+      setUpdatingBalance(false);
     }
   };
 
   useEffect(() => {
     fetchBalance();
-    return () => { isMountedRef.current = false; };
   }, []);
 
   // ── API calls for price and positions ──────────────────────────────────────
   const fetchPrice = useCallback(async (isInitial = false) => {
-    if (!isMountedRef.current) return;
     try {
       if (isInitial) setLoading(true);
       const result = await apiRequest(`/market/price?pair=${pair}`);
@@ -123,23 +123,23 @@ function TradingPage() {
       }
     } catch (err) {
       console.error("Fetch error:", err);
+      // ✅ Fallback price – use a simulated price
       const fallbackPrice = pair === "USD/KES" ? 150.0 : 1.0;
       targetPriceRef.current = fallbackPrice;
-      if (isInitial && isMountedRef.current) {
+      if (isInitial) {
         setCurrentPrice(fallbackPrice);
         const initialHistory = generateData(10, fallbackPrice);
         setData(initialHistory);
       }
     } finally {
-      if (isInitial && isMountedRef.current) setLoading(false);
+      if (isInitial) setLoading(false);
     }
   }, [pair]);
 
   const fetchOpenPositions = useCallback(async () => {
-    if (!isMountedRef.current) return;
     try {
       const res = await apiRequest("/games/prediction/pending");
-      if (res.success && res.data && isMountedRef.current) {
+      if (res.success && res.data) {
         setOpenPositions(res.data);
       }
     } catch (err) {
@@ -147,7 +147,6 @@ function TradingPage() {
     }
   }, []);
 
-  // ── Initial fetch and intervals ────────────────────────────────────────────
   useEffect(() => {
     fetchPrice(true);
     fetchOpenPositions();
@@ -164,7 +163,6 @@ function TradingPage() {
   // ── Tick simulation ──────────────────────────────────────────────────────
   useEffect(() => {
     const tickInterval = setInterval(() => {
-      if (!isMountedRef.current) return;
       setData((prev) => {
         if (prev.length === 0 || !targetPriceRef.current) return prev;
 
@@ -185,7 +183,7 @@ function TradingPage() {
         const high = Math.max(open, close) + Math.random() * (maxVol * 0.5);
         const low = Math.min(open, close) - Math.random() * (maxVol * 0.5);
 
-        if (isMountedRef.current) setCurrentPrice(close);
+        setCurrentPrice(close);
 
         const newCandle = {
           time: (last.time as number) + 1,
@@ -204,7 +202,6 @@ function TradingPage() {
 
   // ── Timer and trade logic ──────────────────────────────────────────────────
   const startTimer = (durationInSeconds: number) => {
-    if (!isMountedRef.current) return;
     setTimeRemaining(durationInSeconds);
     tradeActiveRef.current = true;
 
@@ -226,20 +223,19 @@ function TradingPage() {
   };
 
   const closeTradeAutomatically = async (tradeId: string) => {
-    if (!tradeActiveRef.current || !isMountedRef.current) return;
+    if (!tradeActiveRef.current) return;
     tradeActiveRef.current = false;
 
     const exit = currentPrice || 0;
-    if (isMountedRef.current) setExitPrice(exit);
+    setExitPrice(exit);
 
     if (entryPrice !== null && tradeDirection) {
       const diff = tradeDirection === "UP" ? exit - entryPrice : entryPrice - exit;
       const won = diff > 0;
 
-      if (isMountedRef.current) setTradeResult(won ? "won" : "lost");
+      setTradeResult(won ? "won" : "lost");
 
       setTimeout(() => {
-        if (!isMountedRef.current) return;
         setTradeResult(null);
         setEntryPrice(null);
         setExitPrice(null);
@@ -261,7 +257,7 @@ function TradingPage() {
   };
 
   const handleTrade = async (direction: "buy" | "sell") => {
-    if (!currentPrice || tradeActive || !isMountedRef.current) return;
+    if (!currentPrice || tradeActive) return;
     if (stake < 10) {
       setTradeError("Minimum stake is KES 10");
       return;
@@ -308,7 +304,7 @@ function TradingPage() {
   };
 
   const handleCloseTrade = async (predictionId: string) => {
-    if (tradeActiveRef.current || !isMountedRef.current) return;
+    if (tradeActiveRef.current) return;
     try {
       const res = await apiRequest("/games/prediction/close", {
         method: "POST",
@@ -527,7 +523,9 @@ function TradingPage() {
               className="flex-1 py-4 bg-[#236e40] hover:bg-[#28814a] text-white font-bold rounded-lg flex flex-col items-center justify-center transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="uppercase tracking-wider text-sm mb-1">Buy</span>
-              <span className="font-mono opacity-80 font-normal">{ask.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}</span>
+              <span className="font-mono opacity-80 font-normal">
+                {ask.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}
+              </span>
             </button>
             <button
               onClick={() => handleTrade("sell")}
@@ -535,7 +533,9 @@ function TradingPage() {
               className="flex-1 py-4 bg-[#6e2525] hover:bg-[#852c2c] text-white font-bold rounded-lg flex flex-col items-center justify-center transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="uppercase tracking-wider text-sm mb-1">Sell</span>
-              <span className="font-mono opacity-80 font-normal">{bid.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}</span>
+              <span className="font-mono opacity-80 font-normal">
+                {bid.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}
+              </span>
             </button>
           </div>
 
