@@ -123,6 +123,14 @@ function TradingPage() {
       }
     } catch (err) {
       console.error("Fetch error:", err);
+      // ✅ Fallback price – use a simulated price
+      const fallbackPrice = pair === "USD/KES" ? 150.0 : 1.0;
+      targetPriceRef.current = fallbackPrice;
+      if (isInitial) {
+        setCurrentPrice(fallbackPrice);
+        const initialHistory = generateData(10, fallbackPrice);
+        setData(initialHistory);
+      }
     } finally {
       if (isInitial) setLoading(false);
     }
