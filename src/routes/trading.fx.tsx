@@ -5,7 +5,7 @@ import { Activity, RefreshCw, Timer, ArrowLeft, PlusCircle } from "lucide-react"
 import { apiRequest } from "@/utils/api";
 import { createClient } from "@supabase/supabase-js";
 
-// --- Constants ---
+// ─── Constants ──────────────────────────────────────────────────────────────
 const DURATIONS = [
   { label: "3s", value: 3, unit: "seconds" },
   { label: "5s", value: 5, unit: "seconds" },
@@ -17,23 +17,40 @@ const DURATIONS = [
 
 const API_URL = import.meta.env.VITE_PESAKI_API_URL || "https://pesaki-server.onrender.com";
 
-// Helper to generate initial chart data
-const generateData = (count: number, basePrice: number) => {
+// ─── Simulation Engine ──────────────────────────────────────────────────────
+// Generates realistic candlesticks using Geometric Brownian Motion
+const generateInitialData = (count: number, basePrice: number) => {
   let price = basePrice;
   const data = [];
-  const now = Math.floor(Date.now() / 1000);
+  const now = Math.floor(Date.now() / 1000) - count;
+  const drift = 0.00005;  // tiny upward drift
+  const volatility = 0.002; // 0.2% per step
+
   for (let i = 0; i < count; i++) {
-    const time = now - (count - i) * 1;
+    const time = now + i;
+    const change = (drift + (Math.random() - 0.5) * volatility) * price;
     const open = price;
-    const close = price + (Math.random() - 0.5) * (basePrice * 0.0001);
-    const high = Math.max(open, close) + Math.random() * (basePrice * 0.00005);
-    const low = Math.min(open, close) - Math.random() * (basePrice * 0.00005);
+    const close = price + change;
+    const high = Math.max(open, close) + Math.random() * (price * 0.0005);
+    const low = Math.min(open, close) - Math.random() * (price * 0.0005);
     data.push({ time, open, high, low, close });
     price = close;
   }
   return data;
 };
 
+const generateNextCandle = (lastPrice: number, time: number) => {
+  const drift = 0.00005;
+  const volatility = 0.002;
+  const change = (drift + (Math.random() - 0.5) * volatility) * lastPrice;
+  const open = lastPrice;
+  const close = lastPrice + change;
+  const high = Math.max(open, close) + Math.random() * (lastPrice * 0.0005);
+  const low = Math.min(open, close) - Math.random() * (lastPrice * 0.0005);
+  return { time, open, high, low, close };
+};
+
+// ─── Route ──────────────────────────────────────────────────────────────────
 export const Route = createFileRoute("/trading/fx")({
   validateSearch: (search: Record<string, unknown>) => ({
     mode: (search.mode as string) === "real" ? "real" : "demo",
@@ -46,16 +63,15 @@ function TradingPage() {
   const navigate = useNavigate();
   const mode = search.mode === "real" ? "real" : "demo";
 
+  // ── Chart state ────────────────────────────────────────────────────────────
   const [data, setData] = useState<any[]>([]);
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
   const [pair, setPair] = useState("USD/KES");
-  const [loading, setLoading] = useState(false);
-  const targetPriceRef = useRef<number | null>(null);
+  const [loading, setLoading] = useState(true);
 
+  // ── Trade state ────────────────────────────────────────────────────────────
   const [stake, setStake] = useState<number>(10);
-  const [selectedDuration, setSelectedDuration] = useState<{ label: string; value: number; unit: string }>(
-    DURATIONS[0]
-  );
+  const [selectedDuration, setSelectedDuration] = useState<typeof DURATIONS[0]>(DURATIONS[0]);
   const [tradeActive, setTradeActive] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [tradeDirection, setTradeDirection] = useState<"UP" | "DOWN" | null>(null);
@@ -65,13 +81,20 @@ function TradingPage() {
   const [tradeError, setTradeError] = useState<string | null>(null);
   const [openPositions, setOpenPositions] = useState<any[]>([]);
 
+  // ── Balance state ──────────────────────────────────────────────────────────
   const [balance, setBalance] = useState<number | null>(null);
   const [updatingBalance, setUpdatingBalance] = useState(false);
 
+  // ── Chart markers ─────────────────────────────────────────────────────────
+  const [markers, setMarkers] = useState<any[]>([]);
+
+  // ── Refs ──────────────────────────────────────────────────────────────────
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const tradeIdRef = useRef<string | null>(null);
   const tradeActiveRef = useRef(false);
+  const tickIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // ── Derived prices ─────────────────────────────────────────────────────────
   const spread = currentPrice && currentPrice > 50 ? 0.1 : 0.0002;
   const ask = currentPrice ? currentPrice + spread / 2 : 0;
   const bid = currentPrice ? currentPrice - spread / 2 : 0;
@@ -84,15 +107,13 @@ function TradingPage() {
         import.meta.env.VITE_SUPABASE_ANON_KEY
       );
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        navigate({ to: "/auth" });
-      }
+      if (!session) navigate({ to: "/auth" });
     };
     checkAuth();
   }, [navigate]);
 
   // ── Fetch balance ──────────────────────────────────────────────────────────
-  const fetchBalance = async () => {
+  const fetchBalance = useCallback(async () => {
     try {
       setUpdatingBalance(true);
       const data = await apiRequest("/wallet/balance");
@@ -103,104 +124,60 @@ function TradingPage() {
     } finally {
       setUpdatingBalance(false);
     }
-  };
-
-  useEffect(() => {
-    fetchBalance();
   }, []);
 
-  // ── API calls for price and positions ──────────────────────────────────────
-  const fetchPrice = useCallback(async (isInitial = false) => {
-    try {
-      if (isInitial) setLoading(true);
-      const result = await apiRequest(`/market/price?pair=${pair}`);
-      targetPriceRef.current = result.price;
+  useEffect(() => { fetchBalance(); }, [fetchBalance]);
 
-      if (isInitial) {
-        setCurrentPrice(result.price);
-        const initialHistory = generateData(10, result.price);
-        setData(initialHistory);
-      }
-    } catch (err) {
-      console.error("Fetch error:", err);
-      // ✅ Fallback price – use a simulated price
-      const fallbackPrice = pair === "USD/KES" ? 150.0 : 1.0;
-      targetPriceRef.current = fallbackPrice;
-      if (isInitial) {
-        setCurrentPrice(fallbackPrice);
-        const initialHistory = generateData(10, fallbackPrice);
-        setData(initialHistory);
-      }
-    } finally {
-      if (isInitial) setLoading(false);
-    }
-  }, [pair]);
-
+  // ── Fetch open positions ──────────────────────────────────────────────────
   const fetchOpenPositions = useCallback(async () => {
     try {
       const res = await apiRequest("/games/prediction/pending");
-      if (res.success && res.data) {
-        setOpenPositions(res.data);
-      }
+      if (res.success && res.data) setOpenPositions(res.data);
     } catch (err) {
       console.error("Failed to fetch positions", err);
     }
   }, []);
 
+  // ── Initial chart data and tick engine ──────────────────────────────────
   useEffect(() => {
-    fetchPrice(true);
+    // Get initial price from API or fallback
+    const init = async () => {
+      try {
+        const result = await apiRequest(`/market/price?pair=${pair}`);
+        const price = result.price;
+        setCurrentPrice(price);
+        const initial = generateInitialData(50, price);
+        setData(initial);
+        setLoading(false);
+      } catch (err) {
+        const fallbackPrice = 150.0;
+        setCurrentPrice(fallbackPrice);
+        const initial = generateInitialData(50, fallbackPrice);
+        setData(initial);
+        setLoading(false);
+      }
+    };
+    init();
     fetchOpenPositions();
 
-    const priceInterval = setInterval(() => fetchPrice(false), 5000);
-    const posInterval = setInterval(() => fetchOpenPositions(), 5000);
-
-    return () => {
-      clearInterval(priceInterval);
-      clearInterval(posInterval);
-    };
-  }, [fetchPrice, fetchOpenPositions]);
-
-  // ── Tick simulation ──────────────────────────────────────────────────────
-  useEffect(() => {
-    const tickInterval = setInterval(() => {
+    // ── Start tick engine (new candle every second) ──────────────────────
+    tickIntervalRef.current = setInterval(() => {
       setData((prev) => {
-        if (prev.length === 0 || !targetPriceRef.current) return prev;
-
+        if (prev.length === 0) return prev;
         const last = prev[prev.length - 1];
-        const target = targetPriceRef.current;
-
-        const maxVol = target * 0.00015;
-        const noise = (Math.random() - 0.5) * maxVol * 2;
-        const pull = (target - last.close) * 0.15;
-        let delta = noise + pull;
-        const maxDelta = target * 0.0005;
-        if (delta > maxDelta) delta = maxDelta;
-        if (delta < -maxDelta) delta = -maxDelta;
-
-        const nextPrice = last.close + delta;
-        const open = last.close;
-        const close = nextPrice;
-        const high = Math.max(open, close) + Math.random() * (maxVol * 0.5);
-        const low = Math.min(open, close) - Math.random() * (maxVol * 0.5);
-
-        setCurrentPrice(close);
-
-        const newCandle = {
-          time: (last.time as number) + 1,
-          open,
-          high,
-          low,
-          close,
-        };
-
+        const newTime = last.time + 1;
+        const newCandle = generateNextCandle(last.close, newTime);
+        setCurrentPrice(newCandle.close);
         return [...prev.slice(1), newCandle];
       });
     }, 1000);
 
-    return () => clearInterval(tickInterval);
-  }, []);
+    return () => {
+      if (tickIntervalRef.current) clearInterval(tickIntervalRef.current);
+    };
+  }, [pair, fetchOpenPositions]);
 
-  // ── Timer and trade logic ──────────────────────────────────────────────────
+  // ── Timer logic ──────────────────────────────────────────────────────────
   const startTimer = (durationInSeconds: number) => {
     setTimeRemaining(durationInSeconds);
     tradeActiveRef.current = true;
@@ -232,8 +209,10 @@ function TradingPage() {
     if (entryPrice !== null && tradeDirection) {
       const diff = tradeDirection === "UP" ? exit - entryPrice : entryPrice - exit;
       const won = diff > 0;
-
       setTradeResult(won ? "won" : "lost");
+
+      // Remove marker
+      setMarkers([]);
 
       setTimeout(() => {
         setTradeResult(null);
@@ -252,10 +231,10 @@ function TradingPage() {
         fetchBalance();
       }
     }
-
     setTradeActive(false);
   };
 
+  // ── Handle Buy/Sell ──────────────────────────────────────────────────────
   const handleTrade = async (direction: "buy" | "sell") => {
     if (!currentPrice || tradeActive) return;
     if (stake < 10) {
@@ -265,10 +244,23 @@ function TradingPage() {
 
     setTradeError(null);
     setTradeActive(true);
-    setTradeDirection(direction === "buy" ? "UP" : "DOWN");
+    const dir = direction === "buy" ? "UP" : "DOWN";
+    setTradeDirection(dir);
     setEntryPrice(currentPrice);
     setExitPrice(null);
     setTradeResult(null);
+
+    // ── Add marker to chart ──────────────────────────────────────────────
+    const markerColor = direction === "buy" ? "#26a69a" : "#ef5350";
+    const markerShape = direction === "buy" ? "arrowUp" : "arrowDown";
+    const newMarker = {
+      time: Math.floor(Date.now() / 1000),
+      position: "aboveBar",
+      color: markerColor,
+      shape: markerShape,
+      text: direction === "buy" ? "BUY ▲" : "SELL ▼",
+    };
+    setMarkers([newMarker]);
 
     let durationSeconds = selectedDuration.value;
     if (selectedDuration.unit === "minutes") {
@@ -282,7 +274,7 @@ function TradingPage() {
           amount: stake,
           mode,
           market: pair,
-          direction: direction === "buy" ? "UP" : "DOWN",
+          direction: dir,
           windowMinutes: selectedDuration.unit === "minutes" ? selectedDuration.value : 0,
           windowSeconds: selectedDuration.unit === "seconds" ? selectedDuration.value : 0,
         }),
@@ -296,13 +288,16 @@ function TradingPage() {
       } else {
         setTradeError(res.error || "Failed to place trade");
         setTradeActive(false);
+        setMarkers([]);
       }
     } catch (err: any) {
       setTradeError(err.message || "An error occurred");
       setTradeActive(false);
+      setMarkers([]);
     }
   };
 
+  // ── Close trade manually ─────────────────────────────────────────────────
   const handleCloseTrade = async (predictionId: string) => {
     if (tradeActiveRef.current) return;
     try {
@@ -313,6 +308,7 @@ function TradingPage() {
       if (res.success) {
         fetchOpenPositions();
         fetchBalance();
+        setMarkers([]);
       } else {
         alert(res.error || "Failed to close trade");
       }
@@ -321,6 +317,15 @@ function TradingPage() {
     }
   };
 
+  // ── Cleanup intervals ────────────────────────────────────────────────────
+  useEffect(() => {
+    return () => {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+      if (tickIntervalRef.current) clearInterval(tickIntervalRef.current);
+    };
+  }, []);
+
+  // ── UI helpers ────────────────────────────────────────────────────────────
   const formatTime = (seconds: number | null) => {
     if (seconds === null) return "--:--";
     const mins = Math.floor(seconds / 60);
@@ -347,16 +352,14 @@ function TradingPage() {
     return null;
   };
 
-  // ── Toggle mode ────────────────────────────────────────────────────────────
   const setMode = (newMode: "demo" | "real") => {
-    navigate({
-      search: (prev: any) => ({ ...prev, mode: newMode }),
-    });
+    navigate({ search: (prev: any) => ({ ...prev, mode: newMode }) });
   };
 
   const isDemo = mode === "demo";
   const currentBalance = isDemo ? 10000 : balance;
 
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4 max-w-5xl mx-auto pb-20 lg:pb-6 px-4">
       {/* Header */}
@@ -395,7 +398,7 @@ function TradingPage() {
             </Link>
           )}
           <span className="text-[8px] md:text-[10px] text-gray-400 hidden sm:inline">{isDemo ? "🎮 FUN" : "🔴 REAL"}</span>
-          <button onClick={() => fetchPrice(true)} className="p-1 hover:bg-white/5 rounded-lg transition-colors text-muted-foreground" title="Refresh">
+          <button onClick={() => { setLoading(true); fetchPrice(true); }} className="p-1 hover:bg-white/5 rounded-lg transition-colors text-muted-foreground" title="Refresh">
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
           </button>
           <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/10 text-emerald-500 rounded border border-emerald-500/20 text-[10px] font-semibold tracking-wide">
@@ -437,7 +440,7 @@ function TradingPage() {
               <Activity className="animate-pulse text-primary" size={32} />
             </div>
           ) : (
-            <TradingChart data={data} colors={{ backgroundColor: "#151924" }} />
+            <TradingChart data={data} markers={markers} colors={{ backgroundColor: "#151924" }} />
           )}
 
           {tradeActive && timeRemaining !== null && timeRemaining > 0 && (
@@ -492,102 +495,4 @@ function TradingPage() {
                   className={`py-2 rounded-lg text-sm font-medium transition-colors ${
                     selectedDuration.label === d.label
                       ? "bg-[#dcb13c] text-black"
-                      : "bg-[#181d29] text-gray-400 hover:bg-[#202636]"
-                  } disabled:opacity-50`}
-                >
-                  {d.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex justify-between items-center text-sm font-mono px-2">
-            <div className="text-gray-400">Ask: <span className="text-gray-200">{ask.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}</span></div>
-            <div className="text-gray-500 text-xs">Spread: {spread.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}</div>
-            <div className="text-gray-400">Bid: <span className="text-gray-200">{bid.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}</span></div>
-          </div>
-
-          {entryPrice !== null && (
-            <div className="flex justify-between text-xs text-gray-500 px-2">
-              <span>Entry: <span className="text-white font-mono">{entryPrice.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}</span></span>
-              {exitPrice !== null && (
-                <span>Exit: <span className="text-white font-mono">{exitPrice.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}</span></span>
-              )}
-            </div>
-          )}
-
-          <div className="flex gap-4">
-            <button
-              onClick={() => handleTrade("buy")}
-              disabled={loading || !currentPrice || tradeActive}
-              className="flex-1 py-4 bg-[#236e40] hover:bg-[#28814a] text-white font-bold rounded-lg flex flex-col items-center justify-center transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span className="uppercase tracking-wider text-sm mb-1">Buy</span>
-              <span className="font-mono opacity-80 font-normal">
-                {ask.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}
-              </span>
-            </button>
-            <button
-              onClick={() => handleTrade("sell")}
-              disabled={loading || !currentPrice || tradeActive}
-              className="flex-1 py-4 bg-[#6e2525] hover:bg-[#852c2c] text-white font-bold rounded-lg flex flex-col items-center justify-center transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span className="uppercase tracking-wider text-sm mb-1">Sell</span>
-              <span className="font-mono opacity-80 font-normal">
-                {bid.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}
-              </span>
-            </button>
-          </div>
-
-          {tradeError && <div className="text-center text-red-500 text-sm font-medium">{tradeError}</div>}
-
-          <div className="text-center text-xs text-gray-500">Mode: <span className="text-gray-300 font-medium capitalize">{mode}</span></div>
-        </div>
-      </div>
-
-      {/* Open Positions */}
-      <div className="bg-[#0b0e14] border border-[#1e2330] rounded-xl p-4 flex flex-col gap-3">
-        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-widest block">Open Positions ({openPositions.length})</h2>
-        <div className="flex flex-col gap-2">
-          {openPositions.length === 0 ? (
-            <p className="text-sm text-gray-600 text-center py-4">No open positions.</p>
-          ) : (
-            openPositions.map((pos) => {
-              const isBuy = pos.direction === "up" || pos.direction === "UP";
-              let profitMock = 0;
-              if (pos.market === pair && currentPrice) {
-                const diff = isBuy ? currentPrice - pos.entry_price : pos.entry_price - currentPrice;
-                if (diff > 0) profitMock = pos.amount * 0.2;
-                else if (diff < 0) profitMock = -pos.amount;
-              }
-              const profitColor = profitMock >= 0 ? "text-emerald-500" : "text-red-500";
-              return (
-                <div key={pos.id} className="flex items-center justify-between p-3 bg-[#131720] rounded-lg border border-[#1e2330]">
-                  <div className="flex items-center gap-3">
-                    <div className={`text-[10px] font-bold px-2 py-0.5 rounded ${isBuy ? "bg-[#236e40] text-emerald-100" : "bg-[#6e2525] text-red-100"} uppercase`}>
-                      {isBuy ? "Buy" : "Sell"}
-                    </div>
-                    <div className="font-semibold text-sm text-gray-200">{pos.market}</div>
-                    <div className="text-xs text-gray-500">&times;{pos.amount / 10000}</div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className={`text-sm font-mono font-medium ${profitColor} w-20 text-right`}>
-                      {profitMock > 0 ? "+" : ""}{profitMock.toFixed(2)} KES
-                    </div>
-                    <button
-                      onClick={() => handleCloseTrade(pos.id)}
-                      disabled={tradeActive}
-                      className="text-[10px] uppercase font-bold bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded transition-colors disabled:opacity-50"
-                    >
-                      Close
-                    </button>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+                      : "bg-[#1
