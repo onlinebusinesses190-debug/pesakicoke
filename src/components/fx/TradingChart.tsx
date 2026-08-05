@@ -17,7 +17,9 @@ export const TradingChart = ({
 
         const handleResize = () => {
             if (chartRef.current && chartContainerRef.current) {
-                chartRef.current.applyOptions({ width: chartContainerRef.current.clientWidth });
+                chartRef.current.applyOptions({
+                    width: chartContainerRef.current.clientWidth,
+                });
                 chartRef.current.timeScale().fitContent();
             }
         };
@@ -25,29 +27,54 @@ export const TradingChart = ({
         if (chartContainerRef.current) {
             const chart = createChart(chartContainerRef.current, {
                 layout: {
-                    background: { type: ColorType.Solid, color: backgroundColor },
+                    background: {
+                        type: ColorType.Solid,
+                        color: backgroundColor,
+                    },
                     textColor,
                 },
                 width: chartContainerRef.current.clientWidth,
                 height: chartContainerRef.current.clientHeight || 280,
+
                 grid: {
-                    vertLines: { color: 'rgba(255, 255, 255, 0.05)' },
-                    horzLines: { color: 'rgba(255, 255, 255, 0.05)' },
+                    vertLines: {
+                        color: 'rgba(255,255,255,0.03)',
+                    },
+                    horzLines: {
+                        color: 'rgba(255,255,255,0.03)',
+                    },
                 },
+
                 timeScale: {
                     timeVisible: true,
                     secondsVisible: true,
-                }
+                    barSpacing: 6,
+                    rightOffset: 5,
+                    fixLeftEdge: true,
+                    fixRightEdge: true,
+                },
+
+                rightPriceScale: {
+                    borderVisible: false,
+                    scaleMargins: {
+                        top: 0.15,
+                        bottom: 0.15,
+                    },
+                },
             });
+
             chartRef.current = chart;
 
             const newSeries = chart.addCandlestickSeries({
                 upColor: '#26a69a',
                 downColor: '#ef5350',
-                borderVisible: false,
+                borderVisible: true,
+                borderUpColor: '#26a69a',
+                borderDownColor: '#ef5350',
                 wickUpColor: '#26a69a',
-                wickDownColor: '#ef5350'
+                wickDownColor: '#ef5350',
             });
+
             seriesRef.current = newSeries;
             newSeries.setData(data);
             chart.timeScale().fitContent();
@@ -64,6 +91,7 @@ export const TradingChart = ({
     useEffect(() => {
         if (seriesRef.current && data && data.length > 0) {
             seriesRef.current.setData(data);
+
             if (chartRef.current) {
                 chartRef.current.timeScale().fitContent();
             }
