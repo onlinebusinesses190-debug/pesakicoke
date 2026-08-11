@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Search, Star, MapPin, ShieldCheck, Plus, X, ArrowLeft, Upload, CheckCircle2,
   Send, Bell, Wallet, User as UserIcon, Phone, Mail, Briefcase, Clock,
@@ -35,23 +35,19 @@ function KaziPage() {
   const store = useKazi();
   const unread = store.notifications.filter((n) => !n.read).length;
 
-  // ── Local state for applications (fetched based on role) ──────────────
+  // ── Local applications (role‑based) ──────────────────────────────────────
   const [applications, setApplications] = useState<Application[]>([]);
 
-  // ── Fetch applications when tab changes ─────────────────────────────────
   useEffect(() => {
     const fetchApplications = async () => {
-      let url = '/kazi/applications';
-      if (tab === 'hire') {
-        url += '?role=employer';
-      } else if (tab === 'mine') {
-        url += '?role=worker';
-      }
+      let url = "/kazi/applications";
+      if (tab === "hire") url += "?role=employer";
+      else if (tab === "mine") url += "?role=worker";
       try {
         const data = await apiRequest(url);
         setApplications(data);
       } catch (err) {
-        console.error('Failed to fetch applications:', err);
+        console.error("Failed to fetch applications:", err);
       }
     };
     fetchApplications();
@@ -72,7 +68,6 @@ function KaziPage() {
     return list;
   }, [store.jobs, q]);
 
-  // ─── Use local applications for both "Hire" and "My Panel" ──────────────
   const applicantsGrouped = useMemo(() => {
     const term = q.trim().toLowerCase();
     let apps = applications;
@@ -177,7 +172,9 @@ function KaziPage() {
           <section className="mt-3 px-5">
             <SectionTitle title={`Open jobs (${visibleJobs.length})`} />
             {visibleJobs.length === 0 ? (
-              <EmptyState label="No jobs match your search." />
+              <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-6 text-center text-xs text-muted-foreground">
+                No jobs match your search.
+              </div>
             ) : (
               <div className="space-y-2.5">
                 {visibleJobs.map((j) => (
@@ -193,7 +190,9 @@ function KaziPage() {
                         </p>
                         <p className="mt-1 text-sm font-bold text-primary">{j.pay}</p>
                       </div>
-                      <Badge tone={j.badge === "Urgent" ? "destructive" : j.badge === "Hot" ? "warning" : "gold"}>{j.badge}</Badge>
+                      <Badge tone={j.badge === "Urgent" ? "destructive" : j.badge === "Hot" ? "warning" : "gold"}>
+                        {j.badge}
+                      </Badge>
                     </div>
                     <button
                       onClick={() => setApplyJob(j)}
@@ -216,11 +215,42 @@ function KaziPage() {
               <SectionTitle title={`Applicants awaiting your review (${applicantsGrouped.length})`} />
               <div className="space-y-2.5">
                 {applicantsGrouped.map((a) => (
-                  <ApplicantRow key={a.id}
-                    a={a}
-                    onHire={() => setHireApp(a)}
-                    onChat={() => setChatApp(a)}
-                  />
+                  <Card key={a.id} className="!p-3.5">
+                    <div className="flex items-start gap-3">
+                      <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full gradient-gold text-sm font-bold text-gold-foreground">
+                        {a.applicantName.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="truncate text-sm font-semibold">{a.applicantName}</p>
+                          <Badge tone={a.status === "Hired" ? "success" : a.status === "Rejected" ? "destructive" : "primary"}>
+                            {a.status}
+                          </Badge>
+                        </div>
+                        <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                          <Briefcase className="h-3 w-3" /> Applied for {a.jobTitle}
+                        </p>
+                        <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+                          <MapPin className="h-3 w-3" /> {a.location} · {a.experience} yrs
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => setChatApp(a)}
+                        className="relative rounded-full border border-border py-2 text-xs font-semibold"
+                      >
+                        Message
+                      </button>
+                      <button
+                        onClick={() => setHireApp(a)}
+                        disabled={a.status === "Hired" || a.status === "Rejected"}
+                        className="rounded-full gradient-primary py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+                      >
+                        {a.status === "Hired" ? "Hired" : "Hire · View"}
+                      </button>
+                    </div>
+                  </Card>
                 ))}
               </div>
             </section>
@@ -256,7 +286,9 @@ function KaziPage() {
                       </div>
                       <div className="mt-2 flex flex-wrap gap-1">
                         {w.skills.map((s) => (
-                          <span key={s} className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">{s}</span>
+                          <span key={s} className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                            {s}
+                          </span>
                         ))}
                       </div>
                     </div>
@@ -272,10 +304,48 @@ function KaziPage() {
       )}
 
       {tab === "mine" && (
-        <MyPanel
-          apps={applications}
-          onChat={(a) => setChatApp(a)}
-        />
+        <section className="mt-5 px-5">
+          <SectionTitle title={`My applications (${applications.length})`} />
+          {applications.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-6 text-center text-xs text-muted-foreground">
+              You haven't applied to any jobs yet. Head to Find Work to get started.
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {applications.map((a) => (
+                <Card key={a.id} className="!p-3.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">{a.jobTitle}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{a.jobPay}</p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        Applied {new Date(a.appliedAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <Badge tone={a.status === "Hired" ? "success" : a.status === "Rejected" ? "destructive" : a.status === "Shortlisted" ? "gold" : "primary"}>
+                      {a.status}
+                    </Badge>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setChatApp(a)}
+                      className="relative rounded-full border border-border py-2 text-xs font-semibold"
+                    >
+                      Chat with employer
+                    </button>
+                    <button
+                      disabled={a.status !== "Hired" || a.serviceFeePaid}
+                      onClick={() => kaziStore.registerPayout(a.id)}
+                      className="rounded-full gradient-primary py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+                    >
+                      {a.serviceFeePaid ? "Paid ✓" : "Receive payout"}
+                    </button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </section>
       )}
 
       {applyJob && <ApplyJobSheet job={applyJob} onClose={() => setApplyJob(null)} />}
@@ -287,157 +357,7 @@ function KaziPage() {
   );
 }
 
-/* ------------------------------ Applicant Row ------------------------------ */
-
-function ApplicantRow({ a, onHire, onChat }: { a: Application; onHire: () => void; onChat: () => void }) {
-  const store = useKazi();
-  const unread = store.messages.filter((m) => m.threadId === `${a.jobId}:${a.id}` && m.from === "worker").length;
-  return (
-    <Card className="!p-3.5">
-      <div className="flex items-start gap-3">
-        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full gradient-gold text-sm font-bold text-gold-foreground">
-          {a.applicantName.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <p className="truncate text-sm font-semibold">{a.applicantName}</p>
-            <Badge tone={a.status === "Hired" ? "success" : a.status === "Rejected" ? "destructive" : "primary"}>{a.status}</Badge>
-          </div>
-          <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-            <Briefcase className="h-3 w-3" /> Applied for {a.jobTitle}
-          </p>
-          <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
-            <MapPin className="h-3 w-3" /> {a.location} · {a.experience} yrs
-          </p>
-        </div>
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <button onClick={onChat} className="relative rounded-full border border-border py-2 text-xs font-semibold">
-          Message
-          {unread > 0 && <span className="absolute right-2 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-destructive" />}
-        </button>
-        <button
-          onClick={onHire}
-          disabled={a.status === "Hired" || a.status === "Rejected"}
-          className="rounded-full gradient-primary py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
-        >
-          {a.status === "Hired" ? "Hired" : "Hire · View"}
-        </button>
-      </div>
-    </Card>
-  );
-}
-
-/* --------------------------------- My Panel -------------------------------- */
-
-function MyPanel({ apps, onChat }: { apps: Application[]; onChat: (a: Application) => void }) {
-  const store = useKazi();
-  if (apps.length === 0) {
-    return (
-      <section className="mt-6 px-5">
-        <EmptyState label="You haven't applied to any jobs yet. Head to Find Work to get started." />
-      </section>
-    );
-  }
-  return (
-    <section className="mt-5 px-5">
-      <SectionTitle title={`My applications (${apps.length})`} />
-      <div className="space-y-2.5">
-        {apps.map((a) => {
-          const unread = store.messages.filter((m) => m.threadId === `${a.jobId}:${a.id}` && m.from === "employer").length;
-          return (
-            <Card key={a.id} className="!p-3.5">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold">{a.jobTitle}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{a.jobPay}</p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    Applied {new Date(a.appliedAt).toLocaleDateString()}
-                  </p>
-                </div>
-                <Badge tone={a.status === "Hired" ? "success" : a.status === "Rejected" ? "destructive" : a.status === "Shortlisted" ? "gold" : "primary"}>
-                  {a.status}
-                </Badge>
-              </div>
-
-              {a.status === "Hired" && a.paidEscrow && (
-                <div className="mt-3 rounded-xl bg-success/10 p-3 text-[11px]">
-                  <p className="font-semibold text-success">Payment secured in escrow</p>
-                  <PayoutBreakdown application={a} />
-                </div>
-              )}
-
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => onChat(a)}
-                  className="relative rounded-full border border-border py-2 text-xs font-semibold"
-                >
-                  Chat with employer
-                  {unread > 0 && <span className="absolute right-3 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-destructive" />}
-                </button>
-                <button
-                  disabled={a.status !== "Hired" || a.serviceFeePaid}
-                  onClick={() => kaziStore.registerPayout(a.id)}
-                  className="rounded-full gradient-primary py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
-                >
-                  {a.serviceFeePaid ? "Paid ✓" : "Receive payout"}
-                </button>
-              </div>
-            </Card>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-function PayoutBreakdown({ application }: { application: Application }) {
-  const store = useKazi();
-  const job = store.jobs.find((j) => j.id === application.jobId);
-  if (!job) return null;
-  const gross = job.payAmount;
-  const serviceFee = application.serviceFeePaid ? 0 : (store.firstJobPayoutDone ? 0 : 200);
-  const insurance = Math.round(gross * 0.01);
-  const net = gross - serviceFee - insurance;
-  return (
-    <ul className="mt-1 space-y-0.5 text-muted-foreground">
-      <li className="flex justify-between"><span>Gross pay</span><span className="font-semibold text-foreground">KES {gross.toLocaleString()}</span></li>
-      <li className="flex justify-between"><span>Service fee (once)</span><span>- KES {serviceFee}</span></li>
-      <li className="flex justify-between"><span>Insurance (1%)</span><span>- KES {insurance.toLocaleString()}</span></li>
-      <li className="flex justify-between border-t border-border/60 pt-1"><span className="font-semibold text-foreground">Net</span><span className="font-bold text-success">KES {net.toLocaleString()}</span></li>
-    </ul>
-  );
-}
-
-/* --------------------------------- Sheets --------------------------------- */
-
-function SheetShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="fixed inset-0 z-[60] grid place-items-end sm:place-items-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative z-10 flex max-h-[92vh] w-full max-w-md flex-col rounded-t-3xl bg-card shadow-2xl sm:rounded-3xl">
-        <div className="flex items-center justify-between border-b border-border px-5 py-3">
-          <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground" aria-label="Back">
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-          <h3 className="text-base font-bold">{title}</h3>
-          <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto px-5 pb-[calc(env(safe-area-inset-bottom)+7rem)] pt-4">
-          {children}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{children}</label>;
-}
-const inputCls = "mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring";
-
+/* ─── ApplyJobSheet ────────────────────────────────────────────────────────── */
 function ApplyJobSheet({ job, onClose }: { job: PostedJob; onClose: () => void }) {
   const [done, setDone] = useState(false);
   const [form, setForm] = useState({
@@ -525,6 +445,7 @@ function ApplyJobSheet({ job, onClose }: { job: PostedJob; onClose: () => void }
   );
 }
 
+/* ─── PostJobSheet ─────────────────────────────────────────────────────────── */
 function PostJobSheet({ onClose }: { onClose: () => void }) {
   const [done, setDone] = useState(false);
   const [accommodation, setAccommodation] = useState(false);
@@ -664,6 +585,7 @@ function PostJobSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
+/* ─── HireSheet ───────────────────────────────────────────────────────────── */
 function HireSheet({ app, onClose, onOpenChat }: { app: Application; onClose: () => void; onOpenChat: () => void }) {
   const bal = useBalance();
   const store = useKazi();
@@ -701,11 +623,41 @@ function HireSheet({ app, onClose, onOpenChat }: { app: Application; onClose: ()
           </div>
 
           <ul className="mt-4 space-y-2 text-sm">
-            <ProfileRow icon={<Phone className="h-4 w-4" />} label="Phone" value={app.phone} />
-            <ProfileRow icon={<Mail className="h-4 w-4" />} label="Email" value={app.email} />
-            <ProfileRow icon={<Briefcase className="h-4 w-4" />} label="Experience" value={`${app.experience} years`} />
-            <ProfileRow icon={<Clock className="h-4 w-4" />} label="Availability" value={app.availability} />
-            <ProfileRow icon={<UserIcon className="h-4 w-4" />} label="Photo" value={app.photoName || "Provided"} />
+            <li className="flex items-center gap-3 rounded-xl border border-border p-3">
+              <span className="grid h-8 w-8 place-items-center rounded-lg bg-muted text-muted-foreground"><Phone className="h-4 w-4" /></span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Phone</p>
+                <p className="truncate text-sm font-semibold">{app.phone}</p>
+              </div>
+            </li>
+            <li className="flex items-center gap-3 rounded-xl border border-border p-3">
+              <span className="grid h-8 w-8 place-items-center rounded-lg bg-muted text-muted-foreground"><Mail className="h-4 w-4" /></span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Email</p>
+                <p className="truncate text-sm font-semibold">{app.email}</p>
+              </div>
+            </li>
+            <li className="flex items-center gap-3 rounded-xl border border-border p-3">
+              <span className="grid h-8 w-8 place-items-center rounded-lg bg-muted text-muted-foreground"><Briefcase className="h-4 w-4" /></span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Experience</p>
+                <p className="truncate text-sm font-semibold">{app.experience} years</p>
+              </div>
+            </li>
+            <li className="flex items-center gap-3 rounded-xl border border-border p-3">
+              <span className="grid h-8 w-8 place-items-center rounded-lg bg-muted text-muted-foreground"><Clock className="h-4 w-4" /></span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Availability</p>
+                <p className="truncate text-sm font-semibold">{app.availability}</p>
+              </div>
+            </li>
+            <li className="flex items-center gap-3 rounded-xl border border-border p-3">
+              <span className="grid h-8 w-8 place-items-center rounded-lg bg-muted text-muted-foreground"><UserIcon className="h-4 w-4" /></span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Photo</p>
+                <p className="truncate text-sm font-semibold">{app.photoName || "Provided"}</p>
+              </div>
+            </li>
           </ul>
 
           <button
@@ -747,18 +699,7 @@ function HireSheet({ app, onClose, onOpenChat }: { app: Application; onClose: ()
   );
 }
 
-function ProfileRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <li className="flex items-center gap-3 rounded-xl border border-border p-3">
-      <span className="grid h-8 w-8 place-items-center rounded-lg bg-muted text-muted-foreground">{icon}</span>
-      <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
-        <p className="truncate text-sm font-semibold">{value}</p>
-      </div>
-    </li>
-  );
-}
-
+/* ─── ChatSheet ───────────────────────────────────────────────────────────── */
 function ChatSheet({ app, from, onClose }: { app: Application; from: "employer" | "worker"; onClose: () => void }) {
   const store = useKazi();
   const [text, setText] = useState("");
@@ -780,9 +721,7 @@ function ChatSheet({ app, from, onClose }: { app: Application; from: "employer" 
       <p className="text-[11px] text-muted-foreground">About: {app.jobTitle}</p>
       <div className="mt-3 space-y-2">
         {msgs.length === 0 && (
-          <p className="rounded-xl bg-muted p-3 text-xs text-muted-foreground">
-            No messages yet. Say hello 👋
-          </p>
+          <p className="rounded-xl bg-muted p-3 text-xs text-muted-foreground">No messages yet. Say hello 👋</p>
         )}
         {msgs.map((m) => {
           const mine = m.from === from;
@@ -815,13 +754,16 @@ function ChatSheet({ app, from, onClose }: { app: Application; from: "employer" 
   );
 }
 
+/* ─── NotifSheet ──────────────────────────────────────────────────────────── */
 function NotifSheet({ onClose }: { onClose: () => void }) {
   const store = useKazi();
   useEffect(() => { kaziStore.markAllRead(); }, []);
   return (
     <SheetShell title="Notifications" onClose={onClose}>
       {store.notifications.length === 0 ? (
-        <EmptyState label="You're all caught up." />
+        <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-6 text-center text-xs text-muted-foreground">
+          You're all caught up.
+        </div>
       ) : (
         <ul className="space-y-2">
           {store.notifications.map((n) => (
@@ -839,9 +781,35 @@ function NotifSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
-/* --------------------------------- Helpers -------------------------------- */
+/* ─── Helpers ──────────────────────────────────────────────────────────────── */
+function SheetShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-end sm:place-items-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative z-10 flex max-h-[92vh] w-full max-w-md flex-col rounded-t-3xl bg-card shadow-2xl sm:rounded-3xl">
+        <div className="flex items-center justify-between border-b border-border px-5 py-3">
+          <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground" aria-label="Back">
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <h3 className="text-base font-bold">{title}</h3>
+          <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 pb-[calc(env(safe-area-inset-bottom)+7rem)] pt-4">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
 
-export function FileField({ label, required, accept }: { label: string; required?: boolean; accept?: string }) {
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{children}</label>;
+}
+const inputCls = "mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring";
+
+function FileField({ label, required, accept }: { label: string; required?: boolean; accept?: string }) {
   const [name, setName] = useState<string>("");
   return (
     <div>
@@ -861,7 +829,7 @@ export function FileField({ label, required, accept }: { label: string; required
   );
 }
 
-export function SuccessBlock({ message, onClose }: { message: string; onClose: () => void }) {
+function SuccessBlock({ message, onClose }: { message: string; onClose: () => void }) {
   return (
     <div className="py-6 text-center">
       <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-success/15 text-success">
@@ -872,14 +840,6 @@ export function SuccessBlock({ message, onClose }: { message: string; onClose: (
       <button onClick={onClose} className="mt-4 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground">
         Done
       </button>
-    </div>
-  );
-}
-
-function EmptyState({ label }: { label: string }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-6 text-center text-xs text-muted-foreground">
-      {label}
     </div>
   );
 }
