@@ -123,7 +123,7 @@ function KaziPage() {
     // Only applications for jobs posted by the current user (employer)
     const myJobIds = new Set(jobs.filter((j) => j.employerId === user?.id).map((j) => j.id));
     let apps = applications.filter((a) => myJobIds.has(a.jobId));
-    // Exclude the employer themselves if they are in the applicants list (shouldn't happen, but safety)
+    // Exclude the employer themselves if they are in the applicants list
     apps = apps.filter((a) => a.workerId !== user?.id);
     if (term) {
       apps = apps.filter(
@@ -429,7 +429,7 @@ function MyPanel({ apps, onChat }: { apps: Application[]; onChat: (a: Applicatio
               </button>
               <button
                 disabled={a.status !== "Hired" || a.serviceFeePaid}
-                onClick={() => {} /* placeholder, implement later */}
+                onClick={() => {} /* placeholder */}
                 className="rounded-full gradient-primary py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
               >
                 {a.serviceFeePaid ? "Paid ✓" : "Receive payout"}
@@ -443,7 +443,6 @@ function MyPanel({ apps, onChat }: { apps: Application[]; onChat: (a: Applicatio
 }
 
 // ─── Sheets (Apply, Post, Hire, Chat, Notifications) ────────────────────
-// (These are the same as before – I've kept them minimal)
 function SheetShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-[60] grid place-items-end sm:place-items-center">
@@ -500,12 +499,39 @@ function ApplyJobSheet({ job, onClose, onSuccess }: { job: Job; onClose: () => v
       {done ? (
         <SuccessBlock message={`Your application for "${job.title}" has been submitted.`} onClose={onClose} />
       ) : (
-        // ... form (same as original, omitted for brevity – you can reuse the old one)
-        // I'll keep it minimal – the full form is in previous versions.
         <form className="space-y-3" onSubmit={submit}>
-          {/* Input fields – same as original */}
-          <div><FieldLabel>Full name</FieldLabel><input required value={form.applicantName} onChange={set("applicantName")} className={inputCls} /></div>
-          {/* ... rest of the fields */}
+          <div>
+            <FieldLabel>Full name</FieldLabel>
+            <input required value={form.applicantName} onChange={set("applicantName")} className={inputCls} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><FieldLabel>Phone</FieldLabel><input required value={form.phone} onChange={set("phone")} className={inputCls} /></div>
+            <div><FieldLabel>Email</FieldLabel><input required type="email" value={form.email} onChange={set("email")} className={inputCls} /></div>
+          </div>
+          <div><FieldLabel>Location</FieldLabel><input required value={form.location} onChange={set("location")} className={inputCls} /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <FieldLabel>Experience</FieldLabel>
+              <select required value={form.experience} onChange={set("experience")} className={inputCls}>
+                <option value="">Select</option>
+                <option>Less than 1</option>
+                <option>1 - 3</option>
+                <option>3 - 5</option>
+                <option>5+</option>
+              </select>
+            </div>
+            <div>
+              <FieldLabel>Availability</FieldLabel>
+              <select required value={form.availability} onChange={set("availability")} className={inputCls}>
+                <option value="">Select</option>
+                <option>Immediate</option>
+                <option>1 week</option>
+                <option>2 weeks</option>
+              </select>
+            </div>
+          </div>
+          <FileField label="Upload photo" required accept="image/*" />
+          <FileField label="CV (optional)" accept=".pdf,.doc,.docx" />
           <button type="submit" className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground">Submit</button>
         </form>
       )}
@@ -515,31 +541,94 @@ function ApplyJobSheet({ job, onClose, onSuccess }: { job: Job; onClose: () => v
 
 function PostJobSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [done, setDone] = useState(false);
-  // ... (same form as original, omitted for brevity)
-  // You can copy the full form from the previous version.
-  // For now, a placeholder:
+  const [accommodation, setAccommodation] = useState(false);
+  const [checked, setChecked] = useState<string[]>([]);
+  const requirements = ["Experience required", "ID Required", "References", "Background check", "Own tools"];
+  const [form, setForm] = useState({
+    title: "", category: "", location: "", pay: "", payAmount: 0, duration: "", description: "", postedBy: "You",
+  });
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const v = k === "payAmount" ? Number((e.target as HTMLInputElement).value) : e.target.value;
+    setForm((f) => ({ ...f, [k]: v }));
+  };
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      await apiRequest("/kazi/jobs", {
+        method: "POST",
+        body: JSON.stringify({
+          title: form.title,
+          category: form.category,
+          location: form.location,
+          pay: form.pay,
+          payAmount: form.payAmount,
+          duration: form.duration,
+          accommodation,
+          requirements: checked,
+          description: form.description,
+        }),
+      });
+      toast.success("Job posted!");
+      setDone(true);
+      onSuccess();
+    } catch (err) {
+      toast.error("Failed to post job");
+    }
+  }
+
   return (
     <SheetShell title="Post a Job" onClose={onClose}>
-      {done ? <SuccessBlock message="Job posted!" onClose={onClose} /> : <form onSubmit={async (e) => { e.preventDefault(); await apiRequest("/kazi/jobs", { method: "POST", body: JSON.stringify({}) }); toast.success("Posted"); setDone(true); onSuccess(); }}><button type="submit">Post</button></form>}
+      {done ? <SuccessBlock message="Your job is now live!" onClose={onClose} /> : (
+        <form className="space-y-3" onSubmit={submit}>
+          <div><FieldLabel>Job title</FieldLabel><input required value={form.title} onChange={set("title")} className={inputCls} /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><FieldLabel>Category</FieldLabel><select required value={form.category} onChange={set("category")} className={inputCls}><option value="">Select</option><option>House Help</option><option>Cleaner</option><option>Tutor</option><option>Gardener</option><option>Driver</option><option>Plumber</option><option>Electrician</option><option>Security Guard</option><option>Event Worker</option><option>Other</option></select></div>
+            <div><FieldLabel>Location</FieldLabel><input required value={form.location} onChange={set("location")} className={inputCls} /></div>
+          </div>
+          <div><FieldLabel>Duration</FieldLabel><select required value={form.duration} onChange={set("duration")} className={inputCls}><option value="">Select</option><option>1 day</option><option>3 days</option><option>1 week</option><option>2 weeks</option><option>3 weeks</option><option>1 month</option><option>3 months</option><option>6 months</option><option>Ongoing</option></select></div>
+          <div className="flex items-center justify-between rounded-xl border border-border p-3">
+            <div><p className="text-sm font-semibold">Accommodation provided?</p><p className="text-[11px] text-muted-foreground">Toggle if the role includes housing.</p></div>
+            <button type="button" onClick={() => setAccommodation(v => !v)} className={`relative h-6 w-11 rounded-full transition-colors ${accommodation ? "bg-primary" : "bg-muted"}`}><span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${accommodation ? "left-[22px]" : "left-0.5"}`} /></button>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><FieldLabel>Pay label</FieldLabel><input required value={form.pay} onChange={set("pay")} className={inputCls} /></div>
+            <div><FieldLabel>Pay amount (KES)</FieldLabel><input required type="number" min={1} value={form.payAmount || ""} onChange={set("payAmount")} className={inputCls} /></div>
+          </div>
+          <div><FieldLabel>Requirements</FieldLabel><div className="mt-1 grid grid-cols-2 gap-2">{requirements.map(r => <label key={r} className="flex items-center gap-2 rounded-lg border border-border p-2 text-xs"><input type="checkbox" className="h-4 w-4 accent-primary" checked={checked.includes(r)} onChange={e => setChecked(c => e.target.checked ? [...c, r] : c.filter(x => x !== r))} />{r}</label>)}</div></div>
+          <div><FieldLabel>Description</FieldLabel><textarea required rows={4} value={form.description} onChange={set("description")} className={inputCls} /></div>
+          <FileField label="Add image (optional)" accept="image/*" />
+          <button type="submit" className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground">Publish</button>
+        </form>
+      )}
     </SheetShell>
   );
 }
 
 function HireSheet({ app, onClose, onOpenChat }: { app: Application; onClose: () => void; onOpenChat: () => void }) {
-  // ... (same as before)
+  const bal = useBalance();
+  const [done, setDone] = useState(false);
+  // Placeholder – implement hire logic later
   return (
-    <SheetShell title="Hire" onClose={onClose}>
-      <div>Hire sheet for {app.applicantName}</div>
-      <button onClick={onOpenChat}>Chat</button>
+    <SheetShell title="Applicant profile" onClose={onClose}>
+      {done ? <SuccessBlock message={`${app.applicantName} hired!`} onClose={onClose} /> : (
+        <div>
+          <p>Hire {app.applicantName}</p>
+          <button onClick={onOpenChat}>Chat</button>
+          <button onClick={() => setDone(true)} className="mt-3 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground">Confirm Hire</button>
+        </div>
+      )}
     </SheetShell>
   );
 }
 
 function ChatSheet({ app, from, onClose }: { app: Application; from: string; onClose: () => void }) {
-  // ... (same as before)
+  const [text, setText] = useState("");
   return (
-    <SheetShell title="Chat" onClose={onClose}>
+    <SheetShell title={`Chat · ${app.applicantName}`} onClose={onClose}>
       <div>Chat with {app.applicantName}</div>
+      <input value={text} onChange={e => setText(e.target.value)} className="w-full border rounded p-2" />
+      <button onClick={() => {}} className="mt-2 bg-primary text-white px-4 py-2 rounded">Send</button>
     </SheetShell>
   );
 }
@@ -547,7 +636,7 @@ function ChatSheet({ app, from, onClose }: { app: Application; from: string; onC
 function NotifSheet({ onClose }: { onClose: () => void }) {
   return (
     <SheetShell title="Notifications" onClose={onClose}>
-      <div>Notifications</div>
+      <div>No notifications</div>
     </SheetShell>
   );
 }
@@ -561,7 +650,28 @@ function EmptyState({ label }: { label: string }) {
   );
 }
 
-function SuccessBlock({ message, onClose }: { message: string; onClose: () => void }) {
+// ─── Exports for business.tsx ──────────────────────────────────────────────
+export function FileField({ label, required, accept }: { label: string; required?: boolean; accept?: string }) {
+  const [name, setName] = useState("");
+  return (
+    <div>
+      <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</label>
+      <label className="mt-1 flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-border bg-background px-3 py-3 text-xs text-muted-foreground hover:border-primary/40">
+        <Upload className="h-4 w-4" />
+        <span className="truncate">{name || "Tap to upload"}</span>
+        <input
+          type="file"
+          required={required}
+          accept={accept}
+          onChange={(e) => setName(e.target.files?.[0]?.name ?? "")}
+          className="hidden"
+        />
+      </label>
+    </div>
+  );
+}
+
+export function SuccessBlock({ message, onClose }: { message: string; onClose: () => void }) {
   return (
     <div className="py-6 text-center">
       <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-success/15 text-success">
