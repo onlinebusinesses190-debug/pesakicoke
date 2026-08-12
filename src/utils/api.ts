@@ -15,34 +15,41 @@ export async function apiRequest(path: string, options: RequestInit = {}) {
     }
 
     const supabase = createBrowserClient();
-    const { data: { session }, error } = await supabase.auth.getSession();
 
-    if (error) {
-        console.error('[API] getSession error:', error);
+    // ── Get session once ──────────────────────────────────────────────
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+    if (sessionError) {
+        console.error('[API] getSession error:', sessionError);
     }
 
-    // If no token, throw immediately – no retries, no loops.
+    // ── If no token, throw immediately (no retry, no loop) ──────────
     if (!session?.access_token) {
-        throw new Error('Authentication required. Please log in to continue.');
+        const errorMsg = 'Authentication required. Please log in to continue.';
+        console.warn(`[API] ${errorMsg} (URL: ${path})`);
+        throw new Error(errorMsg);
     }
 
+    // ── Build headers ─────────────────────────────────────────────────
     const headers = new Headers(options.headers);
     headers.set('Authorization', `Bearer ${session.access_token}`);
     headers.set('Content-Type', 'application/json');
 
     const fetchUrl = (path.startsWith('http') || path.startsWith('/api/')) ? path : `${API_URL}${path}`;
 
-    const response = await fetch(fetchUrl, {
+    // ── Make request ──────────────────────────────────────────────────
+    let response = await fetch(fetchUrl, {
         ...options,
         headers,
         cache: 'no-store',
     });
 
+    // ── Handle non-200 responses ──────────────────────────────────────
     if (!response.ok) {
         let errorMsg = `HTTP error! status: ${response.status}`;
         try {
-            const errorBody = await response.json();
-            errorMsg = errorBody.error || errorBody.message || errorMsg;
+            const error = await response.json();
+            errorMsg = error.error || error.message || errorMsg;
         } catch (e) {
             try {
                 const text = await response.text();
