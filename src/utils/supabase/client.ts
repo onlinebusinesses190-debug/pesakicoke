@@ -1,13 +1,22 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js';
 
-export function createClient() {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-    if (!supabaseUrl || !supabaseAnonKey) {
-        console.error('Supabase configuration missing:', { supabaseUrl: !!supabaseUrl, supabaseAnonKey: !!supabaseAnonKey })
-        throw new Error('Supabase configuration is missing in environment variables.')
-    }
+if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Missing Supabase environment variables');
+}
 
-    return createClient(supabaseUrl, supabaseAnonKey)
+// ─── Singleton client (no auto‑refresh, no listeners) ────────────
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+        autoRefreshToken: false, // prevents automatic refresh loops
+        persistSession: true,
+        detectSessionInUrl: false,
+    },
+});
+
+// ─── Keep the original function name for backward compatibility ──
+export function createBrowserClient() {
+    return supabase;
 }
