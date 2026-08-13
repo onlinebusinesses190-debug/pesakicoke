@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   Building2, FileText, TrendingUp, Award, BookOpen, ChevronRight, X, ArrowLeft,
   Rocket, Store, Calendar, CheckCircle2, Clock,
@@ -61,6 +61,7 @@ function BusinessPage() {
   const [mode, setMode] = useState<"none" | "picker" | "startup" | "existing">("none");
   const [info, setInfo] = useState<null | "invest" | "guide">(null);
   const [loading, setLoading] = useState(true);
+  const fetchCount = useRef(0);
 
   const [applications, setApplications] = useState<BusinessApplication[]>([]);
   const [investments, setInvestments] = useState<BusinessInvestment[]>([]);
@@ -77,11 +78,10 @@ function BusinessPage() {
     import.meta.env.VITE_SUPABASE_ANON_KEY
   );
 
-  // ─── Fetch data ──────────────────────────────────────────────────────────
   const fetchData = async () => {
-    console.log("🔵 Business fetchData called, user:", user?.id || "no user");
+    fetchCount.current += 1;
+    console.log(`🔵 fetchData (attempt ${fetchCount.current}), user:`, user?.id || "no user");
 
-    // If no user, show empty state and stop loading
     if (!user) {
       console.log("🟡 No user – setting loading false");
       setLoading(false);
@@ -119,7 +119,6 @@ function BusinessPage() {
       if (storyErr) throw storyErr;
       setStories(storyData || []);
 
-      // Compute stats
       const total = appsData?.reduce((sum, a) => sum + (a.amount_requested || 0), 0) || 0;
       const open = appsData?.filter(a => a.status === 'Pending').length || 0;
       const approved = appsData?.filter(a => a.status === 'Approved' || a.status === 'Disbursed').length || 0;
@@ -127,10 +126,9 @@ function BusinessPage() {
       setTotalFunding(total);
       setOpenApps(open);
       setApprovedApps(approved);
-      // other stats remain placeholders for now
 
     } catch (err) {
-      console.error("🔴 Error fetching business data:", err);
+      console.error("🔴 Error:", err);
       toast.error('Could not load Business Hub data');
     } finally {
       console.log("🟣 Setting loading false");
@@ -138,15 +136,28 @@ function BusinessPage() {
     }
   };
 
-  // ─── Effect ─────────────────────────────────────────────────────────────
   useEffect(() => {
     let mounted = true;
     const load = async () => {
       if (mounted) await fetchData();
     };
     load();
-    return () => { mounted = false; };
-  }, [user]); // re-run when user changes
+
+    // Safety: force loading false after 3s
+    const timeout = setTimeout(() => {
+      if (mounted && loading) {
+        console.warn("⚠️ Safety timeout – forcing loading false");
+        setLoading(false);
+      }
+    }, 3000);
+
+    return () => {
+      mounted = false;
+      clearTimeout(timeout);
+    };
+  }, [user]);
+
+  console.log(`📊 Rendering, loading = ${loading}`);
 
   const onAction = (k: ActionKey) => {
     if (k === "apply") return setMode("picker");
@@ -156,8 +167,8 @@ function BusinessPage() {
     if (k === "guide") return setInfo("guide");
   };
 
-  // ─── Render ─────────────────────────────────────────────────────────────
   if (loading) {
+    console.log("⏳ Still loading – showing spinner");
     return (
       <AppShell>
         <PageHeader title="Business Hub" subtitle="Fund. Build. Scale." />
@@ -168,7 +179,7 @@ function BusinessPage() {
     );
   }
 
-  // ─── Main content ──────────────────────────────────────────────────────
+  console.log("✅ Rendering main content");
   return (
     <AppShell>
       <PageHeader title="Business Hub" subtitle="Fund. Build. Scale." />
@@ -280,7 +291,8 @@ function BusinessPage() {
   );
 }
 
-// ─── Sheet Components (unchanged) ───────────────────────────────────────
+// ─── Sheet Components ────────────────────────────────────────────────
+
 function SheetShell({ title, onBack, onClose, children }: { title: string; onBack?: () => void; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-end sm:place-items-center">
@@ -349,7 +361,6 @@ function FundingSheet({ mode, setMode, onClose, user, onSuccess }: any) {
   return <ExistingForm onBack={() => setMode("picker")} onClose={onClose} user={user} onSuccess={onSuccess} />;
 }
 
-// ─── StartupForm (unchanged, still works) ──────────────────────────────
 function StartupForm({ onBack, onClose, user, onSuccess }: any) {
   const [done, setDone] = useState(false);
   const [agree, setAgree] = useState(false);
@@ -454,7 +465,6 @@ function StartupForm({ onBack, onClose, user, onSuccess }: any) {
   );
 }
 
-// ─── ExistingForm (unchanged) ────────────────────────────────────────────
 function ExistingForm({ onBack, onClose, user, onSuccess }: any) {
   const [submitted, setSubmitted] = useState(false);
   const [agree, setAgree] = useState(false);
