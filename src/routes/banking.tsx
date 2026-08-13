@@ -6,8 +6,8 @@ import {
 } from "lucide-react";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Stat, SectionTitle, Progress, Badge } from "@/components/ui-bits";
-import { apiRequest } from "@/utils/api";
 import { toast } from "sonner";
+import { createClient } from "@supabase/supabase-js";
 
 export const Route = createFileRoute("/banking")({
   head: () => ({
@@ -43,6 +43,14 @@ const fmt = (amount: number) => {
 function BankingPage() {
   const [modal, setModal] = useState<ActionKey | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // ─── Supabase client ──────────────────────────────────────────────────────
+  const supabase = createClient(
+    import.meta.env.VITE_SUPABASE_URL,
+    import.meta.env.VITE_SUPABASE_ANON_KEY
+  );
+
+  // ─── Data state ──────────────────────────────────────────────────────────
   const [summary, setSummary] = useState({
     totalSavings: 0,
     interestEarned: 0,
@@ -54,27 +62,55 @@ function BankingPage() {
   const [lockedDeposits, setLockedDeposits] = useState<any[]>([]);
   const [savingsGoals, setSavingsGoals] = useState<any[]>([]);
 
+  // ─── Fetch banking data directly from Supabase ──────────────────────────
   const fetchBankingData = async () => {
     try {
       setLoading(true);
-      // Fetch summary
-      const summaryData = await apiRequest('/banking/summary');
+
+      // 1. Fetch summary (from user's wallet and locked deposits)
+      const { data: walletData, error: walletErr } = await supabase
+        .from('wallets')
+        .select('balance, locked')
+        .single();
+
+      if (walletErr) throw walletErr;
+
+      // 2. Fetch locked deposits
+      const { data: lockedData, error: lockedErr } = await supabase
+        .from('locked_deposits')
+        .select('*')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+
+      if (lockedErr) throw lockedErr;
+
+      // 3. Fetch savings goals
+      const { data: goalsData, error: goalsErr } = await supabase
+        .from('savings_goals')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (goalsErr) throw goalsErr;
+
+      // ── Calculate summary ──────────────────────────────────────────────
+      const totalLocked = lockedData?.reduce((sum: number, d: any) => sum + d.amount, 0) || 0;
+      const totalSavings = (walletData?.balance || 0) + totalLocked;
+      const avgApy = lockedData?.length > 0
+        ? lockedData.reduce((sum: number, d: any) => sum + d.apy, 0) / lockedData.length
+        : 0;
+
       setSummary({
-        totalSavings: summaryData.totalSavings || 0,
-        interestEarned: summaryData.interestEarned || 0,
-        projectedAnnual: summaryData.projectedAnnual || 0,
-        lockedTotal: summaryData.lockedTotal || 0,
-        availableBalance: summaryData.availableBalance || 0,
-        avgApy: summaryData.avgApy || 0,
+        totalSavings: totalSavings,
+        interestEarned: 0, // You can calculate from interest_history table later
+        projectedAnnual: Math.round(totalLocked * 0.08), // 8% projected
+        lockedTotal: totalLocked,
+        availableBalance: walletData?.balance || 0,
+        avgApy: Math.round(avgApy),
       });
 
-      // Fetch locked deposits
-      const lockedData = await apiRequest('/banking/locked');
       setLockedDeposits(lockedData || []);
-
-      // Fetch savings goals
-      const goalsData = await apiRequest('/banking/goals');
       setSavingsGoals(goalsData || []);
+
     } catch (err) {
       console.error('Failed to load banking data:', err);
       toast.error('Could not load banking data');
@@ -255,13 +291,18 @@ function BankingPage() {
   );
 }
 
-// ── LockFundsCard (converted to real API) ─────────────────────────────────
+// ─── LockFundsCard ──────────────────────────────────────────────────────────
 function LockFundsCard({ onSuccess }: { onSuccess: () => void }) {
   const [amount, setAmount] = useState<number>(50000);
   const [months, setMonths] = useState<number>(12);
   const [confirming, setConfirming] = useState(false);
   const [done, setDone] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const supabase = createClient(
+    import.meta.env.VITE_SUPABASE_URL,
+    import.meta.env.VITE_SUPABASE_ANON_KEY
+  );
 
   const selected = durations.find((d) => d.months === months)!;
   const interest = useMemo(
@@ -275,16 +316,26 @@ function LockFundsCard({ onSuccess }: { onSuccess: () => void }) {
   const handleLock = async () => {
     setSubmitting(true);
     try {
-      await apiRequest('/banking/lock', {
-        method: 'POST',
-        body: JSON.stringify({ amount, months, apy: selected.apy }),
-      });
+      const { error } = await supabase
+        .from('locked_deposits')
+        .insert([{
+          amount: amount,
+          months: months,
+          apy: selected.apy,
+          name: `${months} Month Lock`,
+          total: months,
+          days: 0,
+          status: 'active',
+        }]);
+
+      if (error) throw error;
       toast.success(`Locked ${fmt(amount)} for ${months} months`);
       setConfirming(false);
       setDone(true);
       onSuccess();
-    } catch (err: any) {
-      toast.error(err.message || 'Lock failed');
+    } catch (err) {
+      toast.error('Failed to lock funds');
+      console.error(err);
     } finally {
       setSubmitting(false);
     }
@@ -313,7 +364,6 @@ function LockFundsCard({ onSuccess }: { onSuccess: () => void }) {
   return (
     <>
       <Card className="!p-4">
-        {/* Amount */}
         <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Amount to lock</label>
         <div className="mt-1 flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2.5">
           <span className="text-sm font-semibold text-muted-foreground">KES</span>
@@ -340,7 +390,6 @@ function LockFundsCard({ onSuccess }: { onSuccess: () => void }) {
           ))}
         </div>
 
-        {/* Duration */}
         <p className="mt-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Choose duration</p>
         <div className="mt-2 grid grid-cols-2 gap-2">
           {durations.map((d) => {
@@ -368,7 +417,6 @@ function LockFundsCard({ onSuccess }: { onSuccess: () => void }) {
           })}
         </div>
 
-        {/* Summary */}
         <div className="mt-4 rounded-xl bg-muted/60 p-3">
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Interest ({selected.apy}% APY)</span>
@@ -380,7 +428,7 @@ function LockFundsCard({ onSuccess }: { onSuccess: () => void }) {
           </div>
           <div className="mt-2 flex items-start gap-1.5 text-[10px] text-muted-foreground">
             <Info className="mt-0.5 h-3 w-3 shrink-0" />
-            <span>Early withdrawal available with reduced interest. Funds insured up to KES 500,000.</span>
+            <span>Early withdrawal available with reduced interest.</span>
           </div>
         </div>
 
@@ -400,11 +448,7 @@ function LockFundsCard({ onSuccess }: { onSuccess: () => void }) {
           <div className="absolute inset-0 bg-black/50" onClick={() => setConfirming(false)} />
           <div className="relative z-10 w-full max-w-md rounded-t-3xl bg-card p-5 shadow-2xl sm:rounded-3xl">
             <div className="mb-4 flex items-center justify-between">
-              <button
-                onClick={() => setConfirming(false)}
-                className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground"
-                aria-label="Back"
-              >
+              <button onClick={() => setConfirming(false)} className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground">
                 <ArrowLeft className="h-4 w-4" />
               </button>
               <h3 className="text-base font-bold">Confirm lock</h3>
@@ -416,7 +460,7 @@ function LockFundsCard({ onSuccess }: { onSuccess: () => void }) {
             <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-primary/10 text-primary">
               <Lock className="h-6 w-6" />
             </div>
-            <p className="mt-3 text-center text-xs text-muted-foreground">Please review the details below before locking your funds.</p>
+            <p className="mt-3 text-center text-xs text-muted-foreground">Review the details below before locking your funds.</p>
 
             <div className="mt-4 divide-y divide-border rounded-xl border border-border">
               <div className="flex items-center justify-between px-4 py-3">
@@ -462,7 +506,7 @@ function LockFundsCard({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
-// ── ActionSheet (Deposit/Withdraw/Invest/Loan) ──────────────────────────────
+// ─── ActionSheet ──────────────────────────────────────────────────────────────
 function ActionSheet({ action, onClose, onSuccess }: { action: ActionKey; onClose: () => void; onSuccess: () => void }) {
   const config = {
     deposit:  { title: "Deposit funds",  cta: "Deposit",  hint: "Top up via M-Pesa, bank or card." },
@@ -470,6 +514,11 @@ function ActionSheet({ action, onClose, onSuccess }: { action: ActionKey; onClos
     invest:   { title: "New investment", cta: "Invest",   hint: "Grow with our curated portfolios." },
     loan:     { title: "Apply for loan", cta: "Apply",    hint: "Get pre-approved in minutes." },
   }[action];
+
+  const supabase = createClient(
+    import.meta.env.VITE_SUPABASE_URL,
+    import.meta.env.VITE_SUPABASE_ANON_KEY
+  );
 
   const [amount, setAmount] = useState<number>(action === "loan" ? 20000 : 5000);
   const [months, setMonths] = useState<number>(6);
@@ -480,24 +529,28 @@ function ActionSheet({ action, onClose, onSuccess }: { action: ActionKey; onClos
     if (amount < 100) return toast.error('Minimum amount is KES 100');
     setSubmitting(true);
     try {
-      const endpointMap = {
-        deposit: '/banking/deposit',
-        withdraw: '/banking/withdraw',
-        invest: '/banking/invest',
-        loan: '/banking/loan',
+      const tableMap = {
+        deposit: 'transactions',
+        withdraw: 'transactions',
+        invest: 'investments',
+        loan: 'loan_applications',
       };
+
       const payload = action === 'loan'
-        ? { amount, months }
-        : { amount };
-      await apiRequest(endpointMap[action], {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
+        ? { amount, months, status: 'pending' }
+        : { amount, type: action, status: 'pending' };
+
+      const { error } = await supabase
+        .from(tableMap[action])
+        .insert([payload]);
+
+      if (error) throw error;
       toast.success(`${config.cta} of ${fmt(amount)} submitted successfully`);
       setDone(true);
       onSuccess();
-    } catch (err: any) {
+    } catch (err) {
       toast.error(err.message || `${config.cta} failed`);
+      console.error(err);
     } finally {
       setSubmitting(false);
     }
