@@ -1,133 +1,140 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  Search, Star, MapPin, ShieldCheck, Plus, X, ArrowLeft, Upload, CheckCircle2,
-  Send, Bell, Wallet, User as UserIcon, Phone, Mail, Briefcase, Clock, Loader2,
+  Building2, FileText, TrendingUp, Award, BookOpen, ChevronRight, X, ArrowLeft,
+  Rocket, Store, Calendar, CheckCircle2, Clock,
 } from "lucide-react";
 import { AppShell, PageHeader } from "@/components/AppShell";
-import { Card, Badge, SectionTitle } from "@/components/ui-bits";
-import { jobCategories, workers } from "@/lib/mock";
-import { useBalance } from "@/lib/balance";
-import { useAuth } from "@/hooks/useAuth";
-import { toast } from "sonner";
+import { Card, Stat, SectionTitle, Badge } from "@/components/ui-bits";
+import { fmt } from "@/lib/mock";
+import { FileField, SuccessBlock } from "./kazi";
 import { createClient } from "@supabase/supabase-js";
+import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
 
-// ✅ Confirm this version is loaded
-console.log("🔵 KAZI: Supabase direct version loaded");
-
-export const Route = createFileRoute("/kazi")({
+export const Route = createFileRoute("/business")({
   head: () => ({
     meta: [
-      { title: "KAZI Link — PESAKI" },
-      { name: "description", content: "Find work or hire trusted workers on KAZI Link — house helps, drivers, plumbers, tutors and more." },
+      { title: "Business Hub — PESAKI" },
+      { name: "description", content: "Apply for funding, manage applications, and grow your business through PESAKI Business Hub." },
     ],
   }),
-  component: KaziPage,
+  component: BusinessPage,
 });
 
-type Tab = "find" | "hire" | "mine";
+type ActionKey = "apply" | "apps" | "invest" | "stories" | "guide";
+const sections: { label: string; icon: any; tone: string; key: ActionKey }[] = [
+  { label: "Apply for Funding",  icon: FileText,    tone: "primary", key: "apply" },
+  { label: "My Applications",    icon: Building2,   tone: "gold",    key: "apps" },
+  { label: "My Investments",     icon: TrendingUp,  tone: "success", key: "invest" },
+  { label: "Success Stories",    icon: Award,       tone: "gold",    key: "stories" },
+  { label: "Funding Guidelines", icon: BookOpen,    tone: "primary", key: "guide" },
+];
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-interface Job {
+// ─── Types (match Supabase tables) ────────────────────────────────────────
+interface BusinessApplication {
   id: string;
-  title: string;
-  category: string;
-  location: string;
-  pay: string;
-  payAmount: number;
-  duration: string;
-  description: string;
-  badge: string;
-  status: string;
+  user_id: string;
+  business_name: string;
+  business_type: string; // 'startup' | 'existing'
+  amount_requested: number;
+  status: string; // 'Pending', 'Approved', 'Disbursed', 'Rejected'
   created_at: string;
-  employer_id: string;
+  // additional fields as needed
 }
 
-interface Application {
+interface BusinessInvestment {
   id: string;
-  job_id: string;
-  jobs?: {
-    title: string;
-    pay_label: string;
-    pay_amount: number;
-    employer_id: string;
-    location: string;
-  };
-  applicant_name: string;
-  phone: string;
-  email: string;
-  location: string;
-  experience: string;
-  availability: string;
-  status: string;
-  applied_at: string;
-  photo_url?: string;
-  worker_id: string;
+  user_id: string;
+  business_name: string;
+  amount_invested: number;
+  projected_return: number;
+  // ...
 }
 
-function KaziPage() {
+interface SuccessStory {
+  id: string;
+  business_name: string;
+  grew: string; // e.g., "2x revenue"
+  quote: string;
+  // ...
+}
+
+function BusinessPage() {
   const { user } = useAuth();
-  const [tab, setTab] = useState<Tab>("find");
-  const [q, setQ] = useState("");
-  const [applyJob, setApplyJob] = useState<Job | null>(null);
-  const [postJob, setPostJob] = useState(false);
-  const [hireApp, setHireApp] = useState<Application | null>(null);
-  const [chatApp, setChatApp] = useState<Application | null>(null);
-  const [notifOpen, setNotifOpen] = useState(false);
+  const [mode, setMode] = useState<"none" | "picker" | "startup" | "existing">("none");
+  const [info, setInfo] = useState<null | "invest" | "guide">(null);
   const [loading, setLoading] = useState(true);
+
+  // ─── Data state ────────────────────────────────────────────────────────────
+  const [applications, setApplications] = useState<BusinessApplication[]>([]);
+  const [investments, setInvestments] = useState<BusinessInvestment[]>([]);
+  const [stories, setStories] = useState<SuccessStory[]>([]);
+  const [totalFunding, setTotalFunding] = useState(0);
+  const [amountRepaid, setAmountRepaid] = useState(0);
+  const [profitSharePaid, setProfitSharePaid] = useState(0);
+  const [openApps, setOpenApps] = useState(0);
+  const [approvedApps, setApprovedApps] = useState(0);
+  const [repaymentStatus, setRepaymentStatus] = useState("On time");
 
   const supabase = createClient(
     import.meta.env.VITE_SUPABASE_URL,
     import.meta.env.VITE_SUPABASE_ANON_KEY
   );
 
-  // ─── Data state ────────────────────────────────────────────────────────────
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [applications, setApplications] = useState<Application[]>([]);
-  const [notifications, setNotifications] = useState<any[]>([]);
-
-  // ─── Fetch all data directly from Supabase ──────────────────────────────
+  // ─── Fetch all data ──────────────────────────────────────────────────────
   const fetchData = async () => {
+    if (!user) return;
     try {
       setLoading(true);
 
-      // 1. Jobs (open)
-      const { data: jobsData, error: jobsErr } = await supabase
-        .from('jobs')
+      // 1. Applications (for this user)
+      const { data: appsData, error: appsErr } = await supabase
+        .from('business_applications')
         .select('*')
-        .eq('status', 'open')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (jobsErr) throw jobsErr;
-      setJobs(jobsData || []);
+      if (appsErr) throw appsErr;
+      setApplications(appsData || []);
 
-      // 2. Applications (if logged in)
-      if (user) {
-        const { data: appsData, error: appsErr } = await supabase
-          .from('applications')
-          .select('*, jobs:job_id ( title, pay_label, pay_amount, employer_id, location )')
-          .eq('worker_id', user.id)
-          .order('applied_at', { ascending: false });
+      // 2. Investments (for this user)
+      const { data: invData, error: invErr } = await supabase
+        .from('business_investments')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
-        if (appsErr) throw appsErr;
-        setApplications(appsData || []);
-      }
+      if (invErr) throw invErr;
+      setInvestments(invData || []);
 
-      // 3. Notifications (if logged in)
-      if (user) {
-        const { data: notifsData, error: notifsErr } = await supabase
-          .from('notifications')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
+      // 3. Success stories (public)
+      const { data: storyData, error: storyErr } = await supabase
+        .from('success_stories')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-        if (notifsErr) throw notifsErr;
-        setNotifications(notifsData || []);
-      }
+      if (storyErr) throw storyErr;
+      setStories(storyData || []);
+
+      // 4. Aggregate stats (you can compute from apps or a separate summary table)
+      // For now, compute from apps:
+      const total = appsData?.reduce((sum, a) => sum + (a.amount_requested || 0), 0) || 0;
+      const repaid = 0; // would need a repayment table
+      const profitPaid = 0;
+      const open = appsData?.filter(a => a.status === 'Pending').length || 0;
+      const approved = appsData?.filter(a => a.status === 'Approved' || a.status === 'Disbursed').length || 0;
+
+      setTotalFunding(total);
+      setAmountRepaid(repaid);
+      setProfitSharePaid(profitPaid);
+      setOpenApps(open);
+      setApprovedApps(approved);
+      setRepaymentStatus("On time"); // placeholder
 
     } catch (err) {
-      console.error('Failed to fetch KAZI data:', err);
-      toast.error('Could not load KAZI Link data');
+      console.error('Failed to fetch business data:', err);
+      toast.error('Could not load Business Hub data');
     } finally {
       setLoading(false);
     }
@@ -135,50 +142,20 @@ function KaziPage() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [user]);
 
-  // ─── Filtered jobs ────────────────────────────────────────────────────────
-  const visibleJobs = useMemo(() => {
-    const term = q.trim().toLowerCase();
-    let list = jobs;
-    if (term) {
-      list = list.filter(
-        (j) =>
-          j.title.toLowerCase().includes(term) ||
-          j.location.toLowerCase().includes(term) ||
-          j.category.toLowerCase().includes(term) ||
-          j.description.toLowerCase().includes(term),
-      );
-    }
-    return list;
-  }, [jobs, q]);
-
-  // ─── Applicants for "Hire" tab ──────────────────────────────────────────
-  const applicantsGrouped = useMemo(() => {
-    const term = q.trim().toLowerCase();
-    let apps = applications;
-    if (term) {
-      apps = apps.filter(
-        (a) =>
-          a.applicant_name.toLowerCase().includes(term) ||
-          a.location.toLowerCase().includes(term) ||
-          (a.jobs?.title || '').toLowerCase().includes(term),
-      );
-    }
-    return apps;
-  }, [applications, q]);
-
-  // ─── Worker's own applications ──────────────────────────────────────────
-  const myApplications = useMemo(() => {
-    return applications.filter((a) => a.worker_id === user?.id);
-  }, [applications, user]);
-
-  const unread = notifications.filter((n) => !n.read).length;
+  const onAction = (k: ActionKey) => {
+    if (k === "apply") return setMode("picker");
+    if (k === "apps") return document.getElementById("apps-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (k === "stories") return document.getElementById("stories-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (k === "invest") return setInfo("invest");
+    if (k === "guide") return setInfo("guide");
+  };
 
   if (loading) {
     return (
       <AppShell>
-        <PageHeader title="KAZI Link" subtitle="Connecting workers and employers" />
+        <PageHeader title="Business Hub" subtitle="Fund. Build. Scale." />
         <div className="flex items-center justify-center h-64">
           <p className="text-muted-foreground">Loading...</p>
         </div>
@@ -188,299 +165,130 @@ function KaziPage() {
 
   return (
     <AppShell>
-      <PageHeader
-        title="KAZI Link"
-        subtitle="Connecting workers and employers"
-        right={
-          <button
-            onClick={() => setNotifOpen(true)}
-            className="relative grid h-9 w-9 place-items-center rounded-full bg-muted text-foreground"
-            aria-label="Notifications"
-          >
-            <Bell className="h-4 w-4" />
-            {unread > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
-                {unread}
-              </span>
-            )}
-          </button>
-        }
-      />
+      <PageHeader title="Business Hub" subtitle="Fund. Build. Scale." />
 
-      <div className="px-5 pt-4">
-        <div className="grid grid-cols-4 gap-1 rounded-full bg-muted p-1">
-          {([
-            { k: "find", label: "Find Work" },
-            { k: "hire", label: "Hire" },
-            { k: "mine", label: "My Panel" },
-          ] as const).map((t) => (
-            <button
-              key={t.k}
-              onClick={() => setTab(t.k)}
-              className={`rounded-full py-2 text-[11px] font-semibold transition-all ${
-                tab === t.k ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-          <button
-            onClick={() => setPostJob(true)}
-            className="inline-flex items-center justify-center gap-1 rounded-full gradient-primary py-2 text-[11px] font-semibold text-primary-foreground"
-          >
-            <Plus className="h-3 w-3" /> Post
-          </button>
-        </div>
-      </div>
-
-      {tab !== "mine" && (
-        <section className="mt-4 px-5">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder={tab === "find" ? "Search jobs, location, category" : "Search applicants by name, job, area"}
-              className="w-full rounded-full border border-border bg-card py-2.5 pl-9 pr-9 text-sm outline-none focus:ring-2 focus:ring-ring"
-            />
-            {q && (
-              <button
-                onClick={() => setQ("")}
-                className="absolute right-2 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full bg-muted text-muted-foreground"
-                aria-label="Clear search"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
+      <section className="px-5 pt-5">
+        <div className="gradient-primary rounded-2xl p-5 text-primary-foreground">
+          <p className="text-xs uppercase tracking-widest opacity-80">Total Funding Received</p>
+          <p className="mt-1 font-display text-3xl font-bold">{fmt(totalFunding)}</p>
+          <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+            <div className="rounded-xl bg-white/10 p-2.5">
+              <p className="opacity-70">Amount Repaid</p>
+              <p className="mt-0.5 font-semibold">{fmt(amountRepaid)}</p>
+            </div>
+            <div className="rounded-xl bg-white/10 p-2.5">
+              <p className="opacity-70">Profit Share Paid</p>
+              <p className="mt-0.5 font-semibold">{fmt(profitSharePaid)}</p>
+            </div>
           </div>
-        </section>
-      )}
+        </div>
+      </section>
 
-      {tab === "find" && (
-        <>
-          <section className="mt-5 px-5">
-            <SectionTitle title="Categories" />
-            <div className="flex gap-2 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {jobCategories.map((c) => (
+      <section className="mt-5 grid grid-cols-3 gap-3 px-5">
+        <Stat label="Open Apps" value={openApps.toString()} tone="primary" />
+        <Stat label="Approved" value={approvedApps.toString()} tone="success" />
+        <Stat label="Repayment" value={repaymentStatus} tone="gold" />
+      </section>
+
+      <section className="mt-6 px-5">
+        <SectionTitle title="Quick actions" />
+        <Card className="!p-2">
+          <ul className="divide-y divide-border">
+            {sections.map((s) => (
+              <li key={s.label}>
                 <button
-                  key={c}
-                  onClick={() => setQ(c)}
-                  className="shrink-0 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-muted"
+                  onClick={() => onAction(s.key)}
+                  className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-2 py-3 text-left"
                 >
-                  {c}
+                  <span className={`grid h-9 w-9 place-items-center rounded-xl ${
+                    s.tone === "gold" ? "bg-gold/15 text-gold-foreground"
+                    : s.tone === "success" ? "bg-success/15 text-success"
+                    : "bg-primary/10 text-primary"
+                  }`}>
+                    <s.icon className="h-4 w-4" />
+                  </span>
+                  <span className="truncate text-sm font-semibold">{s.label}</span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </button>
-              ))}
-            </div>
-          </section>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      </section>
 
-          <section className="mt-3 px-5">
-            <SectionTitle title={`Open jobs (${visibleJobs.length})`} />
-            {visibleJobs.length === 0 ? (
-              <EmptyState label="No jobs match your search." />
-            ) : (
-              <div className="space-y-2.5">
-                {visibleJobs.map((j) => (
-                  <Card key={j.id} className="!p-3.5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">{j.title}</p>
-                        <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-                          <MapPin className="h-3 w-3" /> {j.location}
-                        </p>
-                        <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
-                          <Clock className="h-3 w-3" /> {j.duration}
-                        </p>
-                        <p className="mt-1 text-sm font-bold text-primary">{j.pay}</p>
-                      </div>
-                      <Badge tone={j.badge === "Urgent" ? "destructive" : j.badge === "Hot" ? "warning" : "gold"}>
-                        {j.badge}
-                      </Badge>
-                    </div>
-                    <button
-                      onClick={() => setApplyJob(j)}
-                      className="mt-3 w-full rounded-full gradient-primary py-2 text-xs font-semibold text-primary-foreground"
-                    >
-                      Apply now
-                    </button>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </section>
-        </>
-      )}
-
-      {tab === "hire" && (
-        <>
-          {applicantsGrouped.length > 0 && (
-            <section className="mt-5 px-5">
-              <SectionTitle title={`Applicants awaiting your review (${applicantsGrouped.length})`} />
-              <div className="space-y-2.5">
-                {applicantsGrouped.map((a) => (
-                  <ApplicantRow key={a.id}
-                    a={a}
-                    onHire={() => setHireApp(a)}
-                    onChat={() => setChatApp(a)}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-
-          <section className="mt-5 px-5">
-            <SectionTitle title="Top workers" />
-            <div className="space-y-2.5">
-              {workers.map((w) => (
-                <Card key={w.name} className="!p-3.5">
-                  <div className="flex items-start gap-3">
-                    <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full gradient-primary text-sm font-bold text-primary-foreground">
-                      {w.name.split(" ").map((n) => n[0]).slice(0, 2).join("")}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="truncate text-sm font-semibold">{w.name}</p>
-                        <Badge tone={w.badge === "Top Rated" ? "gold" : w.badge === "Verified" ? "success" : "primary"}>
-                          {w.badge}
-                        </Badge>
-                      </div>
-                      <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-                        <MapPin className="h-3 w-3" /> {w.loc}
-                      </p>
-                      <div className="mt-1.5 flex items-center gap-3 text-xs">
-                        <span className="inline-flex items-center gap-0.5 font-semibold">
-                          <Star className="h-3 w-3 fill-gold text-gold" /> {w.rating}
-                        </span>
-                        <span className="text-muted-foreground">{w.jobs} jobs</span>
-                        <span className="inline-flex items-center gap-0.5 text-success">
-                          <ShieldCheck className="h-3 w-3" /> Verified
-                        </span>
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {w.skills.map((s) => (
-                          <span key={s} className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">{s}</span>
-                        ))}
-                      </div>
-                    </div>
+      <section id="apps-section" className="mt-6 px-5 scroll-mt-20">
+        <SectionTitle title="My applications" />
+        {applications.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
+            You haven't applied for funding yet.
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {applications.map((a) => (
+              <Card key={a.id} className="!p-3.5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold">{a.business_name}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">Requested {fmt(a.amount_requested)}</p>
+                    {a.status === 'Approved' && (
+                      <p className="mt-1 text-[11px] text-success">Approved</p>
+                    )}
                   </div>
-                  <p className="mt-2 text-[11px] text-muted-foreground">
-                    Post a job to receive applications from workers like {w.name.split(" ")[0]}.
-                  </p>
-                </Card>
-              ))}
-            </div>
-          </section>
-        </>
-      )}
+                  <Badge tone={a.status === "Approved" ? "success" : a.status === "Disbursed" ? "primary" : "warning"}>
+                    {a.status}
+                  </Badge>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
 
-      {tab === "mine" && (
-        <MyPanel
-          apps={myApplications}
-          onChat={(a) => setChatApp(a)}
+      <section id="stories-section" className="mt-6 px-5 pb-2 scroll-mt-20">
+        <SectionTitle title="Success stories" />
+        {stories.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
+            No success stories yet. Be the first!
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {stories.map((s) => (
+              <Card key={s.id} className="!p-4">
+                <Badge tone="gold">{s.grew}</Badge>
+                <p className="mt-2 text-sm font-semibold">{s.business_name}</p>
+                <p className="mt-1 text-xs italic text-muted-foreground">"{s.quote}"</p>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {mode !== "none" && (
+        <FundingSheet
+          mode={mode}
+          setMode={setMode}
+          onClose={() => setMode("none")}
+          user={user}
+          onSuccess={fetchData}
         />
       )}
-
-      {applyJob && <ApplyJobSheet job={applyJob} onClose={() => setApplyJob(null)} onSuccess={fetchData} user={user} supabase={supabase} />}
-      {postJob && <PostJobSheet onClose={() => setPostJob(false)} onSuccess={fetchData} user={user} supabase={supabase} />}
-      {hireApp && <HireSheet app={hireApp} onClose={() => setHireApp(null)} onOpenChat={() => { setChatApp(hireApp); setHireApp(null); }} />}
-      {chatApp && <ChatSheet app={chatApp} from="employer" onClose={() => setChatApp(null)} />}
-      {notifOpen && <NotifSheet onClose={() => setNotifOpen(false)} />}
+      {info && <InfoSheet which={info} onClose={() => setInfo(null)} />}
     </AppShell>
   );
 }
 
-// ─── Applicant Row ────────────────────────────────────────────────────────────
-function ApplicantRow({ a, onHire, onChat }: { a: Application; onHire: () => void; onChat: () => void }) {
+// ─── Sheet Components (unchanged except for props) ──────────────────────
+function SheetShell({ title, onBack, onClose, children }: { title: string; onBack?: () => void; onClose: () => void; children: React.ReactNode }) {
   return (
-    <Card className="!p-3.5">
-      <div className="flex items-start gap-3">
-        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full gradient-gold text-sm font-bold text-gold-foreground">
-          {a.applicant_name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <p className="truncate text-sm font-semibold">{a.applicant_name}</p>
-            <Badge tone={a.status === "Hired" ? "success" : a.status === "Rejected" ? "destructive" : "primary"}>{a.status}</Badge>
-          </div>
-          <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-            <Briefcase className="h-3 w-3" /> Applied for {a.jobs?.title || 'Unknown'}
-          </p>
-          <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
-            <MapPin className="h-3 w-3" /> {a.location} · {a.experience} yrs
-          </p>
-        </div>
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <button onClick={onChat} className="rounded-full border border-border py-2 text-xs font-semibold">
-          Message
-        </button>
-        <button
-          onClick={onHire}
-          disabled={a.status === "Hired" || a.status === "Rejected"}
-          className="rounded-full gradient-primary py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
-        >
-          {a.status === "Hired" ? "Hired" : "Hire · View"}
-        </button>
-      </div>
-    </Card>
-  );
-}
-
-// ─── My Panel ─────────────────────────────────────────────────────────────────
-function MyPanel({ apps, onChat }: { apps: Application[]; onChat: (a: Application) => void }) {
-  if (apps.length === 0) {
-    return (
-      <section className="mt-6 px-5">
-        <EmptyState label="You haven't applied to any jobs yet. Head to Find Work to get started." />
-      </section>
-    );
-  }
-  return (
-    <section className="mt-5 px-5">
-      <SectionTitle title={`My applications (${apps.length})`} />
-      <div className="space-y-2.5">
-        {apps.map((a) => (
-          <Card key={a.id} className="!p-3.5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">{a.jobs?.title || 'Unknown'}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{a.jobs?.pay_label || 'KES 0'}</p>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  Applied {new Date(a.applied_at).toLocaleDateString()}
-                </p>
-              </div>
-              <Badge tone={a.status === "Hired" ? "success" : a.status === "Rejected" ? "destructive" : a.status === "Shortlisted" ? "gold" : "primary"}>
-                {a.status}
-              </Badge>
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <button
-                onClick={() => onChat(a)}
-                className="rounded-full border border-border py-2 text-xs font-semibold"
-              >
-                Chat with employer
-              </button>
-              <button
-                disabled={a.status !== "Hired"}
-                className="rounded-full gradient-primary py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
-              >
-                Receive payout
-              </button>
-            </div>
-          </Card>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-// ─── Sheets ──────────────────────────────────────────────────────────────────
-function SheetShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="fixed inset-0 z-[60] grid place-items-end sm:place-items-center">
+    <div className="fixed inset-0 z-50 grid place-items-end sm:place-items-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative z-10 flex max-h-[92vh] w-full max-w-md flex-col rounded-t-3xl bg-card shadow-2xl sm:rounded-3xl">
-        <div className="flex items-center justify-between border-b border-border px-5 py-3">
-          <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground" aria-label="Back">
+      <div className="relative z-10 max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-card p-5 shadow-2xl sm:rounded-3xl">
+        <div className="mb-4 flex items-center justify-between">
+          <button
+            onClick={onBack ?? onClose}
+            className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground"
+            aria-label="Back"
+          >
             <ArrowLeft className="h-4 w-4" />
           </button>
           <h3 className="text-base font-bold">{title}</h3>
@@ -488,9 +296,7 @@ function SheetShell({ title, onClose, children }: { title: string; onClose: () =
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-5 pb-[calc(env(safe-area-inset-bottom)+7rem)] pt-4">
-          {children}
-        </div>
+        {children}
       </div>
     </div>
   );
@@ -501,169 +307,376 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 }
 const inputCls = "mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring";
 
-// ─── FileField (exported for business.tsx) ──────────────────────────────
-export function FileField({
-  label,
-  accept,
-  onChange,
-}: {
-  label?: string;
-  accept?: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-}) {
+function SectionHeader({ n, title }: { n: number; title: string }) {
   return (
-    <div>
-      {label && <FieldLabel>{label}</FieldLabel>}
-      <input
-        type="file"
-        accept={accept}
-        onChange={onChange}
-        className={inputCls}
-      />
+    <div className="mt-5 flex items-center gap-2 border-b border-border pb-2">
+      <span className="grid h-6 w-6 place-items-center rounded-full gradient-primary text-[11px] font-bold text-primary-foreground">{n}</span>
+      <h4 className="text-sm font-bold">{title}</h4>
     </div>
   );
 }
 
-// ─── ApplyJobSheet ──────────────────────────────────────────────────────────
-function ApplyJobSheet({ job, onClose, onSuccess, user, supabase }: any) {
-  const [done, setDone] = useState(false);
-  const [form, setForm] = useState({
-    applicantName: "", phone: "", email: "", location: "",
-    experience: "", availability: "",
-  });
-  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setForm((f) => ({ ...f, [k]: e.target.value }));
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    try {
-      const { error } = await supabase
-        .from('applications')
-        .insert([{
-          job_id: job.id,
-          worker_id: user?.id,
-          applicant_name: form.applicantName,
-          phone: form.phone,
-          email: form.email,
-          location: form.location,
-          experience: form.experience,
-          availability: form.availability,
-          status: 'Pending',
-        }]);
-
-      if (error) throw error;
-      toast.success('Application submitted!');
-      setDone(true);
-      onSuccess();
-    } catch (err) {
-      toast.error('Failed to apply');
-      console.error(err);
-    }
+// ─── FundingSheet (receives user & onSuccess) ──────────────────────────
+function FundingSheet({
+  mode, setMode, onClose, user, onSuccess
+}: {
+  mode: "picker" | "startup" | "existing";
+  setMode: (m: "picker" | "startup" | "existing") => void;
+  onClose: () => void;
+  user: any;
+  onSuccess: () => void;
+}) {
+  if (mode === "picker") {
+    return (
+      <SheetShell title="Apply for funding" onClose={onClose}>
+        <p className="text-xs text-muted-foreground">Choose the type of business you're funding. Each flow is tailored to your stage.</p>
+        <div className="mt-4 space-y-3">
+          <button
+            onClick={() => setMode("startup")}
+            className="w-full rounded-2xl border border-border p-4 text-left transition-colors hover:border-primary/40"
+          >
+            <div className="flex items-center gap-3">
+              <span className="grid h-11 w-11 place-items-center rounded-xl gradient-primary text-primary-foreground">
+                <Rocket className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-bold">Startup</p>
+                <p className="text-[11px] text-muted-foreground">New idea or business under 1 year</p>
+              </div>
+              <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
+            </div>
+          </button>
+          <button
+            onClick={() => setMode("existing")}
+            className="w-full rounded-2xl border border-border p-4 text-left transition-colors hover:border-primary/40"
+          >
+            <div className="flex items-center gap-3">
+              <span className="grid h-11 w-11 place-items-center rounded-xl gradient-gold text-gold-foreground">
+                <Store className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-bold">Existing Business</p>
+                <p className="text-[11px] text-muted-foreground">Operating with revenue & records</p>
+              </div>
+              <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
+            </div>
+          </button>
+        </div>
+      </SheetShell>
+    );
   }
 
-  return (
-    <SheetShell title="Apply for job" onClose={onClose}>
-      {done ? (
-        <SuccessBlock message={`Your application for "${job.title}" has been submitted.`} onClose={onClose} />
-      ) : (
-        <form className="space-y-3" onSubmit={submit}>
-          <div><FieldLabel>Full name</FieldLabel><input required value={form.applicantName} onChange={set("applicantName")} className={inputCls} /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><FieldLabel>Phone</FieldLabel><input required value={form.phone} onChange={set("phone")} className={inputCls} /></div>
-            <div><FieldLabel>Email</FieldLabel><input required type="email" value={form.email} onChange={set("email")} className={inputCls} /></div>
-          </div>
-          <div><FieldLabel>Location</FieldLabel><input required value={form.location} onChange={set("location")} className={inputCls} /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><FieldLabel>Experience</FieldLabel><select required value={form.experience} onChange={set("experience")} className={inputCls}><option value="">Select</option><option>Less than 1</option><option>1-3</option><option>3-5</option><option>5+</option></select></div>
-            <div><FieldLabel>Availability</FieldLabel><select required value={form.availability} onChange={set("availability")} className={inputCls}><option value="">Select</option><option>Immediate</option><option>1 week</option><option>2 weeks</option></select></div>
-          </div>
-          <button type="submit" className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground">Submit</button>
-        </form>
-      )}
-    </SheetShell>
-  );
+  if (mode === "startup") {
+    return <StartupForm onBack={() => setMode("picker")} onClose={onClose} user={user} onSuccess={onSuccess} />;
+  }
+  return <ExistingForm onBack={() => setMode("picker")} onClose={onClose} user={user} onSuccess={onSuccess} />;
 }
 
-// ─── PostJobSheet ───────────────────────────────────────────────────────────
-function PostJobSheet({ onClose, onSuccess, user, supabase }: any) {
+// ─── StartupForm with Supabase insert ──────────────────────────────────
+function StartupForm({ onBack, onClose, user, onSuccess }: any) {
   const [done, setDone] = useState(false);
+  const [agree, setAgree] = useState(false);
+  const [slot, setSlot] = useState<"morning" | "afternoon">("morning");
+  const [date, setDate] = useState("");
   const [loading, setLoading] = useState(false);
-  const [accommodation, setAccommodation] = useState(false);
-  const [checked, setChecked] = useState<string[]>([]);
-  const requirements = ["Experience required", "ID Required", "References", "Background check", "Own tools"];
-  const [form, setForm] = useState({
-    title: "", category: "", location: "", pay: "", payAmount: 0, duration: "", description: "",
-  });
-  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const v = k === "payAmount" ? Number((e.target as HTMLInputElement).value) : e.target.value;
-    setForm((f) => ({ ...f, [k]: v }));
-  };
 
-  async function submit(e: React.FormEvent) {
+  const supabase = createClient(
+    import.meta.env.VITE_SUPABASE_URL,
+    import.meta.env.VITE_SUPABASE_ANON_KEY
+  );
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!agree) return;
     setLoading(true);
+    const form = e.currentTarget;
+    const formData = new FormData(form);
     try {
       const { error } = await supabase
-        .from('jobs')
+        .from('business_applications')
         .insert([{
-          employer_id: user?.id,
-          title: form.title,
-          category: form.category,
-          location: form.location,
-          pay_label: form.pay,
-          pay_amount: form.payAmount,
-          duration: form.duration,
-          accommodation: accommodation,
-          requirements: checked,
-          description: form.description,
-          status: 'open',
-          urgent: false,
-          hot: false,
+          user_id: user?.id,
+          business_name: formData.get('business_name'),
+          business_type: 'startup',
+          amount_requested: parseInt(formData.get('amount') as string),
+          status: 'Pending',
+          // other fields can be stored in a JSON column if needed
+          details: {
+            type: formData.get('type'),
+            years: formData.get('years'),
+            location: formData.get('location'),
+            founder_name: formData.get('founder_name'),
+            phone: formData.get('phone'),
+            email: formData.get('email'),
+            id_number: formData.get('id_number'),
+            problem: formData.get('problem'),
+            purpose: formData.get('purpose'),
+            expected_profit: formData.get('expected_profit'),
+            training_date: date,
+            training_slot: slot,
+          }
         }]);
-
       if (error) throw error;
-      toast.success('Job posted successfully!');
+      toast.success('Application submitted successfully!');
       setDone(true);
       onSuccess();
     } catch (err) {
-      toast.error('Failed to post job');
+      toast.error('Failed to submit application');
       console.error(err);
     } finally {
       setLoading(false);
     }
+  };
+
+  if (done) {
+    return (
+      <SheetShell title="Startup funding" onClose={onClose}>
+        <SuccessBlock message="Your startup application has been submitted. We'll review and get back to you shortly." onClose={onClose} />
+      </SheetShell>
+    );
   }
 
   return (
-    <SheetShell title="Post a Job" onClose={onClose}>
-      {done ? (
-        <SuccessBlock message="Your job is now live and visible in Find Work." onClose={onClose} />
+    <SheetShell title="Startup funding" onBack={onBack} onClose={onClose}>
+      <div className="rounded-xl bg-primary/5 p-3">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">Startup track</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">Fill in each section — a training session is required after review.</p>
+      </div>
+
+      <form onSubmit={handleSubmit}>
+        <SectionHeader n={1} title="Business details" />
+        <div className="mt-3 space-y-3">
+          <div><FieldLabel>Business name</FieldLabel><input required name="business_name" className={inputCls} /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><FieldLabel>Business type</FieldLabel>
+              <select required name="type" className={inputCls}><option value="Startup">Startup</option></select>
+            </div>
+            <div><FieldLabel>Years in operation</FieldLabel>
+              <select required name="years" className={inputCls}>
+                <option value="">Select</option>
+                <option>Less than 1</option><option>1 - 2</option><option>2+</option>
+              </select>
+            </div>
+          </div>
+          <div><FieldLabel>Location</FieldLabel><input required name="location" className={inputCls} placeholder="e.g. Nairobi CBD" /></div>
+        </div>
+
+        <SectionHeader n={2} title="Founder details" />
+        <div className="mt-3 space-y-3">
+          <div><FieldLabel>Full name</FieldLabel><input required name="founder_name" className={inputCls} /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><FieldLabel>Phone</FieldLabel><input required name="phone" className={inputCls} /></div>
+            <div><FieldLabel>Email</FieldLabel><input required name="email" type="email" className={inputCls} /></div>
+          </div>
+          <div><FieldLabel>ID / Passport number</FieldLabel><input required name="id_number" className={inputCls} /></div>
+          <FileField label="Founder photo" required accept="image/*" />
+        </div>
+
+        <SectionHeader n={3} title="Pitch" />
+        <div className="mt-3 space-y-3">
+          <div><FieldLabel>Tell us about your business idea</FieldLabel><textarea required name="idea" rows={3} className={inputCls} /></div>
+          <div><FieldLabel>What problem does it solve?</FieldLabel><textarea required name="problem" rows={3} className={inputCls} /></div>
+        </div>
+
+        <SectionHeader n={4} title="Funding" />
+        <div className="mt-3 space-y-3">
+          <div><FieldLabel>Amount requested (KES)</FieldLabel><input required name="amount" type="number" min={1000} className={inputCls} /></div>
+          <div><FieldLabel>Purpose</FieldLabel>
+            <select required name="purpose" className={inputCls}>
+              <option value="">Select</option>
+              <option>Equipment</option><option>Inventory</option><option>Marketing</option><option>Expansion</option><option>Other</option>
+            </select>
+          </div>
+          <div><FieldLabel>Expected monthly profit (KES)</FieldLabel><input required name="expected_profit" type="number" className={inputCls} /></div>
+        </div>
+
+        <SectionHeader n={5} title="Training (after review)" />
+        <div className="mt-3 rounded-xl bg-gold/10 p-3 text-xs">
+          <p className="font-semibold text-gold-foreground">
+            You must attend a free one-time physical training to get funds for startup.
+          </p>
+        </div>
+        <div className="mt-3 space-y-3">
+          <div>
+            <FieldLabel>Preferred training date</FieldLabel>
+            <div className="relative">
+              <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input required type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls + " pl-9"} />
+            </div>
+          </div>
+          <div>
+            <FieldLabel>Preferred time</FieldLabel>
+            <div className="mt-1 grid grid-cols-2 gap-2">
+              {([
+                { key: "morning" as const, label: "8:00 AM – 11:00 AM" },
+                { key: "afternoon" as const, label: "2:00 PM – 5:00 PM" },
+              ]).map((s) => (
+                <button
+                  type="button"
+                  key={s.key}
+                  onClick={() => setSlot(s.key)}
+                  className={`flex items-center justify-center gap-1.5 rounded-xl border py-2.5 text-xs font-semibold ${
+                    slot === s.key ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"
+                  }`}
+                >
+                  <Clock className="h-3.5 w-3.5" /> {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <SectionHeader n={6} title="Terms" />
+        <label className="mt-3 flex items-start gap-2 rounded-xl border border-border p-3 text-xs">
+          <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" />
+          <span>I agree to return a percentage of my monthly profit to PESAKI until the full amount is repaid.</span>
+        </label>
+
+        <button
+          type="submit"
+          disabled={!agree || loading}
+          className="mt-5 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50"
+        >
+          {loading ? "Submitting..." : "Submit Application"}
+        </button>
+      </form>
+    </SheetShell>
+  );
+}
+
+// ─── ExistingForm with Supabase insert ────────────────────────────────
+function ExistingForm({ onBack, onClose, user, onSuccess }: any) {
+  const [submitted, setSubmitted] = useState(false);
+  const [agree, setAgree] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const supabase = createClient(
+    import.meta.env.VITE_SUPABASE_URL,
+    import.meta.env.VITE_SUPABASE_ANON_KEY
+  );
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!agree) return;
+    setLoading(true);
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+    try {
+      const { error } = await supabase
+        .from('business_applications')
+        .insert([{
+          user_id: user?.id,
+          business_name: formData.get('business_name'),
+          business_type: 'existing',
+          amount_requested: parseInt(formData.get('amount') as string),
+          status: 'Pending',
+          details: {
+            registration: formData.get('registration'),
+            type: formData.get('type'),
+            location: formData.get('location'),
+            years: formData.get('years'),
+            monthly_revenue: formData.get('monthly_revenue'),
+            monthly_profit: formData.get('monthly_profit'),
+            reason: formData.get('reason'),
+            repayment_plan: formData.get('repayment_plan'),
+            purpose: formData.get('purpose'),
+          }
+        }]);
+      if (error) throw error;
+      toast.success('Application submitted!');
+      setSubmitted(true);
+      onSuccess();
+    } catch (err) {
+      toast.error('Failed to submit');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <SheetShell title="Existing business funding" onBack={onBack} onClose={onClose}>
+      <div className="rounded-xl bg-gold/10 p-3">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-gold-foreground">Established track</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">Documented businesses with revenue history.</p>
+      </div>
+
+      {submitted ? (
+        <div className="mt-5 rounded-2xl border border-border bg-primary/5 p-5 text-center">
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-primary/15 text-primary">
+            <CheckCircle2 className="h-6 w-6" />
+          </div>
+          <p className="mt-3 text-base font-bold">Your application is under review</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Our team will assess your documents and financials. Expect a decision within 3–5 business days.
+          </p>
+          <button onClick={onClose} className="mt-4 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground">
+            Done
+          </button>
+        </div>
       ) : (
-        <form className="space-y-3" onSubmit={submit}>
-          <div><FieldLabel>Job title</FieldLabel><input required value={form.title} onChange={set("title")} className={inputCls} placeholder="e.g. Live-in House Help" /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><FieldLabel>Category</FieldLabel><select required value={form.category} onChange={set("category")} className={inputCls}><option value="">Select</option><option>House Help</option><option>Cleaner</option><option>Tutor</option><option>Gardener</option><option>Driver</option><option>Plumber</option><option>Electrician</option><option>Security Guard</option><option>Event Worker</option><option>Other</option></select></div>
-            <div><FieldLabel>Location</FieldLabel><input required value={form.location} onChange={set("location")} className={inputCls} placeholder="Karen, Nairobi" /></div>
+        <form onSubmit={handleSubmit}>
+          <SectionHeader n={1} title="Business details" />
+          <div className="mt-3 space-y-3">
+            <div><FieldLabel>Business name</FieldLabel><input required name="business_name" className={inputCls} /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><FieldLabel>Registration number</FieldLabel><input required name="registration" className={inputCls} /></div>
+              <div><FieldLabel>Business type</FieldLabel>
+                <select required name="type" className={inputCls}><option>Existing</option></select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><FieldLabel>Location</FieldLabel><input required name="location" className={inputCls} /></div>
+              <div><FieldLabel>Years in operation</FieldLabel>
+                <select required name="years" className={inputCls}>
+                  <option value="">Select</option>
+                  <option>1 - 2</option><option>3 - 5</option><option>5 - 10</option><option>10+</option>
+                </select>
+              </div>
+            </div>
           </div>
 
-          <div><FieldLabel>Duration</FieldLabel><select required value={form.duration} onChange={set("duration")} className={inputCls}><option value="">Select</option><option>1 day</option><option>3 days</option><option>1 week</option><option>2 weeks</option><option>3 weeks</option><option>1 month</option><option>3 months</option><option>6 months</option><option>Ongoing</option></select></div>
-
-          <div className="flex items-center justify-between rounded-xl border border-border p-3">
-            <div><p className="text-sm font-semibold">Accommodation provided?</p><p className="text-[11px] text-muted-foreground">Toggle if the role includes housing.</p></div>
-            <button type="button" onClick={() => setAccommodation(v => !v)} className={`relative h-6 w-11 rounded-full transition-colors ${accommodation ? "bg-primary" : "bg-muted"}`}><span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${accommodation ? "left-[22px]" : "left-0.5"}`} /></button>
+          <SectionHeader n={2} title="Documents" />
+          <div className="mt-3 space-y-3">
+            <FileField label="Business license" required accept=".pdf,image/*" />
+            <FileField label="Bank statements (last 6 months)" required accept=".pdf" />
+            <FileField label="Tax compliance certificate (optional)" accept=".pdf,image/*" />
+            <FileField label="Business plan (optional)" accept=".pdf,.doc,.docx" />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div><FieldLabel>Pay label</FieldLabel><input required value={form.pay} onChange={set("pay")} className={inputCls} placeholder="e.g. KES 25,000/mo" /></div>
-            <div><FieldLabel>Pay amount (KES)</FieldLabel><input required type="number" min={1} value={form.payAmount || ""} onChange={set("payAmount")} className={inputCls} placeholder="25000" /></div>
+          <SectionHeader n={3} title="Financials" />
+          <div className="mt-3 space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div><FieldLabel>Monthly revenue (KES)</FieldLabel><input required name="monthly_revenue" type="number" className={inputCls} /></div>
+              <div><FieldLabel>Monthly profit (KES)</FieldLabel><input required name="monthly_profit" type="number" className={inputCls} /></div>
+            </div>
+            <div><FieldLabel>Reason for funding</FieldLabel><textarea required name="reason" rows={3} className={inputCls} /></div>
+            <div><FieldLabel>Repayment plan</FieldLabel><textarea required name="repayment_plan" rows={3} className={inputCls} /></div>
           </div>
 
-          <div><FieldLabel>Requirements</FieldLabel><div className="mt-1 grid grid-cols-2 gap-2">{requirements.map(r => <label key={r} className="flex items-center gap-2 rounded-lg border border-border p-2 text-xs"><input type="checkbox" className="h-4 w-4 accent-primary" checked={checked.includes(r)} onChange={e => setChecked(c => e.target.checked ? [...c, r] : c.filter(x => x !== r))} />{r}</label>)}</div></div>
+          <SectionHeader n={4} title="Funding" />
+          <div className="mt-3 space-y-3">
+            <div><FieldLabel>Amount requested (KES)</FieldLabel><input required name="amount" type="number" className={inputCls} /></div>
+            <div><FieldLabel>Purpose</FieldLabel>
+              <select required name="purpose" className={inputCls}>
+                <option value="">Select</option>
+                <option>Equipment</option><option>Inventory</option><option>Marketing</option><option>Expansion</option><option>Other</option>
+              </select>
+            </div>
+          </div>
 
-          <div><FieldLabel>Description</FieldLabel><textarea required rows={4} value={form.description} onChange={set("description")} className={inputCls} placeholder="Describe duties, working hours, expectations…" /></div>
+          <SectionHeader n={5} title="Terms" />
+          <label className="mt-3 flex items-start gap-2 rounded-xl border border-border p-3 text-xs">
+            <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" />
+            <span>I agree to return a percentage of my monthly profit to PESAKI until the full amount is repaid.</span>
+          </label>
 
-          <button type="submit" disabled={loading} className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50 flex items-center justify-center gap-2">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {loading ? "Publishing..." : "Publish job"}
+          <button
+            type="submit"
+            disabled={!agree || loading}
+            className="mt-5 h-11 w-full rounded-xl gradient-gold text-sm font-semibold text-gold-foreground disabled:opacity-50"
+          >
+            {loading ? "Submitting..." : "Submit Application"}
           </button>
         </form>
       )}
@@ -671,55 +684,58 @@ function PostJobSheet({ onClose, onSuccess, user, supabase }: any) {
   );
 }
 
-// ─── HireSheet (placeholder) ──────────────────────────────────────────────
-function HireSheet({ app, onClose, onOpenChat }: any) {
+// ─── InfoSheet (unchanged) ──────────────────────────────────────────────
+function InfoSheet({ which, onClose }: { which: "invest" | "guide"; onClose: () => void }) {
+  const title = which === "invest" ? "My Investments" : "Funding Guidelines";
   return (
-    <SheetShell title="Hire" onClose={onClose}>
-      <div>Hire {app.applicant_name}</div>
-      <button onClick={onOpenChat} className="border p-2 rounded">Chat</button>
+    <SheetShell title={title} onClose={onClose}>
+      {which === "invest" ? (
+        <div className="space-y-3 text-sm">
+          <p className="text-xs text-muted-foreground">Track businesses you've co-funded through PESAKI and your projected returns.</p>
+          <div className="rounded-2xl gradient-primary p-4 text-primary-foreground">
+            <p className="text-[11px] uppercase tracking-widest opacity-80">Total invested</p>
+            <p className="mt-1 text-2xl font-bold">KES 175,000</p>
+            <p className="mt-1 text-xs opacity-90">Avg. return · +14.2% p.a.</p>
+          </div>
+          <div className="space-y-2">
+            {/* This would come from Supabase investments table, keep placeholder for now */}
+            <div className="flex items-center justify-between rounded-xl border border-border p-3">
+              <div>
+                <p className="text-sm font-semibold">Wanjiku's Bakery</p>
+                <p className="text-[11px] text-muted-foreground">KES 75,000 invested</p>
+              </div>
+              <span className="text-xs font-bold text-success">+18%</span>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3 text-xs text-muted-foreground">
+          <div className="rounded-xl bg-primary/5 p-3 text-foreground">
+            <p className="text-sm font-bold">Who qualifies?</p>
+            <ul className="mt-1 list-disc space-y-1 pl-4">
+              <li>Kenyan resident, 18+ with verified ID and phone</li>
+              <li>Startup: viable idea + attendance of one free training</li>
+              <li>Existing: 12+ months of trading and documented revenue</li>
+            </ul>
+          </div>
+          <div className="rounded-xl border border-border p-3">
+            <p className="text-sm font-bold text-foreground">Funding range</p>
+            <p className="mt-1">Startup: KES 20,000 – 250,000 · Existing: KES 50,000 – 2,000,000.</p>
+          </div>
+          <div className="rounded-xl border border-border p-3">
+            <p className="text-sm font-bold text-foreground">Repayment</p>
+            <p className="mt-1">A negotiated share of monthly profit until the funded amount is fully repaid — no compounding interest.</p>
+          </div>
+          <div className="rounded-xl border border-border p-3">
+            <p className="text-sm font-bold text-foreground">Timeline</p>
+            <p className="mt-1">Startup: 7–10 business days including training. Existing: 3–5 business days after documents are verified.</p>
+          </div>
+          <div className="rounded-xl border border-border p-3">
+            <p className="text-sm font-bold text-foreground">Required documents</p>
+            <p className="mt-1">National ID, KRA PIN, business registration (if any), 6 months of bank/M-Pesa statements, and a short business plan.</p>
+          </div>
+        </div>
+      )}
     </SheetShell>
-  );
-}
-
-// ─── ChatSheet (placeholder) ──────────────────────────────────────────────
-function ChatSheet({ app, onClose }: any) {
-  return (
-    <SheetShell title="Chat" onClose={onClose}>
-      <div>Chat with {app.applicant_name}</div>
-    </SheetShell>
-  );
-}
-
-// ─── NotifSheet ────────────────────────────────────────────────────────────
-function NotifSheet({ onClose }: { onClose: () => void }) {
-  return (
-    <SheetShell title="Notifications" onClose={onClose}>
-      <div>No notifications</div>
-    </SheetShell>
-  );
-}
-
-// ─── Helpers ───────────────────────────────────────────────────────────────────
-function EmptyState({ label }: { label: string }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-6 text-center text-xs text-muted-foreground">
-      {label}
-    </div>
-  );
-}
-
-// ─── SuccessBlock (exported for business.tsx) ──────────────────────────
-export function SuccessBlock({ message, onClose }: { message: string; onClose: () => void }) {
-  return (
-    <div className="py-6 text-center">
-      <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-success/15 text-success">
-        <CheckCircle2 className="h-6 w-6" />
-      </div>
-      <p className="mt-3 text-base font-bold">Success</p>
-      <p className="mt-1 text-xs text-muted-foreground">{message}</p>
-      <button onClick={onClose} className="mt-4 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground">
-        Done
-      </button>
-    </div>
   );
 }
