@@ -12,6 +12,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { createClient } from "@supabase/supabase-js";
 
+// ✅ Confirm this version is loaded
+console.log("🔵 KAZI: Supabase direct version loaded");
+
 export const Route = createFileRoute("/kazi")({
   head: () => ({
     meta: [
