@@ -501,6 +501,29 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 }
 const inputCls = "mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring";
 
+// ─── FileField (exported for business.tsx) ──────────────────────────────
+export function FileField({
+  label,
+  accept,
+  onChange,
+}: {
+  label?: string;
+  accept?: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}) {
+  return (
+    <div>
+      {label && <FieldLabel>{label}</FieldLabel>}
+      <input
+        type="file"
+        accept={accept}
+        onChange={onChange}
+        className={inputCls}
+      />
+    </div>
+  );
+}
+
 // ─── ApplyJobSheet ──────────────────────────────────────────────────────────
 function ApplyJobSheet({ job, onClose, onSuccess, user, supabase }: any) {
   const [done, setDone] = useState(false);
@@ -685,7 +708,8 @@ function EmptyState({ label }: { label: string }) {
   );
 }
 
-function SuccessBlock({ message, onClose }: { message: string; onClose: () => void }) {
+// ─── SuccessBlock (exported for business.tsx) ──────────────────────────
+export function SuccessBlock({ message, onClose }: { message: string; onClose: () => void }) {
   return (
     <div className="py-6 text-center">
       <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-success/15 text-success">
