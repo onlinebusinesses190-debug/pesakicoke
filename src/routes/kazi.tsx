@@ -9,8 +9,8 @@ import { Card, Badge, SectionTitle } from "@/components/ui-bits";
 import { jobCategories, workers } from "@/lib/mock";
 import { useBalance } from "@/lib/balance";
 import { useAuth } from "@/hooks/useAuth";
-import { apiRequest } from "@/utils/api";
 import { toast } from "sonner";
+import { createClient } from "@supabase/supabase-js";
 
 export const Route = createFileRoute("/kazi")({
   head: () => ({
@@ -36,28 +36,30 @@ interface Job {
   description: string;
   badge: string;
   status: string;
-  createdAt: string;
-  employerId: string;
+  created_at: string;
+  employer_id: string;
 }
 
 interface Application {
   id: string;
-  jobId: string;
-  jobTitle: string;
-  jobPay: string;
-  jobPayAmount: number;
-  applicantName: string;
+  job_id: string;
+  jobs?: {
+    title: string;
+    pay_label: string;
+    pay_amount: number;
+    employer_id: string;
+    location: string;
+  };
+  applicant_name: string;
   phone: string;
   email: string;
   location: string;
   experience: string;
   availability: string;
   status: string;
-  appliedAt: string;
-  photoName: string | null;
-  workerId: string;
-  paidEscrow?: boolean;
-  serviceFeePaid?: boolean;
+  applied_at: string;
+  photo_url?: string;
+  worker_id: string;
 }
 
 function KaziPage() {
@@ -71,26 +73,58 @@ function KaziPage() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // ─── Data state (from backend) ──────────────────────────────────────────
+  const supabase = createClient(
+    import.meta.env.VITE_SUPABASE_URL,
+    import.meta.env.VITE_SUPABASE_ANON_KEY
+  );
+
+  // ─── Data state ────────────────────────────────────────────────────────────
   const [jobs, setJobs] = useState<Job[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
 
-  // ─── Fetch all data from backend ──────────────────────────────────────
+  // ─── Fetch all data directly from Supabase ──────────────────────────────
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [jobsRes, appsRes, notifsRes] = await Promise.all([
-        apiRequest("/kazi/jobs"),
-        apiRequest("/kazi/applications"),
-        apiRequest("/kazi/notifications"),
-      ]);
-      setJobs(jobsRes || []);
-      setApplications(appsRes || []);
-      setNotifications(notifsRes || []);
+
+      // 1. Jobs (open)
+      const { data: jobsData, error: jobsErr } = await supabase
+        .from('jobs')
+        .select('*')
+        .eq('status', 'open')
+        .order('created_at', { ascending: false });
+
+      if (jobsErr) throw jobsErr;
+      setJobs(jobsData || []);
+
+      // 2. Applications (if logged in)
+      if (user) {
+        const { data: appsData, error: appsErr } = await supabase
+          .from('applications')
+          .select('*, jobs:job_id ( title, pay_label, pay_amount, employer_id, location )')
+          .eq('worker_id', user.id)
+          .order('applied_at', { ascending: false });
+
+        if (appsErr) throw appsErr;
+        setApplications(appsData || []);
+      }
+
+      // 3. Notifications (if logged in)
+      if (user) {
+        const { data: notifsData, error: notifsErr } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (notifsErr) throw notifsErr;
+        setNotifications(notifsData || []);
+      }
+
     } catch (err) {
-      console.error("Failed to fetch KAZI data:", err);
-      toast.error("Could not load KAZI Link data");
+      console.error('Failed to fetch KAZI data:', err);
+      toast.error('Could not load KAZI Link data');
     } finally {
       setLoading(false);
     }
@@ -100,10 +134,10 @@ function KaziPage() {
     fetchData();
   }, []);
 
-  // ─── Filtered jobs (Find Work) ──────────────────────────────────────────
+  // ─── Filtered jobs ────────────────────────────────────────────────────────
   const visibleJobs = useMemo(() => {
     const term = q.trim().toLowerCase();
-    let list = jobs.filter((j) => j.status === "open");
+    let list = jobs;
     if (term) {
       list = list.filter(
         (j) =>
@@ -116,26 +150,24 @@ function KaziPage() {
     return list;
   }, [jobs, q]);
 
-  // ─── Applicants for "Hire" tab ─────────────────────────────────────────
+  // ─── Applicants for "Hire" tab ──────────────────────────────────────────
   const applicantsGrouped = useMemo(() => {
     const term = q.trim().toLowerCase();
-    const myJobIds = new Set(jobs.filter((j) => j.employerId === user?.id).map((j) => j.id));
-    let apps = applications.filter((a) => myJobIds.has(a.jobId));
-    apps = apps.filter((a) => a.workerId !== user?.id);
+    let apps = applications;
     if (term) {
       apps = apps.filter(
         (a) =>
-          a.applicantName.toLowerCase().includes(term) ||
+          a.applicant_name.toLowerCase().includes(term) ||
           a.location.toLowerCase().includes(term) ||
-          a.jobTitle.toLowerCase().includes(term),
+          (a.jobs?.title || '').toLowerCase().includes(term),
       );
     }
     return apps;
-  }, [applications, jobs, q, user]);
+  }, [applications, q]);
 
-  // ─── Worker's own applications for "My Panel" ─────────────────────────
+  // ─── Worker's own applications ──────────────────────────────────────────
   const myApplications = useMemo(() => {
-    return applications.filter((a) => a.workerId === user?.id);
+    return applications.filter((a) => a.worker_id === user?.id);
   }, [applications, user]);
 
   const unread = notifications.filter((n) => !n.read).length;
@@ -344,8 +376,8 @@ function KaziPage() {
         />
       )}
 
-      {applyJob && <ApplyJobSheet job={applyJob} onClose={() => setApplyJob(null)} onSuccess={fetchData} />}
-      {postJob && <PostJobSheet onClose={() => setPostJob(false)} onSuccess={fetchData} />}
+      {applyJob && <ApplyJobSheet job={applyJob} onClose={() => setApplyJob(null)} onSuccess={fetchData} user={user} supabase={supabase} />}
+      {postJob && <PostJobSheet onClose={() => setPostJob(false)} onSuccess={fetchData} user={user} supabase={supabase} />}
       {hireApp && <HireSheet app={hireApp} onClose={() => setHireApp(null)} onOpenChat={() => { setChatApp(hireApp); setHireApp(null); }} />}
       {chatApp && <ChatSheet app={chatApp} from="employer" onClose={() => setChatApp(null)} />}
       {notifOpen && <NotifSheet onClose={() => setNotifOpen(false)} />}
@@ -359,15 +391,15 @@ function ApplicantRow({ a, onHire, onChat }: { a: Application; onHire: () => voi
     <Card className="!p-3.5">
       <div className="flex items-start gap-3">
         <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full gradient-gold text-sm font-bold text-gold-foreground">
-          {a.applicantName.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()}
+          {a.applicant_name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
-            <p className="truncate text-sm font-semibold">{a.applicantName}</p>
+            <p className="truncate text-sm font-semibold">{a.applicant_name}</p>
             <Badge tone={a.status === "Hired" ? "success" : a.status === "Rejected" ? "destructive" : "primary"}>{a.status}</Badge>
           </div>
           <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-            <Briefcase className="h-3 w-3" /> Applied for {a.jobTitle}
+            <Briefcase className="h-3 w-3" /> Applied for {a.jobs?.title || 'Unknown'}
           </p>
           <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
             <MapPin className="h-3 w-3" /> {a.location} · {a.experience} yrs
@@ -407,10 +439,10 @@ function MyPanel({ apps, onChat }: { apps: Application[]; onChat: (a: Applicatio
           <Card key={a.id} className="!p-3.5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">{a.jobTitle}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{a.jobPay}</p>
+                <p className="truncate text-sm font-semibold">{a.jobs?.title || 'Unknown'}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{a.jobs?.pay_label || 'KES 0'}</p>
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  Applied {new Date(a.appliedAt).toLocaleDateString()}
+                  Applied {new Date(a.applied_at).toLocaleDateString()}
                 </p>
               </div>
               <Badge tone={a.status === "Hired" ? "success" : a.status === "Rejected" ? "destructive" : a.status === "Shortlisted" ? "gold" : "primary"}>
@@ -425,11 +457,10 @@ function MyPanel({ apps, onChat }: { apps: Application[]; onChat: (a: Applicatio
                 Chat with employer
               </button>
               <button
-                disabled={a.status !== "Hired" || a.serviceFeePaid}
-                onClick={() => {}}
+                disabled={a.status !== "Hired"}
                 className="rounded-full gradient-primary py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
               >
-                {a.serviceFeePaid ? "Paid ✓" : "Receive payout"}
+                Receive payout
               </button>
             </div>
           </Card>
@@ -439,7 +470,7 @@ function MyPanel({ apps, onChat }: { apps: Application[]; onChat: (a: Applicatio
   );
 }
 
-// ─── Sheets (Apply, Post, Hire, Chat, Notifications) ────────────────────
+// ─── Sheets ──────────────────────────────────────────────────────────────────
 function SheetShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-[60] grid place-items-end sm:place-items-center">
@@ -467,7 +498,8 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 }
 const inputCls = "mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring";
 
-function ApplyJobSheet({ job, onClose, onSuccess }: { job: Job; onClose: () => void; onSuccess: () => void }) {
+// ─── ApplyJobSheet ──────────────────────────────────────────────────────────
+function ApplyJobSheet({ job, onClose, onSuccess, user, supabase }: any) {
   const [done, setDone] = useState(false);
   const [form, setForm] = useState({
     applicantName: "", phone: "", email: "", location: "",
@@ -479,15 +511,27 @@ function ApplyJobSheet({ job, onClose, onSuccess }: { job: Job; onClose: () => v
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await apiRequest("/kazi/applications", {
-        method: "POST",
-        body: JSON.stringify({ jobId: job.id, ...form }),
-      });
-      toast.success("Application submitted!");
+      const { error } = await supabase
+        .from('applications')
+        .insert([{
+          job_id: job.id,
+          worker_id: user?.id,
+          applicant_name: form.applicantName,
+          phone: form.phone,
+          email: form.email,
+          location: form.location,
+          experience: form.experience,
+          availability: form.availability,
+          status: 'Pending',
+        }]);
+
+      if (error) throw error;
+      toast.success('Application submitted!');
       setDone(true);
       onSuccess();
     } catch (err) {
-      toast.error("Failed to apply");
+      toast.error('Failed to apply');
+      console.error(err);
     }
   }
 
@@ -507,8 +551,6 @@ function ApplyJobSheet({ job, onClose, onSuccess }: { job: Job; onClose: () => v
             <div><FieldLabel>Experience</FieldLabel><select required value={form.experience} onChange={set("experience")} className={inputCls}><option value="">Select</option><option>Less than 1</option><option>1-3</option><option>3-5</option><option>5+</option></select></div>
             <div><FieldLabel>Availability</FieldLabel><select required value={form.availability} onChange={set("availability")} className={inputCls}><option value="">Select</option><option>Immediate</option><option>1 week</option><option>2 weeks</option></select></div>
           </div>
-          <FileField label="Upload photo" required accept="image/*" />
-          <FileField label="CV (optional)" accept=".pdf,.doc,.docx" />
           <button type="submit" className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground">Submit</button>
         </form>
       )}
@@ -516,8 +558,8 @@ function ApplyJobSheet({ job, onClose, onSuccess }: { job: Job; onClose: () => v
   );
 }
 
-// ─── FIXED PostJobSheet ─────────────────────────────────────────────────────
-function PostJobSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+// ─── PostJobSheet ───────────────────────────────────────────────────────────
+function PostJobSheet({ onClose, onSuccess, user, supabase }: any) {
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
   const [accommodation, setAccommodation] = useState(false);
@@ -535,25 +577,32 @@ function PostJobSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
     e.preventDefault();
     setLoading(true);
     try {
-      await apiRequest("/kazi/jobs", {
-        method: "POST",
-        body: JSON.stringify({
+      const { error } = await supabase
+        .from('jobs')
+        .insert([{
+          employer_id: user?.id,
           title: form.title,
           category: form.category,
           location: form.location,
-          pay: form.pay,
-          payAmount: form.payAmount,
+          pay_label: form.pay,
+          pay_amount: form.payAmount,
           duration: form.duration,
-          accommodation,
+          accommodation: accommodation,
           requirements: checked,
           description: form.description,
-        }),
-      });
-      toast.success("Job posted successfully!");
+          status: 'open',
+          urgent: false,
+          hot: false,
+        }]);
+
+      if (error) throw error;
+      toast.success('Job posted successfully!');
       setDone(true);
       onSuccess();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to post job");
+    } catch (err) {
+      toast.error('Failed to post job');
+      console.error(err);
+    } finally {
       setLoading(false);
     }
   }
@@ -564,94 +613,29 @@ function PostJobSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
         <SuccessBlock message="Your job is now live and visible in Find Work." onClose={onClose} />
       ) : (
         <form className="space-y-3" onSubmit={submit}>
-          <div>
-            <FieldLabel>Job title</FieldLabel>
-            <input required value={form.title} onChange={set("title")} className={inputCls} placeholder="e.g. Live-in House Help" />
-          </div>
+          <div><FieldLabel>Job title</FieldLabel><input required value={form.title} onChange={set("title")} className={inputCls} placeholder="e.g. Live-in House Help" /></div>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <FieldLabel>Category</FieldLabel>
-              <select required value={form.category} onChange={set("category")} className={inputCls}>
-                <option value="">Select</option>
-                <option>House Help</option><option>Cleaner</option><option>Tutor</option>
-                <option>Gardener</option><option>Driver</option><option>Plumber</option>
-                <option>Electrician</option><option>Security Guard</option><option>Event Worker</option>
-                <option>Other</option>
-              </select>
-            </div>
-            <div>
-              <FieldLabel>Location</FieldLabel>
-              <input required value={form.location} onChange={set("location")} className={inputCls} placeholder="Karen, Nairobi" />
-            </div>
+            <div><FieldLabel>Category</FieldLabel><select required value={form.category} onChange={set("category")} className={inputCls}><option value="">Select</option><option>House Help</option><option>Cleaner</option><option>Tutor</option><option>Gardener</option><option>Driver</option><option>Plumber</option><option>Electrician</option><option>Security Guard</option><option>Event Worker</option><option>Other</option></select></div>
+            <div><FieldLabel>Location</FieldLabel><input required value={form.location} onChange={set("location")} className={inputCls} placeholder="Karen, Nairobi" /></div>
           </div>
 
-          <div>
-            <FieldLabel>Job duration</FieldLabel>
-            <select required value={form.duration} onChange={set("duration")} className={inputCls}>
-              <option value="">Select duration</option>
-              <option>1 day</option><option>3 days</option><option>1 week</option>
-              <option>2 weeks</option><option>3 weeks</option><option>1 month</option>
-              <option>3 months</option><option>6 months</option><option>Ongoing</option>
-            </select>
-          </div>
+          <div><FieldLabel>Duration</FieldLabel><select required value={form.duration} onChange={set("duration")} className={inputCls}><option value="">Select</option><option>1 day</option><option>3 days</option><option>1 week</option><option>2 weeks</option><option>3 weeks</option><option>1 month</option><option>3 months</option><option>6 months</option><option>Ongoing</option></select></div>
 
           <div className="flex items-center justify-between rounded-xl border border-border p-3">
-            <div>
-              <p className="text-sm font-semibold">Accommodation provided?</p>
-              <p className="text-[11px] text-muted-foreground">Toggle if the role includes housing.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setAccommodation(v => !v)}
-              className={`relative h-6 w-11 rounded-full transition-colors ${accommodation ? "bg-primary" : "bg-muted"}`}
-              aria-pressed={accommodation}
-            >
-              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${accommodation ? "left-[22px]" : "left-0.5"}`} />
-            </button>
+            <div><p className="text-sm font-semibold">Accommodation provided?</p><p className="text-[11px] text-muted-foreground">Toggle if the role includes housing.</p></div>
+            <button type="button" onClick={() => setAccommodation(v => !v)} className={`relative h-6 w-11 rounded-full transition-colors ${accommodation ? "bg-primary" : "bg-muted"}`}><span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${accommodation ? "left-[22px]" : "left-0.5"}`} /></button>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <FieldLabel>Pay label</FieldLabel>
-              <input required value={form.pay} onChange={set("pay")} className={inputCls} placeholder="e.g. KES 25,000/mo" />
-            </div>
-            <div>
-              <FieldLabel>Pay amount (KES)</FieldLabel>
-              <input required type="number" min={1} value={form.payAmount || ""} onChange={set("payAmount")} className={inputCls} placeholder="25000" />
-            </div>
+            <div><FieldLabel>Pay label</FieldLabel><input required value={form.pay} onChange={set("pay")} className={inputCls} placeholder="e.g. KES 25,000/mo" /></div>
+            <div><FieldLabel>Pay amount (KES)</FieldLabel><input required type="number" min={1} value={form.payAmount || ""} onChange={set("payAmount")} className={inputCls} placeholder="25000" /></div>
           </div>
 
-          <div>
-            <FieldLabel>Job requirements</FieldLabel>
-            <div className="mt-1 grid grid-cols-2 gap-2">
-              {requirements.map((r) => (
-                <label key={r} className="flex items-center gap-2 rounded-lg border border-border p-2 text-xs">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 accent-primary"
-                    checked={checked.includes(r)}
-                    onChange={(e) =>
-                      setChecked(c => e.target.checked ? [...c, r] : c.filter(x => x !== r))
-                    }
-                  />
-                  {r}
-                </label>
-              ))}
-            </div>
-          </div>
+          <div><FieldLabel>Requirements</FieldLabel><div className="mt-1 grid grid-cols-2 gap-2">{requirements.map(r => <label key={r} className="flex items-center gap-2 rounded-lg border border-border p-2 text-xs"><input type="checkbox" className="h-4 w-4 accent-primary" checked={checked.includes(r)} onChange={e => setChecked(c => e.target.checked ? [...c, r] : c.filter(x => x !== r))} />{r}</label>)}</div></div>
 
-          <div>
-            <FieldLabel>Job description</FieldLabel>
-            <textarea required rows={4} value={form.description} onChange={set("description")} className={inputCls} placeholder="Describe duties, working hours, expectations…" />
-          </div>
+          <div><FieldLabel>Description</FieldLabel><textarea required rows={4} value={form.description} onChange={set("description")} className={inputCls} placeholder="Describe duties, working hours, expectations…" /></div>
 
-          <FileField label="Add image (optional)" accept="image/*" />
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50 flex items-center justify-center gap-2"
-          >
+          <button type="submit" disabled={loading} className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50 flex items-center justify-center gap-2">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {loading ? "Publishing..." : "Publish job"}
           </button>
@@ -661,33 +645,26 @@ function PostJobSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
   );
 }
 
-function HireSheet({ app, onClose, onOpenChat }: { app: Application; onClose: () => void; onOpenChat: () => void }) {
-  const bal = useBalance();
-  const [done, setDone] = useState(false);
+// ─── HireSheet (placeholder) ──────────────────────────────────────────────
+function HireSheet({ app, onClose, onOpenChat }: any) {
   return (
-    <SheetShell title="Applicant profile" onClose={onClose}>
-      {done ? <SuccessBlock message={`${app.applicantName} hired!`} onClose={onClose} /> : (
-        <div>
-          <p>Hire {app.applicantName}</p>
-          <button onClick={onOpenChat} className="border p-2 rounded">Chat</button>
-          <button onClick={() => setDone(true)} className="mt-3 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground">Confirm Hire</button>
-        </div>
-      )}
+    <SheetShell title="Hire" onClose={onClose}>
+      <div>Hire {app.applicant_name}</div>
+      <button onClick={onOpenChat} className="border p-2 rounded">Chat</button>
     </SheetShell>
   );
 }
 
-function ChatSheet({ app, from, onClose }: { app: Application; from: string; onClose: () => void }) {
-  const [text, setText] = useState("");
+// ─── ChatSheet (placeholder) ──────────────────────────────────────────────
+function ChatSheet({ app, onClose }: any) {
   return (
-    <SheetShell title={`Chat · ${app.applicantName}`} onClose={onClose}>
-      <div>Chat with {app.applicantName}</div>
-      <input value={text} onChange={e => setText(e.target.value)} className="w-full border rounded p-2" />
-      <button onClick={() => {}} className="mt-2 bg-primary text-white px-4 py-2 rounded">Send</button>
+    <SheetShell title="Chat" onClose={onClose}>
+      <div>Chat with {app.applicant_name}</div>
     </SheetShell>
   );
 }
 
+// ─── NotifSheet ────────────────────────────────────────────────────────────
 function NotifSheet({ onClose }: { onClose: () => void }) {
   return (
     <SheetShell title="Notifications" onClose={onClose}>
@@ -705,28 +682,7 @@ function EmptyState({ label }: { label: string }) {
   );
 }
 
-// ─── Exports for business.tsx ──────────────────────────────────────────────
-export function FileField({ label, required, accept }: { label: string; required?: boolean; accept?: string }) {
-  const [name, setName] = useState("");
-  return (
-    <div>
-      <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</label>
-      <label className="mt-1 flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-border bg-background px-3 py-3 text-xs text-muted-foreground hover:border-primary/40">
-        <Upload className="h-4 w-4" />
-        <span className="truncate">{name || "Tap to upload"}</span>
-        <input
-          type="file"
-          required={required}
-          accept={accept}
-          onChange={(e) => setName(e.target.files?.[0]?.name ?? "")}
-          className="hidden"
-        />
-      </label>
-    </div>
-  );
-}
-
-export function SuccessBlock({ message, onClose }: { message: string; onClose: () => void }) {
+function SuccessBlock({ message, onClose }: { message: string; onClose: () => void }) {
   return (
     <div className="py-6 text-center">
       <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-success/15 text-success">
