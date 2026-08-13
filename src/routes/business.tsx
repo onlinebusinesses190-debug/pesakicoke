@@ -77,16 +77,20 @@ function BusinessPage() {
     import.meta.env.VITE_SUPABASE_ANON_KEY
   );
 
+  // ─── Fetch data ──────────────────────────────────────────────────────────
   const fetchData = async () => {
-    // ✅ Fix: if no user, stop loading and return
+    console.log("🔵 Business fetchData called, user:", user?.id || "no user");
+
+    // If no user, show empty state and stop loading
     if (!user) {
+      console.log("🟡 No user – setting loading false");
       setLoading(false);
       return;
     }
 
+    setLoading(true);
     try {
-      setLoading(true);
-
+      console.log("🟢 Fetching applications...");
       const { data: appsData, error: appsErr } = await supabase
         .from('business_applications')
         .select('*')
@@ -96,6 +100,7 @@ function BusinessPage() {
       if (appsErr) throw appsErr;
       setApplications(appsData || []);
 
+      console.log("🟢 Fetching investments...");
       const { data: invData, error: invErr } = await supabase
         .from('business_investments')
         .select('*')
@@ -105,6 +110,7 @@ function BusinessPage() {
       if (invErr) throw invErr;
       setInvestments(invData || []);
 
+      console.log("🟢 Fetching success stories...");
       const { data: storyData, error: storyErr } = await supabase
         .from('success_stories')
         .select('*')
@@ -113,6 +119,7 @@ function BusinessPage() {
       if (storyErr) throw storyErr;
       setStories(storyData || []);
 
+      // Compute stats
       const total = appsData?.reduce((sum, a) => sum + (a.amount_requested || 0), 0) || 0;
       const open = appsData?.filter(a => a.status === 'Pending').length || 0;
       const approved = appsData?.filter(a => a.status === 'Approved' || a.status === 'Disbursed').length || 0;
@@ -120,19 +127,26 @@ function BusinessPage() {
       setTotalFunding(total);
       setOpenApps(open);
       setApprovedApps(approved);
-      // other stats remain placeholders
+      // other stats remain placeholders for now
 
     } catch (err) {
-      console.error('Failed to fetch business data:', err);
+      console.error("🔴 Error fetching business data:", err);
       toast.error('Could not load Business Hub data');
     } finally {
+      console.log("🟣 Setting loading false");
       setLoading(false);
     }
   };
 
+  // ─── Effect ─────────────────────────────────────────────────────────────
   useEffect(() => {
-    fetchData();
-  }, [user]);
+    let mounted = true;
+    const load = async () => {
+      if (mounted) await fetchData();
+    };
+    load();
+    return () => { mounted = false; };
+  }, [user]); // re-run when user changes
 
   const onAction = (k: ActionKey) => {
     if (k === "apply") return setMode("picker");
@@ -142,6 +156,7 @@ function BusinessPage() {
     if (k === "guide") return setInfo("guide");
   };
 
+  // ─── Render ─────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <AppShell>
@@ -153,6 +168,7 @@ function BusinessPage() {
     );
   }
 
+  // ─── Main content ──────────────────────────────────────────────────────
   return (
     <AppShell>
       <PageHeader title="Business Hub" subtitle="Fund. Build. Scale." />
@@ -264,8 +280,7 @@ function BusinessPage() {
   );
 }
 
-// ─── Sheet Components (same as before, unchanged) ────────────────────
-
+// ─── Sheet Components (unchanged) ───────────────────────────────────────
 function SheetShell({ title, onBack, onClose, children }: { title: string; onBack?: () => void; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-end sm:place-items-center">
@@ -300,15 +315,7 @@ function SectionHeader({ n, title }: { n: number; title: string }) {
   );
 }
 
-function FundingSheet({
-  mode, setMode, onClose, user, onSuccess
-}: {
-  mode: "picker" | "startup" | "existing";
-  setMode: (m: "picker" | "startup" | "existing") => void;
-  onClose: () => void;
-  user: any;
-  onSuccess: () => void;
-}) {
+function FundingSheet({ mode, setMode, onClose, user, onSuccess }: any) {
   if (mode === "picker") {
     return (
       <SheetShell title="Apply for funding" onClose={onClose}>
@@ -342,10 +349,7 @@ function FundingSheet({
   return <ExistingForm onBack={() => setMode("picker")} onClose={onClose} user={user} onSuccess={onSuccess} />;
 }
 
-// ─── StartupForm and ExistingForm are unchanged (they already work) ──
-// I'll include them but they remain as in your previous version.
-// (To save space, I'll keep them minimal; they are the same as earlier.)
-
+// ─── StartupForm (unchanged, still works) ──────────────────────────────
 function StartupForm({ onBack, onClose, user, onSuccess }: any) {
   const [done, setDone] = useState(false);
   const [agree, setAgree] = useState(false);
@@ -450,6 +454,7 @@ function StartupForm({ onBack, onClose, user, onSuccess }: any) {
   );
 }
 
+// ─── ExistingForm (unchanged) ────────────────────────────────────────────
 function ExistingForm({ onBack, onClose, user, onSuccess }: any) {
   const [submitted, setSubmitted] = useState(false);
   const [agree, setAgree] = useState(false);
