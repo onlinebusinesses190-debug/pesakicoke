@@ -2,17 +2,19 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
-// ─── Environment Secrets (set in Supabase Dashboard) ──────────────
+// ─── Secrets (names without "SUPABASE_" prefix) ────────────────
 const CONSUMER_KEY = Deno.env.get("DARAJA_CONSUMER_KEY")!;
 const CONSUMER_SECRET = Deno.env.get("DARAJA_CONSUMER_SECRET")!;
 const PASSKEY = Deno.env.get("DARAJA_PASSKEY")!;
 const SHORTCODE = Deno.env.get("DARAJA_SHORTCODE")!;
-const CALLBACK_URL = Deno.env.get("DARAJA_CALLBACK_URL")!; // e.g., https://pesaki-server.onrender.com/api/mpesa/callback
+const CALLBACK_URL = Deno.env.get("DARAJA_CALLBACK_URL")!;
 const ENV = Deno.env.get("DARAJA_ENV") || "sandbox";
 
-// ─── Supabase Admin Client (for DB updates) ──────────────────────
+// ✅ Use automatically provided SUPABASE_URL
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+// ✅ Custom secret name – not starting with "SUPABASE_"
+const supabaseServiceKey = Deno.env.get("SERVICE_ROLE_KEY")!;
+
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // ─── Daraja API endpoints ────────────────────────────────────────
@@ -37,40 +39,33 @@ async function getAccessToken(): Promise<string> {
 
 // ─── Main handler ────────────────────────────────────────────────
 serve(async (req) => {
-  // Only allow POST
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
   }
 
-  // Check authorization (user must be authenticated)
   const authHeader = req.headers.get("Authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
   }
   const token = authHeader.split(" ")[1];
 
-  // Validate the user's token with Supabase
   const { data: { user }, error: userError } = await supabase.auth.getUser(token);
   if (userError || !user) {
     return new Response(JSON.stringify({ error: "Invalid token" }), { status: 401 });
   }
 
-  // Parse request body
   const { amount, phone, userId } = await req.json();
   if (!amount || !phone || !userId) {
     return new Response(JSON.stringify({ error: "Missing required fields" }), { status: 400 });
   }
 
-  // Ensure userId matches the authenticated user
   if (user.id !== userId) {
     return new Response(JSON.stringify({ error: "User mismatch" }), { status: 403 });
   }
 
   try {
-    // 1. Get access token
     const accessToken = await getAccessToken();
 
-    // 2. Prepare STK request
     const timestamp = new Date().toISOString().replace(/[^0-9]/g, "").slice(0, 14);
     const password = btoa(`${SHORTCODE}${PASSKEY}${timestamp}`);
 
@@ -103,7 +98,6 @@ serve(async (req) => {
       throw new Error(stkData.ResponseDescription || "STK push failed");
     }
 
-    // 3. Record deposit in mpesa_deposits table
     const { error: insertErr } = await supabase
       .from("mpesa_deposits")
       .insert({
@@ -117,7 +111,6 @@ serve(async (req) => {
 
     if (insertErr) throw insertErr;
 
-    // 4. Return success
     return new Response(JSON.stringify({
       success: true,
       checkout_request_id: stkData.CheckoutRequestID,
