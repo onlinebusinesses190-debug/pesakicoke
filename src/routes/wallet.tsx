@@ -5,7 +5,7 @@ import { Card, Badge, SectionTitle } from "@/components/ui-bits";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@supabase/supabase-js";
 import { toast } from "sonner";
-import { ArrowLeft, Wallet, History, TrendingUp, Lock, ArrowDown } from "lucide-react";
+import { ArrowLeft, TrendingUp, X } from "lucide-react";
 import { fmt } from "@/lib/mock";
 
 export const Route = createFileRoute("/wallet")({
@@ -19,9 +19,9 @@ interface Wallet {
 
 interface Transaction {
   id: string;
-  type: string;   // deposit, withdrawal, game_win, game_loss, referral, payment
+  type: string;
   amount: number;
-  mode: string;   // credit, debit
+  mode: string;
   description: string;
   created_at: string;
 }
@@ -40,7 +40,12 @@ function WalletPage() {
 
   // ─── Fetch wallet data ──────────────────────────────────────────────
   const fetchWallet = async () => {
-    if (!user) return;
+    // ✅ Fix: if no user, stop loading and return
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -201,8 +206,7 @@ function DepositSheet({ onClose, user, supabase, onSuccess }: any) {
       if (data?.checkout_request_id) {
         toast.success('STK Push sent. Check your phone for the prompt.');
         setStep('success');
-        onSuccess(); // refresh wallet after deposit
-        // Close after a delay
+        onSuccess();
         setTimeout(() => onClose(), 5000);
       } else {
         throw new Error(data?.message || 'Failed to initiate payment');
@@ -236,7 +240,8 @@ function DepositSheet({ onClose, user, supabase, onSuccess }: any) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-end sm:place-items-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md rounded-t-3xl bg-card p-5 shadow-2xl sm:rounded-3xl">
+      {/* ✅ Added max-h and overflow-y-auto for scrolling */}
+      <div className="relative z-10 w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-3xl bg-card p-5 shadow-2xl sm:rounded-3xl">
         <div className="flex items-center justify-between border-b border-border pb-3">
           <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground">
             <ArrowLeft className="h-4 w-4" />
@@ -284,9 +289,4 @@ function DepositSheet({ onClose, user, supabase, onSuccess }: any) {
       </div>
     </div>
   );
-}
-
-// ─── Helper: X icon (since we didn't import it) ──────────────────────
-function X({ className }: { className?: string }) {
-  return <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
 }
