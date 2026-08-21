@@ -19,7 +19,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background">
-      <main className="flex-1 pb-24">{children}</main>
+      {/* ✅ Main content – now scrollable */}
+      <main className="flex-1 overflow-y-auto pb-24">{children}</main>
 
       <nav
         className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-md border-t border-border bg-card/90 px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl"
