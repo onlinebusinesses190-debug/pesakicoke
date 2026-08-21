@@ -61,7 +61,7 @@ function BusinessPage() {
   const [mode, setMode] = useState<"none" | "picker" | "startup" | "existing">("none");
   const [info, setInfo] = useState<null | "invest" | "guide">(null);
   const [loading, setLoading] = useState(true);
-  const fetchCount = useRef(0);
+  const hasFetched = useRef(false); // ✅ prevent infinite loops
 
   const [applications, setApplications] = useState<BusinessApplication[]>([]);
   const [investments, setInvestments] = useState<BusinessInvestment[]>([]);
@@ -74,21 +74,27 @@ function BusinessPage() {
   const [repaymentStatus, setRepaymentStatus] = useState("On time");
 
   const supabase = createClient(
-    import.meta.env.VITE_SUPABASE_URL,
-    import.meta.env.VITE_SUPABASE_ANON_KEY
+    import.meta.env.VITE_SUPABASE_URL!,
+    import.meta.env.VITE_SUPABASE_ANON_KEY!
   );
 
   const fetchData = async () => {
-    fetchCount.current += 1;
-    console.log(`🔵 fetchData (attempt ${fetchCount.current}), user:`, user?.id || "no user");
-
+    // ✅ If no user, stop loading and return
     if (!user) {
       console.log("🟡 No user – setting loading false");
       setLoading(false);
       return;
     }
 
+    // ✅ Prevent multiple simultaneous fetches
+    if (hasFetched.current) {
+      console.log("⏭️ Already fetched – skipping");
+      return;
+    }
+
+    hasFetched.current = true;
     setLoading(true);
+
     try {
       console.log("🟢 Fetching applications...");
       const { data: appsData, error: appsErr } = await supabase
@@ -128,7 +134,7 @@ function BusinessPage() {
       setApprovedApps(approved);
 
     } catch (err) {
-      console.error("🔴 Error:", err);
+      console.error("🔴 Error fetching business data:", err);
       toast.error('Could not load Business Hub data');
     } finally {
       console.log("🟣 Setting loading false");
@@ -136,28 +142,17 @@ function BusinessPage() {
     }
   };
 
+  // ─── Effect with proper dependencies ──────────────────────────────
   useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      if (mounted) await fetchData();
-    };
-    load();
-
-    // Safety: force loading false after 3s
-    const timeout = setTimeout(() => {
-      if (mounted && loading) {
-        console.warn("⚠️ Safety timeout – forcing loading false");
-        setLoading(false);
-      }
-    }, 3000);
-
-    return () => {
-      mounted = false;
-      clearTimeout(timeout);
-    };
-  }, [user]);
-
-  console.log(`📊 Rendering, loading = ${loading}`);
+    // ✅ Only fetch if user exists and we haven't fetched yet
+    if (user && !hasFetched.current) {
+      fetchData();
+    }
+    // ✅ If no user, make sure loading is false
+    if (!user) {
+      setLoading(false);
+    }
+  }, [user?.id]); // ✅ Use user.id, not the whole user object
 
   const onAction = (k: ActionKey) => {
     if (k === "apply") return setMode("picker");
@@ -283,7 +278,10 @@ function BusinessPage() {
           setMode={setMode}
           onClose={() => setMode("none")}
           user={user}
-          onSuccess={fetchData}
+          onSuccess={() => {
+            hasFetched.current = false; // allow refetch on success
+            fetchData();
+          }}
         />
       )}
       {info && <InfoSheet which={info} onClose={() => setInfo(null)} />}
@@ -367,7 +365,10 @@ function StartupForm({ onBack, onClose, user, onSuccess }: any) {
   const [slot, setSlot] = useState<"morning" | "afternoon">("morning");
   const [date, setDate] = useState("");
   const [loading, setLoading] = useState(false);
-  const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
+  const supabase = createClient(
+    import.meta.env.VITE_SUPABASE_URL!,
+    import.meta.env.VITE_SUPABASE_ANON_KEY!
+  );
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -399,7 +400,7 @@ function StartupForm({ onBack, onClose, user, onSuccess }: any) {
       if (error) throw error;
       toast.success('Application submitted!');
       setDone(true);
-      onSuccess();
+      if (onSuccess) onSuccess();
     } catch (err) {
       toast.error('Failed to submit');
       console.error(err);
@@ -469,7 +470,10 @@ function ExistingForm({ onBack, onClose, user, onSuccess }: any) {
   const [submitted, setSubmitted] = useState(false);
   const [agree, setAgree] = useState(false);
   const [loading, setLoading] = useState(false);
-  const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
+  const supabase = createClient(
+    import.meta.env.VITE_SUPABASE_URL!,
+    import.meta.env.VITE_SUPABASE_ANON_KEY!
+  );
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -498,7 +502,7 @@ function ExistingForm({ onBack, onClose, user, onSuccess }: any) {
       if (error) throw error;
       toast.success('Application submitted!');
       setSubmitted(true);
-      onSuccess();
+      if (onSuccess) onSuccess();
     } catch (err) {
       toast.error('Failed to submit');
       console.error(err);
