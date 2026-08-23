@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import {
   Target, PiggyBank, Plus, ArrowDownToLine, ArrowUpFromLine,
   TrendingUp, HandCoins, Lock, Info, CheckCircle2, ShieldCheck, Calendar, X, ArrowLeft,
@@ -8,12 +8,13 @@ import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Stat, SectionTitle, Progress, Badge } from "@/components/ui-bits";
 import { toast } from "sonner";
 import { createClient } from "@supabase/supabase-js";
+import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/banking")({
   head: () => ({
     meta: [
       { title: "Banking Hub — PESAKI" },
-      { name: "description", content: "Deposit, withdraw, lock funds, invest and borrow — your PESAKI bank in one place." },
+      { name: "description", content: "Deposit, withdraw, invest and borrow – your PESAKI bank in one place." },
     ],
   }),
   component: BankingPage,
@@ -28,26 +29,21 @@ const actions: { key: ActionKey; label: string; icon: any; tone: string }[] = [
   { key: "loan",     label: "Loan",     icon: HandCoins,       tone: "bg-muted text-foreground" },
 ];
 
-const durations = [
-  { months: 3,  apy: 4,  label: "3 months",  hint: "Flexible" },
-  { months: 6,  apy: 6,  label: "6 months",  hint: "Balanced" },
-  { months: 12, apy: 8,  label: "12 months", hint: "Popular", featured: true },
-  { months: 24, apy: 10, label: "24 months", hint: "Best rate" },
-];
-
 // Helper: format currency
 const fmt = (amount: number) => {
   return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', minimumFractionDigits: 0 }).format(amount);
 };
 
 function BankingPage() {
+  const { user } = useAuth();
   const [modal, setModal] = useState<ActionKey | null>(null);
   const [loading, setLoading] = useState(true);
+  const hasFetched = useRef(false);
 
   // ─── Supabase client ──────────────────────────────────────────────────────
   const supabase = createClient(
-    import.meta.env.VITE_SUPABASE_URL,
-    import.meta.env.VITE_SUPABASE_ANON_KEY
+    import.meta.env.VITE_SUPABASE_URL!,
+    import.meta.env.VITE_SUPABASE_ANON_KEY!
   );
 
   // ─── Data state ──────────────────────────────────────────────────────────
@@ -59,32 +55,57 @@ function BankingPage() {
     availableBalance: 0,
     avgApy: 0,
   });
-  const [lockedDeposits, setLockedDeposits] = useState<any[]>([]);
+  const [deposits, setDeposits] = useState<any[]>([]);
   const [savingsGoals, setSavingsGoals] = useState<any[]>([]);
 
   // ─── Fetch banking data directly from Supabase ──────────────────────────
   const fetchBankingData = async () => {
-    try {
-      setLoading(true);
+    // ✅ If no user, stop loading and return
+    if (!user) {
+      console.log("🟡 Banking: No user – setting loading false");
+      setLoading(false);
+      return;
+    }
 
-      // 1. Fetch summary (from user's wallet and locked deposits)
+    // ✅ Prevent multiple simultaneous fetches
+    if (hasFetched.current) {
+      console.log("⏭️ Banking: Already fetched – skipping");
+      return;
+    }
+
+    hasFetched.current = true;
+    setLoading(true);
+
+    try {
+      // 1. Fetch wallet balance (and locked if exists)
       const { data: walletData, error: walletErr } = await supabase
         .from('wallets')
         .select('balance, locked')
+        .eq('user_id', user.id)
         .single();
 
-      if (walletErr) throw walletErr;
+      if (walletErr) {
+        // If 'locked' column missing, fallback to balance only
+        const { data: balanceOnly, error: balanceErr } = await supabase
+          .from('wallets')
+          .select('balance')
+          .eq('user_id', user.id)
+          .single();
+        if (balanceErr) throw balanceErr;
+        walletData = { balance: balanceOnly.balance, locked: 0 };
+      }
 
-      // 2. Fetch locked deposits
-      const { data: lockedData, error: lockedErr } = await supabase
-        .from('locked_deposits')
+      // 2. Fetch completed deposits from mpesa_deposits
+      const { data: depositData, error: depositErr } = await supabase
+        .from('mpesa_deposits')
         .select('*')
-        .eq('status', 'active')
+        .eq('user_id', user.id)
+        .eq('status', 'completed')
         .order('created_at', { ascending: false });
 
-      if (lockedErr) throw lockedErr;
+      if (depositErr) throw depositErr;
 
-      // 3. Fetch savings goals
+      // 3. Fetch savings goals (if any)
       const { data: goalsData, error: goalsErr } = await supabase
         .from('savings_goals')
         .select('*')
@@ -93,35 +114,45 @@ function BankingPage() {
       if (goalsErr) throw goalsErr;
 
       // ── Calculate summary ──────────────────────────────────────────────
-      const totalLocked = lockedData?.reduce((sum: number, d: any) => sum + d.amount, 0) || 0;
+      const totalLocked = walletData?.locked || 0;
       const totalSavings = (walletData?.balance || 0) + totalLocked;
-      const avgApy = lockedData?.length > 0
-        ? lockedData.reduce((sum: number, d: any) => sum + d.apy, 0) / lockedData.length
-        : 0;
+      const avgApy = 0; // no locked deposits now
 
       setSummary({
         totalSavings: totalSavings,
-        interestEarned: 0, // You can calculate from interest_history table later
-        projectedAnnual: Math.round(totalLocked * 0.08), // 8% projected
+        interestEarned: 0,
+        projectedAnnual: 0,
         lockedTotal: totalLocked,
         availableBalance: walletData?.balance || 0,
-        avgApy: Math.round(avgApy),
+        avgApy: avgApy,
       });
 
-      setLockedDeposits(lockedData || []);
+      setDeposits(depositData || []);
       setSavingsGoals(goalsData || []);
 
     } catch (err) {
-      console.error('Failed to load banking data:', err);
+      console.error('🔴 Failed to load banking data:', err);
       toast.error('Could not load banking data');
     } finally {
+      console.log("🟣 Banking: Setting loading false");
       setLoading(false);
     }
   };
 
+  // ─── Effect ──────────────────────────────────────────────────────────────
   useEffect(() => {
+    if (user && !hasFetched.current) {
+      fetchBankingData();
+    }
+    if (!user) {
+      setLoading(false);
+    }
+  }, [user?.id]);
+
+  const refreshBanking = () => {
+    hasFetched.current = false;
     fetchBankingData();
-  }, []);
+  };
 
   const { totalSavings, interestEarned, projectedAnnual, lockedTotal, availableBalance, avgApy } = summary;
 
@@ -185,42 +216,29 @@ function BankingPage() {
         <Stat label="Avg. APY" value={`${avgApy}%`} tone="gold" />
       </section>
 
-      {/* Lock funds */}
+      {/* Deposit History (replaces lock funds) */}
       <section className="mt-6 px-5">
-        <SectionTitle title="Lock funds & earn" action={<Badge tone="gold">Up to 10% APY</Badge>} />
-        <LockFundsCard onSuccess={fetchBankingData} />
-      </section>
-
-      {/* Active locked deposits */}
-      <section className="mt-6 px-5">
-        <SectionTitle title="Active locked deposits" />
+        <SectionTitle title="Deposit History" />
         <div className="space-y-2.5">
-          {lockedDeposits.length === 0 && (
-            <Card className="!p-4 text-center text-xs text-muted-foreground">No locked deposits yet.</Card>
+          {deposits.length === 0 && (
+            <Card className="!p-4 text-center text-xs text-muted-foreground">No deposits yet.</Card>
           )}
-          {lockedDeposits.map((d) => {
-            const pct = Math.round((d.days / d.total) * 100);
-            const daysLeft = d.total - d.days;
-            const projected = Math.round(d.amount * (d.apy / 100) * (d.total / 365));
-            return (
-              <Card key={d.id} className="!p-4">
-                <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
-                  <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary">
-                    <Lock className="h-4 w-4" />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold">{d.name}</p>
-                    <p className="text-[11px] text-muted-foreground">{fmt(d.amount)} · earns {fmt(projected)}</p>
-                  </div>
-                  <Badge tone="gold">{d.apy}% APY</Badge>
+          {deposits.map((d) => (
+            <Card key={d.id} className="!p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold">Deposit</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {new Date(d.created_at).toLocaleDateString()} · {d.phone}
+                  </p>
                 </div>
-                <div className="mt-3 flex items-center gap-3">
-                  <div className="flex-1"><Progress value={pct} /></div>
-                  <span className="text-[11px] font-semibold text-muted-foreground whitespace-nowrap">{daysLeft}d left</span>
+                <div className="text-right">
+                  <p className="text-sm font-bold text-success">+{fmt(d.amount)}</p>
+                  <Badge tone={d.status === 'completed' ? 'success' : 'warning'}>{d.status}</Badge>
                 </div>
-              </Card>
-            );
-          })}
+              </div>
+            </Card>
+          ))}
         </div>
       </section>
 
@@ -286,228 +304,14 @@ function BankingPage() {
         Funds insured · Secured by PESAKI
       </p>
 
-      {modal && <ActionSheet action={modal} onClose={() => setModal(null)} onSuccess={fetchBankingData} />}
+      {modal && <ActionSheet action={modal} onClose={() => setModal(null)} onSuccess={refreshBanking} />}
     </AppShell>
   );
 }
 
-// ─── LockFundsCard ──────────────────────────────────────────────────────────
-function LockFundsCard({ onSuccess }: { onSuccess: () => void }) {
-  const [amount, setAmount] = useState<number>(50000);
-  const [months, setMonths] = useState<number>(12);
-  const [confirming, setConfirming] = useState(false);
-  const [done, setDone] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-
-  const supabase = createClient(
-    import.meta.env.VITE_SUPABASE_URL,
-    import.meta.env.VITE_SUPABASE_ANON_KEY
-  );
-
-  const selected = durations.find((d) => d.months === months)!;
-  const interest = useMemo(
-    () => Math.round(amount * (selected.apy / 100) * (months / 12)),
-    [amount, months, selected.apy],
-  );
-  const total = amount + interest;
-
-  const presets = [10000, 25000, 50000, 100000];
-
-  const handleLock = async () => {
-    setSubmitting(true);
-    try {
-      const { error } = await supabase
-        .from('locked_deposits')
-        .insert([{
-          amount: amount,
-          months: months,
-          apy: selected.apy,
-          name: `${months} Month Lock`,
-          total: months,
-          days: 0,
-          status: 'active',
-        }]);
-
-      if (error) throw error;
-      toast.success(`Locked ${fmt(amount)} for ${months} months`);
-      setConfirming(false);
-      setDone(true);
-      onSuccess();
-    } catch (err) {
-      toast.error('Failed to lock funds');
-      console.error(err);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  if (done) {
-    return (
-      <Card className="!p-5 text-center">
-        <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-success/15 text-success">
-          <CheckCircle2 className="h-6 w-6" />
-        </div>
-        <p className="mt-3 text-base font-bold">Funds locked</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {fmt(amount)} locked for {months} months at {selected.apy}% APY.
-        </p>
-        <button
-          onClick={() => setDone(false)}
-          className="mt-4 rounded-full border border-border px-4 py-2 text-xs font-semibold hover:bg-muted"
-        >
-          Lock another
-        </button>
-      </Card>
-    );
-  }
-
-  return (
-    <>
-      <Card className="!p-4">
-        <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Amount to lock</label>
-        <div className="mt-1 flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2.5">
-          <span className="text-sm font-semibold text-muted-foreground">KES</span>
-          <input
-            type="number"
-            min={1000}
-            step={1000}
-            value={amount}
-            onChange={(e) => setAmount(Number(e.target.value) || 0)}
-            className="w-full bg-transparent text-lg font-bold outline-none"
-          />
-        </div>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {presets.map((p) => (
-            <button
-              key={p}
-              onClick={() => setAmount(p)}
-              className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                amount === p ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground"
-              }`}
-            >
-              {fmt(p).replace("KES ", "KES ")}
-            </button>
-          ))}
-        </div>
-
-        <p className="mt-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Choose duration</p>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          {durations.map((d) => {
-            const active = d.months === months;
-            return (
-              <button
-                key={d.months}
-                onClick={() => setMonths(d.months)}
-                className={`relative rounded-xl border p-3 text-left transition-all ${
-                  active ? "border-primary bg-primary/5 shadow-sm" : "border-border hover:border-primary/40"
-                }`}
-              >
-                {d.featured && (
-                  <span className="absolute -top-2 right-2 rounded-full bg-gold px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-gold-foreground">
-                    Popular
-                  </span>
-                )}
-                <div className="flex items-center gap-1.5 text-xs font-semibold">
-                  <Calendar className="h-3 w-3" /> {d.label}
-                </div>
-                <div className="mt-1 text-lg font-bold text-primary">{d.apy}%</div>
-                <div className="text-[10px] text-muted-foreground">{d.hint}</div>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="mt-4 rounded-xl bg-muted/60 p-3">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Interest ({selected.apy}% APY)</span>
-            <span className="font-bold text-success">+ {fmt(interest)}</span>
-          </div>
-          <div className="mt-1.5 flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">At maturity</span>
-            <span className="font-bold text-primary">{fmt(total)}</span>
-          </div>
-          <div className="mt-2 flex items-start gap-1.5 text-[10px] text-muted-foreground">
-            <Info className="mt-0.5 h-3 w-3 shrink-0" />
-            <span>Early withdrawal available with reduced interest.</span>
-          </div>
-        </div>
-
-        <button
-          onClick={() => setConfirming(true)}
-          disabled={amount < 1000}
-          className="mt-4 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground shadow hover:opacity-95 disabled:opacity-50"
-        >
-          <span className="inline-flex items-center gap-2">
-            <Lock className="h-4 w-4" /> Lock Now
-          </span>
-        </button>
-      </Card>
-
-      {confirming && (
-        <div className="fixed inset-0 z-50 grid place-items-end sm:place-items-center">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setConfirming(false)} />
-          <div className="relative z-10 w-full max-w-md rounded-t-3xl bg-card p-5 shadow-2xl sm:rounded-3xl">
-            <div className="mb-4 flex items-center justify-between">
-              <button onClick={() => setConfirming(false)} className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground">
-                <ArrowLeft className="h-4 w-4" />
-              </button>
-              <h3 className="text-base font-bold">Confirm lock</h3>
-              <button onClick={() => setConfirming(false)} className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-primary/10 text-primary">
-              <Lock className="h-6 w-6" />
-            </div>
-            <p className="mt-3 text-center text-xs text-muted-foreground">Review the details below before locking your funds.</p>
-
-            <div className="mt-4 divide-y divide-border rounded-xl border border-border">
-              <div className="flex items-center justify-between px-4 py-3">
-                <span className="text-xs text-muted-foreground">Amount</span>
-                <span className="text-sm font-bold">{fmt(amount)}</span>
-              </div>
-              <div className="flex items-center justify-between px-4 py-3">
-                <span className="text-xs text-muted-foreground">Duration</span>
-                <span className="text-sm font-bold">{months} months</span>
-              </div>
-              <div className="flex items-center justify-between px-4 py-3">
-                <span className="text-xs text-muted-foreground">APY</span>
-                <span className="text-sm font-bold text-primary">{selected.apy}%</span>
-              </div>
-              <div className="flex items-center justify-between px-4 py-3">
-                <span className="text-xs text-muted-foreground">Interest earned</span>
-                <span className="text-sm font-bold text-success">+ {fmt(interest)}</span>
-              </div>
-              <div className="flex items-center justify-between px-4 py-3">
-                <span className="text-xs text-muted-foreground">Total at maturity</span>
-                <span className="text-sm font-bold text-primary">{fmt(total)}</span>
-              </div>
-            </div>
-
-            <button
-              onClick={handleLock}
-              disabled={submitting}
-              className="mt-5 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50"
-            >
-              {submitting ? 'Locking...' : 'Confirm Lock'}
-            </button>
-
-            <button
-              onClick={() => setConfirming(false)}
-              className="mt-2 h-11 w-full rounded-xl border border-border text-sm font-semibold"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
-
-// ─── ActionSheet ──────────────────────────────────────────────────────────────
+// ─── ActionSheet (unchanged, but uses Supabase tables) ──────────────────
 function ActionSheet({ action, onClose, onSuccess }: { action: ActionKey; onClose: () => void; onSuccess: () => void }) {
+  const { user } = useAuth();
   const config = {
     deposit:  { title: "Deposit funds",  cta: "Deposit",  hint: "Top up via M-Pesa, bank or card." },
     withdraw: { title: "Withdraw funds", cta: "Withdraw", hint: "Instant to M-Pesa or bank." },
@@ -516,8 +320,8 @@ function ActionSheet({ action, onClose, onSuccess }: { action: ActionKey; onClos
   }[action];
 
   const supabase = createClient(
-    import.meta.env.VITE_SUPABASE_URL,
-    import.meta.env.VITE_SUPABASE_ANON_KEY
+    import.meta.env.VITE_SUPABASE_URL!,
+    import.meta.env.VITE_SUPABASE_ANON_KEY!
   );
 
   const [amount, setAmount] = useState<number>(action === "loan" ? 20000 : 5000);
@@ -526,9 +330,11 @@ function ActionSheet({ action, onClose, onSuccess }: { action: ActionKey; onClos
   const [submitting, setSubmitting] = useState(false);
 
   const handleAction = async () => {
+    if (!user) return toast.error('Please log in');
     if (amount < 100) return toast.error('Minimum amount is KES 100');
     setSubmitting(true);
     try {
+      // Map action to table – adjust as needed
       const tableMap = {
         deposit: 'transactions',
         withdraw: 'transactions',
@@ -537,8 +343,8 @@ function ActionSheet({ action, onClose, onSuccess }: { action: ActionKey; onClos
       };
 
       const payload = action === 'loan'
-        ? { amount, months, status: 'pending' }
-        : { amount, type: action, status: 'pending' };
+        ? { user_id: user.id, amount, months, status: 'pending' }
+        : { user_id: user.id, amount, type: action, status: 'pending' };
 
       const { error } = await supabase
         .from(tableMap[action])
@@ -548,7 +354,7 @@ function ActionSheet({ action, onClose, onSuccess }: { action: ActionKey; onClos
       toast.success(`${config.cta} of ${fmt(amount)} submitted successfully`);
       setDone(true);
       onSuccess();
-    } catch (err) {
+    } catch (err: any) {
       toast.error(err.message || `${config.cta} failed`);
       console.error(err);
     } finally {
