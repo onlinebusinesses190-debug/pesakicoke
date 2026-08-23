@@ -32,33 +32,23 @@ function WalletPage() {
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [showDeposit, setShowDeposit] = useState(false);
-  const hasFetched = useRef(false); // ✅ prevent infinite loop
+  const hasFetched = useRef(false);
 
   const supabase = createClient(
     import.meta.env.VITE_SUPABASE_URL!,
     import.meta.env.VITE_SUPABASE_ANON_KEY!
   );
 
-  // ─── Fetch wallet data ──────────────────────────────────────────────
   const fetchWallet = async () => {
-    // ✅ If no user, stop loading and return
     if (!user) {
-      console.log("🟡 Wallet: No user – setting loading false");
       setLoading(false);
       return;
     }
-
-    // ✅ Prevent multiple simultaneous fetches
-    if (hasFetched.current) {
-      console.log("⏭️ Wallet: Already fetched – skipping");
-      return;
-    }
-
+    if (hasFetched.current) return;
     hasFetched.current = true;
     setLoading(true);
 
     try {
-      console.log("🟢 Wallet: Fetching balance...");
       const { data: walletData, error: walletErr } = await supabase
         .from('wallets')
         .select('balance, demo_balance')
@@ -68,7 +58,6 @@ function WalletPage() {
       if (walletErr) throw walletErr;
       setWallet(walletData);
 
-      console.log("🟢 Wallet: Fetching transactions...");
       const { data: txData, error: txErr } = await supabase
         .from('wallet_ledger')
         .select('id, type, amount, mode, description, created_at')
@@ -78,27 +67,18 @@ function WalletPage() {
 
       if (txErr) throw txErr;
       setTransactions(txData || []);
-
     } catch (err) {
-      console.error('🔴 Error fetching wallet:', err);
+      console.error('Error fetching wallet:', err);
       toast.error('Could not load wallet data');
     } finally {
-      console.log("🟣 Wallet: Setting loading false");
       setLoading(false);
     }
   };
 
-  // ─── Effect ──────────────────────────────────────────────────────────
   useEffect(() => {
-    // ✅ Only fetch if user exists and we haven't fetched yet
-    if (user && !hasFetched.current) {
-      fetchWallet();
-    }
-    // ✅ If no user, make sure loading is false
-    if (!user) {
-      setLoading(false);
-    }
-  }, [user?.id]); // ✅ use user.id, not the whole user object
+    if (user && !hasFetched.current) fetchWallet();
+    if (!user) setLoading(false);
+  }, [user?.id]);
 
   const refreshWallet = () => {
     hasFetched.current = false;
@@ -106,7 +86,6 @@ function WalletPage() {
   };
 
   if (loading) {
-    console.log("⏳ Wallet: Still loading – showing spinner");
     return (
       <AppShell>
         <PageHeader title="Wallet" subtitle="Your funds" />
@@ -117,7 +96,6 @@ function WalletPage() {
     );
   }
 
-  console.log("✅ Wallet: Rendering main content");
   return (
     <AppShell>
       <PageHeader
@@ -167,9 +145,7 @@ function WalletPage() {
                       {new Date(tx.created_at).toLocaleDateString()} · {new Date(tx.created_at).toLocaleTimeString()}
                     </p>
                   </div>
-                  <div className={`font-semibold ${
-                    tx.mode === 'credit' ? 'text-success' : 'text-destructive'
-                  }`}>
+                  <div className={`font-semibold ${tx.mode === 'credit' ? 'text-success' : 'text-destructive'}`}>
                     {tx.mode === 'credit' ? '+' : '-'}{fmt(tx.amount)}
                   </div>
                 </div>
@@ -203,7 +179,6 @@ function DepositSheet({ onClose, user, supabase, onSuccess }: any) {
     if (!amount || !phone) return;
     if (!user) return;
 
-    // Ensure phone format: 2547XXXXXXXX
     let cleanPhone = phone.replace(/\D/g, '');
     if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
     if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
@@ -217,18 +192,20 @@ function DepositSheet({ onClose, user, supabase, onSuccess }: any) {
     setStep('processing');
 
     try {
-      // Call Supabase Edge Function
-      const { data, error } = await supabase.functions.invoke('mpesa-stk', {
-        body: {
+      // ✅ Call your working Render backend
+      const response = await fetch('https://pesaki-server.onrender.com/api/p/deposit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           amount: parseInt(amount),
           phone: cleanPhone,
           userId: user.id,
-        },
+        }),
       });
 
-      if (error) throw error;
+      const data = await response.json();
 
-      if (data?.checkout_request_id) {
+      if (response.ok && data?.checkout_request_id) {
         toast.success('STK Push sent. Check your phone for the prompt.');
         setStep('success');
         onSuccess();
@@ -265,7 +242,6 @@ function DepositSheet({ onClose, user, supabase, onSuccess }: any) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-end sm:place-items-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      {/* ✅ Added max-h and overflow-y-auto for scrolling */}
       <div className="relative z-10 w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-3xl bg-card p-5 shadow-2xl sm:rounded-3xl">
         <div className="flex items-center justify-between border-b border-border pb-3">
           <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground">
