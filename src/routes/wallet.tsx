@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Badge, SectionTitle } from "@/components/ui-bits";
 import { useAuth } from "@/hooks/useAuth";
@@ -32,6 +32,7 @@ function WalletPage() {
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [showDeposit, setShowDeposit] = useState(false);
+  const hasFetched = useRef(false); // ✅ prevent infinite loop
 
   const supabase = createClient(
     import.meta.env.VITE_SUPABASE_URL!,
@@ -40,16 +41,24 @@ function WalletPage() {
 
   // ─── Fetch wallet data ──────────────────────────────────────────────
   const fetchWallet = async () => {
-    // ✅ Fix: if no user, stop loading and return
+    // ✅ If no user, stop loading and return
     if (!user) {
+      console.log("🟡 Wallet: No user – setting loading false");
       setLoading(false);
       return;
     }
 
-    try {
-      setLoading(true);
+    // ✅ Prevent multiple simultaneous fetches
+    if (hasFetched.current) {
+      console.log("⏭️ Wallet: Already fetched – skipping");
+      return;
+    }
 
-      // 1. Get wallet balance
+    hasFetched.current = true;
+    setLoading(true);
+
+    try {
+      console.log("🟢 Wallet: Fetching balance...");
       const { data: walletData, error: walletErr } = await supabase
         .from('wallets')
         .select('balance, demo_balance')
@@ -59,7 +68,7 @@ function WalletPage() {
       if (walletErr) throw walletErr;
       setWallet(walletData);
 
-      // 2. Get transaction history
+      console.log("🟢 Wallet: Fetching transactions...");
       const { data: txData, error: txErr } = await supabase
         .from('wallet_ledger')
         .select('id, type, amount, mode, description, created_at')
@@ -71,18 +80,33 @@ function WalletPage() {
       setTransactions(txData || []);
 
     } catch (err) {
-      console.error('Error fetching wallet:', err);
+      console.error('🔴 Error fetching wallet:', err);
       toast.error('Could not load wallet data');
     } finally {
+      console.log("🟣 Wallet: Setting loading false");
       setLoading(false);
     }
   };
 
+  // ─── Effect ──────────────────────────────────────────────────────────
   useEffect(() => {
+    // ✅ Only fetch if user exists and we haven't fetched yet
+    if (user && !hasFetched.current) {
+      fetchWallet();
+    }
+    // ✅ If no user, make sure loading is false
+    if (!user) {
+      setLoading(false);
+    }
+  }, [user?.id]); // ✅ use user.id, not the whole user object
+
+  const refreshWallet = () => {
+    hasFetched.current = false;
     fetchWallet();
-  }, [user]);
+  };
 
   if (loading) {
+    console.log("⏳ Wallet: Still loading – showing spinner");
     return (
       <AppShell>
         <PageHeader title="Wallet" subtitle="Your funds" />
@@ -93,6 +117,7 @@ function WalletPage() {
     );
   }
 
+  console.log("✅ Wallet: Rendering main content");
   return (
     <AppShell>
       <PageHeader
@@ -159,7 +184,7 @@ function WalletPage() {
           onClose={() => setShowDeposit(false)}
           user={user}
           supabase={supabase}
-          onSuccess={fetchWallet}
+          onSuccess={refreshWallet}
         />
       )}
     </AppShell>
