@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Target, PiggyBank, Plus, ArrowDownToLine, ArrowUpFromLine,
   TrendingUp, HandCoins, Lock, Info, CheckCircle2, ShieldCheck, Calendar, X, ArrowLeft,
@@ -77,22 +77,33 @@ function BankingPage() {
     setLoading(true);
 
     try {
-      // 1. Fetch wallet balance (and locked if exists)
-      const { data: walletData, error: walletErr } = await supabase
-        .from('wallets')
-        .select('balance, locked')
-        .eq('user_id', user.id)
-        .single();
+      // 1. Fetch wallet balance
+      // Use let so we can reassign if 'locked' column is missing
+      let walletData: any;
 
-      if (walletErr) {
-        // If 'locked' column missing, fallback to balance only
-        const { data: balanceOnly, error: balanceErr } = await supabase
+      try {
+        // Try fetching with 'locked' column first
+        const { data, error } = await supabase
           .from('wallets')
-          .select('balance')
+          .select('balance, locked')
           .eq('user_id', user.id)
           .single();
-        if (balanceErr) throw balanceErr;
-        walletData = { balance: balanceOnly.balance, locked: 0 };
+
+        if (!error) {
+          walletData = data;
+        } else {
+          // If 'locked' column doesn't exist, fetch just balance
+          const { data: balanceOnly, error: balanceErr } = await supabase
+            .from('wallets')
+            .select('balance')
+            .eq('user_id', user.id)
+            .single();
+
+          if (balanceErr) throw balanceErr;
+          walletData = { ...balanceOnly, locked: 0 };
+        }
+      } catch (err) {
+        throw err;
       }
 
       // 2. Fetch completed deposits from mpesa_deposits
@@ -116,7 +127,6 @@ function BankingPage() {
       // ── Calculate summary ──────────────────────────────────────────────
       const totalLocked = walletData?.locked || 0;
       const totalSavings = (walletData?.balance || 0) + totalLocked;
-      const avgApy = 0; // no locked deposits now
 
       setSummary({
         totalSavings: totalSavings,
@@ -124,7 +134,7 @@ function BankingPage() {
         projectedAnnual: 0,
         lockedTotal: totalLocked,
         availableBalance: walletData?.balance || 0,
-        avgApy: avgApy,
+        avgApy: 0,
       });
 
       setDeposits(depositData || []);
@@ -259,7 +269,7 @@ function BankingPage() {
           {savingsGoals.map((g) => {
             const pct = Math.round((g.saved / g.target) * 100);
             return (
-              <Card key={g.name} className="!p-4">
+              <Card key={g.id || g.name} className="!p-4">
                 <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
                   <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
                     <Target className="h-4 w-4" />
@@ -309,7 +319,7 @@ function BankingPage() {
   );
 }
 
-// ─── ActionSheet (unchanged, but uses Supabase tables) ──────────────────
+// ─── ActionSheet ──────────────────────────────────────────────────────────
 function ActionSheet({ action, onClose, onSuccess }: { action: ActionKey; onClose: () => void; onSuccess: () => void }) {
   const { user } = useAuth();
   const config = {
