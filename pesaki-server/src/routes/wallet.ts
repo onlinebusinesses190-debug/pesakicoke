@@ -66,7 +66,6 @@ export default async function walletRoutes(server: FastifyInstance) {
       const { data: { user }, error: userError } = await supabase.auth.getUser(token);
       if (userError || !user) return reply.status(401).send({ error: 'Invalid token' });
 
-      // Total deposits (credit transactions)
       const { data: deposits, error: depError } = await supabase
         .from('wallet_ledger')
         .select('amount')
@@ -76,7 +75,6 @@ export default async function walletRoutes(server: FastifyInstance) {
 
       if (depError) throw depError;
 
-      // Total withdrawals (debit transactions)
       const { data: withdrawals, error: wdError } = await supabase
         .from('wallet_ledger')
         .select('amount')
@@ -86,7 +84,6 @@ export default async function walletRoutes(server: FastifyInstance) {
 
       if (wdError) throw wdError;
 
-      // Pending deposits
       const { data: pending, error: pendError } = await supabase
         .from('mpesa_deposits')
         .select('id')
@@ -95,7 +92,6 @@ export default async function walletRoutes(server: FastifyInstance) {
 
       if (pendError) throw pendError;
 
-      // Referral earnings
       const { data: referrals, error: refError } = await supabase
         .from('wallet_ledger')
         .select('amount')
@@ -133,7 +129,6 @@ export default async function walletRoutes(server: FastifyInstance) {
 
       const { amount, phone } = request.body as { amount: number; phone: string };
 
-      // Get current balance
       const { data: wallet, error: walletError } = await supabase
         .from('wallets')
         .select('balance')
@@ -145,7 +140,6 @@ export default async function walletRoutes(server: FastifyInstance) {
         return reply.status(400).send({ error: 'Insufficient balance' });
       }
 
-      // Deduct balance
       const { error: updateError } = await supabase
         .from('wallets')
         .update({ balance: wallet.balance - amount })
@@ -153,19 +147,14 @@ export default async function walletRoutes(server: FastifyInstance) {
 
       if (updateError) throw updateError;
 
-      // Record transaction
-      const { error: ledgerError } = await supabase
-        .from('wallet_ledger')
-        .insert({
-          user_id: user.id,
-          amount: amount,
-          type: 'withdrawal',
-          mode: 'debit',
-          description: `Withdrawal to ${phone}`,
-          status: 'pending',
-        });
-
-      if (ledgerError) throw ledgerError;
+      await supabase.from('wallet_ledger').insert({
+        user_id: user.id,
+        amount: amount,
+        type: 'withdrawal',
+        mode: 'debit',
+        description: `Withdrawal to ${phone}`,
+        status: 'pending',
+      });
 
       return reply.send({ success: true, message: 'Withdrawal request submitted' });
     } catch (err) {
@@ -185,7 +174,6 @@ export default async function walletRoutes(server: FastifyInstance) {
 
       const { amount, recipient } = request.body as { amount: number; recipient: string };
 
-      // Find recipient by email or phone
       const { data: recipientUser, error: findError } = await supabase
         .from('profiles')
         .select('id')
@@ -196,7 +184,6 @@ export default async function walletRoutes(server: FastifyInstance) {
         return reply.status(404).send({ error: 'Recipient not found' });
       }
 
-      // Get sender balance
       const { data: senderWallet, error: senderError } = await supabase
         .from('wallets')
         .select('balance')
@@ -208,15 +195,11 @@ export default async function walletRoutes(server: FastifyInstance) {
         return reply.status(400).send({ error: 'Insufficient balance' });
       }
 
-      // Deduct from sender
-      const { error: deductError } = await supabase
+      await supabase
         .from('wallets')
         .update({ balance: senderWallet.balance - amount })
         .eq('user_id', user.id);
 
-      if (deductError) throw deductError;
-
-      // Credit recipient
       const { data: recipientWallet, error: recipError } = await supabase
         .from('wallets')
         .select('balance')
@@ -225,32 +208,29 @@ export default async function walletRoutes(server: FastifyInstance) {
 
       if (recipError) throw recipError;
 
-      const { error: creditError } = await supabase
+      await supabase
         .from('wallets')
         .update({ balance: (recipientWallet.balance || 0) + amount })
         .eq('user_id', recipientUser.id);
 
-      if (creditError) throw creditError;
-
-      // Record sender ledger
-      await supabase.from('wallet_ledger').insert({
-        user_id: user.id,
-        amount: amount,
-        type: 'transfer',
-        mode: 'debit',
-        description: `Transfer to ${recipient}`,
-        status: 'completed',
-      });
-
-      // Record recipient ledger
-      await supabase.from('wallet_ledger').insert({
-        user_id: recipientUser.id,
-        amount: amount,
-        type: 'transfer',
-        mode: 'credit',
-        description: `Transfer from ${user.email || user.id}`,
-        status: 'completed',
-      });
+      await supabase.from('wallet_ledger').insert([
+        {
+          user_id: user.id,
+          amount: amount,
+          type: 'transfer',
+          mode: 'debit',
+          description: `Transfer to ${recipient}`,
+          status: 'completed',
+        },
+        {
+          user_id: recipientUser.id,
+          amount: amount,
+          type: 'transfer',
+          mode: 'credit',
+          description: `Transfer from ${user.email || user.id}`,
+          status: 'completed',
+        },
+      ]);
 
       return reply.send({ success: true, message: 'Transfer completed' });
     } catch (err) {
