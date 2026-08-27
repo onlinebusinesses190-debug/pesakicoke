@@ -10,6 +10,9 @@ import { initCronJobs } from './cron';
 import { registerRoutes } from './api';
 import { setupRateLimit } from './middleware/rateLimit';
 
+// ✅ Import the new wallet routes
+import walletRoutes from './routes/wallet';
+
 const startServer = async () => {
   try {
     const server = fastify({ logger: true }); 
@@ -26,8 +29,11 @@ const startServer = async () => {
     
     await setupRateLimit(server);
 
-    // Register REST API Routes
+    // Register REST API Routes (existing ones)
     registerRoutes(server);
+
+    // ✅ Register the new wallet routes
+    server.register(walletRoutes);
 
     // Start Socket.io Engine
     initSocket(server.server);
