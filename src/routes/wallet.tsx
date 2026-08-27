@@ -4,14 +4,19 @@ import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Badge, SectionTitle } from "@/components/ui-bits";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { ArrowLeft, TrendingUp, X, ArrowDownToLine, ArrowUpFromLine, Send, History, Filter } from "lucide-react";
+import { ArrowLeft, TrendingUp, X, ArrowDownToLine, ArrowUpFromLine, Send, Filter } from "lucide-react";
 import { fmt } from "@/lib/mock";
+import { createClient } from "@supabase/supabase-js";
 
 export const Route = createFileRoute("/wallet")({
   component: WalletPage,
 });
 
 const API_BASE = import.meta.env.VITE_PESAKI_API_URL || "https://pesaki-server.onrender.com";
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL!,
+  import.meta.env.VITE_SUPABASE_ANON_KEY!
+);
 
 interface Wallet {
   balance: number;
@@ -58,7 +63,6 @@ function WalletPage() {
     return data.session?.access_token;
   };
 
-  // ─── Fetch wallet data from backend ──────────────────────────────
   const fetchWallet = async () => {
     if (!user) {
       setLoading(false);
@@ -71,7 +75,6 @@ function WalletPage() {
     try {
       const token = await getAuthToken();
 
-      // 1. Get wallet balance
       const balanceRes = await fetch(`${API_BASE}/wallet/balance`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -83,7 +86,6 @@ function WalletPage() {
         demo_balance: balanceData.demo_balance || 8600,
       });
 
-      // 2. Get transactions
       const txRes = await fetch(`${API_BASE}/wallet/transactions?limit=50`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -91,7 +93,6 @@ function WalletPage() {
       const txData = await txRes.json();
       setTransactions(txData || []);
 
-      // 3. Get stats
       const statsRes = await fetch(`${API_BASE}/wallet/stats`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -143,22 +144,14 @@ function WalletPage() {
 
   return (
     <AppShell>
-      <PageHeader
-        title="Wallet"
-        subtitle="Your PESAKI money center"
-        right={null}
-      />
+      <PageHeader title="Wallet" subtitle="Your PESAKI money center" right={null} />
 
-      {/* ─── Balance Card ────────────────────────────────────────── */}
       <section className="px-5 pt-5">
         <div className="relative overflow-hidden rounded-2xl gradient-primary p-5 text-primary-foreground">
           <p className="text-xs uppercase tracking-widest opacity-80">Available Balance</p>
           <p className="mt-1 font-display text-3xl font-bold">{fmt(wallet?.balance || 0)}</p>
-          <p className="mt-0.5 text-xs opacity-80">
-            Locked: {fmt(wallet?.locked || 0)}
-          </p>
+          <p className="mt-0.5 text-xs opacity-80">Locked: {fmt(wallet?.locked || 0)}</p>
 
-          {/* ─── Action Buttons ──────────────────────────────────── */}
           <div className="mt-4 grid grid-cols-3 gap-2">
             <button
               onClick={() => setShowDeposit(true)}
@@ -182,7 +175,6 @@ function WalletPage() {
         </div>
       </section>
 
-      {/* ─── Stats ────────────────────────────────────────────────── */}
       <section className="mt-4 grid grid-cols-4 gap-2 px-5">
         <StatCard label="Total Deposits" value={fmt(stats.totalDeposits)} tone="success" />
         <StatCard label="Total Withdrawals" value={fmt(stats.totalWithdrawals)} tone="destructive" />
@@ -190,7 +182,6 @@ function WalletPage() {
         <StatCard label="Referral Earnings" value={fmt(stats.referralEarnings)} tone="gold" />
       </section>
 
-      {/* ─── Transaction History ────────────────────────────────── */}
       <section className="mt-6 px-5">
         <div className="flex items-center justify-between">
           <SectionTitle title="Transaction history" />
@@ -199,7 +190,6 @@ function WalletPage() {
           </button>
         </div>
 
-        {/* Filter tabs */}
         <div className="mt-2 flex gap-1 rounded-full bg-muted p-1">
           {[
             { key: "all", label: "All" },
@@ -221,7 +211,6 @@ function WalletPage() {
           ))}
         </div>
 
-        {/* Transactions list */}
         <div className="mt-3 space-y-2.5">
           {filteredTransactions.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
@@ -252,7 +241,6 @@ function WalletPage() {
         </div>
       </section>
 
-      {/* ─── Sheets ──────────────────────────────────────────────── */}
       {showDeposit && (
         <DepositSheet
           onClose={() => setShowDeposit(false)}
@@ -280,7 +268,7 @@ function WalletPage() {
   );
 }
 
-// ─── Stat Card Component ────────────────────────────────────────────────
+// ─── Stat Card ──────────────────────────────────────────────────────────
 function StatCard({ label, value, tone }: { label: string; value: string; tone?: string }) {
   const colorClasses = {
     success: "bg-success/10 text-success",
@@ -298,7 +286,7 @@ function StatCard({ label, value, tone }: { label: string; value: string; tone?:
   );
 }
 
-// ─── Deposit Sheet ──────────────────────────────────────────────────────
+// ─── Deposit Sheet (scrolling fixed) ──────────────────────────────────
 function DepositSheet({ onClose, user, onSuccess }: any) {
   const [amount, setAmount] = useState("");
   const [phone, setPhone] = useState("");
@@ -376,7 +364,8 @@ function DepositSheet({ onClose, user, onSuccess }: any) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-end sm:place-items-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-3xl bg-card p-5 shadow-2xl sm:rounded-3xl">
+      {/* ✅ Fixed: added pb-20 to ensure bottom space, and max-h-[95vh] */}
+      <div className="relative z-10 w-full max-w-md max-h-[95vh] overflow-y-auto rounded-t-3xl bg-card p-5 shadow-2xl sm:rounded-3xl pb-20">
         <div className="flex items-center justify-between border-b border-border pb-3">
           <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground">
             <ArrowLeft className="h-4 w-4" />
@@ -600,7 +589,7 @@ function SheetShell({ title, children, onClose }: { title: string; children: Rea
   return (
     <div className="fixed inset-0 z-50 grid place-items-end sm:place-items-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-3xl bg-card p-5 shadow-2xl sm:rounded-3xl">
+      <div className="relative z-10 w-full max-w-md max-h-[95vh] overflow-y-auto rounded-t-3xl bg-card p-5 shadow-2xl sm:rounded-3xl pb-20">
         <div className="flex items-center justify-between border-b border-border pb-3">
           <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground">
             <ArrowLeft className="h-4 w-4" />
@@ -615,10 +604,3 @@ function SheetShell({ title, children, onClose }: { title: string; children: Rea
     </div>
   );
 }
-
-// ─── Supabase instance for auth token ────────────────────────────────────
-import { createClient } from "@supabase/supabase-js";
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL!,
-  import.meta.env.VITE_SUPABASE_ANON_KEY!
-);
