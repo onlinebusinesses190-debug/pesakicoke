@@ -10,8 +10,9 @@ import { initCronJobs } from './cron';
 import { registerRoutes } from './api';
 import { setupRateLimit } from './middleware/rateLimit';
 
-// ✅ Import the new wallet routes
+// ✅ Import the new wallet and kazi routes
 import walletRoutes from './routes/wallet';
+import kaziRoutes from './routes/kazi';
 
 const startServer = async () => {
   try {
@@ -34,6 +35,8 @@ const startServer = async () => {
 
     // ✅ Register the new wallet routes
     server.register(walletRoutes);
+    // ✅ Register the new kazi routes
+    server.register(kaziRoutes);
 
     // Start Socket.io Engine
     initSocket(server.server);
