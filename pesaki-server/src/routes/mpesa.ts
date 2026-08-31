@@ -37,7 +37,7 @@ interface STKPushResponse {
 const depositInitiateSchema = z.object({
   amount: z.number().positive('Amount must be greater than 0'),
   phone: z.string().regex(/^254\d{9}$/, 'Phone must be in format: 254XXXXXXXXX'),
-  userId: z.string().uuid('Invalid user ID'), // ✅ Require UUID from frontend
+  userId: z.string().uuid('Invalid user ID'),
 });
 
 // ─── Utilities ──────────────────────────────────────────────────────────
@@ -79,7 +79,13 @@ const initiateSTKPush = async (
   try {
     const shortCode = env.MPESA_SHORTCODE;
     const passkey = env.MPESA_PASSKEY;
-    const callbackUrl = env.MPESA_CALLBACK_URL;
+    const callbackBase = env.MPESA_CALLBACK_URL || '';
+    // Ensure the callback URL is correctly formed
+    let callbackUrl = callbackBase;
+    if (!callbackUrl.endsWith('/api/mpesa/callback')) {
+      // Remove any trailing slash and append the callback path
+      callbackUrl = callbackUrl.replace(/\/+$/, '') + '/api/mpesa/callback';
+    }
     if (!shortCode || !passkey || !callbackUrl) {
       logger.error('Missing M-Pesa configuration');
       return false;
@@ -100,7 +106,7 @@ const initiateSTKPush = async (
       PartyA: phoneNumber,
       PartyB: shortCode,
       PhoneNumber: phoneNumber,
-      CallBackURL: `${callbackUrl}/api/mpesa/callback`,
+      CallBackURL: callbackUrl,
       AccountReference: userId,
       TransactionDesc: 'Pesaki Deposit',
     };
@@ -139,7 +145,7 @@ const initiateSTKPush = async (
 
 // ─── Routes ─────────────────────────────────────────────────────────────
 export const mpesaRoutes = async (fastify: FastifyInstance) => {
-  // POST /api/p/deposit
+  // ─── Deposit endpoint (with prefix /api/p) ────────────────────────────
   fastify.post('/deposit', async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = depositInitiateSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -148,7 +154,7 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
     }
 
     try {
-      const { amount, phone, userId } = parsed.data; // ✅ Use userId from body
+      const { amount, phone, userId } = parsed.data;
 
       const accessToken = await generateAccessToken();
       if (!accessToken) {
@@ -157,9 +163,8 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
 
       const checkoutRequestId = `${userId}_${Date.now()}`;
 
-      // ✅ Save pending deposit with valid UUID user_id
       const { error: insertError } = await supabase.from('mpesa_deposits').insert({
-        user_id: userId,      // Now a valid UUID
+        user_id: userId,
         phone: phone,
         amount,
         checkout_request_id: checkoutRequestId,
@@ -191,8 +196,8 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
     }
   });
 
-  // POST /api/mpesa/callback
-  fastify.post('/callback', async (request: FastifyRequest, reply: FastifyReply) => {
+  // ─── Callback endpoint – must be EXACTLY /api/mpesa/callback ──────────
+  fastify.post('/api/mpesa/callback', async (request: FastifyRequest, reply: FastifyReply) => {
     const body: any = request.body;
     logger.info({ body }, 'M-Pesa callback received');
 
@@ -213,7 +218,6 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
       }
 
       if (resultCode !== 0) {
-        // Payment failed/cancelled
         await supabase
           .from('mpesa_deposits')
           .update({ status: 'failed' })
@@ -222,7 +226,6 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
         return reply.code(200).send({ success: true });
       }
 
-      // Successful payment
       const callbackMetadata = stkCallback.CallbackMetadata;
       let amount = 0;
       let mpesaReceipt = '';
@@ -233,7 +236,6 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
         });
       }
 
-      // Get deposit record
       const { data: deposit, error: depositError } = await supabase
         .from('mpesa_deposits')
         .select('user_id, status')
@@ -250,13 +252,11 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
         return reply.code(200).send({ success: true });
       }
 
-      // Update deposit status
       await supabase
         .from('mpesa_deposits')
         .update({ status: 'completed' })
         .eq('checkout_request_id', checkoutRequestId);
 
-      // Credit wallet using the service
       const userId = deposit.user_id;
       const creditResult = await credit(userId, amount, 'real', `M-Pesa deposit: ${mpesaReceipt}`);
       if (!creditResult.success) {
@@ -271,13 +271,12 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
     return reply.code(200).send({ success: true });
   });
 
-  // POST /api/p/v (Validation)
+  // ─── Validation and C2B endpoints (with prefix) ──────────────────────
   fastify.post('/v', async (request, reply) => {
     logger.info({ body: request.body }, 'M-Pesa Validation received');
     return reply.code(200).send({ ResultCode: 0, ResultDesc: 'Accepted' });
   });
 
-  // POST /api/p/c (C2B Confirmation)
   fastify.post('/c', async (request, reply) => {
     const body: any = request.body;
     logger.info({ body }, 'M-Pesa C2B received');
