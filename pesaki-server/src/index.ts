@@ -10,9 +10,11 @@ import { initCronJobs } from './cron';
 import { registerRoutes } from './api';
 import { setupRateLimit } from './middleware/rateLimit';
 
-import walletRoutes from './routes/wallet';
+// Only import routes that are NOT already registered by registerRoutes
 import kaziRoutes from './routes/kazi';
 import { mpesaRoutes } from './routes/mpesa';
+
+// ❌ Remove: import walletRoutes from './routes/wallet';
 
 const startServer = async () => {
   try {
@@ -26,15 +28,14 @@ const startServer = async () => {
 
     await setupRateLimit(server);
 
-    // Register all routes from `api/routes` (including /health)
+    // This already registers all routes from api/routes (including wallet)
     registerRoutes(server);
 
-    // Register new routes
-    server.register(walletRoutes);
+    // ✅ Register only NEW routes that are NOT in api/routes
     server.register(kaziRoutes);
     server.register(mpesaRoutes, { prefix: '/api/p' });
 
-    // ✅ REMOVED duplicate /health route – it's already registered
+    // ❌ Do NOT register walletRoutes here – it's already loaded
 
     initSocket(server.server);
     startNewRound();
@@ -43,7 +44,6 @@ const startServer = async () => {
 
     await server.listen({ port: env.PORT, host: '0.0.0.0' });
     logger.info(`✨ Pesaki Server listening at http://localhost:${env.PORT}`);
-    logger.info(`📌 Registered routes: /wallet/*, /kazi/*, /api/p/*, /health`);
   } catch (err) {
     logger.fatal(err, 'Failed to start server');
     process.exit(1);
