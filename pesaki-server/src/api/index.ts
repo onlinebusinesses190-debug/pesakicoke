@@ -1,7 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { walletRoutes } from './routes/wallet';
 import { aviatorRoutes } from './routes/aviator';
-import { mpesaRoutes } from './routes/mpesa';
 import { spinRoutes } from './routes/spin';
 import { predictionRoutes } from './routes/prediction';
 import { healthRoutes } from './routes/health';
