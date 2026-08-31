@@ -80,12 +80,8 @@ const initiateSTKPush = async (
     const shortCode = env.MPESA_SHORTCODE;
     const passkey = env.MPESA_PASSKEY;
     const callbackBase = env.MPESA_CALLBACK_URL || '';
-    // Ensure the callback URL is correctly formed
-    let callbackUrl = callbackBase;
-    if (!callbackUrl.endsWith('/api/mpesa/callback')) {
-      // Remove any trailing slash and append the callback path
-      callbackUrl = callbackUrl.replace(/\/+$/, '') + '/api/mpesa/callback';
-    }
+    let callbackUrl = callbackBase.replace(/\/+$/, '') + '/api/mpesa/callback';
+
     if (!shortCode || !passkey || !callbackUrl) {
       logger.error('Missing M-Pesa configuration');
       return false;
@@ -145,8 +141,8 @@ const initiateSTKPush = async (
 
 // ─── Routes ─────────────────────────────────────────────────────────────
 export const mpesaRoutes = async (fastify: FastifyInstance) => {
-  // ─── Deposit endpoint (with prefix /api/p) ────────────────────────────
-  fastify.post('/deposit', async (request: FastifyRequest, reply: FastifyReply) => {
+  // Deposit endpoint – absolute path
+  fastify.post('/api/p/deposit', async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = depositInitiateSchema.safeParse(request.body);
     if (!parsed.success) {
       logger.warn({ error: parsed.error.format() }, 'Invalid deposit request');
@@ -196,7 +192,7 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
     }
   });
 
-  // ─── Callback endpoint – must be EXACTLY /api/mpesa/callback ──────────
+  // Callback endpoint – absolute path (no prefix)
   fastify.post('/api/mpesa/callback', async (request: FastifyRequest, reply: FastifyReply) => {
     const body: any = request.body;
     logger.info({ body }, 'M-Pesa callback received');
@@ -271,13 +267,13 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
     return reply.code(200).send({ success: true });
   });
 
-  // ─── Validation and C2B endpoints (with prefix) ──────────────────────
-  fastify.post('/v', async (request, reply) => {
+  // Validation and C2B endpoints – absolute paths
+  fastify.post('/api/p/v', async (request, reply) => {
     logger.info({ body: request.body }, 'M-Pesa Validation received');
     return reply.code(200).send({ ResultCode: 0, ResultDesc: 'Accepted' });
   });
 
-  fastify.post('/c', async (request, reply) => {
+  fastify.post('/api/p/c', async (request, reply) => {
     const body: any = request.body;
     logger.info({ body }, 'M-Pesa C2B received');
     try {
