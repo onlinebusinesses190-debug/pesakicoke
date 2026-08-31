@@ -37,6 +37,7 @@ interface STKPushResponse {
 const depositInitiateSchema = z.object({
   amount: z.number().positive('Amount must be greater than 0'),
   phone: z.string().regex(/^254\d{9}$/, 'Phone must be in format: 254XXXXXXXXX'),
+  userId: z.string().uuid('Invalid user ID'), // ✅ Require UUID from frontend
 });
 
 // ─── Utilities ──────────────────────────────────────────────────────────
@@ -142,12 +143,12 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
   fastify.post('/deposit', async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = depositInitiateSchema.safeParse(request.body);
     if (!parsed.success) {
+      logger.warn({ error: parsed.error.format() }, 'Invalid deposit request');
       return reply.code(400).send({ success: false, error: 'Invalid payload', code: 'BAD_REQUEST' });
     }
 
     try {
-      const { amount, phone } = parsed.data;
-      const userId = (request as any).user?.id || phone; // fallback
+      const { amount, phone, userId } = parsed.data; // ✅ Use userId from body
 
       const accessToken = await generateAccessToken();
       if (!accessToken) {
@@ -156,15 +157,16 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
 
       const checkoutRequestId = `${userId}_${Date.now()}`;
 
-      // Save pending deposit
+      // ✅ Save pending deposit with valid UUID user_id
       const { error: insertError } = await supabase.from('mpesa_deposits').insert({
-        user_id: userId,
+        user_id: userId,      // Now a valid UUID
         phone: phone,
         amount,
         checkout_request_id: checkoutRequestId,
         status: 'pending',
         created_at: new Date().toISOString(),
       });
+
       if (insertError) {
         logger.error({ insertError, userId }, 'Failed to save pending deposit');
         return reply.code(500).send({ success: false, error: 'Failed to initialize deposit' });
@@ -259,7 +261,6 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
       const creditResult = await credit(userId, amount, 'real', `M-Pesa deposit: ${mpesaReceipt}`);
       if (!creditResult.success) {
         logger.error({ userId, amount, error: creditResult.error }, 'Failed to credit wallet');
-        // We don't return an error because the callback must always return 200
       } else {
         logger.info({ userId, amount, mpesaReceipt }, 'Wallet credited successfully');
       }
