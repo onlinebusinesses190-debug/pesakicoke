@@ -10,11 +10,9 @@ import { initCronJobs } from './cron';
 import { registerRoutes } from './api';
 import { setupRateLimit } from './middleware/rateLimit';
 
-// Only import routes that are NOT already registered by registerRoutes
+// Only import new routes NOT in api/routes
 import kaziRoutes from './routes/kazi';
 import { mpesaRoutes } from './routes/mpesa';
-
-// ❌ Remove: import walletRoutes from './routes/wallet';
 
 const startServer = async () => {
   try {
@@ -28,14 +26,12 @@ const startServer = async () => {
 
     await setupRateLimit(server);
 
-    // This already registers all routes from api/routes (including wallet)
+    // Registers all old routes (including wallet)
     registerRoutes(server);
 
-    // ✅ Register only NEW routes that are NOT in api/routes
+    // Register new routes (NO prefix for mpesaRoutes)
     server.register(kaziRoutes);
-    server.register(mpesaRoutes, { prefix: '/api/p' });
-
-    // ❌ Do NOT register walletRoutes here – it's already loaded
+    server.register(mpesaRoutes); // <-- removed prefix
 
     initSocket(server.server);
     startNewRound();
