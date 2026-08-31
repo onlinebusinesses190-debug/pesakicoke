@@ -12,7 +12,7 @@ import { setupRateLimit } from './middleware/rateLimit';
 
 import walletRoutes from './routes/wallet';
 import kaziRoutes from './routes/kazi';
-import { mpesaRoutes } from './routes/mpesa'; // ✅ NEW
+import { mpesaRoutes } from './routes/mpesa';
 
 const startServer = async () => {
   try {
@@ -26,16 +26,15 @@ const startServer = async () => {
 
     await setupRateLimit(server);
 
+    // Register all routes from `api/routes` (including /health)
     registerRoutes(server);
 
     // Register new routes
     server.register(walletRoutes);
     server.register(kaziRoutes);
-    server.register(mpesaRoutes, { prefix: '/api/p' }); // ✅ NEW
+    server.register(mpesaRoutes, { prefix: '/api/p' });
 
-    server.get('/health', async () => {
-      return { status: 'ok', timestamp: new Date().toISOString() };
-    });
+    // ✅ REMOVED duplicate /health route – it's already registered
 
     initSocket(server.server);
     startNewRound();
