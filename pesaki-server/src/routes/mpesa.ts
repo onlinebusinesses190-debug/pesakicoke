@@ -69,7 +69,8 @@ const initiateSTKPush = async (
   checkoutRequestId: string
 ): Promise<boolean> => {
   try {
-    const shortCode = env.MPESA_SHORTCODE;
+    const shortCode = env.MPESA_SHORTCODE;          // 4574053 (your PayBill shortcode)
+    const tillNumber = '5710970';                   // ✅ YOUR TILL NUMBER
     const passkey = env.MPESA_PASSKEY;
     const callbackBase = env.MPESA_CALLBACK_URL || '';
     let callbackUrl = callbackBase.replace(/\/+$/, '') + '/api/mpesa/callback';
@@ -85,15 +86,16 @@ const initiateSTKPush = async (
     const passwordString = `${shortCode}${passkey}${timestamp}`;
     const password = Buffer.from(passwordString).toString('base64');
 
+    // ─── Build the STK Payload for Buy Goods (Till) ────────────────────
     const payload: STKPushPayload = {
-      BusinessShortCode: shortCode,
+      BusinessShortCode: shortCode,                  // 4574053
       Password: password,
       Timestamp: timestamp,
-      TransactionType: 'CustomerPayBillOnline',
+      TransactionType: 'CustomerBuyGoodsOnline',     // ✅ Changed for Till
       Amount: Math.round(amount),
-      PartyA: phoneNumber,
-      PartyB: shortCode,
-      PhoneNumber: phoneNumber,
+      PartyA: phoneNumber,                           // Customer phone
+      PartyB: tillNumber,                            // ✅ YOUR TILL NUMBER
+      PhoneNumber: phoneNumber,                      // Customer phone
       CallBackURL: callbackUrl,
       AccountReference: `PESAKI-${userId.slice(0, 8)}`,
       TransactionDesc: 'Pesaki Deposit',
