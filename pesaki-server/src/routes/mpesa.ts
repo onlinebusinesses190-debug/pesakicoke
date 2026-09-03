@@ -4,7 +4,6 @@ import { env } from '../config/env';
 import { credit } from '../wallet/service';
 import { supabase } from '../lib/supabase';
 
-// ─── Types ──────────────────────────────────────────────────────────────
 interface AccessTokenResponse {
   access_token: string;
   expires_in: number;
@@ -32,7 +31,7 @@ interface STKPushResponse {
   CustomerMessage: string;
 }
 
-// ─── Utilities ──────────────────────────────────────────────────────────
+// ─── Generate OAuth token (uses your app shortcode 4574053) ──────────
 const generateAccessToken = async (): Promise<string | null> => {
   try {
     const consumerKey = env.MPESA_CONSUMER_KEY;
@@ -69,33 +68,34 @@ const initiateSTKPush = async (
   checkoutRequestId: string
 ): Promise<boolean> => {
   try {
-    const shortCode = env.MPESA_SHORTCODE;          // 4574053 (your PayBill shortcode)
-    const tillNumber = '5710970';                   // ✅ YOUR TILL NUMBER
-    const passkey = env.MPESA_PASSKEY;
+    // ✅ Use your Till number as the merchant identifier
+    const tillNumber = '5710970';          // Your Till number
+    const passkey = env.MPESA_PASSKEY;     // Passkey for this Till
     const callbackBase = env.MPESA_CALLBACK_URL || '';
     let callbackUrl = callbackBase.replace(/\/+$/, '') + '/api/mpesa/callback';
 
-    if (!shortCode || !passkey || !callbackUrl) {
-      logger.error('Missing M-Pesa configuration');
+    if (!passkey || !callbackUrl) {
+      logger.error('Missing M-Pesa configuration (passkey or callback URL)');
       return false;
     }
+
     const timestamp = new Date()
       .toISOString()
       .replace(/[-:.TZ]/g, '')
       .slice(0, 14);
-    const passwordString = `${shortCode}${passkey}${timestamp}`;
+    // Password uses the Till number + passkey + timestamp
+    const passwordString = `${tillNumber}${passkey}${timestamp}`;
     const password = Buffer.from(passwordString).toString('base64');
 
-    // ─── Build the STK Payload for Buy Goods (Till) ────────────────────
     const payload: STKPushPayload = {
-      BusinessShortCode: shortCode,                  // 4574053
+      BusinessShortCode: tillNumber,          // ✅ Till number
       Password: password,
       Timestamp: timestamp,
-      TransactionType: 'CustomerBuyGoodsOnline',     // ✅ Changed for Till
+      TransactionType: 'CustomerBuyGoodsOnline', // ✅ Till transaction
       Amount: Math.round(amount),
-      PartyA: phoneNumber,                           // Customer phone
-      PartyB: tillNumber,                            // ✅ YOUR TILL NUMBER
-      PhoneNumber: phoneNumber,                      // Customer phone
+      PartyA: phoneNumber,
+      PartyB: tillNumber,                     // ✅ Till number
+      PhoneNumber: phoneNumber,
       CallBackURL: callbackUrl,
       AccountReference: `PESAKI-${userId.slice(0, 8)}`,
       TransactionDesc: 'Pesaki Deposit',
@@ -133,39 +133,30 @@ const initiateSTKPush = async (
   }
 };
 
-// ─── Routes ─────────────────────────────────────────────────────────────
 export const mpesaRoutes = async (fastify: FastifyInstance) => {
-  // ─── Deposit endpoint ────────────────────────────────────────────────
+  // ─── /api/p/deposit ──────────────────────────────────────────────────
   fastify.post('/api/p/deposit', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const body = request.body as any;
       const { amount, phone, userId } = body;
 
-      // ✅ Simple validation
       if (!amount || !phone || !userId) {
         logger.warn({ body }, 'Missing required fields');
-        return reply.code(400).send({ 
-          success: false, 
-          error: 'Missing required fields: amount, phone, userId' 
+        return reply.code(400).send({
+          success: false,
+          error: 'Missing required fields: amount, phone, userId'
         });
       }
-
       if (isNaN(amount) || amount <= 0) {
-        return reply.code(400).send({ 
-          success: false, 
-          error: 'Amount must be a positive number' 
+        return reply.code(400).send({
+          success: false,
+          error: 'Amount must be a positive number'
         });
       }
 
-      // ✅ Clean phone number (remove spaces, +, etc.)
       let cleanPhone = phone.toString().replace(/\D/g, '');
-      if (cleanPhone.startsWith('0')) {
-        cleanPhone = '254' + cleanPhone.slice(1);
-      } else if (cleanPhone.startsWith('254')) {
-        // already correct
-      } else {
-        cleanPhone = '254' + cleanPhone;
-      }
+      if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
+      else if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
 
       logger.info({ amount, cleanPhone, userId }, 'Deposit request received');
 
@@ -209,7 +200,7 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
     }
   });
 
-  // ─── Callback endpoint ────────────────────────────────────────────────
+  // ─── /api/mpesa/callback ─────────────────────────────────────────────
   fastify.post('/api/mpesa/callback', async (request: FastifyRequest, reply: FastifyReply) => {
     const body: any = request.body;
     logger.info({ body }, 'M-Pesa callback received');
@@ -284,7 +275,7 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
     return reply.code(200).send({ success: true });
   });
 
-  // ─── Validation and C2B endpoints ────────────────────────────────────
+  // ─── /api/p/v and /api/p/c ────────────────────────────────────────────
   fastify.post('/api/p/v', async (request, reply) => {
     logger.info({ body: request.body }, 'M-Pesa Validation received');
     return reply.code(200).send({ ResultCode: 0, ResultDesc: 'Accepted' });
