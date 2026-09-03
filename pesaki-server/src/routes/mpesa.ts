@@ -31,7 +31,7 @@ interface STKPushResponse {
   CustomerMessage: string;
 }
 
-// ─── Generate OAuth token (uses your app shortcode 4574053) ──────────
+// ─── Generate OAuth token ──────────────────────────────────────────────
 const generateAccessToken = async (): Promise<string | null> => {
   try {
     const consumerKey = env.MPESA_CONSUMER_KEY;
@@ -68,14 +68,14 @@ const initiateSTKPush = async (
   checkoutRequestId: string
 ): Promise<boolean> => {
   try {
-    // ✅ Use your Till number as the merchant identifier
-    const tillNumber = '5710970';          // Your Till number
-    const passkey = env.MPESA_PASSKEY;     // Passkey for this Till
+    const shortcode = '4574053';              // ✅ Your app shortcode (for auth & password)
+    const tillNumber = '5710970';             // ✅ Your Till number (destination)
+    const passkey = env.MPESA_PASSKEY;        // Passkey for the shortcode
     const callbackBase = env.MPESA_CALLBACK_URL || '';
     let callbackUrl = callbackBase.replace(/\/+$/, '') + '/api/mpesa/callback';
 
-    if (!passkey || !callbackUrl) {
-      logger.error('Missing M-Pesa configuration (passkey or callback URL)');
+    if (!shortcode || !passkey || !callbackUrl) {
+      logger.error('Missing M-Pesa configuration');
       return false;
     }
 
@@ -83,18 +83,19 @@ const initiateSTKPush = async (
       .toISOString()
       .replace(/[-:.TZ]/g, '')
       .slice(0, 14);
-    // Password uses the Till number + passkey + timestamp
-    const passwordString = `${tillNumber}${passkey}${timestamp}`;
+
+    // ✅ Password uses the shortcode + passkey
+    const passwordString = `${shortcode}${passkey}${timestamp}`;
     const password = Buffer.from(passwordString).toString('base64');
 
     const payload: STKPushPayload = {
-      BusinessShortCode: tillNumber,          // ✅ Till number
+      BusinessShortCode: shortcode,            // ✅ Shortcode (4574053)
       Password: password,
       Timestamp: timestamp,
       TransactionType: 'CustomerBuyGoodsOnline', // ✅ Till transaction
       Amount: Math.round(amount),
       PartyA: phoneNumber,
-      PartyB: tillNumber,                     // ✅ Till number
+      PartyB: tillNumber,                      // ✅ Till number (5710970)
       PhoneNumber: phoneNumber,
       CallBackURL: callbackUrl,
       AccountReference: `PESAKI-${userId.slice(0, 8)}`,
