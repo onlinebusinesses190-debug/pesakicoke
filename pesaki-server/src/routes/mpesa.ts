@@ -2,7 +2,6 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { logger } from '../utils/logger';
 import { env } from '../config/env';
 import { credit } from '../wallet/service';
-import { z } from 'zod';
 import { supabase } from '../lib/supabase';
 
 // ─── Types ──────────────────────────────────────────────────────────────
@@ -32,13 +31,6 @@ interface STKPushResponse {
   ResponseDescription: string;
   CustomerMessage: string;
 }
-
-// ─── Schemas ────────────────────────────────────────────────────────────
-const depositInitiateSchema = z.object({
-  amount: z.number().positive('Amount must be greater than 0'),
-  phone: z.string().regex(/^254\d{9}$/, 'Phone must be in format: 254XXXXXXXXX'),
-  userId: z.string().uuid('Invalid user ID'),
-});
 
 // ─── Utilities ──────────────────────────────────────────────────────────
 const generateAccessToken = async (): Promise<string | null> => {
@@ -103,7 +95,7 @@ const initiateSTKPush = async (
       PartyB: shortCode,
       PhoneNumber: phoneNumber,
       CallBackURL: callbackUrl,
-      AccountReference: userId,
+      AccountReference: `PESAKI-${userId.slice(0, 8)}`,
       TransactionDesc: 'Pesaki Deposit',
     };
 
@@ -141,16 +133,39 @@ const initiateSTKPush = async (
 
 // ─── Routes ─────────────────────────────────────────────────────────────
 export const mpesaRoutes = async (fastify: FastifyInstance) => {
-  // Deposit endpoint – absolute path
+  // ─── Deposit endpoint ────────────────────────────────────────────────
   fastify.post('/api/p/deposit', async (request: FastifyRequest, reply: FastifyReply) => {
-    const parsed = depositInitiateSchema.safeParse(request.body);
-    if (!parsed.success) {
-      logger.warn({ error: parsed.error.format() }, 'Invalid deposit request');
-      return reply.code(400).send({ success: false, error: 'Invalid payload', code: 'BAD_REQUEST' });
-    }
-
     try {
-      const { amount, phone, userId } = parsed.data;
+      const body = request.body as any;
+      const { amount, phone, userId } = body;
+
+      // ✅ Simple validation
+      if (!amount || !phone || !userId) {
+        logger.warn({ body }, 'Missing required fields');
+        return reply.code(400).send({ 
+          success: false, 
+          error: 'Missing required fields: amount, phone, userId' 
+        });
+      }
+
+      if (isNaN(amount) || amount <= 0) {
+        return reply.code(400).send({ 
+          success: false, 
+          error: 'Amount must be a positive number' 
+        });
+      }
+
+      // ✅ Clean phone number (remove spaces, +, etc.)
+      let cleanPhone = phone.toString().replace(/\D/g, '');
+      if (cleanPhone.startsWith('0')) {
+        cleanPhone = '254' + cleanPhone.slice(1);
+      } else if (cleanPhone.startsWith('254')) {
+        // already correct
+      } else {
+        cleanPhone = '254' + cleanPhone;
+      }
+
+      logger.info({ amount, cleanPhone, userId }, 'Deposit request received');
 
       const accessToken = await generateAccessToken();
       if (!accessToken) {
@@ -161,7 +176,7 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
 
       const { error: insertError } = await supabase.from('mpesa_deposits').insert({
         user_id: userId,
-        phone: phone,
+        phone: cleanPhone,
         amount,
         checkout_request_id: checkoutRequestId,
         status: 'pending',
@@ -173,7 +188,7 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
         return reply.code(500).send({ success: false, error: 'Failed to initialize deposit' });
       }
 
-      const stkSuccess = await initiateSTKPush(accessToken, amount, phone, userId, checkoutRequestId);
+      const stkSuccess = await initiateSTKPush(accessToken, amount, cleanPhone, userId, checkoutRequestId);
       if (!stkSuccess) {
         await supabase
           .from('mpesa_deposits')
@@ -192,7 +207,7 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
     }
   });
 
-  // Callback endpoint – absolute path (no prefix)
+  // ─── Callback endpoint ────────────────────────────────────────────────
   fastify.post('/api/mpesa/callback', async (request: FastifyRequest, reply: FastifyReply) => {
     const body: any = request.body;
     logger.info({ body }, 'M-Pesa callback received');
@@ -267,7 +282,7 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
     return reply.code(200).send({ success: true });
   });
 
-  // Validation and C2B endpoints – absolute paths
+  // ─── Validation and C2B endpoints ────────────────────────────────────
   fastify.post('/api/p/v', async (request, reply) => {
     logger.info({ body: request.body }, 'M-Pesa Validation received');
     return reply.code(200).send({ ResultCode: 0, ResultDesc: 'Accepted' });
