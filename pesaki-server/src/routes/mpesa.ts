@@ -152,7 +152,7 @@ const initiateSTKPush = async (
 ): Promise<STKPushResponse | null> => {
   try {
     const businessShortCode = '4574053';
-    const tillNumber = '5710970';
+    const tillNumber = '3240141'; // ✅ CORRECT TILL NUMBER (as per old working system)
     const passkey = env.MPESA_PASSKEY;
 
     if (!passkey) {
@@ -193,7 +193,7 @@ const initiateSTKPush = async (
       TransactionType: 'CustomerBuyGoodsOnline',
       Amount: paymentAmount,
       PartyA: phoneNumber,
-      PartyB: tillNumber,
+      PartyB: tillNumber, // ✅ Now using correct Till
       PhoneNumber: phoneNumber,
       CallBackURL: callbackUrl,
       AccountReference: accountReference,
