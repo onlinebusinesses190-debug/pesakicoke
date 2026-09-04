@@ -573,7 +573,6 @@ function TransferSheet({ onClose, user, balance, onSuccess }: any) {
 
     setLoading(true);
     try {
-      // ✅ Use Supabase Edge Function (instead of backend API)
       const token = (await supabase.auth.getSession()).data.session?.access_token;
       const { data, error } = await supabase.functions.invoke("transfer", {
         body: { amount: numAmount, recipient },
