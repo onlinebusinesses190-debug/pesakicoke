@@ -1,29 +1,51 @@
-// pesaki-server/src/routes/wallet.ts
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { createClient } from '@supabase/supabase-js';
+import { env } from '../config/env';
 
 const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  env.SUPABASE_URL,
+  env.SUPABASE_SERVICE_ROLE_KEY
 );
 
 export default async function walletRoutes(server: FastifyInstance) {
-  // ─── GET /wallet/balance ──────────────────────────────────────
+  // ─── GET /wallet/balance ────────────────────────────────────────────
   server.get('/wallet/balance', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
-      if (!token) return reply.status(401).send({ error: 'Unauthorized' });
+      if (!token) {
+        return reply.status(401).send({ error: 'Unauthorized' });
+      }
 
       const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-      if (userError || !user) return reply.status(401).send({ error: 'Invalid token' });
+      if (userError || !user) {
+        return reply.status(401).send({ error: 'Invalid token' });
+      }
+
+      // ✅ Allow optional 'mode' query param (default to 'real')
+      const query = request.query as { mode?: string };
+      const mode = query.mode === 'demo' ? 'demo' : 'real';
+      const balanceField = mode === 'real' ? 'balance' : 'demo_balance';
 
       const { data: wallet, error: walletError } = await supabase
         .from('wallets')
-        .select('balance, locked, demo_balance')
+        .select(`${balanceField} as balance, demo_balance, locked`)
         .eq('user_id', user.id)
         .single();
 
-      if (walletError) throw walletError;
+      if (walletError) {
+        // If wallet doesn't exist, create one
+        if (walletError.code === 'PGRST116') {
+          const { data: newWallet, error: createError } = await supabase
+            .from('wallets')
+            .insert({ user_id: user.id, balance: 0, demo_balance: 10000 })
+            .select(`${balanceField} as balance, demo_balance, locked`)
+            .single();
+
+          if (createError) throw createError;
+          return reply.send(newWallet);
+        }
+        throw walletError;
+      }
 
       return reply.send(wallet);
     } catch (err) {
@@ -32,7 +54,7 @@ export default async function walletRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /wallet/transactions ──────────────────────────────────
+  // ─── GET /wallet/transactions ───────────────────────────────────────
   server.get('/wallet/transactions', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -49,7 +71,6 @@ export default async function walletRoutes(server: FastifyInstance) {
         .limit(50);
 
       if (txError) throw txError;
-
       return reply.send(transactions);
     } catch (err) {
       console.error(err);
@@ -57,7 +78,7 @@ export default async function walletRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /wallet/stats ─────────────────────────────────────────
+  // ─── GET /wallet/stats ──────────────────────────────────────────────
   server.get('/wallet/stats', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -66,6 +87,7 @@ export default async function walletRoutes(server: FastifyInstance) {
       const { data: { user }, error: userError } = await supabase.auth.getUser(token);
       if (userError || !user) return reply.status(401).send({ error: 'Invalid token' });
 
+      // Total deposits (credit mode)
       const { data: deposits, error: depError } = await supabase
         .from('wallet_ledger')
         .select('amount')
@@ -75,6 +97,7 @@ export default async function walletRoutes(server: FastifyInstance) {
 
       if (depError) throw depError;
 
+      // Total withdrawals (debit mode)
       const { data: withdrawals, error: wdError } = await supabase
         .from('wallet_ledger')
         .select('amount')
@@ -84,6 +107,7 @@ export default async function walletRoutes(server: FastifyInstance) {
 
       if (wdError) throw wdError;
 
+      // Pending deposits
       const { data: pending, error: pendError } = await supabase
         .from('mpesa_deposits')
         .select('id')
@@ -92,6 +116,7 @@ export default async function walletRoutes(server: FastifyInstance) {
 
       if (pendError) throw pendError;
 
+      // Referral earnings
       const { data: referrals, error: refError } = await supabase
         .from('wallet_ledger')
         .select('amount')
@@ -118,7 +143,7 @@ export default async function walletRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── POST /wallet/withdraw ─────────────────────────────────────
+  // ─── POST /wallet/withdraw ──────────────────────────────────────────
   server.post('/wallet/withdraw', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -140,30 +165,31 @@ export default async function walletRoutes(server: FastifyInstance) {
         return reply.status(400).send({ error: 'Insufficient balance' });
       }
 
+      const newBalance = wallet.balance - amount;
       const { error: updateError } = await supabase
         .from('wallets')
-        .update({ balance: wallet.balance - amount })
+        .update({ balance: newBalance })
         .eq('user_id', user.id);
 
       if (updateError) throw updateError;
 
       await supabase.from('wallet_ledger').insert({
         user_id: user.id,
-        amount: amount,
+        amount,
         type: 'withdrawal',
         mode: 'debit',
         description: `Withdrawal to ${phone}`,
         status: 'pending',
       });
 
-      return reply.send({ success: true, message: 'Withdrawal request submitted' });
+      return reply.send({ success: true, newBalance });
     } catch (err) {
       console.error(err);
       return reply.status(500).send({ error: 'Internal server error' });
     }
   });
 
-  // ─── POST /wallet/transfer ─────────────────────────────────────
+  // ─── POST /wallet/transfer ──────────────────────────────────────────
   server.post('/wallet/transfer', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -174,6 +200,7 @@ export default async function walletRoutes(server: FastifyInstance) {
 
       const { amount, recipient } = request.body as { amount: number; recipient: string };
 
+      // Find recipient by email or phone
       const { data: recipientUser, error: findError } = await supabase
         .from('profiles')
         .select('id')
@@ -195,11 +222,13 @@ export default async function walletRoutes(server: FastifyInstance) {
         return reply.status(400).send({ error: 'Insufficient balance' });
       }
 
+      // Deduct from sender
       await supabase
         .from('wallets')
         .update({ balance: senderWallet.balance - amount })
         .eq('user_id', user.id);
 
+      // Credit recipient
       const { data: recipientWallet, error: recipError } = await supabase
         .from('wallets')
         .select('balance')
@@ -213,10 +242,11 @@ export default async function walletRoutes(server: FastifyInstance) {
         .update({ balance: (recipientWallet.balance || 0) + amount })
         .eq('user_id', recipientUser.id);
 
+      // Ledger entries
       await supabase.from('wallet_ledger').insert([
         {
           user_id: user.id,
-          amount: amount,
+          amount,
           type: 'transfer',
           mode: 'debit',
           description: `Transfer to ${recipient}`,
@@ -224,7 +254,7 @@ export default async function walletRoutes(server: FastifyInstance) {
         },
         {
           user_id: recipientUser.id,
-          amount: amount,
+          amount,
           type: 'transfer',
           mode: 'credit',
           description: `Transfer from ${user.email || user.id}`,
