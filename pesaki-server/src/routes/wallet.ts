@@ -6,6 +6,8 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export default async function walletRoutes(server: FastifyInstance) {
+  console.log('✅ walletRoutes loaded');
+
   // ─── Test route ────────────────────────────────────────────────
   server.get('/wallet/ping', async (_request: FastifyRequest, reply: FastifyReply) => {
     return reply.send({ pong: true });
@@ -90,7 +92,6 @@ export default async function walletRoutes(server: FastifyInstance) {
       const { data: { user }, error: userError } = await supabase.auth.getUser(token);
       if (userError || !user) return reply.status(401).send({ error: 'Invalid token' });
 
-      // Total deposits (credit)
       const { data: deposits, error: depError } = await supabase
         .from('wallet_ledger')
         .select('amount')
@@ -100,7 +101,6 @@ export default async function walletRoutes(server: FastifyInstance) {
 
       if (depError) throw depError;
 
-      // Total withdrawals (debit)
       const { data: withdrawals, error: wdError } = await supabase
         .from('wallet_ledger')
         .select('amount')
@@ -110,7 +110,6 @@ export default async function walletRoutes(server: FastifyInstance) {
 
       if (wdError) throw wdError;
 
-      // Pending deposits – try to count from mpesa_deposits if table exists, else return 0
       let pendingCount = 0;
       try {
         const { data: pending, error: pendError } = await supabase
@@ -119,14 +118,9 @@ export default async function walletRoutes(server: FastifyInstance) {
           .eq('user_id', user.id)
           .eq('status', 'pending');
 
-        if (!pendError) {
-          pendingCount = pending?.length || 0;
-        }
-      } catch (e) {
-        // table may not exist – ignore
-      }
+        if (!pendError) pendingCount = pending?.length || 0;
+      } catch (e) { /* ignore */ }
 
-      // Referral earnings
       const { data: referrals, error: refError } = await supabase
         .from('wallet_ledger')
         .select('amount')
@@ -148,7 +142,6 @@ export default async function walletRoutes(server: FastifyInstance) {
       });
     } catch (err: any) {
       console.error('Stats error:', err);
-      // Return default zeros to avoid frontend errors
       return reply.send({
         totalDeposits: 0,
         totalWithdrawals: 0,
@@ -204,7 +197,7 @@ export default async function walletRoutes(server: FastifyInstance) {
   // ─── POST /wallet/transfer ────────────────────────────────────
   server.post('/wallet/transfer', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      console.log('📌 Transfer route hit');
+      console.log('📌 Transfer route HIT');
       const token = request.headers.authorization?.replace('Bearer ', '');
       if (!token) {
         return reply.status(401).send({ error: 'Unauthorized' });
