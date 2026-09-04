@@ -573,18 +573,14 @@ function TransferSheet({ onClose, user, balance, onSuccess }: any) {
 
     setLoading(true);
     try {
+      // ✅ Use Supabase Edge Function (instead of backend API)
       const token = (await supabase.auth.getSession()).data.session?.access_token;
-      const response = await fetch(`${API_BASE}/wallet/transfer`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ amount: numAmount, recipient }),
+      const { data, error } = await supabase.functions.invoke("transfer", {
+        body: { amount: numAmount, recipient },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || "Transfer failed");
+      if (error) throw new Error(error.message);
       toast.success("Transfer completed");
       onSuccess();
       onClose();
