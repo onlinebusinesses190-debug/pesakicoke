@@ -1,11 +1,10 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { createClient } from '@supabase/supabase-js';
-import { env } from '../config/env';
 
-const supabase = createClient(
-  env.SUPABASE_URL,
-  env.SUPABASE_SERVICE_ROLE_KEY
-);
+// Use the same Supabase client pattern as your other routes
+const supabaseUrl = process.env.SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export default async function walletRoutes(server: FastifyInstance) {
   // ─── GET /wallet/balance ────────────────────────────────────────────
@@ -13,7 +12,7 @@ export default async function walletRoutes(server: FastifyInstance) {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
       if (!token) {
-        return reply.status(401).send({ error: 'Unauthorized' });
+        return reply.status(401).send({ error: 'Unauthorized: No token' });
       }
 
       const { data: { user }, error: userError } = await supabase.auth.getUser(token);
@@ -21,14 +20,10 @@ export default async function walletRoutes(server: FastifyInstance) {
         return reply.status(401).send({ error: 'Invalid token' });
       }
 
-      // ✅ Allow optional 'mode' query param (default to 'real')
-      const query = request.query as { mode?: string };
-      const mode = query.mode === 'demo' ? 'demo' : 'real';
-      const balanceField = mode === 'real' ? 'balance' : 'demo_balance';
-
+      // Get balance (without 'mode' requirement)
       const { data: wallet, error: walletError } = await supabase
         .from('wallets')
-        .select(`${balanceField} as balance, demo_balance, locked`)
+        .select('balance, demo_balance, locked')
         .eq('user_id', user.id)
         .single();
 
@@ -37,20 +32,24 @@ export default async function walletRoutes(server: FastifyInstance) {
         if (walletError.code === 'PGRST116') {
           const { data: newWallet, error: createError } = await supabase
             .from('wallets')
-            .insert({ user_id: user.id, balance: 0, demo_balance: 10000 })
-            .select(`${balanceField} as balance, demo_balance, locked`)
+            .insert({ user_id: user.id, balance: 0, demo_balance: 10000, locked: 0 })
+            .select('balance, demo_balance, locked')
             .single();
 
-          if (createError) throw createError;
+          if (createError) {
+            console.error('Create wallet error:', createError);
+            return reply.status(500).send({ error: 'Failed to create wallet' });
+          }
           return reply.send(newWallet);
         }
-        throw walletError;
+        console.error('Wallet fetch error:', walletError);
+        return reply.status(500).send({ error: 'Database error' });
       }
 
       return reply.send(wallet);
-    } catch (err) {
-      console.error(err);
-      return reply.status(500).send({ error: 'Internal server error' });
+    } catch (err: any) {
+      console.error('Unexpected error:', err);
+      return reply.status(500).send({ error: err.message || 'Internal server error' });
     }
   });
 
@@ -70,11 +69,15 @@ export default async function walletRoutes(server: FastifyInstance) {
         .order('created_at', { ascending: false })
         .limit(50);
 
-      if (txError) throw txError;
-      return reply.send(transactions);
-    } catch (err) {
-      console.error(err);
-      return reply.status(500).send({ error: 'Internal server error' });
+      if (txError) {
+        console.error('Transaction fetch error:', txError);
+        return reply.status(500).send({ error: 'Database error' });
+      }
+
+      return reply.send(transactions || []);
+    } catch (err: any) {
+      console.error('Unexpected error:', err);
+      return reply.status(500).send({ error: err.message || 'Internal server error' });
     }
   });
 
@@ -87,7 +90,6 @@ export default async function walletRoutes(server: FastifyInstance) {
       const { data: { user }, error: userError } = await supabase.auth.getUser(token);
       if (userError || !user) return reply.status(401).send({ error: 'Invalid token' });
 
-      // Total deposits (credit mode)
       const { data: deposits, error: depError } = await supabase
         .from('wallet_ledger')
         .select('amount')
@@ -97,7 +99,6 @@ export default async function walletRoutes(server: FastifyInstance) {
 
       if (depError) throw depError;
 
-      // Total withdrawals (debit mode)
       const { data: withdrawals, error: wdError } = await supabase
         .from('wallet_ledger')
         .select('amount')
@@ -107,7 +108,6 @@ export default async function walletRoutes(server: FastifyInstance) {
 
       if (wdError) throw wdError;
 
-      // Pending deposits
       const { data: pending, error: pendError } = await supabase
         .from('mpesa_deposits')
         .select('id')
@@ -116,7 +116,6 @@ export default async function walletRoutes(server: FastifyInstance) {
 
       if (pendError) throw pendError;
 
-      // Referral earnings
       const { data: referrals, error: refError } = await supabase
         .from('wallet_ledger')
         .select('amount')
@@ -137,9 +136,9 @@ export default async function walletRoutes(server: FastifyInstance) {
         pending: pendingCount,
         referralEarnings,
       });
-    } catch (err) {
-      console.error(err);
-      return reply.status(500).send({ error: 'Internal server error' });
+    } catch (err: any) {
+      console.error('Stats error:', err);
+      return reply.status(500).send({ error: err.message || 'Internal server error' });
     }
   });
 
@@ -166,12 +165,10 @@ export default async function walletRoutes(server: FastifyInstance) {
       }
 
       const newBalance = wallet.balance - amount;
-      const { error: updateError } = await supabase
+      await supabase
         .from('wallets')
         .update({ balance: newBalance })
         .eq('user_id', user.id);
-
-      if (updateError) throw updateError;
 
       await supabase.from('wallet_ledger').insert({
         user_id: user.id,
@@ -183,9 +180,9 @@ export default async function walletRoutes(server: FastifyInstance) {
       });
 
       return reply.send({ success: true, newBalance });
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      return reply.status(500).send({ error: 'Internal server error' });
+      return reply.status(500).send({ error: err.message || 'Internal server error' });
     }
   });
 
@@ -200,7 +197,6 @@ export default async function walletRoutes(server: FastifyInstance) {
 
       const { amount, recipient } = request.body as { amount: number; recipient: string };
 
-      // Find recipient by email or phone
       const { data: recipientUser, error: findError } = await supabase
         .from('profiles')
         .select('id')
@@ -222,13 +218,11 @@ export default async function walletRoutes(server: FastifyInstance) {
         return reply.status(400).send({ error: 'Insufficient balance' });
       }
 
-      // Deduct from sender
       await supabase
         .from('wallets')
         .update({ balance: senderWallet.balance - amount })
         .eq('user_id', user.id);
 
-      // Credit recipient
       const { data: recipientWallet, error: recipError } = await supabase
         .from('wallets')
         .select('balance')
@@ -242,7 +236,6 @@ export default async function walletRoutes(server: FastifyInstance) {
         .update({ balance: (recipientWallet.balance || 0) + amount })
         .eq('user_id', recipientUser.id);
 
-      // Ledger entries
       await supabase.from('wallet_ledger').insert([
         {
           user_id: user.id,
@@ -263,9 +256,9 @@ export default async function walletRoutes(server: FastifyInstance) {
       ]);
 
       return reply.send({ success: true, message: 'Transfer completed' });
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      return reply.status(500).send({ error: 'Internal server error' });
+      return reply.status(500).send({ error: err.message || 'Internal server error' });
     }
   });
 }
