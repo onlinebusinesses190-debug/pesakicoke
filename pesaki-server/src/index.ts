@@ -10,7 +10,8 @@ import { initCronJobs } from './cron';
 import { registerRoutes } from './api';
 import { setupRateLimit } from './middleware/rateLimit';
 
-// Only import new routes NOT in api/routes
+// Import new routes (these are NOT in api/routes)
+import walletRoutes from './routes/wallet';
 import kaziRoutes from './routes/kazi';
 import { mpesaRoutes } from './routes/mpesa';
 
@@ -26,12 +27,14 @@ const startServer = async () => {
 
     await setupRateLimit(server);
 
-    // Registers all old routes (including wallet)
+    // This registers all routes from api/routes (excluding the deleted wallet)
     registerRoutes(server);
 
-    // Register new routes (NO prefix for mpesaRoutes)
+    // Register new routes (these override if there's a conflict)
+    // Since we deleted the old wallet from api/routes, this is safe.
+    server.register(walletRoutes);
     server.register(kaziRoutes);
-    server.register(mpesaRoutes); // <-- removed prefix
+    server.register(mpesaRoutes);
 
     initSocket(server.server);
     startNewRound();
