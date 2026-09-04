@@ -18,12 +18,11 @@ serve(async (req) => {
   // ─── Handle CORS preflight (OPTIONS) ────────────────────────────────
   if (req.method === "OPTIONS") {
     return new Response(null, {
-      status: 200, // ✅ Changed from 204 to 200
+      status: 200,
       headers: corsHeaders,
     });
   }
 
-  // ─── Only POST allowed ──────────────────────────────────────────────
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
@@ -32,7 +31,6 @@ serve(async (req) => {
   }
 
   try {
-    // ─── Auth ──────────────────────────────────────────────────────────
     const authHeader = req.headers.get("Authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -50,7 +48,6 @@ serve(async (req) => {
       });
     }
 
-    // ─── Parse body ────────────────────────────────────────────────────
     const { amount, recipient } = await req.json();
     if (!amount || !recipient) {
       return new Response(JSON.stringify({ error: "Missing amount or recipient" }), {
@@ -65,7 +62,6 @@ serve(async (req) => {
       });
     }
 
-    // ─── Find recipient ────────────────────────────────────────────────
     const { data: recipientUser, error: findError } = await supabase
       .from("profiles")
       .select("id")
@@ -79,7 +75,6 @@ serve(async (req) => {
       });
     }
 
-    // ─── Get sender wallet ─────────────────────────────────────────────
     const { data: senderWallet, error: senderError } = await supabase
       .from("wallets")
       .select("balance")
@@ -99,7 +94,6 @@ serve(async (req) => {
       });
     }
 
-    // ─── Deduct sender ──────────────────────────────────────────────────
     const { error: deductError } = await supabase
       .from("wallets")
       .update({ balance: senderWallet.balance - amount })
@@ -113,7 +107,6 @@ serve(async (req) => {
       });
     }
 
-    // ─── Credit recipient ──────────────────────────────────────────────
     const { data: recipientWallet, error: recipError } = await supabase
       .from("wallets")
       .select("balance")
@@ -121,7 +114,6 @@ serve(async (req) => {
       .single();
 
     if (recipError || !recipientWallet) {
-      // Rollback sender
       await supabase
         .from("wallets")
         .update({ balance: senderWallet.balance })
@@ -138,7 +130,6 @@ serve(async (req) => {
       .eq("user_id", recipientUser.id);
 
     if (creditError) {
-      // Rollback sender
       await supabase
         .from("wallets")
         .update({ balance: senderWallet.balance })
@@ -150,7 +141,6 @@ serve(async (req) => {
       });
     }
 
-    // ─── Log ledger entries ─────────────────────────────────────────────
     await supabase.from("wallet_ledger").insert([
       {
         user_id: user.id,
