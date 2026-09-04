@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef }react } from "react";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Badge, SectionTitle } from "@/components/ui-bits";
 import { useAuth } from "@/hooks/useAuth";
@@ -91,7 +91,9 @@ function WalletPage() {
       });
       if (!txRes.ok) throw new Error("Failed to fetch transactions");
       const txData = await txRes.json();
-      setTransactions(txData || []);
+      // ensure each tx has a status (default to 'completed' if not provided)
+      const txWithStatus = txData.map((tx: any) => ({ ...tx, status: tx.status || 'completed' }));
+      setTransactions(txWithStatus);
 
       const statsRes = await fetch(`${API_BASE}/wallet/stats`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -286,7 +288,7 @@ function StatCard({ label, value, tone }: { label: string; value: string; tone?:
   );
 }
 
-// ─── Deposit Sheet (scrolling fixed) ──────────────────────────────────
+// ─── Deposit Sheet ──────────────────────────────────────────────────────
 function DepositSheet({ onClose, user, onSuccess }: any) {
   const [amount, setAmount] = useState("");
   const [phone, setPhone] = useState("");
@@ -364,7 +366,6 @@ function DepositSheet({ onClose, user, onSuccess }: any) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-end sm:place-items-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      {/* ✅ Fixed: added pb-20 to ensure bottom space, and max-h-[95vh] */}
       <div className="relative z-10 w-full max-w-md max-h-[95vh] overflow-y-auto rounded-t-3xl bg-card p-5 shadow-2xl sm:rounded-3xl pb-20">
         <div className="flex items-center justify-between border-b border-border pb-3">
           <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground">
@@ -522,6 +523,7 @@ function TransferSheet({ onClose, user, balance, onSuccess }: any) {
     setLoading(true);
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
+      // ✅ Corrected URL – removed "404" typo
       const response = await fetch(`${API_BASE}/wallet/transfer`, {
         method: "POST",
         headers: {
