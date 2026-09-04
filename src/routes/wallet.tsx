@@ -1,10 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState, useRef }react } from "react";
+import { useEffect, useState, useRef } from "react";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Badge, SectionTitle } from "@/components/ui-bits";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { ArrowLeft, TrendingUp, X, ArrowDownToLine, ArrowUpFromLine, Send, Filter } from "lucide-react";
+import {
+  ArrowLeft,
+  TrendingUp,
+  X,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Send,
+  Filter,
+} from "lucide-react";
 import { fmt } from "@/lib/mock";
 import { createClient } from "@supabase/supabase-js";
 
@@ -12,7 +20,8 @@ export const Route = createFileRoute("/wallet")({
   component: WalletPage,
 });
 
-const API_BASE = import.meta.env.VITE_PESAKI_API_URL || "https://pesaki-server.onrender.com";
+const API_BASE =
+  import.meta.env.VITE_PESAKI_API_URL || "https://pesaki-server.onrender.com";
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL!,
   import.meta.env.VITE_SUPABASE_ANON_KEY!
@@ -91,8 +100,10 @@ function WalletPage() {
       });
       if (!txRes.ok) throw new Error("Failed to fetch transactions");
       const txData = await txRes.json();
-      // ensure each tx has a status (default to 'completed' if not provided)
-      const txWithStatus = txData.map((tx: any) => ({ ...tx, status: tx.status || 'completed' }));
+      const txWithStatus = txData.map((tx: any) => ({
+        ...tx,
+        status: tx.status || "completed",
+      }));
       setTransactions(txWithStatus);
 
       const statsRes = await fetch(`${API_BASE}/wallet/stats`, {
@@ -129,7 +140,8 @@ function WalletPage() {
     if (filter === "all") return true;
     if (filter === "deposit") return tx.type === "deposit";
     if (filter === "withdrawal") return tx.type === "withdrawal";
-    if (filter === "trading") return tx.type === "game_win" || tx.type === "game_loss" || tx.type === "market";
+    if (filter === "trading")
+      return tx.type === "game_win" || tx.type === "game_loss" || tx.type === "market";
     return true;
   });
 
@@ -151,7 +163,9 @@ function WalletPage() {
       <section className="px-5 pt-5">
         <div className="relative overflow-hidden rounded-2xl gradient-primary p-5 text-primary-foreground">
           <p className="text-xs uppercase tracking-widest opacity-80">Available Balance</p>
-          <p className="mt-1 font-display text-3xl font-bold">{fmt(wallet?.balance || 0)}</p>
+          <p className="mt-1 font-display text-3xl font-bold">
+            {fmt(wallet?.balance || 0)}
+          </p>
           <p className="mt-0.5 text-xs opacity-80">Locked: {fmt(wallet?.locked || 0)}</p>
 
           <div className="mt-4 grid grid-cols-3 gap-2">
@@ -225,16 +239,25 @@ function WalletPage() {
                   <div className="min-w-0">
                     <p className="text-sm font-semibold">{tx.description || tx.type}</p>
                     <p className="mt-0.5 text-[11px] text-muted-foreground">
-                      {new Date(tx.created_at).toLocaleDateString()} · {new Date(tx.created_at).toLocaleTimeString()}
+                      {new Date(tx.created_at).toLocaleDateString()} ·{" "}
+                      {new Date(tx.created_at).toLocaleTimeString()}
                     </p>
                     {tx.status && (
-                      <Badge tone={tx.status === "completed" ? "success" : "warning"} className="mt-1">
+                      <Badge
+                        tone={tx.status === "completed" ? "success" : "warning"}
+                        className="mt-1"
+                      >
                         {tx.status}
                       </Badge>
                     )}
                   </div>
-                  <div className={`font-semibold ${tx.mode === "credit" ? "text-success" : "text-destructive"}`}>
-                    {tx.mode === "credit" ? "+" : "-"}{fmt(tx.amount)}
+                  <div
+                    className={`font-semibold ${
+                      tx.mode === "credit" ? "text-success" : "text-destructive"
+                    }`}
+                  >
+                    {tx.mode === "credit" ? "+" : "-"}
+                    {fmt(tx.amount)}
                   </div>
                 </div>
               </Card>
@@ -244,11 +267,7 @@ function WalletPage() {
       </section>
 
       {showDeposit && (
-        <DepositSheet
-          onClose={() => setShowDeposit(false)}
-          user={user}
-          onSuccess={refreshWallet}
-        />
+        <DepositSheet onClose={() => setShowDeposit(false)} user={user} onSuccess={refreshWallet} />
       )}
       {showWithdraw && (
         <WithdrawSheet
@@ -271,14 +290,25 @@ function WalletPage() {
 }
 
 // ─── Stat Card ──────────────────────────────────────────────────────────
-function StatCard({ label, value, tone }: { label: string; value: string; tone?: string }) {
+function StatCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: string;
+}) {
   const colorClasses = {
     success: "bg-success/10 text-success",
     destructive: "bg-destructive/10 text-destructive",
     warning: "bg-warning/10 text-warning",
     gold: "bg-gold/10 text-gold-foreground",
   };
-  const color = tone ? colorClasses[tone as keyof typeof colorClasses] || "bg-muted text-foreground" : "bg-muted text-foreground";
+  const color =
+    tone && tone in colorClasses
+      ? colorClasses[tone as keyof typeof colorClasses]
+      : "bg-muted text-foreground";
 
   return (
     <div className={`rounded-xl ${color} p-2.5 text-center`}>
@@ -354,8 +384,13 @@ function DepositSheet({ onClose, user, onSuccess }: any) {
             <TrendingUp className="h-8 w-8" />
           </div>
           <p className="mt-3 text-lg font-bold">STK Push Sent</p>
-          <p className="text-xs text-muted-foreground">Check your phone for the M-Pesa prompt. Enter your PIN to confirm.</p>
-          <button onClick={onClose} className="mt-4 w-full rounded-xl gradient-primary py-3 text-sm font-semibold text-primary-foreground">
+          <p className="text-xs text-muted-foreground">
+            Check your phone for the M-Pesa prompt. Enter your PIN to confirm.
+          </p>
+          <button
+            onClick={onClose}
+            className="mt-4 w-full rounded-xl gradient-primary py-3 text-sm font-semibold text-primary-foreground"
+          >
             Done
           </button>
         </div>
@@ -368,18 +403,26 @@ function DepositSheet({ onClose, user, onSuccess }: any) {
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative z-10 w-full max-w-md max-h-[95vh] overflow-y-auto rounded-t-3xl bg-card p-5 shadow-2xl sm:rounded-3xl pb-20">
         <div className="flex items-center justify-between border-b border-border pb-3">
-          <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground">
+          <button
+            onClick={onClose}
+            className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground"
+          >
             <ArrowLeft className="h-4 w-4" />
           </button>
           <h3 className="text-base font-bold">Deposit via M-Pesa</h3>
-          <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground">
+          <button
+            onClick={onClose}
+            className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           <div>
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Amount (KES)</label>
+            <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Amount (KES)
+            </label>
             <input
               type="number"
               min="1"
@@ -391,7 +434,9 @@ function DepositSheet({ onClose, user, onSuccess }: any) {
             />
           </div>
           <div>
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">M-Pesa Phone Number</label>
+            <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              M-Pesa Phone Number
+            </label>
             <input
               type="tel"
               required
@@ -400,7 +445,9 @@ function DepositSheet({ onClose, user, onSuccess }: any) {
               className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
               placeholder="0712345678"
             />
-            <p className="mt-1 text-[10px] text-muted-foreground">Enter the phone number registered with M-Pesa.</p>
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Enter the phone number registered with M-Pesa.
+            </p>
           </div>
 
           <button
@@ -470,7 +517,9 @@ function WithdrawSheet({ onClose, user, balance, onSuccess }: any) {
       <p className="mt-1 text-sm font-semibold">Available: {fmt(balance)}</p>
       <form onSubmit={handleSubmit} className="mt-4 space-y-4">
         <div>
-          <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Amount (KES)</label>
+          <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Amount (KES)
+          </label>
           <input
             type="number"
             min="1"
@@ -483,7 +532,9 @@ function WithdrawSheet({ onClose, user, balance, onSuccess }: any) {
           />
         </div>
         <div>
-          <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">M-Pesa Phone Number</label>
+          <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            M-Pesa Phone Number
+          </label>
           <input
             type="tel"
             required
@@ -523,7 +574,6 @@ function TransferSheet({ onClose, user, balance, onSuccess }: any) {
     setLoading(true);
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
-      // ✅ Corrected URL – removed "404" typo
       const response = await fetch(`${API_BASE}/wallet/transfer`, {
         method: "POST",
         headers: {
@@ -551,7 +601,9 @@ function TransferSheet({ onClose, user, balance, onSuccess }: any) {
       <p className="mt-1 text-sm font-semibold">Available: {fmt(balance)}</p>
       <form onSubmit={handleSubmit} className="mt-4 space-y-4">
         <div>
-          <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Recipient Email or Phone</label>
+          <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Recipient Email or Phone
+          </label>
           <input
             type="text"
             required
@@ -562,7 +614,9 @@ function TransferSheet({ onClose, user, balance, onSuccess }: any) {
           />
         </div>
         <div>
-          <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Amount (KES)</label>
+          <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Amount (KES)
+          </label>
           <input
             type="number"
             min="1"
@@ -587,17 +641,31 @@ function TransferSheet({ onClose, user, balance, onSuccess }: any) {
 }
 
 // ─── Sheet Shell ──────────────────────────────────────────────────────────
-function SheetShell({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
+function SheetShell({
+  title,
+  children,
+  onClose,
+}: {
+  title: string;
+  children: React.ReactNode;
+  onClose: () => void;
+}) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-end sm:place-items-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative z-10 w-full max-w-md max-h-[95vh] overflow-y-auto rounded-t-3xl bg-card p-5 shadow-2xl sm:rounded-3xl pb-20">
         <div className="flex items-center justify-between border-b border-border pb-3">
-          <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground">
+          <button
+            onClick={onClose}
+            className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground"
+          >
             <ArrowLeft className="h-4 w-4" />
           </button>
           <h3 className="text-base font-bold">{title}</h3>
-          <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground">
+          <button
+            onClick={onClose}
+            className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
