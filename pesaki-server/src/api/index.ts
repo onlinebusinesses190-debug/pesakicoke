@@ -1,18 +1,18 @@
-import { FastifyInstance } from 'fastify';
-import { walletRoutes } from './routes/wallet';
-import { aviatorRoutes } from './routes/aviator';
-import { spinRoutes } from './routes/spin';
-import { predictionRoutes } from './routes/prediction';
-import { healthRoutes } from './routes/health';
-import { marketRoutes } from './routes/market';
-import { nseRoutes } from './routes/nse';
+// ─── Routes loaded by registerRoutes() ──────────────────────────────
+// NOTE: walletRoutes is now registered directly in index.ts
+//       to avoid conflicts and support optional 'mode' parameter.
 
-export const registerRoutes = (fastify: FastifyInstance) => {
-  fastify.register(healthRoutes); // /health is global
-  fastify.register(marketRoutes, { prefix: '/market' });
-  fastify.register(walletRoutes, { prefix: '/wallet' });
-  fastify.register(aviatorRoutes, { prefix: '/games/aviator' });
-  fastify.register(spinRoutes, { prefix: '/games/spin' });
-  fastify.register(predictionRoutes, { prefix: '/games/prediction' });
-  fastify.register(nseRoutes, { prefix: '/games/nse' });
+import { kaziRoutes } from './routes/kazi';
+import { mpesaRoutes } from './routes/mpesa';
+
+export { kaziRoutes, mpesaRoutes };
+
+// ─── This function is called from the main index.ts ────────────────
+import { FastifyInstance } from 'fastify';
+
+export const registerRoutes = (server: FastifyInstance) => {
+  // All routes from ./routes/* are auto‑registered here.
+  // If you have other routes besides kazi and mpesa, add them below.
+  server.register(kaziRoutes);
+  server.register(mpesaRoutes);
 };
