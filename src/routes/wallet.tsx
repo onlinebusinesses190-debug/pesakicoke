@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useRef } from "react";
 import { AppShell, PageHeader } from "@/components/AppShell";
-import { Card, SectionTitle } from "@/components/ui-bits";
+import { Card, SectionTitle, Badge } from "@/components/ui-bits";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import {
