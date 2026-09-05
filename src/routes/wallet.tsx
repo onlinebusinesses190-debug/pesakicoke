@@ -4,11 +4,6 @@ import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, SectionTitle } from "@/components/ui-bits";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-<<<<<<< HEAD
-import { ArrowLeft, TrendingUp, X, ArrowLeftRight } from "lucide-react";
-import { fmt } from "@/lib/mock";
-import { apiRequest } from "@/utils/api";
-=======
 import {
   ArrowLeft,
   TrendingUp,
@@ -17,21 +12,17 @@ import {
   ArrowUpFromLine,
   Send,
   Filter,
+  ArrowLeftRight,
 } from "lucide-react";
 import { fmt } from "@/lib/mock";
-import { createClient } from "@supabase/supabase-js";
->>>>>>> 907544261e94f2a4430149f8be593735c1adb54e
+import { apiRequest } from "@/utils/api";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/wallet")({
   component: WalletPage,
 });
 
-const API_BASE =
-  import.meta.env.VITE_PESAKI_API_URL || "https://pesaki-server.onrender.com";
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL!,
-  import.meta.env.VITE_SUPABASE_ANON_KEY!
-);
+const API_BASE = import.meta.env.VITE_PESAKI_API_URL || "https://pesaki-server.onrender.com";
 
 interface Wallet {
   balance: number;
@@ -315,13 +306,6 @@ function WalletPage() {
           onClose={() => setShowTransfer(false)}
           user={user}
           balance={wallet?.balance || 0}
-          onSuccess={refreshWallet}
-        />
-      )}
-
-      {showTransfer && (
-        <TransferSheet
-          onClose={() => setShowTransfer(false)}
           onSuccess={refreshWallet}
         />
       )}
@@ -699,13 +683,10 @@ function TransferSheet({ onClose, user, balance, onSuccess }: any) {
 
     setLoading(true);
     try {
-      const token = (await supabase.auth.getSession()).data.session?.access_token;
-      const { data, error } = await supabase.functions.invoke("transfer", {
-        body: { amount: numAmount, recipient },
-        headers: { Authorization: `Bearer ${token}` },
+      await apiRequest('/wallet/transfer', {
+        method: 'POST',
+        body: JSON.stringify({ amount: numAmount, recipient }),
       });
-
-      if (error) throw new Error(error.message);
       toast.success("Transfer completed");
       onSuccess();
       onClose();
