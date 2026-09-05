@@ -1,12 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useRef } from "react";
 import { AppShell, PageHeader } from "@/components/AppShell";
-import { Card, Badge, SectionTitle } from "@/components/ui-bits";
+import { Card, SectionTitle } from "@/components/ui-bits";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@supabase/supabase-js";
 import { toast } from "sonner";
-import { ArrowLeft, TrendingUp, X } from "lucide-react";
+import { ArrowLeft, TrendingUp, X, ArrowLeftRight } from "lucide-react";
 import { fmt } from "@/lib/mock";
+import { apiRequest } from "@/utils/api";
 
 export const Route = createFileRoute("/wallet")({
   component: WalletPage,
@@ -32,6 +33,7 @@ function WalletPage() {
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [showDeposit, setShowDeposit] = useState(false);
+  const [showTransfer, setShowTransfer] = useState(false);
   const hasFetched = useRef(false);
 
   const supabase = createClient(
@@ -102,12 +104,20 @@ function WalletPage() {
         title="Wallet"
         subtitle="Manage your funds"
         right={
-          <button
-            onClick={() => setShowDeposit(true)}
-            className="rounded-full gradient-primary px-4 py-2 text-xs font-semibold text-primary-foreground"
-          >
-            Deposit
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowTransfer(true)}
+              className="rounded-full border border-border bg-background px-3 py-2 text-[11px] font-semibold text-foreground"
+            >
+              <span className="inline-flex items-center gap-1.5"><ArrowLeftRight className="h-3.5 w-3.5" />Transfer</span>
+            </button>
+            <button
+              onClick={() => setShowDeposit(true)}
+              className="rounded-full gradient-primary px-4 py-2 text-xs font-semibold text-primary-foreground"
+            >
+              Deposit
+            </button>
+          </div>
         }
       />
 
@@ -163,7 +173,101 @@ function WalletPage() {
           onSuccess={refreshWallet}
         />
       )}
+
+      {showTransfer && (
+        <TransferSheet
+          onClose={() => setShowTransfer(false)}
+          onSuccess={refreshWallet}
+        />
+      )}
     </AppShell>
+  );
+}
+
+function TransferSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const [amount, setAmount] = useState('');
+  const [recipient, setRecipient] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!amount || !recipient) return;
+
+    setLoading(true);
+
+    try {
+      const payload = {
+        amount: Number(amount),
+        mode: 'real',
+        recipient: recipient.trim(),
+      };
+
+      await apiRequest('/wallet/transfer', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+
+      toast.success('Transfer sent successfully');
+      onSuccess();
+      onClose();
+    } catch (error: any) {
+      toast.error(error.message || 'Transfer failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-end sm:place-items-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-3xl bg-card p-5 shadow-2xl sm:rounded-3xl">
+        <div className="flex items-center justify-between border-b border-border pb-3">
+          <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground">
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <h3 className="text-base font-bold">Send to Pesaki user</h3>
+          <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          <div>
+            <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Amount (KES)</label>
+            <input
+              type="number"
+              min="1"
+              required
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
+              placeholder="e.g. 500"
+            />
+          </div>
+
+          <div>
+            <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Recipient</label>
+            <input
+              type="text"
+              required
+              value={recipient}
+              onChange={(e) => setRecipient(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
+              placeholder="Phone, email, or user ID"
+            />
+            <p className="mt-1 text-[10px] text-muted-foreground">Use the recipient&apos;s phone number, email or Pesaki user ID.</p>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50"
+          >
+            {loading ? 'Sending...' : 'Send money'}
+          </button>
+        </form>
+      </div>
+    </div>
   );
 }
 
