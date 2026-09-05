@@ -1,22 +1,11 @@
-import { createClient } from '@supabase/supabase-js';
+// ─── Unified Supabase client ─────────────────────────────────────
+// Re-exports the app-wide singleton so there is only ONE GoTrueClient
+// instance in the browser, avoiding the "Multiple GoTrueClient instances"
+// warning and potential auth sync issues.
+export { supabase } from '@/integrations/supabase/client';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Missing Supabase environment variables');
-}
-
-// ─── Singleton client (no auto‑refresh, no listeners) ────────────
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-        autoRefreshToken: false, // prevents automatic refresh loops
-        persistSession: true,
-        detectSessionInUrl: false,
-    },
-});
-
-// ─── Keep the original function name for backward compatibility ──
+// ─── Backward compatibility ──────────────────────────────────────
+import { supabase as _supabase } from '@/integrations/supabase/client';
 export function createBrowserClient() {
-    return supabase;
+    return _supabase;
 }

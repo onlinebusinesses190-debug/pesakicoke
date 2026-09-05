@@ -214,15 +214,40 @@ export default async function walletRoutes(server: FastifyInstance) {
         return reply.status(400).send({ error: 'Missing amount or recipient' });
       }
 
-      // Find recipient by email or phone
-      const { data: recipientUser, error: findError } = await supabase
+      // ─── Normalize recipient lookup ──────────────────────────────────
+      const trimmed = recipient.trim();
+
+      // Normalize phone: 0712... → 254712..., +254712... → 254712...
+      const normalizedPhone = (() => {
+        const digits = trimmed.replace(/\D/g, '');
+        if (digits.startsWith('254') && digits.length === 12) return digits;
+        if (digits.startsWith('0') && digits.length === 10) return '254' + digits.slice(1);
+        if (digits.length === 9) return '254' + digits;
+        return digits;
+      })();
+
+      // Try phone lookup first
+      let recipientUser: { id: string } | null = null;
+      const { data: byPhone } = await supabase
         .from('profiles')
         .select('id')
-        .or(`email.eq.${recipient},phone.eq.${recipient}`)
-        .single();
+        .eq('phone', normalizedPhone)
+        .maybeSingle();
 
-      if (findError || !recipientUser) {
-        return reply.status(404).send({ error: 'Recipient not found' });
+      if (byPhone?.id) {
+        recipientUser = byPhone;
+      } else {
+        // Fall back to case-insensitive email lookup
+        const { data: byEmail } = await supabase
+          .from('profiles')
+          .select('id')
+          .ilike('email', trimmed)
+          .maybeSingle();
+        recipientUser = byEmail;
+      }
+
+      if (!recipientUser) {
+        return reply.status(404).send({ error: 'Recipient not found. Check the phone number or email and try again.' });
       }
 
       // Get sender balance

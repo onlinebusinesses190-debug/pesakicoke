@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { createClient } from "@supabase/supabase-js";
 import { Landmark, ShieldCheck, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 // Helper: format phone
 function formatPhoneNumber(raw: string): string {
@@ -33,11 +33,7 @@ function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
-  // Direct Supabase client (no shared client, avoids circular loop)
-  const supabase = createClient(
-    import.meta.env.VITE_SUPABASE_URL,
-    import.meta.env.VITE_SUPABASE_ANON_KEY
-  );
+  // Uses the app-wide singleton — avoids spawning a new GoTrueClient on every render.
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
