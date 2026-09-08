@@ -10,6 +10,7 @@ const envSchema = z.object({
   MPESA_CONSUMER_KEY: z.string().optional(),
   MPESA_CONSUMER_SECRET: z.string().optional(),
   MPESA_SHORTCODE: z.string().optional(),
+  MPESA_TILL_NUMBER: z.string().optional(),
   MPESA_PASSKEY: z.string().optional(),
   MPESA_ENV: z.string().optional(),
   MPESA_CALLBACK_URL: z.string().url().optional(),

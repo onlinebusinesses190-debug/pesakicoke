@@ -375,7 +375,7 @@ function DepositSheet({ onClose, user, onSuccess }: any) {
 
       const data = await response.json();
 
-      if (response.ok && data?.checkout_request_id) {
+      if (response.ok && data?.success && data?.data?.checkoutRequestId) {
         toast.success("STK Push sent. Check your phone for the prompt.");
         setStep("success");
         onSuccess();

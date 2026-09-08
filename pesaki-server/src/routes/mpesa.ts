@@ -34,6 +34,11 @@ interface STKPushResponse {
 /**
  * Get M-Pesa access token
  */
+const isProduction = (): boolean => {
+  const envMode = env.MPESA_ENV;
+  return envMode === 'production' || envMode === 'LIVE';
+};
+
 const generateAccessToken = async (): Promise<string | null> => {
   try {
     const consumerKey = env.MPESA_CONSUMER_KEY;
@@ -49,7 +54,7 @@ const generateAccessToken = async (): Promise<string | null> => {
     ).toString('base64');
 
     const baseUrl =
-      env.MPESA_ENV === 'production'
+      isProduction()
         ? 'https://api.safaricom.co.ke'
         : 'https://sandbox.safaricom.co.ke';
 
@@ -151,12 +156,12 @@ const initiateSTKPush = async (
   localRequestId: string
 ): Promise<STKPushResponse | null> => {
   try {
-    const businessShortCode = '4574053';
-    const tillNumber = '3240141'; // ✅ CORRECT TILL NUMBER (as per old working system)
+    const businessShortCode = env.MPESA_SHORTCODE || '4574053';
+    const tillNumber = env.MPESA_TILL_NUMBER || '3240141';
     const passkey = env.MPESA_PASSKEY;
 
-    if (!passkey) {
-      logger.error('Missing MPESA_PASSKEY');
+    if (!businessShortCode || !tillNumber || !passkey) {
+      logger.error('Missing M-Pesa configuration: shortcode, till number, or passkey');
       return null;
     }
 
@@ -166,8 +171,10 @@ const initiateSTKPush = async (
       return null;
     }
 
-    const callbackUrl =
-      callbackBase.replace(/\/+$/, '') + '/api/mpesa/callback';
+    const trimmedBase = callbackBase.replace(/\/+$/, '');
+    const callbackUrl = trimmedBase.endsWith('/api/mpesa/callback')
+      ? trimmedBase
+      : `${trimmedBase}/api/mpesa/callback`;
 
     const timestamp = generateTimestamp();
 
@@ -214,7 +221,7 @@ const initiateSTKPush = async (
     );
 
     const baseUrl =
-      env.MPESA_ENV === 'production'
+      isProduction()
         ? 'https://api.safaricom.co.ke'
         : 'https://sandbox.safaricom.co.ke';
 
