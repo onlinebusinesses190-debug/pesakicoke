@@ -62,3 +62,39 @@ BEGIN
   RETURN TRUE;
 END;
 $$ SECURITY DEFINER;
+
+-- RPC to release locked funds (move from locked back to balance)
+CREATE OR REPLACE FUNCTION public.release_locked_funds(
+  p_user_id uuid,
+  p_amount numeric
+) RETURNS void
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  cur_balance numeric;
+  cur_locked numeric;
+BEGIN
+  IF p_amount IS NULL OR p_amount <= 0 THEN
+    RETURN;
+  END IF;
+
+  SELECT balance, locked INTO cur_balance, cur_locked
+  FROM public.wallets
+  WHERE user_id = p_user_id
+  FOR UPDATE;
+
+  IF cur_balance IS NULL THEN
+    cur_balance := 0;
+  END IF;
+
+  IF cur_locked IS NULL THEN
+    cur_locked := 0;
+  END IF;
+
+  UPDATE public.wallets
+  SET balance = cur_balance + p_amount,
+      locked = GREATEST(0, cur_locked - p_amount),
+      updated_at = now()
+  WHERE user_id = p_user_id;
+END;
+$$ SECURITY DEFINER;
