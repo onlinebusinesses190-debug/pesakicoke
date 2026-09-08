@@ -1,8 +1,10 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { supabase } from '../../lib/supabase';
-import { getBalance, credit, debit, transfer } from '../../wallet/service';
+import { getBalance, getAvailableBalance, reserveLockedFunds, releaseLockedFunds, credit, debit, transfer } from '../../wallet/service';
 import { verifyAuth } from '../../middleware/auth';
+import { initiateB2CPayout } from '../../b2c/service';
+import { logger } from '../../utils/logger';
 
 const transferSchema = z.object({
   amount: z.number().positive(),
@@ -67,6 +69,16 @@ export const walletRoutes = async (fastify: FastifyInstance) => {
     return reply.send({ success: true, data: { balance } });
   });
 
+  fastify.get('/available-balance', { preHandler: [verifyAuth] }, async (request, reply) => {
+    const { mode } = request.query as { mode: 'real' | 'demo' };
+    if (!mode || (mode !== 'real' && mode !== 'demo')) {
+      return reply.code(400).send({ success: false, error: 'Valid mode required', code: 'BAD_REQUEST' });
+    }
+
+    const available = await getAvailableBalance(request.user!.id, mode);
+    return reply.send({ success: true, data: { available: available ?? 0 } });
+  });
+
   fastify.post('/deposit', { preHandler: [verifyAuth] }, async (request, reply) => {
     const parsed = transferSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -85,6 +97,111 @@ export const walletRoutes = async (fastify: FastifyInstance) => {
     
     const result = await debit(request.user!.id, parsed.data.amount, parsed.data.mode, 'User Withdrawal');
     return reply.send(result);
+  });
+
+  const b2cWithdrawSchema = z.object({
+    amount: z.coerce.number().positive(),
+    phone: z.string().min(10),
+  });
+
+  fastify.post('/withdraw/b2c', { preHandler: [verifyAuth] }, async (request, reply) => {
+    const parsed = b2cWithdrawSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ success: false, error: 'Invalid payload', code: 'BAD_REQUEST' });
+    }
+
+    const userId = request.user!.id;
+    const { amount, phone } = parsed.data;
+    const cleanPhone = normalizePhone(phone);
+
+    if (!cleanPhone) {
+      return reply.code(400).send({ success: false, error: 'Invalid phone number', code: 'BAD_REQUEST' });
+    }
+
+    const available = await getAvailableBalance(userId, 'real');
+    if (available === null || available < amount) {
+      return reply.code(400).send({ success: false, error: 'Insufficient available balance', code: 'INSUFFICIENT_FUNDS' });
+    }
+
+    const reserved = await reserveLockedFunds(userId, amount);
+    if (!reserved.success) {
+      return reply.code(400).send({ success: false, error: reserved.error || 'Failed to reserve funds', code: 'RESERVE_FAILED' });
+    }
+
+    const reference = `PESAKI-WD-${Date.now()}-${userId.slice(0, 8)}`;
+
+    const { data: withdrawalRecord, error: insertError } = await supabase
+      .from('b2c_withdrawals')
+      .insert({
+        user_id: userId,
+        amount,
+        phone: cleanPhone,
+        reference,
+        status: 'pending',
+      })
+      .select('id, reference, status')
+      .single();
+
+    if (insertError || !withdrawalRecord) {
+      await releaseLockedFunds(userId, amount, true);
+      logger.error({ insertError, userId }, 'Failed to create B2C withdrawal record');
+      return reply.code(500).send({ success: false, error: 'Failed to initialize withdrawal', code: 'DB_ERROR' });
+    }
+
+    const payoutResult = await initiateB2CPayout({
+      amount,
+      phone: cleanPhone,
+      reference,
+      description: 'PESAKI withdrawal',
+    });
+
+    if (!payoutResult) {
+      await supabase
+        .from('b2c_withdrawals')
+        .update({ status: 'failed', metadata: { error: 'Payout initiation failed' } })
+        .eq('id', withdrawalRecord.id);
+
+      await releaseLockedFunds(userId, amount, true);
+      return reply.code(500).send({ success: false, error: 'Failed to initiate B2C payout', code: 'PAYOUT_FAILED' });
+    }
+
+    await supabase
+      .from('b2c_withdrawals')
+      .update({
+        provider_transaction_id: payoutResult.data.transactionId,
+        provider_checkout_id: payoutResult.data.providerCheckoutId,
+        metadata: { ...payoutResult.data },
+      })
+      .eq('id', withdrawalRecord.id);
+
+    return reply.send({
+      success: true,
+      data: {
+        reference,
+        status: payoutResult.data.status,
+        transactionId: payoutResult.data.transactionId,
+        providerCheckoutId: payoutResult.data.providerCheckoutId,
+        amount,
+        phone: cleanPhone,
+      },
+    });
+  });
+
+  fastify.get('/withdrawals/status/:reference', { preHandler: [verifyAuth] }, async (request, reply) => {
+    const { reference } = request.params as { reference: string };
+
+    const { data: withdrawal, error } = await supabase
+      .from('b2c_withdrawals')
+      .select('id, amount, phone, status, provider_transaction_id, provider_checkout_id, created_at, updated_at')
+      .eq('reference', reference)
+      .eq('user_id', request.user!.id)
+      .maybeSingle();
+
+    if (error || !withdrawal) {
+      return reply.code(404).send({ success: false, error: 'Withdrawal not found', code: 'NOT_FOUND' });
+    }
+
+    return reply.send({ success: true, data: withdrawal });
   });
 
   fastify.post('/transfer', { preHandler: [verifyAuth] }, async (request, reply) => {

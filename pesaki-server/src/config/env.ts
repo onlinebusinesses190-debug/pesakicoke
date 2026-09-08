@@ -14,6 +14,8 @@ const envSchema = z.object({
   MPESA_PASSKEY: z.string().optional(),
   MPESA_ENV: z.string().optional(),
   MPESA_CALLBACK_URL: z.string().url().optional(),
+  PALPLUSS_API_KEY: z.string().optional(),
+  PALPLUSS_BASE_URL: z.string().url().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

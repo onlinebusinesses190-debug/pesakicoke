@@ -13,6 +13,7 @@ import { setupRateLimit } from './middleware/rateLimit';
 import walletRoutes from './routes/wallet';
 import kaziRoutes from './routes/kazi';
 import { mpesaRoutes } from './routes/mpesa';
+import { palplussRoutes } from './routes/palpluss';
 
 const startServer = async () => {
   try {
@@ -33,6 +34,7 @@ const startServer = async () => {
     server.register(walletRoutes);
     server.register(kaziRoutes);
     server.register(mpesaRoutes);
+    server.register(palplussRoutes);
 
     // Add dummy endpoints for missing ones
     server.get('/user/stats', async (_request, reply) => {

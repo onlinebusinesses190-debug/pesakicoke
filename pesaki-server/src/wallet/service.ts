@@ -7,7 +7,7 @@ const balanceFieldForMode = (mode: WalletMode) => mode === 'real' ? 'balance' : 
 const ensureWalletExists = async (userId: string) => {
   const { data, error } = await supabase
     .from('wallets')
-    .select('user_id, balance, demo_balance')
+    .select('user_id, balance, demo_balance, locked')
     .eq('user_id', userId)
     .maybeSingle();
 
@@ -49,6 +49,94 @@ export const getBalance = async (userId: string, mode: WalletMode): Promise<numb
   } catch (error: any) {
     logger.error({ error, userId, mode }, 'Failed to fetch wallet balance');
     return null;
+  }
+};
+
+export const getAvailableBalance = async (userId: string, mode: WalletMode): Promise<number | null> => {
+  const balanceField = balanceFieldForMode(mode);
+
+  try {
+    const wallet = await ensureWalletExists(userId);
+    const total = (wallet as any)?.[balanceField] ?? 0;
+    const locked = Number((wallet as any)?.locked) || 0;
+    return Math.max(0, total - locked);
+  } catch (error: any) {
+    logger.error({ error, userId, mode }, 'Failed to fetch available balance');
+    return null;
+  }
+};
+
+export const reserveLockedFunds = async (
+  userId: string,
+  amount: number
+): Promise<{ success: boolean; error?: string }> => {
+  if (amount <= 0) return { success: false, error: 'Amount must be greater than zero' };
+
+  logger.info({ userId, amount }, 'Reserving locked funds...');
+
+  try {
+    const { data, error } = await supabase.rpc('reserve_locked_funds', {
+      p_user_id: userId,
+      p_amount: amount,
+    });
+
+    if (error) {
+      logger.warn({ error, userId, amount }, 'Reserve locked funds RPC failed');
+      return { success: false, error: error.message };
+    }
+
+    if (data === false) {
+      return { success: false, error: 'Insufficient available balance' };
+    }
+
+    logger.info({ userId, amount }, 'Locked funds reserved successfully');
+    return { success: true };
+  } catch (error: any) {
+    logger.error(error, 'Exception in reserve locked funds operation');
+    return { success: false, error: 'Internal server error' };
+  }
+};
+
+export const releaseLockedFunds = async (
+  userId: string,
+  amount: number,
+  returnToBalance: boolean
+): Promise<void> => {
+  try {
+    const { data: wallet, error: walletError } = await supabase
+      .from('wallets')
+      .select('locked, balance')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (walletError || !wallet) {
+      logger.error(
+        { userId, amount, walletError },
+        'Failed to fetch wallet for locked funds release'
+      );
+      return;
+    }
+
+    const currentLocked = Number(wallet.locked) || 0;
+    const newLocked = Math.max(0, currentLocked - amount);
+    const balanceAdjustment = returnToBalance ? amount : 0;
+
+    const { error: updateError } = await supabase
+      .from('wallets')
+      .update({
+        locked: newLocked,
+        balance: Number(wallet.balance) + balanceAdjustment,
+      })
+      .eq('user_id', userId);
+
+    if (updateError) {
+      logger.error(
+        { userId, amount, returnToBalance, updateError },
+        'Failed to release locked funds'
+      );
+    }
+  } catch (error) {
+    logger.error(error, 'Exception releasing locked funds');
   }
 };
 

@@ -13,6 +13,9 @@ import {
   Send,
   Filter,
   ArrowLeftRight,
+  Loader2,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import { fmt } from "@/lib/mock";
 import { apiRequest } from "@/utils/api";
@@ -484,15 +487,67 @@ function WithdrawSheet({ onClose, user, balance, onSuccess }: any) {
   const [amount, setAmount] = useState("");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
+  const [availableBalance, setAvailableBalance] = useState(balance);
+  const [withdrawStatus, setWithdrawStatus] = useState<"idle" | "processing" | "pending" | "success" | "failed">("idle");
+  const [withdrawReference, setWithdrawReference] = useState<string | null>(null);
+  const pollRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchAvailable = async () => {
+      try {
+        const data = await apiRequest('/wallet/available-balance?mode=real');
+        if (!cancelled && data?.data?.available !== undefined) {
+          setAvailableBalance(data.data.available);
+        }
+      } catch {
+        // fallback to raw balance
+      }
+    };
+    fetchAvailable();
+    return () => { cancelled = true; };
+  }, []);
+
+  const stopPolling = () => {
+    if (pollRef.current) {
+      clearTimeout(pollRef.current);
+      pollRef.current = null;
+    }
+  };
+
+  const pollWithdrawStatus = async (reference: string) => {
+    try {
+      const statusData = await apiRequest(`/wallet/withdrawals/status/${reference}`);
+      const status = String(statusData?.data?.status || "").toLowerCase();
+
+      if (status === "completed") {
+        setWithdrawStatus("success");
+        stopPolling();
+        onSuccess();
+        toast.success("Withdrawal completed successfully");
+        setTimeout(() => onClose(), 3000);
+      } else if (status === "failed") {
+        setWithdrawStatus("failed");
+        stopPolling();
+        onSuccess();
+        toast.error("Withdrawal failed. Funds have been returned to your wallet.");
+        setTimeout(() => onClose(), 4000);
+      } else {
+        pollRef.current = window.setTimeout(() => pollWithdrawStatus(reference), 5000);
+      }
+    } catch (err) {
+      pollRef.current = window.setTimeout(() => pollWithdrawStatus(reference), 5000);
+    }
+  };
+
+  useEffect(() => {
+    return () => stopPolling();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || !phone) return;
     const numAmount = parseInt(amount);
-    if (numAmount > balance) {
-      toast.error("Insufficient balance");
-      return;
-    }
 
     let cleanPhone = phone.replace(/\D/g, "");
     if (cleanPhone.startsWith("0")) cleanPhone = "254" + cleanPhone.slice(1);
@@ -504,33 +559,100 @@ function WithdrawSheet({ onClose, user, balance, onSuccess }: any) {
     }
 
     setLoading(true);
+    setWithdrawStatus("processing");
     try {
-      const token = (await supabase.auth.getSession()).data.session?.access_token;
-      const response = await fetch(`${API_BASE}/wallet/withdraw`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+      const result = await apiRequest('/wallet/withdraw/b2c', {
+        method: 'POST',
         body: JSON.stringify({ amount: numAmount, phone: cleanPhone }),
       });
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || "Withdrawal failed");
-      toast.success("Withdrawal request submitted");
-      onSuccess();
-      onClose();
+      const reference = result?.data?.reference;
+      if (reference) {
+        setWithdrawReference(reference);
+        setWithdrawStatus("pending");
+        toast.success("Withdrawal initiated. Processing...");
+        pollWithdrawStatus(reference);
+      } else {
+        throw new Error(result?.error || "Withdrawal failed");
+      }
     } catch (err: any) {
       toast.error(err.message || "Withdrawal failed");
+      setWithdrawStatus("idle");
     } finally {
       setLoading(false);
     }
   };
 
+  if (withdrawStatus === "pending") {
+    return (
+      <SheetShell title="Withdraw Funds" onClose={onClose}>
+        <div className="py-6 text-center">
+          <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-warning/15 text-warning">
+            <Loader2 className="h-7 w-7 animate-spin" />
+          </div>
+          <p className="mt-4 text-lg font-bold">Processing Withdrawal</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Your withdrawal of {fmt(parseInt(amount))} to {phone} is being processed.
+            You will be notified once it is complete.
+          </p>
+          {withdrawReference && (
+            <p className="mt-3 text-[10px] text-muted-foreground">
+              Reference: {withdrawReference}
+            </p>
+          )}
+        </div>
+      </SheetShell>
+    );
+  }
+
+  if (withdrawStatus === "success") {
+    return (
+      <div className="fixed inset-0 z-50 grid place-items-center bg-black/50">
+        <div className="w-full max-w-sm rounded-2xl bg-card p-6 text-center">
+          <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-success/15 text-success">
+            <CheckCircle2 className="h-8 w-8" />
+          </div>
+          <p className="mt-3 text-lg font-bold">Withdrawal Successful</p>
+          <p className="text-xs text-muted-foreground">
+            {fmt(parseInt(amount))} has been sent to your M-Pesa account.
+          </p>
+          <button
+            onClick={onClose}
+            className="mt-4 w-full rounded-xl gradient-primary py-3 text-sm font-semibold text-primary-foreground"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (withdrawStatus === "failed") {
+    return (
+      <div className="fixed inset-0 z-50 grid place-items-center bg-black/50">
+        <div className="w-full max-w-sm rounded-2xl bg-card p-6 text-center">
+          <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-destructive/15 text-destructive">
+            <XCircle className="h-8 w-8" />
+          </div>
+          <p className="mt-3 text-lg font-bold">Withdrawal Failed</p>
+          <p className="text-xs text-muted-foreground">
+            The withdrawal could not be completed. The funds have been returned to your wallet.
+          </p>
+          <button
+            onClick={onClose}
+            className="mt-4 w-full rounded-xl gradient-primary py-3 text-sm font-semibold text-primary-foreground"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <SheetShell title="Withdraw Funds" onClose={onClose}>
-      <p className="text-xs text-muted-foreground">Withdraw to your M-Pesa account.</p>
-      <p className="mt-1 text-sm font-semibold">Available: {fmt(balance)}</p>
+      <p className="text-xs text-muted-foreground">Withdraw to your M-Pesa account via Palpluss B2C.</p>
+      <p className="mt-1 text-sm font-semibold">Available: {fmt(availableBalance)}</p>
       <form onSubmit={handleSubmit} className="mt-4 space-y-4">
         <div>
           <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -539,7 +661,7 @@ function WithdrawSheet({ onClose, user, balance, onSuccess }: any) {
           <input
             type="number"
             min="1"
-            max={balance}
+            max={availableBalance}
             required
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
