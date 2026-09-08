@@ -87,7 +87,7 @@ const callPalplussB2C = async (
 };
 
 export const palplussRoutes = async (fastify: FastifyInstance) => {
-  // ─── Webhook (already present, kept unchanged) ───────────────────────
+  // ─── Webhook ──────────────────────────────────────────────────────────
   fastify.post(
     '/api/webhooks/palpluss',
     async (request: FastifyRequest, reply: FastifyReply) => {
@@ -213,7 +213,7 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
     }
   );
 
-  // ─── NEW: Initiate B2C withdrawal ─────────────────────────────────────
+  // ─── Initiate B2C withdrawal (ONLY ONE DEFINITION) ────────────────────
   fastify.post(
     '/wallet/withdraw/b2c',
     async (request: FastifyRequest, reply: FastifyReply) => {
@@ -237,13 +237,11 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
           return reply.status(400).send({ error: 'Phone number is required' });
         }
 
-        // Validate phone format (simple)
         const cleanPhone = phone.replace(/\D/g, '');
         if (!cleanPhone.startsWith('254') || cleanPhone.length !== 12) {
           return reply.status(400).send({ error: 'Phone must be in format 2547XXXXXXXX' });
         }
 
-        // Get wallet
         const { data: wallet, error: walletError } = await supabase
           .from('wallets')
           .select('balance, locked')
@@ -259,7 +257,7 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
           return reply.status(400).send({ error: 'Insufficient balance' });
         }
 
-        // Reserve funds: move from balance to locked
+        // Reserve funds
         const newBalance = Number(wallet.balance) - amount;
         const newLocked = Number(wallet.locked) + amount;
 
@@ -273,10 +271,8 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
           return reply.status(500).send({ error: 'Failed to reserve funds' });
         }
 
-        // Generate reference
         const reference = `WD-${user.id.slice(0, 8)}-${Date.now()}`;
 
-        // Insert withdrawal record
         const { data: withdrawal, error: insertError } = await supabase
           .from('b2c_withdrawals')
           .insert({
@@ -292,7 +288,6 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
 
         if (insertError) {
           logger.error(insertError, 'Failed to create withdrawal record');
-          // Revert reserved funds
           await supabase
             .from('wallets')
             .update({
@@ -303,7 +298,6 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
           return reply.status(500).send({ error: 'Failed to create withdrawal record' });
         }
 
-        // Call Palpluss B2C API
         const callbackUrl =
           process.env.PALPLUSS_CALLBACK_URL ||
           'https://pesaki-server.onrender.com/api/webhooks/palpluss';
@@ -313,7 +307,6 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
           palplussResponse = await callPalplussB2C(amount, cleanPhone, reference, callbackUrl);
         } catch (apiError: any) {
           logger.error(apiError, 'Palpluss API call failed');
-          // Release locked funds
           await releaseLockedFunds(user.id, amount, true);
           await supabase
             .from('b2c_withdrawals')
@@ -325,7 +318,6 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
           return reply.status(500).send({ error: apiError.message || 'Palpluss API error' });
         }
 
-        // Update withdrawal with provider transaction ID
         await supabase
           .from('b2c_withdrawals')
           .update({
@@ -361,7 +353,7 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
     }
   );
 
-  // ─── NEW: Get withdrawal status ──────────────────────────────────────
+  // ─── Get withdrawal status ────────────────────────────────────────────
   fastify.get(
     '/wallet/withdrawals/status/:reference',
     async (request: FastifyRequest, reply: FastifyReply) => {
