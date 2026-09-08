@@ -2,7 +2,92 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { logger } from '../utils/logger';
 import { supabase } from '../lib/supabase';
 
+// ─── Helper: release locked funds ───────────────────────────────────────
+const releaseLockedFunds = async (
+  userId: string,
+  amount: number,
+  returnToBalance: boolean
+): Promise<void> => {
+  try {
+    const { data: wallet, error: walletError } = await supabase
+      .from('wallets')
+      .select('locked, balance')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (walletError || !wallet) {
+      logger.error(
+        { userId, amount, walletError },
+        'Failed to fetch wallet for locked funds release'
+      );
+      return;
+    }
+
+    const currentLocked = Number(wallet.locked) || 0;
+    const newLocked = Math.max(0, currentLocked - amount);
+    const balanceAdjustment = returnToBalance ? amount : 0;
+
+    const { error: updateError } = await supabase
+      .from('wallets')
+      .update({
+        locked: newLocked,
+        balance: Number(wallet.balance) + balanceAdjustment,
+      })
+      .eq('user_id', userId);
+
+    if (updateError) {
+      logger.error(
+        { userId, amount, returnToBalance, updateError },
+        'Failed to release locked funds'
+      );
+    }
+  } catch (error) {
+    logger.error(error, 'Exception releasing locked funds');
+  }
+};
+
+// ─── Helper: call Palpluss B2C API ──────────────────────────────────────
+const callPalplussB2C = async (
+  amount: number,
+  phone: string,
+  reference: string,
+  callbackUrl: string
+) => {
+  const apiKey = process.env.PALPLUSS_API_KEY;
+  const apiUrl = process.env.PALPLUSS_API_URL || 'https://api.palpluss.com/v1';
+
+  if (!apiKey) {
+    throw new Error('PALPLUSS_API_KEY environment variable is not set');
+  }
+
+  const payload = {
+    amount,
+    phone,
+    reference,
+    description: 'PESAKI withdrawal',
+    callback_url: callbackUrl,
+  };
+
+  const response = await fetch(`${apiUrl}/b2c/payouts`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-Key': apiKey,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data?.message || 'Palpluss B2C request failed');
+  }
+
+  return data.data; // contains transactionId, status, etc.
+};
+
 export const palplussRoutes = async (fastify: FastifyInstance) => {
+  // ─── Webhook (already present, kept unchanged) ───────────────────────
   fastify.post(
     '/api/webhooks/palpluss',
     async (request: FastifyRequest, reply: FastifyReply) => {
@@ -97,6 +182,7 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
           return reply.code(200).send({ received: true });
         }
 
+        // Success
         await supabase
           .from('b2c_withdrawals')
           .update({
@@ -126,48 +212,200 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
       }
     }
   );
-};
 
-const releaseLockedFunds = async (
-  userId: string,
-  amount: number,
-  returnToBalance: boolean
-): Promise<void> => {
-  try {
-    const { data: wallet, error: walletError } = await supabase
-      .from('wallets')
-      .select('locked, balance')
-      .eq('user_id', userId)
-      .maybeSingle();
+  // ─── NEW: Initiate B2C withdrawal ─────────────────────────────────────
+  fastify.post(
+    '/wallet/withdraw/b2c',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const token = request.headers.authorization?.replace('Bearer ', '');
+        if (!token) {
+          return reply.status(401).send({ error: 'Unauthorized' });
+        }
 
-    if (walletError || !wallet) {
-      logger.error(
-        { userId, amount, walletError },
-        'Failed to fetch wallet for locked funds release'
-      );
-      return;
+        const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+        if (userError || !user) {
+          return reply.status(401).send({ error: 'Invalid token' });
+        }
+
+        const { amount, phone } = request.body as { amount: number; phone: string };
+
+        if (!amount || amount <= 0) {
+          return reply.status(400).send({ error: 'Invalid amount' });
+        }
+        if (!phone) {
+          return reply.status(400).send({ error: 'Phone number is required' });
+        }
+
+        // Validate phone format (simple)
+        const cleanPhone = phone.replace(/\D/g, '');
+        if (!cleanPhone.startsWith('254') || cleanPhone.length !== 12) {
+          return reply.status(400).send({ error: 'Phone must be in format 2547XXXXXXXX' });
+        }
+
+        // Get wallet
+        const { data: wallet, error: walletError } = await supabase
+          .from('wallets')
+          .select('balance, locked')
+          .eq('user_id', user.id)
+          .single();
+
+        if (walletError || !wallet) {
+          return reply.status(400).send({ error: 'Wallet not found' });
+        }
+
+        const availableBalance = Number(wallet.balance) - Number(wallet.locked);
+        if (availableBalance < amount) {
+          return reply.status(400).send({ error: 'Insufficient balance' });
+        }
+
+        // Reserve funds: move from balance to locked
+        const newBalance = Number(wallet.balance) - amount;
+        const newLocked = Number(wallet.locked) + amount;
+
+        const { error: updateError } = await supabase
+          .from('wallets')
+          .update({ balance: newBalance, locked: newLocked })
+          .eq('user_id', user.id);
+
+        if (updateError) {
+          logger.error(updateError, 'Failed to reserve funds for withdrawal');
+          return reply.status(500).send({ error: 'Failed to reserve funds' });
+        }
+
+        // Generate reference
+        const reference = `WD-${user.id.slice(0, 8)}-${Date.now()}`;
+
+        // Insert withdrawal record
+        const { data: withdrawal, error: insertError } = await supabase
+          .from('b2c_withdrawals')
+          .insert({
+            user_id: user.id,
+            amount,
+            phone: cleanPhone,
+            reference,
+            status: 'pending',
+            idempotency_key: reference,
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          logger.error(insertError, 'Failed to create withdrawal record');
+          // Revert reserved funds
+          await supabase
+            .from('wallets')
+            .update({
+              balance: Number(wallet.balance),
+              locked: Number(wallet.locked),
+            })
+            .eq('user_id', user.id);
+          return reply.status(500).send({ error: 'Failed to create withdrawal record' });
+        }
+
+        // Call Palpluss B2C API
+        const callbackUrl =
+          process.env.PALPLUSS_CALLBACK_URL ||
+          'https://pesaki-server.onrender.com/api/webhooks/palpluss';
+
+        let palplussResponse;
+        try {
+          palplussResponse = await callPalplussB2C(amount, cleanPhone, reference, callbackUrl);
+        } catch (apiError: any) {
+          logger.error(apiError, 'Palpluss API call failed');
+          // Release locked funds
+          await releaseLockedFunds(user.id, amount, true);
+          await supabase
+            .from('b2c_withdrawals')
+            .update({
+              status: 'failed',
+              metadata: { error: apiError.message },
+            })
+            .eq('id', withdrawal.id);
+          return reply.status(500).send({ error: apiError.message || 'Palpluss API error' });
+        }
+
+        // Update withdrawal with provider transaction ID
+        await supabase
+          .from('b2c_withdrawals')
+          .update({
+            status: 'processing',
+            provider_transaction_id: palplussResponse.transactionId,
+            provider_checkout_id: palplussResponse.providerCheckoutId || null,
+            metadata: { palpluss_response: palplussResponse },
+          })
+          .eq('id', withdrawal.id);
+
+        logger.info(
+          {
+            reference,
+            userId: user.id,
+            amount,
+            transactionId: palplussResponse.transactionId,
+          },
+          'B2C withdrawal initiated successfully'
+        );
+
+        return reply.send({
+          success: true,
+          data: {
+            reference,
+            status: 'processing',
+            message: 'Withdrawal initiated. Check status via polling.',
+          },
+        });
+      } catch (error) {
+        logger.error(error, 'Error in /wallet/withdraw/b2c');
+        return reply.status(500).send({ error: 'Internal server error' });
+      }
     }
+  );
 
-    const currentLocked = Number(wallet.locked) || 0;
-    const newLocked = Math.max(0, currentLocked - amount);
+  // ─── NEW: Get withdrawal status ──────────────────────────────────────
+  fastify.get(
+    '/wallet/withdrawals/status/:reference',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const token = request.headers.authorization?.replace('Bearer ', '');
+        if (!token) {
+          return reply.status(401).send({ error: 'Unauthorized' });
+        }
 
-    const balanceAdjustment = returnToBalance ? amount : 0;
+        const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+        if (userError || !user) {
+          return reply.status(401).send({ error: 'Invalid token' });
+        }
 
-    const { error: updateError } = await supabase
-      .from('wallets')
-      .update({
-        locked: newLocked,
-        balance: Number(wallet.balance) + balanceAdjustment,
-      })
-      .eq('user_id', userId);
+        const { reference } = request.params as { reference: string };
 
-    if (updateError) {
-      logger.error(
-        { userId, amount, returnToBalance, updateError },
-        'Failed to release locked funds'
-      );
+        const { data: withdrawal, error: withdrawalError } = await supabase
+          .from('b2c_withdrawals')
+          .select('status, amount, phone, created_at, completed_at, provider_transaction_id, metadata')
+          .eq('reference', reference)
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (withdrawalError || !withdrawal) {
+          return reply.status(404).send({ error: 'Withdrawal not found' });
+        }
+
+        return reply.send({
+          success: true,
+          data: {
+            reference,
+            status: withdrawal.status,
+            amount: withdrawal.amount,
+            phone: withdrawal.phone,
+            created_at: withdrawal.created_at,
+            completed_at: withdrawal.completed_at,
+            provider_transaction_id: withdrawal.provider_transaction_id,
+            metadata: withdrawal.metadata,
+          },
+        });
+      } catch (error) {
+        logger.error(error, 'Error in /wallet/withdrawals/status/:reference');
+        return reply.status(500).send({ error: 'Internal server error' });
+      }
     }
-  } catch (error) {
-    logger.error(error, 'Exception releasing locked funds');
-  }
+  );
 };
