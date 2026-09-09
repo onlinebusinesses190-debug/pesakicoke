@@ -46,7 +46,7 @@ const releaseLockedFunds = async (
   }
 };
 
-// ─── Helper: call Palpluss B2C API ──────────────────────────────────────
+// ─── Helper: call Palpluss B2C API with Basic Auth ──────────────────────
 const callPalplussB2C = async (
   amount: number,
   phone: string,
@@ -54,36 +54,72 @@ const callPalplussB2C = async (
   callbackUrl: string
 ) => {
   const apiKey = process.env.PALPLUSS_API_KEY;
-  const apiUrl = process.env.PALPLUSS_API_URL || 'https://api.palpluss.com/v1';
+  const apiUrl = process.env.PALPLUSS_API_URL || 'https://api.palplus.com/v1';
 
   if (!apiKey) {
     throw new Error('PALPLUSS_API_KEY environment variable is not set');
   }
 
+  // ✅ Basic Auth: API key as username, password ignored
+  const auth = Buffer.from(`${apiKey}:`).toString('base64');
+
+  // ✅ Palpluss expects camelCase fields: callbackUrl (not callback_url)
   const payload = {
     amount,
     phone,
     reference,
     description: 'PESAKI withdrawal',
-    callback_url: callbackUrl,
+    callbackUrl,
   };
 
-  const response = await fetch(`${apiUrl}/b2c/payouts`, {
+  const url = `${apiUrl}/b2c/payouts`;
+
+  logger.info({ url, amount, phone, reference, callbackUrl, authPrefix: auth.slice(0, 10) + '...' }, 'Calling Palpluss B2C API');
+
+  const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-API-Key': apiKey,
+      'Authorization': `Basic ${auth}`,
     },
     body: JSON.stringify(payload),
   });
 
-  const data = await response.json();
-
-  if (!response.ok || !data.success) {
-    throw new Error(data?.message || 'Palpluss B2C request failed');
+  const responseText = await response.text();
+  let data: any;
+  try {
+    data = JSON.parse(responseText);
+  } catch {
+    // If response is not JSON, log raw text
+    logger.error({ status: response.status, responseText }, 'Palpluss returned non-JSON response');
+    throw new Error(`Palpluss API error: ${response.status} - ${responseText}`);
   }
 
-  return data.data; // contains transactionId, status, etc.
+  // ─── LOG FULL RESPONSE ──────────────────────────────────────────────
+  logger.info({
+    status: response.status,
+    statusText: response.statusText,
+    headers: Object.fromEntries(response.headers.entries()),
+    body: data,
+  }, 'Palpluss B2C full response');
+
+  if (!response.ok) {
+    const errorMsg = data?.message || data?.error || data?.detail || JSON.stringify(data);
+    throw new Error(`Palpluss B2C request failed (${response.status}): ${errorMsg}`);
+  }
+
+  // According to the spec, success is usually `data` object with transactionId
+  const result = data?.data || data;
+  if (!result?.transactionId) {
+    // Sometimes the response structure is different – log and try to extract
+    logger.warn({ data }, 'Palpluss response missing transactionId, but response is OK');
+    if (data?.transactionId) {
+      return data; // sometimes transactionId is at top level
+    }
+    throw new Error('Palpluss response missing transactionId');
+  }
+
+  return result;
 };
 
 export const palplussRoutes = async (fastify: FastifyInstance) => {
@@ -213,7 +249,7 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
     }
   );
 
-  // ─── Initiate B2C withdrawal (ONLY ONE DEFINITION) ────────────────────
+  // ─── Initiate B2C withdrawal ──────────────────────────────────────────
   fastify.post(
     '/wallet/withdraw/b2c',
     async (request: FastifyRequest, reply: FastifyReply) => {
