@@ -27,22 +27,27 @@ export const initiateB2CPayout = async (
 ): Promise<PalplussPayoutResponse | null> => {
   try {
     const apiKey = env.PALPLUSS_API_KEY;
-    const baseUrl = env.PALPLUSS_BASE_URL || 'https://api.palpluss.com/v1';
+    const baseUrl = env.PALPLUSS_API_URL || 'https://api.palpluss.com/v1';
 
     if (!apiKey) {
       logger.error('Missing PALPLUSS_API_KEY');
       return null;
     }
 
-    const authHeader = Buffer.from(apiKey).toString('base64');
-
     const response = await fetch(`${baseUrl}/b2c/payouts`, {
       method: 'POST',
       headers: {
-        'Authorization': `Basic ${authHeader}`,
+        'Authorization': `Basic ${Buffer.from(`${apiKey}:`).toString('base64')}`,
         'Content-Type': 'application/json',
+        'Idempotency-Key': payload.reference,
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        amount: payload.amount,
+        phone: payload.phone,
+        currency: 'KES',
+        reference: payload.reference,
+        description: payload.description,
+      }),
     });
 
     const text = await response.text();

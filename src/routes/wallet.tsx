@@ -526,7 +526,7 @@ function WithdrawSheet({ onClose, user, balance, onSuccess }: any) {
         onSuccess();
         toast.success("Withdrawal completed successfully");
         setTimeout(() => onClose(), 3000);
-      } else if (status === "failed") {
+      } else if (["failed", "cancelled", "expired", "reversed"].includes(status)) {
         setWithdrawStatus("failed");
         stopPolling();
         onSuccess();

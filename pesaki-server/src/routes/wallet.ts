@@ -169,8 +169,7 @@ export default async function walletRoutes(server: FastifyInstance) {
         .single();
 
       if (walletError) throw walletError;
-      const available = (wallet.balance || 0) - (Number(wallet.locked) || 0);
-      if (available < amount) {
+      if (wallet.balance < amount) {
         return reply.status(400).send({ error: 'Insufficient balance' });
       }
 
@@ -237,10 +236,8 @@ export default async function walletRoutes(server: FastifyInstance) {
       }
 
       const total = (wallet as any)[balanceField] || 0;
-      const locked = Number((wallet as any).locked) || 0;
-      const available = Math.max(0, total - locked);
 
-      return reply.send({ available });
+      return reply.send({ available: total });
     } catch (err: any) {
       console.error('Available balance error:', err);
       return reply.status(500).send({ error: err.message || 'Internal server error' });

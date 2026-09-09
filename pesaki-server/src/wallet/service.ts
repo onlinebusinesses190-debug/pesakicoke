@@ -57,9 +57,7 @@ export const getAvailableBalance = async (userId: string, mode: WalletMode): Pro
 
   try {
     const wallet = await ensureWalletExists(userId);
-    const total = (wallet as any)?.[balanceField] ?? 0;
-    const locked = Number((wallet as any)?.locked) || 0;
-    return Math.max(0, total - locked);
+    return (wallet as any)?.[balanceField] ?? 0;
   } catch (error: any) {
     logger.error({ error, userId, mode }, 'Failed to fetch available balance');
     return null;
