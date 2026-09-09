@@ -133,13 +133,20 @@ const callPalplussB2C = async (
 };
 
 export const palplussRoutes = async (fastify: FastifyInstance) => {
-  // ─── Webhook ──────────────────────────────────────────────────────────
+  // ─── Webhook – logs EVERYTHING ──────────────────────────────────────
   fastify.post(
     '/api/webhooks/palpluss',
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
+        // Log raw body and headers
+        const rawBody = (request as any).rawBody || request.body;
+        logger.info({
+          headers: request.headers,
+          rawBody,
+          body: request.body,
+        }, '‼️ Palpluss webhook received – RAW DATA ‼️');
+
         const body: any = request.body;
-        logger.info({ body }, '✅✅✅ Palpluss webhook received ✅✅✅');
 
         const reference = body?.reference || body?.data?.reference;
         const status = body?.status || body?.data?.status;
@@ -247,10 +254,7 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
           })
           .eq('id', withdrawal.id);
 
-        // Release locked funds (returnToBalance: false means keep deducted)
         await releaseLockedFunds(withdrawal.user_id, withdrawalAmount, false);
-
-        // Add ledger entry for the successful withdrawal
         await addLedgerEntry(
           withdrawal.user_id,
           withdrawalAmount,
@@ -266,13 +270,137 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
             amount: withdrawalAmount,
             providerTransactionId,
           },
-          'Palpluss B2C withdrawal completed, lock cleared, ledger entry added'
+          '✅ Palpluss B2C withdrawal completed, lock cleared, ledger entry added ✅'
         );
 
         return reply.code(200).send({ received: true });
       } catch (error) {
         logger.error(error, 'Error processing Palpluss webhook');
         return reply.code(200).send({ received: true });
+      }
+    }
+  );
+
+  // ─── Manual fallback: check status with Palpluss ──────────────────────
+  fastify.get(
+    '/wallet/withdrawals/check/:reference',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const token = request.headers.authorization?.replace('Bearer ', '');
+        if (!token) {
+          return reply.status(401).send({ error: 'Unauthorized' });
+        }
+
+        const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+        if (userError || !user) {
+          return reply.status(401).send({ error: 'Invalid token' });
+        }
+
+        const { reference } = request.params as { reference: string };
+
+        const { data: withdrawal, error: withdrawalError } = await supabase
+          .from('b2c_withdrawals')
+          .select('*')
+          .eq('reference', reference)
+          .eq('user_id', user.id)
+          .single();
+
+        if (withdrawalError || !withdrawal) {
+          return reply.status(404).send({ error: 'Withdrawal not found' });
+        }
+
+        if (withdrawal.status !== 'processing' && withdrawal.status !== 'pending') {
+          return reply.send({
+            success: true,
+            data: {
+              reference,
+              status: withdrawal.status,
+              amount: withdrawal.amount,
+              phone: withdrawal.phone,
+            },
+          });
+        }
+
+        // Query Palpluss for status
+        const apiKey = process.env.PALPLUSS_API_KEY;
+        const apiUrl = process.env.PALPLUSS_API_URL || 'https://api.palplus.com/v1';
+
+        if (!apiKey) {
+          return reply.status(500).send({ error: 'API key missing' });
+        }
+
+        const auth = Buffer.from(`${apiKey}:`).toString('base64');
+        const transactionId = withdrawal.provider_transaction_id;
+
+        if (!transactionId) {
+          return reply.status(400).send({ error: 'No transaction ID to query' });
+        }
+
+        const statusRes = await fetch(`${apiUrl}/b2c/payouts/${transactionId}`, {
+          headers: { Authorization: `Basic ${auth}` },
+        });
+
+        const statusData = await statusRes.json();
+
+        if (!statusRes.ok) {
+          logger.error({ statusData }, 'Failed to query Palpluss status');
+          return reply.status(500).send({ error: 'Failed to query status' });
+        }
+
+        const currentStatus = statusData?.data?.status || statusData?.status;
+        if (!currentStatus) {
+          return reply.status(500).send({ error: 'Invalid status response' });
+        }
+
+        // If status is success or failed, update locally
+        const normalized = String(currentStatus).toUpperCase();
+        if (normalized === 'SUCCESS' || normalized === 'COMPLETED' || normalized === 'PAID') {
+          await supabase
+            .from('b2c_withdrawals')
+            .update({
+              status: 'completed',
+              completed_at: new Date().toISOString(),
+              metadata: { ...withdrawal.metadata, manual_check: statusData },
+            })
+            .eq('id', withdrawal.id);
+
+          await releaseLockedFunds(withdrawal.user_id, Number(withdrawal.amount), false);
+          await addLedgerEntry(
+            withdrawal.user_id,
+            Number(withdrawal.amount),
+            'withdrawal',
+            'debit',
+            `Withdrawal to ${withdrawal.phone} (${reference}) [manual check]`
+          );
+
+          return reply.send({
+            success: true,
+            data: { reference, status: 'completed', amount: withdrawal.amount },
+          });
+        } else if (normalized === 'FAILED' || normalized === 'CANCELLED' || normalized === 'REVERSED') {
+          await supabase
+            .from('b2c_withdrawals')
+            .update({
+              status: 'failed',
+              metadata: { ...withdrawal.metadata, manual_check: statusData },
+            })
+            .eq('id', withdrawal.id);
+
+          await releaseLockedFunds(withdrawal.user_id, Number(withdrawal.amount), true);
+
+          return reply.send({
+            success: true,
+            data: { reference, status: 'failed', amount: withdrawal.amount },
+          });
+        }
+
+        return reply.send({
+          success: true,
+          data: { reference, status: withdrawal.status, amount: withdrawal.amount },
+        });
+      } catch (error) {
+        logger.error(error, 'Manual check error');
+        return reply.status(500).send({ error: 'Internal error' });
       }
     }
   );
