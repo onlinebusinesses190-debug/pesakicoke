@@ -46,6 +46,30 @@ const releaseLockedFunds = async (
   }
 };
 
+// ─── Helper: Add ledger entry ───────────────────────────────────────────
+const addLedgerEntry = async (
+  userId: string,
+  amount: number,
+  type: string,
+  mode: string,
+  description: string
+) => {
+  try {
+    const { error } = await supabase.from('wallet_ledger').insert({
+      user_id: userId,
+      amount,
+      type,
+      mode,
+      description,
+    });
+    if (error) {
+      logger.error({ userId, amount, type, description, error }, 'Failed to add ledger entry');
+    }
+  } catch (error) {
+    logger.error(error, 'Exception adding ledger entry');
+  }
+};
+
 // ─── Helper: call Palpluss B2C API with Basic Auth ──────────────────────
 const callPalplussB2C = async (
   amount: number,
@@ -60,10 +84,8 @@ const callPalplussB2C = async (
     throw new Error('PALPLUSS_API_KEY environment variable is not set');
   }
 
-  // ✅ Basic Auth: API key as username, password ignored
   const auth = Buffer.from(`${apiKey}:`).toString('base64');
 
-  // ✅ Palpluss expects camelCase fields: callbackUrl (not callback_url)
   const payload = {
     amount,
     phone,
@@ -74,7 +96,7 @@ const callPalplussB2C = async (
 
   const url = `${apiUrl}/b2c/payouts`;
 
-  logger.info({ url, amount, phone, reference, callbackUrl, authPrefix: auth.slice(0, 10) + '...' }, 'Calling Palpluss B2C API');
+  logger.info({ url, amount, phone, reference, callbackUrl }, 'Calling Palpluss B2C API');
 
   const response = await fetch(url, {
     method: 'POST',
@@ -90,32 +112,20 @@ const callPalplussB2C = async (
   try {
     data = JSON.parse(responseText);
   } catch {
-    // If response is not JSON, log raw text
     logger.error({ status: response.status, responseText }, 'Palpluss returned non-JSON response');
     throw new Error(`Palpluss API error: ${response.status} - ${responseText}`);
   }
 
-  // ─── LOG FULL RESPONSE ──────────────────────────────────────────────
-  logger.info({
-    status: response.status,
-    statusText: response.statusText,
-    headers: Object.fromEntries(response.headers.entries()),
-    body: data,
-  }, 'Palpluss B2C full response');
+  logger.info({ status: response.status, body: data }, 'Palpluss B2C full response');
 
   if (!response.ok) {
     const errorMsg = data?.message || data?.error || data?.detail || JSON.stringify(data);
     throw new Error(`Palpluss B2C request failed (${response.status}): ${errorMsg}`);
   }
 
-  // According to the spec, success is usually `data` object with transactionId
   const result = data?.data || data;
   if (!result?.transactionId) {
-    // Sometimes the response structure is different – log and try to extract
-    logger.warn({ data }, 'Palpluss response missing transactionId, but response is OK');
-    if (data?.transactionId) {
-      return data; // sometimes transactionId is at top level
-    }
+    if (data?.transactionId) return data;
     throw new Error('Palpluss response missing transactionId');
   }
 
@@ -129,7 +139,7 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const body: any = request.body;
-        logger.info({ body }, 'Palpluss webhook received');
+        logger.info({ body }, '✅✅✅ Palpluss webhook received ✅✅✅');
 
         const reference = body?.reference || body?.data?.reference;
         const status = body?.status || body?.data?.status;
@@ -209,6 +219,13 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
             .eq('id', withdrawal.id);
 
           await releaseLockedFunds(withdrawal.user_id, withdrawalAmount, true);
+          await addLedgerEntry(
+            withdrawal.user_id,
+            withdrawalAmount,
+            'withdrawal',
+            'debit',
+            `Withdrawal failed (${reference})`
+          );
 
           logger.info(
             { reference, userId: withdrawal.user_id, amount: withdrawalAmount },
@@ -218,7 +235,7 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
           return reply.code(200).send({ received: true });
         }
 
-        // Success
+        // ─── SUCCESS ─────────────────────────────────────────────────────
         await supabase
           .from('b2c_withdrawals')
           .update({
@@ -226,10 +243,21 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
             provider_transaction_id: providerTransactionId,
             provider_checkout_id: providerCheckoutId,
             metadata: { ...withdrawal.metadata, webhook: body },
+            completed_at: new Date().toISOString(),
           })
           .eq('id', withdrawal.id);
 
+        // Release locked funds (returnToBalance: false means keep deducted)
         await releaseLockedFunds(withdrawal.user_id, withdrawalAmount, false);
+
+        // Add ledger entry for the successful withdrawal
+        await addLedgerEntry(
+          withdrawal.user_id,
+          withdrawalAmount,
+          'withdrawal',
+          'debit',
+          `Withdrawal to ${withdrawal.phone} (${reference})`
+        );
 
         logger.info(
           {
@@ -238,7 +266,7 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
             amount: withdrawalAmount,
             providerTransactionId,
           },
-          'Palpluss B2C withdrawal completed, lock cleared'
+          'Palpluss B2C withdrawal completed, lock cleared, ledger entry added'
         );
 
         return reply.code(200).send({ received: true });
