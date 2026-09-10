@@ -15,6 +15,15 @@ const normalizePhone = (value: string) => {
   return digits;
 };
 
+const formatPhoneForPalpluss = (value: string) => {
+  const digits = value.replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('254') && digits.length === 12) return `0${digits.slice(3)}`;
+  if (digits.startsWith('0') && digits.length === 10) return digits;
+  if (digits.length === 9) return `0${digits}`;
+  return digits;
+};
+
 // ─── Helper: call Palpluss B2C API ──────────────────────────────────────────
 const callPalplussB2C = async (
   amount: number,
@@ -23,42 +32,66 @@ const callPalplussB2C = async (
   callbackUrl: string
 ) => {
   const apiKey = env.PALPLUSS_API_KEY;
-  const apiUrl = env.PALPLUSS_API_URL || 'https://api.palpluss.com/v1';
+  const apiUrl = env.PALPLUSS_API_URL || 'https://api.palplus.com/v1';
 
   if (!apiKey) {
     throw new Error('PALPLUSS_API_KEY environment variable is not set');
   }
 
+  const palplussPhone = formatPhoneForPalpluss(phone);
+
   const payload = {
     amount,
-    phone,
-    currency: 'KES',
+    phone: palplussPhone,
     reference,
     description: 'PESAKI withdrawal',
-    callback_url: callbackUrl,
+    callbackUrl,
   };
+
+  const authHeader = `Basic ${Buffer.from(`${apiKey}:`).toString('base64')}`;
+
+  logger.info(
+    {
+      url: `${apiUrl}/b2c/payouts`,
+      auth: authHeader.slice(0, 20) + '...',
+      body: payload,
+    },
+    'PALPLUSS_B2C_REQUEST'
+  );
 
   const response = await fetch(`${apiUrl}/b2c/payouts`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Basic ${Buffer.from(`${apiKey}:`).toString('base64')}`,
+      'Authorization': authHeader,
       'Idempotency-Key': reference,
     },
     body: JSON.stringify(payload),
   });
 
-  const text = await response.text();
+  const responseText = await response.text();
+
+  logger.info(
+    {
+      status: response.status,
+      body: responseText,
+    },
+    'PALPLUSS_B2C_RESPONSE'
+  );
+
   let data: any;
 
   try {
-    data = JSON.parse(text);
+    data = JSON.parse(responseText);
   } catch {
     logger.error(
-      { status: response.status, responseText: text, reference },
+      { status: response.status, responseText, reference },
       'Invalid JSON from Palpluss B2C'
     );
-    throw new Error('Invalid response from Palpluss');
+    const err = new Error('Invalid response from Palpluss');
+    (err as any).status = response.status;
+    (err as any).responseBody = responseText;
+    throw err;
   }
 
   if (!response.ok || !data.success) {
@@ -69,8 +102,10 @@ const callPalplussB2C = async (
       'Palpluss B2C request failed'
     );
     const err = new Error(providerMessage || 'Palpluss B2C request failed');
+    (err as any).status = response.status;
     (err as any).providerCode = providerCode;
     (err as any).providerMessage = providerMessage;
+    (err as any).responseBody = data;
     throw err;
   }
 
@@ -310,7 +345,7 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
           'WITHDRAWAL_REQUESTED | FUNDS_RESERVED'
         );
 
-        const callbackUrl = `${env.PALPLUSS_API_URL || 'https://api.palpluss.com/v1'}/webhooks/palpluss`;
+        const callbackUrl = `${env.PALPLUSS_API_URL || 'https://api.palplus.com/v1'}/webhooks/palpluss`;
 
         let palplussResponse: any;
         try {
@@ -326,20 +361,31 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
                 error: apiError.message,
                 provider_code: apiError.providerCode,
                 provider_message: apiError.providerMessage,
+                http_status: apiError.status,
+                response_body: apiError.responseBody,
               },
             })
             .eq('id', withdrawal.id);
 
           logger.error(
-            { reference, error: apiError.message, providerCode: apiError.providerCode, providerMessage: apiError.providerMessage },
+            {
+              reference,
+              error: apiError.message,
+              providerCode: apiError.providerCode,
+              providerMessage: apiError.providerMessage,
+              status: apiError.status,
+              responseBody: apiError.responseBody,
+            },
             'WITHDRAWAL_FAILED | PALPLUSS_REQUEST_FAILED'
           );
 
           return reply.status(500).send({
             success: false,
             error: 'Withdrawal provider rejected the payout',
+            status: apiError.status,
             providerCode: apiError.providerCode,
             providerMessage: apiError.providerMessage,
+            responseBody: apiError.responseBody,
           });
         }
 
