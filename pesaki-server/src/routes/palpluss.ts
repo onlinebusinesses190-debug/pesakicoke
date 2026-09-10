@@ -295,10 +295,14 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
 
         if (rpcError || !withdrawalResult?.success) {
           const errorMsg = withdrawalResult?.error || rpcError?.message || 'Failed to reserve funds';
-          logger.warn({ userId: user.id, amount, error: errorMsg }, 'WITHDRAWAL_REQUESTED | RESERVE_FAILED');
-          return reply.status(400).send({
+          logger.error(
+            { userId: user.id, amount, rpcError: JSON.parse(JSON.stringify(rpcError)), withdrawalResult: JSON.parse(JSON.stringify(withdrawalResult)) },
+            'RPC FULL ERROR'
+          );
+          return reply.status(500).send({
             error: errorMsg,
             requestedAmount: amount,
+            details: rpcError || withdrawalResult,
           });
         }
 
