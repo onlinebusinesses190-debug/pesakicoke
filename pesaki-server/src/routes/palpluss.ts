@@ -38,6 +38,9 @@ const callPalplussB2C = async (
     throw new Error('PALPLUSS_API_KEY environment variable is not set');
   }
 
+  const baseUrl = apiUrl.replace(/\/$/, '');
+  const endpoint = `${baseUrl}/b2c/payouts`;
+
   const palplussPhone = formatPhoneForPalpluss(phone);
 
   const payload = {
@@ -52,14 +55,14 @@ const callPalplussB2C = async (
 
   logger.info(
     {
-      url: `${apiUrl}/b2c/payouts`,
+      url: endpoint,
       auth: authHeader.slice(0, 20) + '...',
       body: payload,
     },
     'PALPLUSS_B2C_REQUEST'
   );
 
-  const response = await fetch(`${apiUrl}/b2c/payouts`, {
+  const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
