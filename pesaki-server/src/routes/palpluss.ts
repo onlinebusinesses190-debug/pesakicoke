@@ -125,7 +125,14 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
         logger.info({ body }, 'Palpluss webhook received');
 
         const transaction = body?.transaction || body?.data?.transaction || body?.data || body;
-        const externalReference = transaction?.external_reference || transaction?.reference || body?.reference;
+        const externalReference = String(
+          transaction?.external_reference ||
+          transaction?.reference ||
+          body?.reference ||
+          body?.data?.reference ||
+          ''
+        ).trim();
+
         const status = String(transaction?.status || body?.status || '').toLowerCase();
         const providerTransactionId = transaction?.id || transaction?.transactionId || body?.transactionId;
         const providerCheckoutId = transaction?.provider_checkout_id || transaction?.providerCheckoutId;
@@ -348,7 +355,8 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
           'WITHDRAWAL_REQUESTED | FUNDS_RESERVED'
         );
 
-        const callbackUrl = `${env.PALPLUSS_API_URL || 'https://api.palplus.com/v1'}/webhooks/palpluss`;
+        const callbackBase = env.MPESA_CALLBACK_URL || 'https://pesaki-server.onrender.com';
+        const callbackUrl = `${callbackBase.replace(/\/$/, '')}/api/webhooks/palpluss`;
 
         let palplussResponse: any;
         try {
