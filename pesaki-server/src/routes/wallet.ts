@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { createClient } from '@supabase/supabase-js';
+import { calculateTransferFee, MIN_TRANSFER } from '../utils/fees';
 
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -264,6 +265,14 @@ export default async function walletRoutes(server: FastifyInstance) {
         return reply.status(400).send({ error: 'Missing amount or recipient' });
       }
 
+      if (amount < MIN_TRANSFER) {
+        return reply.status(400).send({
+          error: `Minimum transfer is KES ${MIN_TRANSFER}`,
+          minimum: MIN_TRANSFER,
+          requestedAmount: amount,
+        });
+      }
+
       // ─── Normalize recipient lookup ──────────────────────────────────
       const trimmed = recipient.trim();
 
@@ -312,6 +321,9 @@ export default async function walletRoutes(server: FastifyInstance) {
         return reply.status(400).send({ error: 'Insufficient balance' });
       }
 
+      const fee = calculateTransferFee(amount);
+      const recipientGets = Math.max(0, amount - fee);
+
       // Deduct from sender
       await supabase
         .from('wallets')
@@ -329,7 +341,7 @@ export default async function walletRoutes(server: FastifyInstance) {
 
       await supabase
         .from('wallets')
-        .update({ balance: (recipientWallet.balance || 0) + amount })
+        .update({ balance: (recipientWallet.balance || 0) + recipientGets })
         .eq('user_id', recipientUser.id);
 
       // Ledger entries
@@ -339,18 +351,18 @@ export default async function walletRoutes(server: FastifyInstance) {
           amount,
           type: 'transfer',
           mode: 'debit',
-          description: `Transfer to ${recipient}`,
+          description: `Transfer to ${recipient} (Fee: ${fee}, Recipient gets: ${recipientGets})`,
         },
         {
           user_id: recipientUser.id,
-          amount,
+          amount: recipientGets,
           type: 'transfer',
           mode: 'credit',
-          description: `Transfer from ${user.email || user.id}`,
+          description: `Transfer from ${user.email || user.id} (Fee: ${fee})`,
         },
       ]);
 
-      return reply.send({ success: true, message: 'Transfer completed' });
+      return reply.send({ success: true, message: 'Transfer completed', fee, recipientGets });
     } catch (err: any) {
       console.error('Transfer error:', err);
       return reply.status(500).send({ error: err.message || 'Internal server error' });

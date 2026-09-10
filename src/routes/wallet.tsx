@@ -20,6 +20,7 @@ import {
 import { fmt } from "@/lib/mock";
 import { apiRequest } from "@/utils/api";
 import { supabase } from "@/integrations/supabase/client";
+import { calculateDepositFee, calculateTransferFee, calculateWithdrawalFee, MIN_DEPOSIT, MIN_TRANSFER, MIN_WITHDRAWAL } from "@/utils/fees";
 
 export const Route = createFileRoute("/wallet")({
   component: WalletPage,
@@ -583,11 +584,19 @@ function DepositSheet({ onClose, user, onSuccess }: any) {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !amount || parseInt(amount) < MIN_DEPOSIT}
             className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50"
           >
             {loading ? "Processing..." : "Send STK Push"}
           </button>
+          {amount && parseInt(amount) < MIN_DEPOSIT && (
+            <p className="text-[11px] text-destructive">Minimum deposit is KES {MIN_DEPOSIT}</p>
+          )}
+          {amount && parseInt(amount) >= MIN_DEPOSIT && (
+            <p className="text-[11px] text-muted-foreground">
+              You will receive: KES {Math.max(0, parseInt(amount) - calculateDepositFee(parseInt(amount)))} (Fee: KES {calculateDepositFee(parseInt(amount))})
+            </p>
+          )}
         </form>
       </div>
     </div>
@@ -724,7 +733,7 @@ function WithdrawSheet({ onClose, user, balance, onSuccess }: any) {
           </label>
           <input
             type="number"
-            min="1"
+            min={MIN_WITHDRAWAL}
             max={availableBalance}
             required
             value={amount}
@@ -732,6 +741,14 @@ function WithdrawSheet({ onClose, user, balance, onSuccess }: any) {
             className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
             placeholder="e.g. 500"
           />
+          {amount && parseInt(amount) < MIN_WITHDRAWAL && (
+            <p className="mt-1 text-[11px] text-destructive">Minimum withdrawal is KES {MIN_WITHDRAWAL}</p>
+          )}
+          {amount && parseInt(amount) >= MIN_WITHDRAWAL && (
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              You will receive: KES {Math.max(0, parseInt(amount) - calculateWithdrawalFee(parseInt(amount)))} (Fee: KES {calculateWithdrawalFee(parseInt(amount))})
+            </p>
+          )}
         </div>
         <div>
           <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -748,7 +765,7 @@ function WithdrawSheet({ onClose, user, balance, onSuccess }: any) {
         </div>
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || !amount || parseInt(amount) < MIN_WITHDRAWAL || parseInt(amount) > availableBalance}
           className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50"
         >
           {loading ? "Processing..." : "Withdraw"}
@@ -813,7 +830,7 @@ function TransferSheet({ onClose, user, balance, onSuccess }: any) {
           </label>
           <input
             type="number"
-            min="1"
+            min={MIN_TRANSFER}
             max={balance}
             required
             value={amount}
@@ -821,10 +838,18 @@ function TransferSheet({ onClose, user, balance, onSuccess }: any) {
             className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
             placeholder="e.g. 500"
           />
+          {amount && parseInt(amount) < MIN_TRANSFER && (
+            <p className="mt-1 text-[11px] text-destructive">Minimum transfer is KES {MIN_TRANSFER}</p>
+          )}
+          {amount && parseInt(amount) >= MIN_TRANSFER && (
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Recipient will receive: KES {Math.max(0, parseInt(amount) - calculateTransferFee(parseInt(amount)))} (Fee: KES {calculateTransferFee(parseInt(amount))})
+            </p>
+          )}
         </div>
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || !amount || parseInt(amount) < MIN_TRANSFER || parseInt(amount) > balance}
           className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50"
         >
           {loading ? "Processing..." : "Transfer"}

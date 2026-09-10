@@ -3,8 +3,9 @@ import { logger } from '../utils/logger';
 import { supabase } from '../lib/supabase';
 import { env } from '../config/env';
 import { getBalance, reserveLockedFunds, releaseLockedFunds } from '../wallet/service';
+import { calculateWithdrawalFee, MIN_WITHDRAWAL } from '../utils/fees';
 
-const MIN_WITHDRAWAL_AMOUNT = 10;
+const MIN_WITHDRAWAL_AMOUNT = MIN_WITHDRAWAL;
 
 const normalizePhone = (value: string) => {
   const digits = value.replace(/\D/g, '');
@@ -364,8 +365,11 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
           });
         }
 
+        const fee = calculateWithdrawalFee(amount);
+        const payoutAmount = Math.max(0, amount - fee);
+
         logger.info(
-          { reference, userId: user.id, amount, phone: cleanPhone },
+          { reference, userId: user.id, amount, fee, payoutAmount, phone: cleanPhone },
           'WITHDRAWAL_REQUESTED | FUNDS_RESERVED'
         );
 
@@ -374,7 +378,7 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
 
         let palplussResponse: any;
         try {
-          palplussResponse = await callPalplussB2C(amount, cleanPhone, reference, callbackUrl);
+          palplussResponse = await callPalplussB2C(payoutAmount, cleanPhone, reference, callbackUrl);
         } catch (apiError: any) {
           await releaseLockedFunds(user.id, amount, true);
 
@@ -438,7 +442,7 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
               type: 'withdrawal',
               mode: 'debit',
               amount,
-              description: `Withdrawal: ${reference}`,
+              description: `Withdrawal: ${reference} (Fee: ${fee}, Payout: ${payoutAmount})`,
             });
         }
 
@@ -448,13 +452,13 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
             status: 'completed',
             provider_transaction_id: palplussResponse?.transactionId || null,
             provider_checkout_id: palplussResponse?.providerCheckoutId || null,
-            metadata: { palpluss_response: palplussResponse },
+            metadata: { palpluss_response: palplussResponse, fee, payout_amount: payoutAmount },
             completed_at: new Date().toISOString(),
           })
           .eq('id', withdrawal.id);
 
         logger.info(
-          { reference, userId: user.id, amount, transactionId: palplussResponse?.transactionId },
+          { reference, userId: user.id, amount, fee, payoutAmount, transactionId: palplussResponse?.transactionId },
           'WITHDRAWAL_COMPLETED'
         );
 
@@ -464,6 +468,8 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
             reference,
             status: 'completed',
             message: 'Withdrawal successful.',
+            fee,
+            payoutAmount,
           },
         });
       } catch (error) {

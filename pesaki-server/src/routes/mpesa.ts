@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { logger } from '../utils/logger';
 import { env } from '../config/env';
 import { credit } from '../wallet/service';
+import { calculateDepositFee, MIN_DEPOSIT } from '../utils/fees';
 import { supabase } from '../lib/supabase';
 
 interface AccessTokenResponse {
@@ -344,6 +345,15 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
           });
         }
 
+        if (numericAmount < MIN_DEPOSIT) {
+          return reply.code(400).send({
+            success: false,
+            error: `Minimum deposit is KES ${MIN_DEPOSIT}`,
+            minimum: MIN_DEPOSIT,
+            requestedAmount: numericAmount,
+          });
+        }
+
         const cleanPhone = normalizePhoneNumber(phone);
 
         if (!/^254[71]\d{8}$/.test(cleanPhone)) {
@@ -353,8 +363,11 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
           });
         }
 
+        const fee = calculateDepositFee(numericAmount);
+        const creditedAmount = Math.max(0, numericAmount - fee);
+
         logger.info(
-          { amount: numericAmount, phone: cleanPhone, userId },
+          { amount: numericAmount, fee, creditedAmount, phone: cleanPhone, userId },
           'Deposit request received'
         );
 
@@ -375,6 +388,8 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
             user_id: userId,
             phone: cleanPhone,
             amount: Math.round(numericAmount),
+            fee,
+            credited_amount: Math.round(creditedAmount),
             checkout_request_id: localRequestId,
             status: 'pending',
             created_at: new Date().toISOString(),
@@ -416,6 +431,8 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
             customerMessage:
               stkResult.CustomerMessage || 'Check your phone and enter your M-Pesa PIN.',
             message: 'STK Push sent. Check your phone.',
+            fee,
+            creditedAmount,
           },
         });
       } catch (error) {
@@ -483,7 +500,7 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
 
         const { data: deposit, error: depositError } = await supabase
           .from('mpesa_deposits')
-          .select('user_id, amount, status')
+          .select('user_id, amount, fee, credited_amount, status')
           .eq('checkout_request_id', checkoutRequestId)
           .single();
 
@@ -507,11 +524,14 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
           return reply.code(200).send({ ResultCode: 0, ResultDesc: 'Accepted' });
         }
 
+        const depositFee = Number(deposit.fee) || calculateDepositFee(finalAmount);
+        const netAmount = Math.max(0, finalAmount - depositFee);
+
         const creditResult = await credit(
           deposit.user_id,
-          finalAmount,
+          netAmount,
           'real',
-          `M-Pesa deposit: ${mpesaReceipt || checkoutRequestId}`
+          `M-Pesa deposit: ${mpesaReceipt || checkoutRequestId} (Fee: ${depositFee})`
         );
 
         if (!creditResult.success) {
