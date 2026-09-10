@@ -488,13 +488,7 @@ function WithdrawSheet({ onClose, user, balance, onSuccess }: any) {
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [availableBalance, setAvailableBalance] = useState(balance);
-  const [withdrawStatus, setWithdrawStatus] = useState<"idle" | "processing" | "pending" | "success" | "failed">("idle");
-  const [withdrawReference, setWithdrawReference] = useState<string | null>(null);
-  const [consecutiveMisses, setConsecutiveMisses] = useState(0);
-  const [showFallback, setShowFallback] = useState(false);
-  const pollRef = useRef<number | null>(null);
-  const pollStartTime = useRef<number | null>(null);
-  const fallbackTimerRef = useRef<number | null>(null);
+  const [withdrawStatus, setWithdrawStatus] = useState<"idle" | "processing" | "success" | "failed">("idle");
 
   useEffect(() => {
     let cancelled = false;
@@ -512,17 +506,6 @@ function WithdrawSheet({ onClose, user, balance, onSuccess }: any) {
     return () => { cancelled = true; };
   }, []);
 
-  const stopPolling = () => {
-    if (pollRef.current) {
-      clearTimeout(pollRef.current);
-      pollRef.current = null;
-    }
-    if (fallbackTimerRef.current) {
-      clearTimeout(fallbackTimerRef.current);
-      fallbackTimerRef.current = null;
-    }
-  };
-
   const refreshBalance = async () => {
     try {
       const data = await apiRequest('/wallet/available-balance?mode=real');
@@ -533,73 +516,6 @@ function WithdrawSheet({ onClose, user, balance, onSuccess }: any) {
       // ignore
     }
   };
-
-  const pollWithdrawStatus = async (reference: string) => {
-    if (consecutiveMisses >= 3) {
-      stopPolling();
-      return;
-    }
-
-    try {
-      const statusData = await apiRequest(`/wallet/withdrawals/status/${reference}`);
-      const status = String(statusData?.data?.status || "").toLowerCase();
-
-      setConsecutiveMisses(0);
-
-      if (status === "completed") {
-        setWithdrawStatus("success");
-        stopPolling();
-        onSuccess();
-        refreshBalance();
-        toast.success("Withdrawal completed successfully");
-        setTimeout(() => onClose(), 3000);
-      } else if (["failed", "cancelled", "expired", "reversed"].includes(status)) {
-        setWithdrawStatus("failed");
-        stopPolling();
-        onSuccess();
-        refreshBalance();
-        toast.error("Withdrawal failed. Funds have been returned to your wallet.");
-        setTimeout(() => onClose(), 4000);
-      } else {
-        pollRef.current = window.setTimeout(() => pollWithdrawStatus(reference), 5000);
-      }
-    } catch (err: any) {
-      const isNotFound = err?.message?.includes("Withdrawal not found") || err?.message?.includes("404");
-      if (isNotFound) {
-        setConsecutiveMisses((prev) => {
-          const next = prev + 1;
-          if (next >= 3) {
-            stopPolling();
-            setShowFallback(true);
-          }
-          return next;
-        });
-      }
-      pollRef.current = window.setTimeout(() => pollWithdrawStatus(reference), 5000);
-    }
-  };
-
-  useEffect(() => {
-    return () => stopPolling();
-  }, []);
-
-  useEffect(() => {
-    if (withdrawStatus !== "pending" || !withdrawReference) return;
-
-    pollStartTime.current = Date.now();
-
-    fallbackTimerRef.current = window.setTimeout(() => {
-      if (withdrawStatus === "pending") {
-        setShowFallback(true);
-      }
-    }, 30000);
-
-    return () => {
-      if (fallbackTimerRef.current) {
-        clearTimeout(fallbackTimerRef.current);
-      }
-    };
-  }, [withdrawStatus, withdrawReference]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -617,66 +533,29 @@ function WithdrawSheet({ onClose, user, balance, onSuccess }: any) {
 
     setLoading(true);
     setWithdrawStatus("processing");
-    setConsecutiveMisses(0);
-    setShowFallback(false);
     try {
       const result = await apiRequest('/wallet/withdraw/b2c', {
         method: 'POST',
         body: JSON.stringify({ amount: numAmount, phone: cleanPhone }),
       });
 
-      const reference = result?.data?.reference;
-      if (reference) {
-        setWithdrawReference(reference);
-        setWithdrawStatus("pending");
-        toast.success("Withdrawal initiated. Processing...");
-        pollWithdrawStatus(reference);
+      if (result?.success) {
+        setWithdrawStatus("success");
+        refreshBalance();
+        onSuccess();
+        toast.success("Withdrawal successful");
+        setTimeout(() => onClose(), 3000);
       } else {
         throw new Error(result?.error || "Withdrawal failed");
       }
     } catch (err: any) {
       toast.error(err.message || "Withdrawal failed");
-      setWithdrawStatus("idle");
+      setWithdrawStatus("failed");
+      setTimeout(() => onClose(), 4000);
     } finally {
       setLoading(false);
     }
   };
-
-  if (withdrawStatus === "pending") {
-    return (
-      <SheetShell title="Withdraw Funds" onClose={onClose}>
-        <div className="py-6 text-center">
-          <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-warning/15 text-warning">
-            <Loader2 className="h-7 w-7 animate-spin" />
-          </div>
-          <p className="mt-4 text-lg font-bold">Processing Withdrawal</p>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Your withdrawal of {fmt(parseInt(amount))} to {phone} is being processed.
-            You will be notified once it is complete.
-          </p>
-          {withdrawReference && (
-            <p className="mt-3 text-[10px] text-muted-foreground">
-              Reference: {withdrawReference}
-            </p>
-          )}
-          {showFallback && (
-            <div className="mt-4 rounded-xl border border-warning/30 bg-warning/10 p-3">
-              <p className="text-xs font-semibold text-warning">Status update delayed</p>
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                We have not received confirmation yet. Please check your M-Pesa account. If the money has been received, no further action is needed. If not, contact support.
-              </p>
-              <button
-                onClick={refreshBalance}
-                className="mt-2 w-full rounded-lg bg-warning/20 py-2 text-xs font-semibold text-warning"
-              >
-                Refresh Balance
-              </button>
-            </div>
-          )}
-        </div>
-      </SheetShell>
-    );
-  }
 
   if (withdrawStatus === "success") {
     return (

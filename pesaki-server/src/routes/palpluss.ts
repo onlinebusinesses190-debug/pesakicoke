@@ -2,7 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { logger } from '../utils/logger';
 import { supabase } from '../lib/supabase';
 import { env } from '../config/env';
-import { reserveLockedFunds, releaseLockedFunds } from '../wallet/service';
+import { getBalance, reserveLockedFunds, releaseLockedFunds } from '../wallet/service';
 
 const MIN_WITHDRAWAL_AMOUNT = 10;
 
@@ -311,6 +311,20 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
           'WITHDRAWAL_REQUESTED | INIT'
         );
 
+        const balance = await getBalance(user.id, 'real');
+        if (balance === null || balance < amount) {
+          logger.warn(
+            { userId: user.id, amount, balance },
+            'WITHDRAWAL_REQUESTED | INSUFFICIENT_BALANCE'
+          );
+          return reply.status(400).send({
+            success: false,
+            error: 'Insufficient balance',
+            requestedAmount: amount,
+            availableBalance: balance,
+          });
+        }
+
         const { data: withdrawal, error: insertError } = await supabase
           .from('b2c_withdrawals')
           .insert({
@@ -368,6 +382,8 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
             .from('b2c_withdrawals')
             .update({
               status: 'failed',
+              provider_transaction_id: apiError.providerTransactionId || null,
+              provider_checkout_id: apiError.providerCheckoutId || null,
               metadata: {
                 error: apiError.message,
                 provider_code: apiError.providerCode,
@@ -400,27 +416,54 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
           });
         }
 
+        const { data: wallet, error: walletError } = await supabase
+          .from('wallets')
+          .select('locked')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (!walletError && wallet) {
+          const currentLocked = Number(wallet.locked) || 0;
+          const newLocked = Math.max(0, currentLocked - amount);
+
+          await supabase
+            .from('wallets')
+            .update({ locked: newLocked })
+            .eq('user_id', user.id);
+
+          await supabase
+            .from('wallet_ledger')
+            .insert({
+              user_id: user.id,
+              type: 'withdrawal',
+              mode: 'debit',
+              amount,
+              description: `Withdrawal: ${reference}`,
+            });
+        }
+
         await supabase
           .from('b2c_withdrawals')
           .update({
-            status: 'processing',
-            provider_transaction_id: palplussResponse?.transactionId,
+            status: 'completed',
+            provider_transaction_id: palplussResponse?.transactionId || null,
             provider_checkout_id: palplussResponse?.providerCheckoutId || null,
             metadata: { palpluss_response: palplussResponse },
+            completed_at: new Date().toISOString(),
           })
           .eq('id', withdrawal.id);
 
         logger.info(
-          { reference, transactionId: palplussResponse?.transactionId, status: palplussResponse?.status },
-          'PALPLUSS_RESPONSE_RECEIVED'
+          { reference, userId: user.id, amount, transactionId: palplussResponse?.transactionId },
+          'WITHDRAWAL_COMPLETED'
         );
 
         return reply.send({
           success: true,
           data: {
             reference,
-            status: 'processing',
-            message: 'Withdrawal initiated. Check status via polling.',
+            status: 'completed',
+            message: 'Withdrawal successful.',
           },
         });
       } catch (error) {
