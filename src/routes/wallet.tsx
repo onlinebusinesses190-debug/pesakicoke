@@ -490,7 +490,11 @@ function WithdrawSheet({ onClose, user, balance, onSuccess }: any) {
   const [availableBalance, setAvailableBalance] = useState(balance);
   const [withdrawStatus, setWithdrawStatus] = useState<"idle" | "processing" | "pending" | "success" | "failed">("idle");
   const [withdrawReference, setWithdrawReference] = useState<string | null>(null);
+  const [consecutiveMisses, setConsecutiveMisses] = useState(0);
+  const [showFallback, setShowFallback] = useState(false);
   const pollRef = useRef<number | null>(null);
+  const pollStartTime = useRef<number | null>(null);
+  const fallbackTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -513,29 +517,64 @@ function WithdrawSheet({ onClose, user, balance, onSuccess }: any) {
       clearTimeout(pollRef.current);
       pollRef.current = null;
     }
+    if (fallbackTimerRef.current) {
+      clearTimeout(fallbackTimerRef.current);
+      fallbackTimerRef.current = null;
+    }
+  };
+
+  const refreshBalance = async () => {
+    try {
+      const data = await apiRequest('/wallet/available-balance?mode=real');
+      if (data?.data?.available !== undefined) {
+        setAvailableBalance(data.data.available);
+      }
+    } catch {
+      // ignore
+    }
   };
 
   const pollWithdrawStatus = async (reference: string) => {
+    if (consecutiveMisses >= 3) {
+      stopPolling();
+      return;
+    }
+
     try {
       const statusData = await apiRequest(`/wallet/withdrawals/status/${reference}`);
       const status = String(statusData?.data?.status || "").toLowerCase();
+
+      setConsecutiveMisses(0);
 
       if (status === "completed") {
         setWithdrawStatus("success");
         stopPolling();
         onSuccess();
+        refreshBalance();
         toast.success("Withdrawal completed successfully");
         setTimeout(() => onClose(), 3000);
       } else if (["failed", "cancelled", "expired", "reversed"].includes(status)) {
         setWithdrawStatus("failed");
         stopPolling();
         onSuccess();
+        refreshBalance();
         toast.error("Withdrawal failed. Funds have been returned to your wallet.");
         setTimeout(() => onClose(), 4000);
       } else {
         pollRef.current = window.setTimeout(() => pollWithdrawStatus(reference), 5000);
       }
-    } catch (err) {
+    } catch (err: any) {
+      const isNotFound = err?.message?.includes("Withdrawal not found") || err?.message?.includes("404");
+      if (isNotFound) {
+        setConsecutiveMisses((prev) => {
+          const next = prev + 1;
+          if (next >= 3) {
+            stopPolling();
+            setShowFallback(true);
+          }
+          return next;
+        });
+      }
       pollRef.current = window.setTimeout(() => pollWithdrawStatus(reference), 5000);
     }
   };
@@ -543,6 +582,24 @@ function WithdrawSheet({ onClose, user, balance, onSuccess }: any) {
   useEffect(() => {
     return () => stopPolling();
   }, []);
+
+  useEffect(() => {
+    if (withdrawStatus !== "pending" || !withdrawReference) return;
+
+    pollStartTime.current = Date.now();
+
+    fallbackTimerRef.current = window.setTimeout(() => {
+      if (withdrawStatus === "pending") {
+        setShowFallback(true);
+      }
+    }, 30000);
+
+    return () => {
+      if (fallbackTimerRef.current) {
+        clearTimeout(fallbackTimerRef.current);
+      }
+    };
+  }, [withdrawStatus, withdrawReference]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -560,6 +617,8 @@ function WithdrawSheet({ onClose, user, balance, onSuccess }: any) {
 
     setLoading(true);
     setWithdrawStatus("processing");
+    setConsecutiveMisses(0);
+    setShowFallback(false);
     try {
       const result = await apiRequest('/wallet/withdraw/b2c', {
         method: 'POST',
@@ -599,6 +658,20 @@ function WithdrawSheet({ onClose, user, balance, onSuccess }: any) {
             <p className="mt-3 text-[10px] text-muted-foreground">
               Reference: {withdrawReference}
             </p>
+          )}
+          {showFallback && (
+            <div className="mt-4 rounded-xl border border-warning/30 bg-warning/10 p-3">
+              <p className="text-xs font-semibold text-warning">Status update delayed</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                We have not received confirmation yet. Please check your M-Pesa account. If the money has been received, no further action is needed. If not, contact support.
+              </p>
+              <button
+                onClick={refreshBalance}
+                className="mt-2 w-full rounded-lg bg-warning/20 py-2 text-xs font-semibold text-warning"
+              >
+                Refresh Balance
+              </button>
+            </div>
           )}
         </div>
       </SheetShell>

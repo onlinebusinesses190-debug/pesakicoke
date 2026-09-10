@@ -47,7 +47,7 @@ const callPalplussB2C = async (
     amount,
     phone: palplussPhone,
     reference,
-    description: 'PESAKI withdrawal',
+    description: 'Received from PESAKI',
     callbackUrl,
   };
 
@@ -304,7 +304,7 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
           return reply.status(400).send({ success: false, error: 'Phone must be a valid Kenyan number (e.g. 0712345678, 254712345678)' });
         }
 
-        const reference = `PESAKI-WD-${Date.now()}-${user.id.slice(0, 8)}`;
+        const reference = `WD-${user.id.slice(0, 8)}-${Date.now()}`;
 
         logger.info(
           { reference, userId: user.id, amount, phone: cleanPhone },
@@ -447,7 +447,7 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
 
         const { reference } = request.params as { reference: string };
 
-        const { data: withdrawal, error: withdrawalError } = await supabase
+        let { data: withdrawal, error: withdrawalError } = await supabase
           .from('b2c_withdrawals')
           .select('status, amount, phone, created_at, completed_at, provider_transaction_id, metadata')
           .eq('reference', reference)
@@ -455,6 +455,43 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
           .maybeSingle();
 
         if (withdrawalError || !withdrawal) {
+          logger.warn(
+            { reference, userId: user.id, withdrawalError },
+            'Withdrawal status: exact reference match failed, trying fallbacks'
+          );
+
+          const last8 = reference.slice(-8);
+
+          const { data: byProviderTx, error: providerTxError } = await supabase
+            .from('b2c_withdrawals')
+            .select('status, amount, phone, created_at, completed_at, provider_transaction_id, metadata')
+            .eq('provider_transaction_id', reference)
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+          if (byProviderTx) {
+            withdrawal = byProviderTx;
+            withdrawalError = providerTxError;
+          } else {
+            const { data: bySuffix, error: suffixError } = await supabase
+              .from('b2c_withdrawals')
+              .select('status, amount, phone, created_at, completed_at, provider_transaction_id, metadata')
+              .ilike('reference', `%-${last8}`)
+              .eq('user_id', user.id)
+              .maybeSingle();
+
+            if (bySuffix) {
+              withdrawal = bySuffix;
+              withdrawalError = suffixError;
+            }
+          }
+        }
+
+        if (withdrawalError || !withdrawal) {
+          logger.warn(
+            { reference, userId: user.id, withdrawalError },
+            'Withdrawal status: not found after all fallbacks'
+          );
           return reply.status(404).send({ error: 'Withdrawal not found' });
         }
 
