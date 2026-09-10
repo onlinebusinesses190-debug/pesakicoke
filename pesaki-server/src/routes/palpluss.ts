@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { logger } from '../utils/logger';
 import { supabase } from '../lib/supabase';
 import { env } from '../config/env';
+import { reserveLockedFunds, releaseLockedFunds } from '../wallet/service';
 
 const MIN_WITHDRAWAL_AMOUNT = 10;
 
@@ -12,52 +13,6 @@ const normalizePhone = (value: string) => {
   if (digits.startsWith('0') && digits.length === 10) return `254${digits.slice(1)}`;
   if (digits.length === 9) return `254${digits}`;
   return digits;
-};
-
-// ─── Helper: release locked funds idempotently ──────────────────────────────
-const releaseLockedFunds = async (
-  userId: string,
-  amount: number
-): Promise<void> => {
-  try {
-    const { data: wallet, error: walletError } = await supabase
-      .from('wallets')
-      .select('locked, balance')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (walletError || !wallet) {
-      logger.error(
-        { userId, amount, walletError },
-        'Failed to fetch wallet for locked funds release'
-      );
-      return;
-    }
-
-    const currentLocked = Number(wallet.locked) || 0;
-    if (currentLocked <= 0) {
-      return;
-    }
-
-    const newLocked = Math.max(0, currentLocked - amount);
-
-    const { error: updateError } = await supabase
-      .from('wallets')
-      .update({
-        locked: newLocked,
-        balance: Number(wallet.balance) + amount,
-      })
-      .eq('user_id', userId);
-
-    if (updateError) {
-      logger.error(
-        { userId, amount, updateError },
-        'Failed to release locked funds'
-      );
-    }
-  } catch (error) {
-    logger.error(error, 'Exception releasing locked funds');
-  }
 };
 
 // ─── Helper: call Palpluss B2C API ──────────────────────────────────────────
@@ -204,7 +159,7 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
             })
             .eq('id', withdrawal.id);
 
-          await releaseLockedFunds(withdrawal.user_id, withdrawalAmount);
+          await releaseLockedFunds(withdrawal.user_id, withdrawalAmount, true);
 
           logger.info(
             { externalReference, userId: withdrawal.user_id, amount: withdrawalAmount, resultCode, resultDesc },
@@ -225,7 +180,31 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
           })
           .eq('id', withdrawal.id);
 
-        await releaseLockedFunds(withdrawal.user_id, withdrawalAmount);
+        const { data: wallet, error: walletError } = await supabase
+          .from('wallets')
+          .select('locked')
+          .eq('user_id', withdrawal.user_id)
+          .maybeSingle();
+
+        if (!walletError && wallet) {
+          const currentLocked = Number(wallet.locked) || 0;
+          const newLocked = Math.max(0, currentLocked - withdrawalAmount);
+
+          await supabase
+            .from('wallets')
+            .update({ locked: newLocked })
+            .eq('user_id', withdrawal.user_id);
+
+          await supabase
+            .from('wallet_ledger')
+            .insert({
+              user_id: withdrawal.user_id,
+              type: 'debit',
+              mode: 'debit',
+              amount: withdrawalAmount,
+              description: `Withdrawal: ${externalReference}`,
+            });
+        }
 
         logger.info(
           {
@@ -263,11 +242,12 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
         const { amount, phone } = request.body as { amount: number; phone: string };
 
         if (!amount || amount <= 0) {
-          return reply.status(400).send({ error: 'Invalid amount' });
+          return reply.status(400).send({ success: false, error: 'Invalid amount' });
         }
 
         if (amount < MIN_WITHDRAWAL_AMOUNT) {
           return reply.status(400).send({
+            success: false,
             error: `Minimum withdrawal amount is KSh ${MIN_WITHDRAWAL_AMOUNT}`,
             minimumAmount: MIN_WITHDRAWAL_AMOUNT,
             requestedAmount: amount,
@@ -276,33 +256,52 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
 
         const cleanPhone = normalizePhone(phone);
         if (!cleanPhone || cleanPhone.length !== 12) {
-          return reply.status(400).send({ error: 'Phone must be a valid Kenyan number (e.g. 0712345678, 254712345678)' });
+          return reply.status(400).send({ success: false, error: 'Phone must be a valid Kenyan number (e.g. 0712345678, 254712345678)' });
         }
 
         const reference = `PESAKI-WD-${Date.now()}-${user.id.slice(0, 8)}`;
-        const idempotencyKey = reference;
 
-        const { data: withdrawalResult, error: rpcError } = await supabase.rpc(
-          'create_b2c_withdrawal',
-          {
-            p_user_id: user.id,
-            p_amount: amount,
-            p_phone: cleanPhone,
-            p_reference: reference,
-            p_idempotency_key: idempotencyKey,
-          }
+        logger.info(
+          { reference, userId: user.id, amount, phone: cleanPhone },
+          'WITHDRAWAL_REQUESTED | INIT'
         );
 
-        if (rpcError || !withdrawalResult?.success) {
-          const errorMsg = withdrawalResult?.error || rpcError?.message || 'Failed to reserve funds';
-          logger.error(
-            { userId: user.id, amount, rpcError: JSON.parse(JSON.stringify(rpcError)), withdrawalResult: JSON.parse(JSON.stringify(withdrawalResult)) },
-            'RPC FULL ERROR'
-          );
+        const { data: withdrawal, error: insertError } = await supabase
+          .from('b2c_withdrawals')
+          .insert({
+            user_id: user.id,
+            amount,
+            phone: cleanPhone,
+            reference,
+            status: 'pending',
+          })
+          .select('id')
+          .single();
+
+        if (insertError || !withdrawal) {
+          logger.error({ insertError, userId: user.id }, 'Failed to create pending withdrawal');
           return reply.status(500).send({
-            error: errorMsg,
+            success: false,
+            error: 'Failed to initialize withdrawal',
+          });
+        }
+
+        const reserveResult = await reserveLockedFunds(user.id, amount);
+        if (!reserveResult.success) {
+          await supabase
+            .from('b2c_withdrawals')
+            .delete()
+            .eq('id', withdrawal.id);
+
+          logger.warn(
+            { userId: user.id, amount, error: reserveResult.error },
+            'WITHDRAWAL_REQUESTED | RESERVE_FAILED'
+          );
+
+          return reply.status(400).send({
+            success: false,
+            error: reserveResult.error || 'Insufficient balance',
             requestedAmount: amount,
-            details: rpcError || withdrawalResult,
           });
         }
 
@@ -317,10 +316,7 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
         try {
           palplussResponse = await callPalplussB2C(amount, cleanPhone, reference, callbackUrl);
         } catch (apiError: any) {
-          logger.error(
-            { reference, error: apiError.message, providerCode: apiError.providerCode, providerMessage: apiError.providerMessage },
-            'WITHDRAWAL_FAILED | PALPLUSS_REQUEST_FAILED'
-          );
+          await releaseLockedFunds(user.id, amount, true);
 
           await supabase
             .from('b2c_withdrawals')
@@ -332,21 +328,20 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
                 provider_message: apiError.providerMessage,
               },
             })
-            .eq('id', withdrawalResult.withdrawal_id);
+            .eq('id', withdrawal.id);
 
-          await releaseLockedFunds(user.id, amount);
+          logger.error(
+            { reference, error: apiError.message, providerCode: apiError.providerCode, providerMessage: apiError.providerMessage },
+            'WITHDRAWAL_FAILED | PALPLUSS_REQUEST_FAILED'
+          );
 
           return reply.status(500).send({
+            success: false,
             error: 'Withdrawal provider rejected the payout',
             providerCode: apiError.providerCode,
             providerMessage: apiError.providerMessage,
           });
         }
-
-        logger.info(
-          { reference, transactionId: palplussResponse?.transactionId, status: palplussResponse?.status },
-          'PALPLUSS_RESPONSE_RECEIVED'
-        );
 
         await supabase
           .from('b2c_withdrawals')
@@ -356,7 +351,12 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
             provider_checkout_id: palplussResponse?.providerCheckoutId || null,
             metadata: { palpluss_response: palplussResponse },
           })
-          .eq('id', withdrawalResult.withdrawal_id);
+          .eq('id', withdrawal.id);
+
+        logger.info(
+          { reference, transactionId: palplussResponse?.transactionId, status: palplussResponse?.status },
+          'PALPLUSS_RESPONSE_RECEIVED'
+        );
 
         return reply.send({
           success: true,
