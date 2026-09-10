@@ -342,7 +342,65 @@ function DepositSheet({ onClose, user, onSuccess }: any) {
   const [amount, setAmount] = useState("");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState<"form" | "processing" | "success">("form");
+  const [step, setStep] = useState<"form" | "processing" | "waiting" | "success" | "failed">("form");
+  const [depositPhone, setDepositPhone] = useState("");
+  const pollRef = useRef<number | null>(null);
+  const attemptsRef = useRef(0);
+
+  const stopPolling = () => {
+    if (pollRef.current) {
+      clearTimeout(pollRef.current);
+      pollRef.current = null;
+    }
+  };
+
+  const refreshBalance = async () => {
+    try {
+      const data = await apiRequest('/wallet/available-balance?mode=real');
+      if (data?.data?.available !== undefined) {
+        // trigger parent refresh via onSuccess
+        onSuccess();
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const pollDepositStatus = async (checkoutRequestId: string) => {
+    if (attemptsRef.current >= 20) {
+      stopPolling();
+      setStep("failed");
+      return;
+    }
+
+    attemptsRef.current += 1;
+
+    try {
+      const statusData = await apiRequest(`/wallet/deposit/status/${checkoutRequestId}`);
+      const status = String(statusData?.data?.status || "").toLowerCase();
+
+      if (status === "completed") {
+        stopPolling();
+        setStep("success");
+        onSuccess();
+        toast.success(`Deposit successful! KES ${amount} has been added to your wallet.`);
+        setTimeout(() => onClose(), 3000);
+      } else if (status === "failed") {
+        stopPolling();
+        setStep("failed");
+        toast.error("Deposit failed or was cancelled. Please try again.");
+        setTimeout(() => onClose(), 4000);
+      } else {
+        pollRef.current = window.setTimeout(() => pollDepositStatus(checkoutRequestId), 3000);
+      }
+    } catch (err) {
+      pollRef.current = window.setTimeout(() => pollDepositStatus(checkoutRequestId), 3000);
+    }
+  };
+
+  useEffect(() => {
+    return () => stopPolling();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -379,10 +437,10 @@ function DepositSheet({ onClose, user, onSuccess }: any) {
       const data = await response.json();
 
       if (response.ok && data?.success && data?.data?.checkoutRequestId) {
-        toast.success("STK Push sent. Check your phone for the prompt.");
-        setStep("success");
-        onSuccess();
-        setTimeout(() => onClose(), 5000);
+        setDepositPhone(cleanPhone);
+        setStep("waiting");
+        attemptsRef.current = 0;
+        pollDepositStatus(data.data.checkoutRequestId);
       } else {
         throw new Error(data?.message || "Failed to initiate payment");
       }
@@ -402,9 +460,9 @@ function DepositSheet({ onClose, user, onSuccess }: any) {
           <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-success/15 text-success">
             <TrendingUp className="h-8 w-8" />
           </div>
-          <p className="mt-3 text-lg font-bold">STK Push Sent</p>
+          <p className="mt-3 text-lg font-bold">Deposit Successful</p>
           <p className="text-xs text-muted-foreground">
-            Check your phone for the M-Pesa prompt. Enter your PIN to confirm.
+            Deposit successful! KES {amount} has been added to your wallet.
           </p>
           <button
             onClick={onClose}
@@ -412,6 +470,60 @@ function DepositSheet({ onClose, user, onSuccess }: any) {
           >
             Done
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === "failed") {
+    return (
+      <div className="fixed inset-0 z-50 grid place-items-center bg-black/50">
+        <div className="w-full max-w-sm rounded-2xl bg-card p-6 text-center">
+          <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-destructive/15 text-destructive">
+            <X className="h-8 w-8" />
+          </div>
+          <p className="mt-3 text-lg font-bold">Deposit Failed</p>
+          <p className="text-xs text-muted-foreground">
+            Taking longer than expected. If you entered your PIN, refresh the page in a minute to see your updated balance.
+          </p>
+          <button
+            onClick={onClose}
+            className="mt-4 w-full rounded-xl gradient-primary py-3 text-sm font-semibold text-primary-foreground"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === "processing") {
+    return (
+      <div className="fixed inset-0 z-50 grid place-items-center bg-black/50">
+        <div className="w-full max-w-sm rounded-2xl bg-card p-6 text-center">
+          <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-warning/15 text-warning">
+            <Loader2 className="h-7 w-7 animate-spin" />
+          </div>
+          <p className="mt-4 text-lg font-bold">Processing your request...</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            You will receive an M-Pesa prompt shortly.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === "waiting") {
+    return (
+      <div className="fixed inset-0 z-50 grid place-items-center bg-black/50">
+        <div className="w-full max-w-sm rounded-2xl bg-card p-6 text-center">
+          <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-warning/15 text-warning">
+            <Loader2 className="h-7 w-7 animate-spin" />
+          </div>
+          <p className="mt-4 text-lg font-bold">M-Pesa prompt sent</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            M-Pesa prompt sent to {depositPhone}. Enter your PIN to confirm.
+          </p>
         </div>
       </div>
     );

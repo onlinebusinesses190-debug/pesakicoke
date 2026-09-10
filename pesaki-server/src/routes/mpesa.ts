@@ -595,4 +595,45 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
       return reply.code(200).send({ ResultCode: 0, ResultDesc: 'Accepted' });
     }
   );
+
+  fastify.get(
+    '/wallet/deposit/status/:checkoutRequestId',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const token = request.headers.authorization?.replace('Bearer ', '');
+        if (!token) {
+          return reply.status(401).send({ error: 'Unauthorized' });
+        }
+
+        const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+        if (userError || !user) {
+          return reply.status(401).send({ error: 'Invalid token' });
+        }
+
+        const { checkoutRequestId } = request.params as { checkoutRequestId: string };
+
+        const { data: deposit, error: depositError } = await supabase
+          .from('mpesa_deposits')
+          .select('status, amount')
+          .eq('checkout_request_id', checkoutRequestId)
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (depositError || !deposit) {
+          return reply.status(404).send({ error: 'Deposit not found' });
+        }
+
+        return reply.send({
+          success: true,
+          data: {
+            status: deposit.status,
+            amount: deposit.amount,
+          },
+        });
+      } catch (error) {
+        logger.error(error, 'Error in /wallet/deposit/status');
+        return reply.status(500).send({ error: 'Internal server error' });
+      }
+    }
+  );
 };
