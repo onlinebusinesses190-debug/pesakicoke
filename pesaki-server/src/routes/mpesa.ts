@@ -388,8 +388,6 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
             user_id: userId,
             phone: cleanPhone,
             amount: Math.round(numericAmount),
-            fee,
-            credited_amount: Math.round(creditedAmount),
             checkout_request_id: localRequestId,
             status: 'pending',
             created_at: new Date().toISOString(),
@@ -400,6 +398,7 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
           return reply.code(500).send({
             success: false,
             error: 'Failed to initialize deposit',
+            details: insertError.message,
           });
         }
 
@@ -500,7 +499,7 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
 
         const { data: deposit, error: depositError } = await supabase
           .from('mpesa_deposits')
-          .select('user_id, amount, fee, credited_amount, status')
+          .select('user_id, amount, status')
           .eq('checkout_request_id', checkoutRequestId)
           .single();
 
