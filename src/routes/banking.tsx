@@ -10,6 +10,7 @@ import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Stat, SectionTitle, Progress, Badge } from "@/components/ui-bits";
 import { toast } from "sonner";
 import { apiRequest } from "@/utils/api";
+import { calculateDepositFee, calculateWithdrawalFee, MIN_DEPOSIT, MIN_WITHDRAWAL } from "@/utils/fees";
 
 export const Route = createFileRoute("/banking")({
   head: () => ({
@@ -491,11 +492,19 @@ function DepositSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
           <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Amount (KES)</label>
           <input type="number" required value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="e.g. 5000" />
         </div>
+        {amount && Number(amount) < MIN_DEPOSIT && (
+          <p className="text-[11px] text-destructive">Minimum deposit is KES {MIN_DEPOSIT}</p>
+        )}
+        {amount && Number(amount) >= MIN_DEPOSIT && (
+          <p className="text-[11px] text-muted-foreground">
+            You will receive: KES {Math.max(0, Number(amount) - calculateDepositFee(Number(amount)))} (Fee: KES {calculateDepositFee(Number(amount))})
+          </p>
+        )}
         <div>
           <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">M-Pesa Phone</label>
           <input type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="0712345678" />
         </div>
-        <button type="submit" disabled={loading} className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50">{loading ? 'Processing...' : 'Send STK Push'}</button>
+        <button type="submit" disabled={loading || !amount || Number(amount) < MIN_DEPOSIT} className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50">{loading ? 'Processing...' : 'Send STK Push'}</button>
       </form>
     </SheetShell>
   );
@@ -561,7 +570,7 @@ function WithdrawSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess:
             <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Amount (KES)</label>
             <input type="number" required value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="e.g. 10000" />
           </div>
-          <button type="submit" disabled={loading} className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50">{loading ? 'Processing...' : 'Withdraw to Wallet'}</button>
+          <button type="submit" disabled={loading || !amount || Number(amount) < 1} className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50">{loading ? 'Processing...' : 'Withdraw to Wallet'}</button>
         </form>
       ) : (
         <form onSubmit={handleMpesaWithdraw} className="mt-4 space-y-4">
@@ -569,11 +578,19 @@ function WithdrawSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess:
             <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Amount (KES)</label>
             <input type="number" required value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="e.g. 10000" />
           </div>
+          {amount && Number(amount) < MIN_WITHDRAWAL && (
+            <p className="text-[11px] text-destructive">Minimum withdrawal is KES {MIN_WITHDRAWAL}</p>
+          )}
+          {amount && Number(amount) >= MIN_WITHDRAWAL && (
+            <p className="text-[11px] text-muted-foreground">
+              You will receive: KES {Math.max(0, Number(amount) - calculateWithdrawalFee(Number(amount)))} (Fee: KES {calculateWithdrawalFee(Number(amount))})
+            </p>
+          )}
           <div>
             <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">M-Pesa Phone</label>
             <input type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="0712345678" />
           </div>
-          <button type="submit" disabled={loading} className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50">{loading ? 'Processing...' : 'Withdraw to M-Pesa'}</button>
+          <button type="submit" disabled={loading || !amount || Number(amount) < MIN_WITHDRAWAL} className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50">{loading ? 'Processing...' : 'Withdraw to M-Pesa'}</button>
         </form>
       )}
     </SheetShell>
