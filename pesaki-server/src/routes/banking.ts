@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { logger } from '../utils/logger';
 import { env } from '../config/env';
-import { calculateWithdrawalFee } from '../utils/fees';
+import { calculateWithdrawalFee, MIN_DEPOSIT, MIN_WITHDRAWAL } from '../utils/fees';
 
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -618,7 +618,7 @@ export const bankingRoutes = async (fastify: FastifyInstance) => {
       const user = await getUser(request, reply);
       if (!user || reply.statusCode !== 200) return;
       const { amount, phone } = request.body as { amount: number; phone: string };
-      if (!amount || amount <= 0) return reply.status(400).send({ error: 'Invalid amount' });
+      if (!amount || amount <= 0 || amount < MIN_DEPOSIT) return reply.status(400).send({ error: `Minimum deposit amount is KES ${MIN_DEPOSIT}` });
       const cleanPhone = normalizePhoneNumber(phone);
       if (!/^254[71]\d{8}$/.test(cleanPhone)) {
         return reply.status(400).send({ error: 'Invalid Kenyan phone number. Use 07XXXXXXXX or 2547XXXXXXXX.' });
@@ -734,6 +734,24 @@ export const bankingRoutes = async (fastify: FastifyInstance) => {
     }
   })
 
+  fastify.get('/banking/deposit/status/:checkoutRequestId', async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const { checkoutRequestId } = request.params as { checkoutRequestId: string };
+      const { data: deposit, error } = await adminSupabase
+        .from('banking_deposits')
+        .select('status, amount, phone')
+        .eq('checkout_request_id', checkoutRequestId)
+        .single();
+      if (error || !deposit) {
+        return reply.send({ data: { status: 'not_found' } });
+      }
+      return reply.send({ data: { status: deposit.status } });
+    } catch (error: any) {
+      logger.error(error, 'Error in /banking/deposit/status/:checkoutRequestId');
+      return reply.status(500).send({ data: { status: 'error' } });
+    }
+  })
+
   // 14. POST /banking/withdraw-to-wallet
   fastify.post('/banking/withdraw-to-wallet', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
@@ -818,8 +836,10 @@ export const bankingRoutes = async (fastify: FastifyInstance) => {
       const bankingWallet = await ensureBankingWallet(user.id);
       const bankingBalance = Number(bankingWallet.balance) || 0;
       if (bankingBalance < amount) return reply.status(400).send({ error: 'Insufficient banking balance' });
+      if (amount < MIN_WITHDRAWAL) return reply.status(400).send({ error: `Minimum withdrawal amount is KES ${MIN_WITHDRAWAL}` });
       const fee = calculateWithdrawalFee(amount);
       const payoutAmount = Math.max(0, amount - fee);
+      if (payoutAmount < 10) return reply.status(400).send({ error: 'After fee deduction, payout must be at least KES 10' });
       const reference = `WD-BANK-${user.id.slice(0, 8)}-${Date.now()}`;
       const callbackBase = env.MPESA_CALLBACK_URL || 'https://pesaki-server.onrender.com';
       const callbackUrl = `${callbackBase.replace(/\/$/, '')}/api/webhooks/palpluss`;

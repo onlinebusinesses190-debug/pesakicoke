@@ -441,7 +441,7 @@ function DepositSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
     if (attemptsRef.current >= 20) { stopPolling(); setStep('failed'); return; }
     attemptsRef.current += 1;
     try {
-      const data = await apiRequest(`/wallet/deposit/status/${crId}`);
+      const data = await apiRequest(`/banking/deposit/status/${crId}`);
       const status = String(data?.data?.status || '').toLowerCase();
       if (status === 'completed') { stopPolling(); setStep('success'); onSuccess(); toast.success('Deposit successful!'); setTimeout(onClose, 3000); }
       else if (status === 'failed') { stopPolling(); setStep('failed'); toast.error('Deposit failed'); setTimeout(onClose, 4000); }
