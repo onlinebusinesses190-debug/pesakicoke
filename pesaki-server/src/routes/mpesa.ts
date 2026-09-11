@@ -523,7 +523,7 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
           return reply.code(200).send({ ResultCode: 0, ResultDesc: 'Accepted' });
         }
 
-        const depositFee = Number(deposit.fee) || calculateDepositFee(finalAmount);
+        const depositFee = calculateDepositFee(finalAmount);
         const netAmount = Math.max(0, finalAmount - depositFee);
 
         const creditResult = await credit(

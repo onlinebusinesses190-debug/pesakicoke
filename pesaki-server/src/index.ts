@@ -14,6 +14,7 @@ import walletRoutes from './routes/wallet';
 import kaziRoutes from './routes/kazi';
 import { mpesaRoutes } from './routes/mpesa';
 import { palplussRoutes } from './routes/palpluss';
+import { bankingRoutes } from './routes/banking';
 
 const startServer = async () => {
   try {
@@ -35,6 +36,7 @@ const startServer = async () => {
     server.register(kaziRoutes);
     server.register(mpesaRoutes);
     server.register(palplussRoutes);
+    server.register(bankingRoutes);
 
     // Add dummy endpoints for missing ones
     server.get('/user/stats', async (_request, reply) => {
