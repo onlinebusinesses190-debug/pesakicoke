@@ -16,14 +16,16 @@ export default defineConfig({
     plugins: [
       VitePWA({
         registerType: "autoUpdate",
-        srcDir: ".output/public",
+        srcDir: "public",
         filename: "sw.js",
+        injectRegister: false,
         includeAssets: [
           "favicon.ico",
           "icons/icon-192.png",
           "icons/icon-512.png",
           "icons/favicon-32.png",
-          "icons/apple-touch-icon-180.png"
+          "icons/apple-touch-icon-180.png",
+          "icons/icon-maskable-512.png"
         ],
         manifest: {
           name: "PESAKI",
