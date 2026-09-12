@@ -18,7 +18,9 @@ export default defineConfig({
         registerType: "autoUpdate",
         srcDir: "public",
         filename: "sw.js",
-        injectRegister: false,
+        devOptions: {
+          enabled: true,
+        },
         includeAssets: [
           "favicon.ico",
           "icons/icon-192.png",

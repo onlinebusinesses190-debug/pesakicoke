@@ -11,7 +11,6 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { useRegisterSW } from "virtual:pwa-register/react";
 
 function NotFoundComponent() {
   return (
@@ -101,6 +100,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap",
       },
     ],
+    scripts: [{ src: "/registerSW.js", defer: true }],
   }),
   shellComponent: RootShell,
   component: RootComponent,
@@ -124,7 +124,6 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  useRegisterSW();
 
   return (
     <QueryClientProvider client={queryClient}>
