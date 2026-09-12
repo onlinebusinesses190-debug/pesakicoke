@@ -16,6 +16,7 @@ export default defineConfig({
     plugins: [
       VitePWA({
         registerType: "autoUpdate",
+        manifestFilename: "manifest.json",
         srcDir: "public",
         filename: "sw.js",
         devOptions: {

@@ -1,0 +1,3 @@
+/manifest.json
+  x-content-type-options: nosniff
+  content-type: application/manifest+json
