@@ -629,7 +629,6 @@ export const bankingRoutes = async (fastify: FastifyInstance) => {
         return reply.status(400).send({ error: 'Invalid Kenyan phone number. Use 07XXXXXXXX or 2547XXXXXXXX.' });
       }
       const localRequestId = `${user.id}_${Date.now()}`;
-      const depositFee = 0;
       const creditedAmount = Math.round(amount);
       const { error: insertError } = await adminSupabase
         .from('banking_deposits')
@@ -772,10 +771,12 @@ export const bankingRoutes = async (fastify: FastifyInstance) => {
       const bankingWallet = await ensureBankingWallet(user.id);
       const bankingBalance = Number(bankingWallet.balance) || 0;
       if (bankingBalance < amount) return reply.status(400).send({ error: 'Insufficient banking balance' });
+      const creditedAmount = Math.max(0, amount - WALLET_WITHDRAWAL_FEE);
+      if (creditedAmount < 1) return reply.status(400).send({ error: 'After fee deduction, amount must be at least KES 1' });
       await adminSupabase.from('banking_wallets').update({ balance: bankingBalance - amount }).eq('user_id', user.id);
       const { error: creditError } = await adminSupabase.rpc('credit_wallet', {
         p_user_id: user.id,
-        p_amount: amount,
+        p_amount: creditedAmount,
         p_mode: 'real',
         p_description: 'From Banking Hub',
       });
@@ -788,13 +789,13 @@ export const bankingRoutes = async (fastify: FastifyInstance) => {
         amount,
         type: 'withdraw_to_wallet',
         mode: 'debit',
-        description: `Withdrawn KES ${amount} to general wallet (Fee: ${WALLET_WITHDRAWAL_FEE})`,
+        description: `Withdrawn KES ${amount} to general wallet (Fee: ${WALLET_WITHDRAWAL_FEE}, Credited: ${creditedAmount})`,
         status: 'completed',
         reference: `WD-WALLET-${user.id.slice(0, 8)}-${Date.now()}`,
       });
       return reply.send({
         success: true,
-        data: { fee: WALLET_WITHDRAWAL_FEE, creditedAmount: amount - WALLET_WITHDRAWAL_FEE },
+        data: { fee: WALLET_WITHDRAWAL_FEE, creditedAmount },
         message: 'Withdrawn to wallet successfully',
       });
     } catch (error: any) {
