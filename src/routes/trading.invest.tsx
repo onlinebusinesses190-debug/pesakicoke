@@ -18,6 +18,7 @@ import {
   PlusCircle,
 } from "lucide-react";
 import { apiRequest } from "@/utils/api";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { createClient } from "@supabase/supabase-js";
 import { toast } from "sonner";
 
@@ -151,6 +152,7 @@ export const Route = createFileRoute("/trading/invest")({
 function InvestmentPage() {
   const search = Route.useSearch();
   const navigate = useNavigate();
+  const { requireAuth } = useRequireAuth();
   const mode = search.mode === "real" ? "real" : "demo";
 
   const [stocks, setStocks] = useState<NseStock[]>([]);
@@ -242,6 +244,7 @@ function InvestmentPage() {
   // ── Place prediction ──────────────────────────────────────────────────────
   const handlePlacePrediction = async () => {
     if (!selectedStock || !prediction) return;
+    if (mode !== "demo" && !requireAuth()) return;
     setIsPlacing(true);
 
     try {

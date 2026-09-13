@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import {
   PiggyBank, Lock, Target, HandCoins, TrendingUp,
   ArrowDownToLine, ArrowUpFromLine, Plus, X, ArrowLeft,
@@ -272,6 +273,7 @@ function BankingPage() {
 
 // ─── Lock Savings Form (inline) ──────────────────────────────────────────────
 function LockSavingsForm({ available, onSuccess }: { available: number; onSuccess: () => void }) {
+  const { requireAuth } = useRequireAuth();
   const [amount, setAmount] = useState(50000);
   const [duration, setDuration] = useState(12);
   const [loading, setLoading] = useState(false);
@@ -280,6 +282,7 @@ function LockSavingsForm({ available, onSuccess }: { available: number; onSucces
   const totalAtMaturity = amount + interest;
 
   const handleLock = async () => {
+    if (!requireAuth()) return;
     if (amount < 1000) return toast.error('Minimum lock amount is KES 1,000');
     if (amount > available) return toast.error('Insufficient available balance');
     setLoading(true);
@@ -428,6 +431,7 @@ function BankingSheet({ action, onClose, onSuccess }: { action: ActionKey; onClo
 }
 
 function DepositSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const { requireAuth } = useRequireAuth();
   const [amount, setAmount] = useState('');
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
@@ -454,6 +458,7 @@ function DepositSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!requireAuth()) return;
     if (!amount || !phone) return;
     let cleanPhone = phone.replace(/\D/g, '');
     if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
@@ -511,6 +516,7 @@ function DepositSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
 }
 
 function WithdrawSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const { requireAuth } = useRequireAuth();
   const [tab, setTab] = useState<'wallet' | 'mpesa'>('wallet');
   const [amount, setAmount] = useState('');
   const [phone, setPhone] = useState('');
@@ -518,6 +524,7 @@ function WithdrawSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess:
 
   const handleWalletWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!requireAuth()) return;
     if (!amount) return;
     const WALLET_WITHDRAWAL_FEE = 2;
     const creditedAmount = Number(amount) - WALLET_WITHDRAWAL_FEE;
@@ -538,6 +545,7 @@ function WithdrawSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess:
 
   const handleMpesaWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!requireAuth()) return;
     if (!amount || !phone) return;
     let cleanPhone = phone.replace(/\D/g, '');
     if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
@@ -606,6 +614,7 @@ function WithdrawSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess:
 }
 
 function InvestSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const { requireAuth } = useRequireAuth();
   const [amount, setAmount] = useState(50000);
   const [duration, setDuration] = useState(12);
   const [loading, setLoading] = useState(false);
@@ -614,6 +623,7 @@ function InvestSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
 
   const handleInvest = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!requireAuth()) return;
     setLoading(true);
     try {
       await apiRequest('/banking/invest', {
@@ -657,6 +667,7 @@ function InvestSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
 }
 
 function LoanSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const { requireAuth } = useRequireAuth();
   const [amount, setAmount] = useState(20000);
   const [duration, setDuration] = useState(12);
   const [purpose, setPurpose] = useState('');
@@ -666,6 +677,7 @@ function LoanSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: () 
 
   const handleApply = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!requireAuth()) return;
     setLoading(true);
     try {
       await apiRequest('/banking/loans', {

@@ -5,6 +5,7 @@ import { io, Socket } from "socket.io-client";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@supabase/supabase-js";
 import { apiRequest } from "@/utils/api";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { AviatorCanvas } from "@/components/aviator/AviatorCanvas";
 
 type GameStatus = "WAITING" | "FLYING" | "CRASHED";
@@ -48,6 +49,7 @@ export const Route = createFileRoute("/trading/aviator")({
 function AviatorPage() {
   const search = Route.useSearch();
   const navigate = useNavigate();
+  const { requireAuth } = useRequireAuth();
   const mode = search.mode === "real" ? "real" : "demo";
 
   const [status, setStatus] = useState<GameStatus>("WAITING");
@@ -142,6 +144,7 @@ function AviatorPage() {
   // ── Place bet (Allocation 1) ──────────────────────────────────────────────
   const placeBet1 = async () => {
     if (status !== "WAITING" || isBetting1) return;
+    if (mode !== "demo" && !requireAuth()) return;
     setIsBetting1(true);
 
     if (mode === "demo") {
@@ -172,6 +175,7 @@ function AviatorPage() {
   // ── Place bet (Allocation 2) ──────────────────────────────────────────────
   const placeBet2 = async () => {
     if (status !== "WAITING" || isBetting2) return;
+    if (mode !== "demo" && !requireAuth()) return;
     setIsBetting2(true);
 
     if (mode === "demo") {
@@ -202,6 +206,7 @@ function AviatorPage() {
   // ── Cash out 1 ─────────────────────────────────────────────────────────────
   const handleCashOut1 = () => {
     if (status !== "FLYING" || cashedOut1 || !socketRef.current) return;
+    if (mode !== "demo" && !requireAuth()) return;
     if (mode === "demo") {
       const currentMultiplier = multiplierRef.current;
       const profit = betAmount1 * currentMultiplier;
@@ -218,6 +223,7 @@ function AviatorPage() {
   // ── Cash out 2 ─────────────────────────────────────────────────────────────
   const handleCashOut2 = () => {
     if (status !== "FLYING" || cashedOut2 || !socketRef.current) return;
+    if (mode !== "demo" && !requireAuth()) return;
     if (mode === "demo") {
       const currentMultiplier = multiplierRef.current;
       const profit = betAmount2 * currentMultiplier;

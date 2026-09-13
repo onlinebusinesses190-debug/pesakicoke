@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { Disc, Sparkles, Loader2, ArrowLeft, PlusCircle } from "lucide-react";
 import { apiRequest } from "@/utils/api";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { createClient } from "@supabase/supabase-js";
 
 type AllocationOutcome = {
@@ -27,6 +28,7 @@ export const Route = createFileRoute("/trading/spin")({
 function MarketGrowthPage() {
   const search = Route.useSearch();
   const navigate = useNavigate();
+  const { requireAuth } = useRequireAuth();
   const mode = search.mode === "real" ? "real" : "demo";
 
   const [outcomes, setOutcomes] = useState<AllocationOutcome[]>([]);
@@ -92,6 +94,7 @@ function MarketGrowthPage() {
   // ── Execute spin ─────────────────────────────────────────────────────────
   const executeSelection = async () => {
     if (executing || outcomes.length === 0) return;
+    if (mode !== "demo" && !requireAuth()) return;
     setLastAdjustment(null);
     setExecuting(true);
 

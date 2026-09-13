@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { TradingChart } from "@/components/fx/TradingChart";
 import { Activity, RefreshCw, Timer, ArrowLeft, PlusCircle } from "lucide-react";
 import { apiRequest } from "@/utils/api";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { createClient } from "@supabase/supabase-js";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -60,6 +61,7 @@ export const Route = createFileRoute("/trading/fx")({
 function TradingPage() {
   const search = Route.useSearch();
   const navigate = useNavigate();
+  const { requireAuth } = useRequireAuth();
   const mode = search.mode === "real" ? "real" : "demo";
 
   const [data, setData] = useState<any[]>([]);
@@ -226,6 +228,7 @@ function TradingPage() {
 
   const handleTrade = async (direction: "buy" | "sell") => {
     if (!currentPrice || tradeActive) return;
+    if (mode !== "demo" && !requireAuth()) return;
     if (stake < 10) {
       setTradeError("Minimum stake is KES 10");
       return;
@@ -287,6 +290,7 @@ function TradingPage() {
 
   const handleCloseTrade = async (predictionId: string) => {
     if (tradeActiveRef.current) return;
+    if (mode !== "demo" && !requireAuth()) return;
     try {
       const res = await apiRequest("/games/prediction/close", {
         method: "POST",

@@ -4,6 +4,7 @@ import { ArrowUp, ArrowDown, Loader2, TrendingUp, ArrowLeft, PlusCircle } from "
 import { createClient } from "@supabase/supabase-js";
 import { io, Socket } from "socket.io-client";
 import { apiRequest } from "@/utils/api";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 
 type RoundState = "open" | "locked" | "result";
 
@@ -72,6 +73,7 @@ export const Route = createFileRoute("/trading/up-down")({
 function UpDownGame() {
   const search = Route.useSearch();
   const navigate = useNavigate();
+  const { requireAuth } = useRequireAuth();
   const mode = search.mode === "real" ? "real" : "demo";
 
   const socketRef = useRef<Socket | null>(null);
@@ -278,6 +280,7 @@ function UpDownGame() {
   const handleOrder = useCallback(
     (direction: "up" | "down") => {
       if (!socketRef.current || !round || round.state !== "open" || myPosition || executingOrder) return;
+      if (!isDemo && !requireAuth()) return;
       const stake = Number(amount);
       if (isNaN(stake) || stake <= 0) return;
 

@@ -8,6 +8,7 @@ import {
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Badge, SectionTitle } from "@/components/ui-bits";
 import { useAuth } from "@/hooks/useAuth";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { toast } from "sonner";
 import { createClient } from "@supabase/supabase-js";
 import { fmt } from "@/lib/mock";
@@ -97,6 +98,7 @@ interface ChatMessage {
 
 function KaziPage() {
   const { user } = useAuth();
+  const { requireAuth } = useRequireAuth();
   const [tab, setTab] = useState<Tab>("find");
   const [q, setQ] = useState("");
   const [applyJob, setApplyJob] = useState<Job | null>(null);
@@ -339,11 +341,11 @@ function KaziPage() {
             ) : (
               <div className="space-y-2.5">
                 {visibleJobs.map((j) => (
-                  <JobCard
-                    key={j.id}
-                    job={j}
-                    onApply={() => setApplyJob(j)}
-                  />
+                   <JobCard
+                     key={j.id}
+                     job={j}
+                     onApply={() => { if (!requireAuth()) return; setApplyJob(j); }}
+                   />
                 ))}
               </div>
             )}
@@ -359,7 +361,7 @@ function KaziPage() {
             const job = myPostedJobs.find(j => j.id === jobId);
             if (job) setChatApp({ application, job });
           }}
-          onHire={(app) => setHireApp(app)}
+           onHire={(app) => { if (!requireAuth()) return; setHireApp(app); }}
           onRefresh={refreshData}
         />
       )}
@@ -604,9 +606,11 @@ function MyPanel({ apps, postedJobs, contracts, onChat, onRefresh, user }: any) 
 
 // ─── Worker Applications ──────────────────────────────────────────────────
 function WorkerApplications({ apps, onChat, onRefresh, user }: any) {
+  const { requireAuth } = useRequireAuth();
   const [withdrawing, setWithdrawing] = useState<string | null>(null);
 
   const handleWithdraw = async (contractId: string) => {
+    if (!requireAuth()) return;
     setWithdrawing(contractId);
     try {
       const supabase = createClient(
@@ -716,9 +720,11 @@ function WorkerApplications({ apps, onChat, onRefresh, user }: any) {
 
 // ─── Active Contracts ────────────────────────────────────────────────────
 function ActiveContracts({ contracts, onRefresh, user }: any) {
+  const { requireAuth } = useRequireAuth();
   const [starting, setStarting] = useState<string | null>(null);
 
   const handleStartJob = async (contractId: string) => {
+    if (!requireAuth()) return;
     setStarting(contractId);
     try {
       const supabase = createClient(
@@ -888,6 +894,7 @@ export function FileField({
 
 // ─── ApplyJobSheet ──────────────────────────────────────────────────────────
 function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
+  const { requireAuth } = useRequireAuth();
   const [done, setDone] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
@@ -909,6 +916,7 @@ function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!requireAuth()) return;
     setSubmitting(true);
     try {
       const { data } = await supabase.auth.getSession();
@@ -974,6 +982,7 @@ function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
 
 // ─── PostJobSheet ───────────────────────────────────────────────────────────
 function PostJobSheet({ onClose, onSuccess, user }: any) {
+  const { requireAuth } = useRequireAuth();
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
   const [accommodation, setAccommodation] = useState(false);
@@ -994,6 +1003,7 @@ function PostJobSheet({ onClose, onSuccess, user }: any) {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!requireAuth()) return;
     setLoading(true);
     try {
       const { data } = await supabase.auth.getSession();
@@ -1070,10 +1080,12 @@ function PostJobSheet({ onClose, onSuccess, user }: any) {
 
 // ─── HireSheet ──────────────────────────────────────────────────────────────
 function HireSheet({ app, onClose, onHireSuccess, user }: any) {
+  const { requireAuth } = useRequireAuth();
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
 
   const handleHire = async () => {
+    if (!requireAuth()) return;
     setLoading(true);
     try {
       const supabase = createClient(

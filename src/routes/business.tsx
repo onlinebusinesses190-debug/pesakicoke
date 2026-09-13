@@ -11,6 +11,7 @@ import { FileField, SuccessBlock } from "./kazi";
 import { createClient } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 
 export const Route = createFileRoute("/business")({
   head: () => ({
@@ -58,6 +59,7 @@ interface SuccessStory {
 
 function BusinessPage() {
   const { user } = useAuth();
+  const { requireAuth } = useRequireAuth();
   const [mode, setMode] = useState<"none" | "picker" | "startup" | "existing">("none");
   const [info, setInfo] = useState<null | "invest" | "guide">(null);
   const [loading, setLoading] = useState(true);
@@ -155,7 +157,7 @@ function BusinessPage() {
   }, [user?.id]); // ✅ Use user.id, not the whole user object
 
   const onAction = (k: ActionKey) => {
-    if (k === "apply") return setMode("picker");
+    if (k === "apply") { if (!requireAuth()) return; return setMode("picker"); }
     if (k === "apps") return document.getElementById("apps-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
     if (k === "stories") return document.getElementById("stories-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
     if (k === "invest") return setInfo("invest");
@@ -360,6 +362,7 @@ function FundingSheet({ mode, setMode, onClose, user, onSuccess }: any) {
 }
 
 function StartupForm({ onBack, onClose, user, onSuccess }: any) {
+  const { requireAuth } = useRequireAuth();
   const [done, setDone] = useState(false);
   const [agree, setAgree] = useState(false);
   const [slot, setSlot] = useState<"morning" | "afternoon">("morning");
@@ -372,6 +375,7 @@ function StartupForm({ onBack, onClose, user, onSuccess }: any) {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!requireAuth()) return;
     if (!agree) return;
     setLoading(true);
     const formData = new FormData(e.currentTarget);
@@ -467,6 +471,7 @@ function StartupForm({ onBack, onClose, user, onSuccess }: any) {
 }
 
 function ExistingForm({ onBack, onClose, user, onSuccess }: any) {
+  const { requireAuth } = useRequireAuth();
   const [submitted, setSubmitted] = useState(false);
   const [agree, setAgree] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -477,6 +482,7 @@ function ExistingForm({ onBack, onClose, user, onSuccess }: any) {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!requireAuth()) return;
     if (!agree) return;
     setLoading(true);
     const formData = new FormData(e.currentTarget);
