@@ -275,6 +275,12 @@ function TradingPage() {
       durationSeconds = selectedDuration.value * 60;
     }
 
+    // Backend schema (predictionSchema) only accepts `windowMinutes`
+    // (a positive number). Convert any seconds-based duration to minutes
+    // so the value is always > 0 and matches the expected field.
+    const windowMinutes =
+      selectedDuration.unit === "minutes" ? selectedDuration.value : selectedDuration.value / 60;
+
     try {
       const res = await apiRequest("/games/prediction/place", {
         method: "POST",
@@ -283,8 +289,7 @@ function TradingPage() {
           mode,
           market: pair,
           direction: dir,
-          windowMinutes: selectedDuration.unit === "minutes" ? selectedDuration.value : 0,
-          windowSeconds: selectedDuration.unit === "seconds" ? selectedDuration.value : 0,
+          windowMinutes,
         }),
       });
 
