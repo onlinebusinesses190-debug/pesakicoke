@@ -10,7 +10,7 @@ import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Stat, SectionTitle, Progress, Badge } from "@/components/ui-bits";
 import { toast } from "sonner";
 import { apiRequest } from "@/utils/api";
-import { calculateDepositFee, calculateWithdrawalFee, MIN_DEPOSIT, MIN_WITHDRAWAL } from "@/utils/fees";
+import { calculateWithdrawalFee, MIN_DEPOSIT, MIN_WITHDRAWAL } from "@/utils/fees";
 
 export const Route = createFileRoute("/banking")({
   head: () => ({
@@ -497,7 +497,7 @@ function DepositSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
         )}
         {amount && Number(amount) >= MIN_DEPOSIT && (
           <p className="text-[11px] text-muted-foreground">
-            You will receive: KES {Math.max(0, Number(amount) - calculateDepositFee(Number(amount)))} (Fee: KES {calculateDepositFee(Number(amount))})
+            You will receive the full KES {Number(amount)} (No deposit fee)
           </p>
         )}
         <div>
@@ -519,13 +519,16 @@ function WithdrawSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess:
   const handleWalletWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount) return;
+    const WALLET_WITHDRAWAL_FEE = 2;
+    const creditedAmount = Number(amount) - WALLET_WITHDRAWAL_FEE;
+    if (creditedAmount < 10) return toast.error(`After fee, you receive at least KES 10`);
     setLoading(true);
     try {
       await apiRequest('/banking/withdraw-to-wallet', {
         method: 'POST',
         body: JSON.stringify({ amount: Number(amount) }),
       });
-      toast.success('Withdrawn to wallet successfully');
+      toast.success(`Withdrawn KES ${Number(amount)} to wallet (Fee: KES ${WALLET_WITHDRAWAL_FEE}, Received: KES ${creditedAmount})`);
       onSuccess();
       setTimeout(onClose, 2000);
     } catch (err: any) {
@@ -570,6 +573,11 @@ function WithdrawSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess:
             <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Amount (KES)</label>
             <input type="number" required value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="e.g. 10000" />
           </div>
+          {amount && Number(amount) > 0 && (
+            <p className="text-[11px] text-muted-foreground">
+              You will receive: KES {Math.max(0, Number(amount) - 2)} (Fee: KES 2)
+            </p>
+          )}
           <button type="submit" disabled={loading || !amount || Number(amount) < 1} className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50">{loading ? 'Processing...' : 'Withdraw to Wallet'}</button>
         </form>
       ) : (

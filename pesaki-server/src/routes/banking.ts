@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { logger } from '../utils/logger';
 import { env } from '../config/env';
-import { calculateWithdrawalFee, calculateDepositFee, MIN_DEPOSIT, MIN_WITHDRAWAL } from '../utils/fees';
+import { calculateWithdrawalFee, MIN_DEPOSIT, MIN_WITHDRAWAL } from '../utils/fees';
 
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -375,10 +375,12 @@ export const bankingRoutes = async (fastify: FastifyInstance) => {
       if (lockError) throw lockError;
       const newBalance = balance - amount;
       const currentLocked = Number(wallet.locked) || 0;
-      await adminSupabase
+      const { error: walletError } = await adminSupabase
         .from('banking_wallets')
         .update({ balance: newBalance, locked: currentLocked + amount })
         .eq('user_id', user.id);
+      if (walletError) throw walletError;
+      logger.info({ userId: user.id, lockedAmount: amount, newBalance, locked: currentLocked + amount }, 'Banking funds locked');
       await adminSupabase.from('banking_ledger').insert({
         user_id: user.id,
         amount,
@@ -451,10 +453,12 @@ export const bankingRoutes = async (fastify: FastifyInstance) => {
       if (investError) throw investError;
       const newBalance = balance - amount;
       const currentLocked = Number(wallet.locked) || 0;
-      await adminSupabase
+      const { error: walletError } = await adminSupabase
         .from('banking_wallets')
         .update({ balance: newBalance, locked: currentLocked + amount })
         .eq('user_id', user.id);
+      if (walletError) throw walletError;
+      logger.info({ userId: user.id, investedAmount: amount, newBalance, locked: currentLocked + amount }, 'Banking investment deducted from balance');
       await adminSupabase.from('banking_ledger').insert({
         user_id: user.id,
         amount,
@@ -625,8 +629,8 @@ export const bankingRoutes = async (fastify: FastifyInstance) => {
         return reply.status(400).send({ error: 'Invalid Kenyan phone number. Use 07XXXXXXXX or 2547XXXXXXXX.' });
       }
       const localRequestId = `${user.id}_${Date.now()}`;
-      const depositFee = calculateDepositFee(amount);
-      const creditedAmount = Math.max(0, amount - depositFee);
+      const depositFee = 0;
+      const creditedAmount = Math.round(amount);
       const { error: insertError } = await adminSupabase
         .from('banking_deposits')
         .insert({
@@ -654,7 +658,6 @@ export const bankingRoutes = async (fastify: FastifyInstance) => {
           checkoutRequestId: stkResult.CheckoutRequestID,
           merchantRequestId: stkResult.MerchantRequestID,
           customerMessage: stkResult.CustomerMessage || 'Check your phone and enter your M-Pesa PIN.',
-          fee: depositFee,
           creditedAmount,
         },
       });
@@ -711,8 +714,7 @@ export const bankingRoutes = async (fastify: FastifyInstance) => {
         logger.error({ checkoutRequestId, callbackAmount, depositAmount: deposit.amount }, 'Invalid payment amount in banking callback');
         return reply.code(200).send({ ResultCode: 0, ResultDesc: 'Accepted' });
       }
-      const depositFee = calculateDepositFee(finalAmount);
-      const netAmount = Math.max(0, finalAmount - depositFee);
+      const netAmount = Math.round(finalAmount);
       const wallet = await ensureBankingWallet(deposit.user_id);
       const currentBalance = Number(wallet.balance) || 0;
       await adminSupabase
@@ -724,7 +726,7 @@ export const bankingRoutes = async (fastify: FastifyInstance) => {
         amount: netAmount,
         type: 'deposit',
         mode: 'credit',
-        description: `M-Pesa deposit: ${mpesaReceipt || checkoutRequestId} (Fee: ${depositFee})`,
+        description: `M-Pesa deposit: ${mpesaReceipt || checkoutRequestId}`,
         status: 'completed',
         reference: checkoutRequestId,
       });
@@ -766,6 +768,7 @@ export const bankingRoutes = async (fastify: FastifyInstance) => {
       if (!user || reply.statusCode !== 200) return;
       const { amount } = request.body as { amount: number };
       if (!amount || amount <= 0) return reply.status(400).send({ error: 'Invalid amount' });
+      const WALLET_WITHDRAWAL_FEE = 2;
       const bankingWallet = await ensureBankingWallet(user.id);
       const bankingBalance = Number(bankingWallet.balance) || 0;
       if (bankingBalance < amount) return reply.status(400).send({ error: 'Insufficient banking balance' });
@@ -785,10 +788,15 @@ export const bankingRoutes = async (fastify: FastifyInstance) => {
         amount,
         type: 'withdraw_to_wallet',
         mode: 'debit',
-        description: `Withdrawn KES ${amount} to general wallet`,
+        description: `Withdrawn KES ${amount} to general wallet (Fee: ${WALLET_WITHDRAWAL_FEE})`,
         status: 'completed',
+        reference: `WD-WALLET-${user.id.slice(0, 8)}-${Date.now()}`,
       });
-      return reply.send({ success: true, message: 'Withdrawn to wallet successfully' });
+      return reply.send({
+        success: true,
+        data: { fee: WALLET_WITHDRAWAL_FEE, creditedAmount: amount - WALLET_WITHDRAWAL_FEE },
+        message: 'Withdrawn to wallet successfully',
+      });
     } catch (error: any) {
       logger.error(error, 'Error in /banking/withdraw-to-wallet');
       return reply.status(500).send({ error: error.message || 'Internal server error' });
