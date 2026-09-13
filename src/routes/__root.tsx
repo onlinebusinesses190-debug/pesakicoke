@@ -3,14 +3,19 @@ import {
   Outlet,
   Link,
   createRootRouteWithContext,
-  useRouter,
+  useRouterState,
+  useNavigate,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
+import { toast } from "sonner";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { useAuth } from "@/hooks/useAuth";
+
+const PUBLIC_PATHS = ["/", "/auth"];
 
 function NotFoundComponent() {
   return (
@@ -128,7 +133,33 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      <AuthRouteGuard>
+        <Outlet />
+      </AuthRouteGuard>
     </QueryClientProvider>
   );
+}
+
+function AuthRouteGuard({ children }: { children: ReactNode }) {
+  const { user, ready } = useAuth();
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  useEffect(() => {
+    if (!ready) return;
+    if (PUBLIC_PATHS.includes(pathname)) return;
+    if (user) return;
+
+    toast("Please sign up or log in to continue.", {
+      action: {
+        label: "Sign In",
+        onClick: () => {
+          navigate({ to: "/auth", search: { redirect: pathname } as never });
+        },
+      },
+    });
+    navigate({ to: "/auth", search: { redirect: pathname } as never });
+  }, [ready, user, pathname, navigate]);
+
+  return <>{children}</>;
 }

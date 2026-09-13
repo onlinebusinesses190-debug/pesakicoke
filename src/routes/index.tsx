@@ -5,10 +5,12 @@ import {
   Briefcase, Building2, Landmark,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import { Card, Stat, SectionTitle, Badge } from "@/components/ui-bits";
 import { apiRequest } from "../utils/api";
 import { createClient } from "@supabase/supabase-js";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 
 // Helper: format currency
 const fmt = (amount: number) => {
@@ -34,6 +36,9 @@ function HomePage() {
   const [referralEarnings, setReferralEarnings] = useState(0);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const navigate = useNavigate();
+  const { requireAuth } = useRequireAuth();
 
   const [stats, setStats] = useState([
     { label: "Active Trades", value: "0", hint: "+0", tone: "primary" as const },
@@ -203,16 +208,16 @@ function HomePage() {
             { label: "Transfer", icon: ArrowLeftRight, to: "/wallet" },
             { label: "Trading", icon: LineChart, to: "/trading" },
           ].map((a) => (
-            <Link
+            <button
               key={a.label}
-              to={a.to}
+              onClick={() => { if (!requireAuth()) return; navigate({ to: a.to }); }}
               className="flex flex-col items-center gap-1.5 rounded-xl p-2 transition-colors hover:bg-muted"
             >
               <span className="grid h-11 w-11 place-items-center rounded-xl gradient-primary text-primary-foreground">
                 <a.icon className="h-5 w-5" />
               </span>
               <span className="text-[11px] font-medium">{a.label}</span>
-            </Link>
+            </button>
           ))}
         </Card>
       </section>
@@ -233,31 +238,31 @@ function HomePage() {
       <section className="mt-6 px-5">
         <SectionTitle title="Explore hubs" />
         <div className="grid grid-cols-2 gap-3">
-          <Link to="/trading" className="group relative overflow-hidden rounded-2xl gradient-primary p-4 text-primary-foreground shadow-[var(--shadow-card)]">
-            <LineChart className="mb-6 h-5 w-5 opacity-90" />
-            <p className="text-sm font-bold">Trading Floor</p>
-            <p className="mt-0.5 text-[11px] opacity-80">FX · Up/Down · Aviator</p>
-            <ChevronRight className="absolute bottom-3 right-3 h-4 w-4 opacity-70 transition-transform group-hover:translate-x-0.5" />
-          </Link>
-          <Link to="/kazi" className="group relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-            <span className="mb-6 grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
-              <Briefcase className="h-4 w-4" />
-            </span>
-            <p className="text-sm font-bold">KAZI Link</p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">Find work · Hire talent</p>
-            <ChevronRight className="absolute bottom-3 right-3 h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-          </Link>
-          <Link to="/business" className="group relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-            <span className="mb-6 grid h-9 w-9 place-items-center rounded-xl gradient-gold text-gold-foreground">
-              <Building2 className="h-4 w-4" />
-            </span>
-            <p className="text-sm font-bold">Business Funding</p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">Grow · Fund · Scale</p>
-            <ChevronRight className="absolute bottom-3 right-3 h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-          </Link>
-          <Link to="/banking" className="group relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-            <span className="mb-6 grid h-9 w-9 place-items-center rounded-xl bg-success/15 text-success">
-              <Landmark className="h-4 w-4" />
+           <Link to="/trading" onClick={(e) => { if (!requireAuth()) e.preventDefault(); }} className="group relative overflow-hidden rounded-2xl gradient-primary p-4 text-primary-foreground shadow-[var(--shadow-card)]">
+             <LineChart className="mb-6 h-5 w-5 opacity-90" />
+             <p className="text-sm font-bold">Trading Floor</p>
+             <p className="mt-0.5 text-[11px] opacity-80">FX · Up/Down · Aviator</p>
+             <ChevronRight className="absolute bottom-3 right-3 h-4 w-4 opacity-70 transition-transform group-hover:translate-x-0.5" />
+           </Link>
+           <Link to="/kazi" onClick={(e) => { if (!requireAuth()) e.preventDefault(); }} className="group relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+             <span className="mb-6 grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
+               <Briefcase className="h-4 w-4" />
+             </span>
+             <p className="text-sm font-bold">KAZI Link</p>
+             <p className="mt-0.5 text-[11px] text-muted-foreground">Find work · Hire talent</p>
+             <ChevronRight className="absolute bottom-3 right-3 h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+           </Link>
+           <Link to="/business" onClick={(e) => { if (!requireAuth()) e.preventDefault(); }} className="group relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+             <span className="mb-6 grid h-9 w-9 place-items-center rounded-xl gradient-gold text-gold-foreground">
+               <Building2 className="h-4 w-4" />
+             </span>
+             <p className="text-sm font-bold">Business Funding</p>
+             <p className="mt-0.5 text-[11px] text-muted-foreground">Grow · Fund · Scale</p>
+             <ChevronRight className="absolute bottom-3 right-3 h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+           </Link>
+           <Link to="/banking" onClick={(e) => { if (!requireAuth()) e.preventDefault(); }} className="group relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+             <span className="mb-6 grid h-9 w-9 place-items-center rounded-xl bg-success/15 text-success">
+               <Landmark className="h-4 w-4" />
             </span>
             <p className="text-sm font-bold">Banking Hub</p>
             <p className="mt-0.5 text-[11px] text-muted-foreground">Save · Lock · Borrow</p>
@@ -277,10 +282,11 @@ function HomePage() {
           <p className="mt-1 max-w-[85%] text-xs opacity-80">
             Lock funds for 90 days and earn premium interest.
           </p>
-          <Link
-            to="/banking"
-            className="mt-3 inline-flex items-center gap-1 rounded-full bg-foreground px-3.5 py-1.5 text-xs font-semibold text-background"
-          >
+           <Link
+             to="/banking"
+             onClick={(e) => { if (!requireAuth()) e.preventDefault(); }}
+             className="mt-3 inline-flex items-center gap-1 rounded-full bg-foreground px-3.5 py-1.5 text-xs font-semibold text-background"
+           >
             Start saving <ChevronRight className="h-3.5 w-3.5" />
           </Link>
         </div>
@@ -288,7 +294,7 @@ function HomePage() {
 
       {/* Opportunities */}
       <section className="mt-7 px-5">
-        <SectionTitle title="Latest opportunities" action={<Link to="/kazi" className="text-xs font-semibold text-primary">See all</Link>} />
+        <SectionTitle title="Latest opportunities" action={<Link to="/kazi" onClick={(e) => { if (!requireAuth()) e.preventDefault(); }} className="text-xs font-semibold text-primary">See all</Link>} />
         <div className="space-y-2.5">
           {opportunities.length > 0 ? (
             opportunities.map((o) => (
@@ -313,7 +319,7 @@ function HomePage() {
 
       {/* Recent transactions */}
       <section className="mt-7 px-5">
-        <SectionTitle title="Recent transactions" action={<Link to="/wallet" className="text-xs font-semibold text-primary">View wallet</Link>} />
+        <SectionTitle title="Recent transactions" action={<Link to="/wallet" onClick={(e) => { if (!requireAuth()) e.preventDefault(); }} className="text-xs font-semibold text-primary">View wallet</Link>} />
         <Card className="!p-2">
           <ul className="divide-y divide-border">
             {transactions.length > 0 ? (

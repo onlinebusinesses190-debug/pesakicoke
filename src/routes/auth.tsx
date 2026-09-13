@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
 import { Landmark, ShieldCheck, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -23,6 +23,7 @@ export const Route = createFileRoute("/auth")({
 });
 
 function AuthPage() {
+  const navigate = useNavigate();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [loginMethod, setLoginMethod] = useState<"email" | "phone">("phone");
   const [name, setName] = useState("");
@@ -32,6 +33,10 @@ function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+
+  // Read redirect target from query string
+  const search = useRouterState({ select: (s) => s.location.search });
+  const redirectParam = new URLSearchParams(search).get("redirect") || "/";
 
   // Uses the app-wide singleton — avoids spawning a new GoTrueClient on every render.
 
@@ -55,8 +60,9 @@ function AuthPage() {
           ? await supabase.auth.signInWithPassword({ email, password })
           : await supabase.auth.signInWithPassword({ phone: formatPhoneNumber(phone), password });
         if (result.error) throw result.error;
-        // Redirect safely
-        window.location.href = "/";
+        // Redirect safely to the intended destination
+        const target = redirectParam.startsWith("/") ? redirectParam : "/";
+        navigate({ to: target });
       }
     } catch (err: any) {
       setError(err?.message || "Something went wrong.");

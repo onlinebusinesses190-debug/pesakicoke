@@ -1,8 +1,9 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import {
   Home, LineChart, Briefcase, Building2, Landmark, Wallet, User,
 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 const nav = [
   { to: "/",         label: "Home",     sub: "",        icon: Home },
@@ -16,6 +17,7 @@ const nav = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { user, ready } = useAuth();
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background">
@@ -34,6 +36,12 @@ export function AppShell({ children }: { children: ReactNode }) {
               <li key={item.to} className="flex">
                 <Link
                   to={item.to}
+                  onClick={(e) => {
+                    if (item.to !== "/" && (!ready || !user)) {
+                      e.preventDefault();
+                      window.location.href = "/auth?redirect=" + encodeURIComponent(item.to);
+                    }
+                  }}
                   className={[
                     "flex w-full flex-col items-center gap-0.5 rounded-xl px-1 py-1.5 text-[10px] font-medium transition-colors",
                     active
