@@ -4,6 +4,7 @@ import { Disc, Sparkles, Loader2, ArrowLeft, PlusCircle } from "lucide-react";
 import { apiRequest } from "@/utils/api";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { createClient } from "@supabase/supabase-js";
+import { DepositSheet } from "@/components/DepositSheet";
 
 type AllocationOutcome = {
   id: number;
@@ -13,10 +14,7 @@ type AllocationOutcome = {
   color?: string;
 };
 
-const PRIZE_COLORS = [
-  "#ef4444", "#f59e0b", "#10b981", "#3b82f6",
-  "#8b5cf6", "#f97316", "#eab308",
-];
+const PRIZE_COLORS = ["#ef4444", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#f97316", "#eab308"];
 
 export const Route = createFileRoute("/trading/spin")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -28,7 +26,7 @@ export const Route = createFileRoute("/trading/spin")({
 function MarketGrowthPage() {
   const search = Route.useSearch();
   const navigate = useNavigate();
-  const { requireAuth } = useRequireAuth();
+  const { requireAuth, user } = useRequireAuth();
   const mode = search.mode === "real" ? "real" : "demo";
 
   const [outcomes, setOutcomes] = useState<AllocationOutcome[]>([]);
@@ -36,9 +34,12 @@ function MarketGrowthPage() {
   const [executing, setExecuting] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [allocation, setAllocation] = useState("100");
-  const [lastAdjustment, setLastAdjustment] = useState<{ name: string; amount: number } | null>(null);
+  const [lastAdjustment, setLastAdjustment] = useState<{ name: string; amount: number } | null>(
+    null,
+  );
   const [balance, setBalance] = useState<number | null>(null);
   const [updatingBalance, setUpdatingBalance] = useState(false);
+  const [showDeposit, setShowDeposit] = useState(false);
 
   // ── Auth check ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -46,9 +47,11 @@ function MarketGrowthPage() {
       try {
         const supabase = createClient(
           import.meta.env.VITE_SUPABASE_URL,
-          import.meta.env.VITE_SUPABASE_ANON_KEY
+          import.meta.env.VITE_SUPABASE_ANON_KEY,
         );
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         if (!session) navigate({ to: "/auth" });
       } catch (err) {
         console.error("Auth check failed", err);
@@ -70,6 +73,11 @@ function MarketGrowthPage() {
     } finally {
       setUpdatingBalance(false);
     }
+  };
+
+  // Refresh balance after a successful deposit (used by the shared DepositSheet).
+  const refreshRealBalance = () => {
+    if (mode === "real") fetchBalance();
   };
 
   useEffect(() => {
@@ -95,6 +103,11 @@ function MarketGrowthPage() {
   const executeSelection = async () => {
     if (executing || outcomes.length === 0) return;
     if (mode !== "demo" && !requireAuth()) return;
+    if (mode === "real" && balance !== null && balance < Number(allocation)) {
+      alert("Insufficient balance. Please deposit to continue.");
+      setShowDeposit(true);
+      return;
+    }
     setLastAdjustment(null);
     setExecuting(true);
 
@@ -106,11 +119,9 @@ function MarketGrowthPage() {
 
       const result = data.data;
       const segmentAngle = 360 / outcomes.length;
-      const targetAngle =
-        360 - (result.prizeIndex * segmentAngle) - segmentAngle / 2;
+      const targetAngle = 360 - result.prizeIndex * segmentAngle - segmentAngle / 2;
       const fullSpins = 5 * 360;
-      const finalRotation =
-        rotation + fullSpins + ((targetAngle - (rotation % 360) + 360) % 360);
+      const finalRotation = rotation + fullSpins + ((targetAngle - (rotation % 360) + 360) % 360);
 
       setRotation(finalRotation);
 
@@ -120,7 +131,13 @@ function MarketGrowthPage() {
         if (mode === "real") fetchBalance();
       }, 5000);
     } catch (err: any) {
-      alert(err.message || "Execution failed");
+      const msg = err.message || "Execution failed";
+      if (/insufficient/i.test(msg)) {
+        alert("Insufficient balance. Please deposit to continue.");
+        setShowDeposit(true);
+      } else {
+        alert(msg);
+      }
       setExecuting(false);
     }
   };
@@ -202,12 +219,12 @@ function MarketGrowthPage() {
             {updatingBalance && <span className="text-gray-400 text-[8px] animate-pulse">⋯</span>}
           </div>
           {!isDemo && (
-            <Link
-              to="/wallet"
+            <button
+              onClick={() => setShowDeposit(true)}
               className="flex items-center gap-0.5 bg-green-600 hover:bg-green-500 text-white text-[10px] md:text-xs font-bold px-2 py-1 rounded-lg transition-colors"
             >
               <PlusCircle size={14} className="h-3 w-3 md:h-4 md:w-4" /> Deposit
-            </Link>
+            </button>
           )}
           <span className="text-[8px] md:text-[10px] text-gray-400 hidden sm:inline">
             {isDemo ? "🎮 FUN" : "🔴 REAL"}
@@ -304,7 +321,9 @@ function MarketGrowthPage() {
 
           {/* Legend */}
           <div className="space-y-0.5">
-            <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Returns</div>
+            <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+              Returns
+            </div>
             {outcomes.slice(0, 4).map((p, i) => (
               <div key={i} className="flex items-center justify-between text-[10px]">
                 <div className="flex items-center gap-1.5">
@@ -335,6 +354,15 @@ function MarketGrowthPage() {
           </div>
         </div>
       </div>
+
+      {showDeposit && (
+        <DepositSheet
+          onClose={() => setShowDeposit(false)}
+          user={user}
+          onSuccess={refreshRealBalance}
+          onDepositComplete={refreshRealBalance}
+        />
+      )}
     </div>
   );
 }

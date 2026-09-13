@@ -21,7 +21,13 @@ import {
 import { fmt } from "@/lib/mock";
 import { apiRequest } from "@/utils/api";
 import { supabase } from "@/integrations/supabase/client";
-import { calculateDepositFee, calculateTransferFee, calculateWithdrawalFee, MIN_DEPOSIT, MIN_TRANSFER, MIN_WITHDRAWAL } from "@/utils/fees";
+import {
+  calculateTransferFee,
+  calculateWithdrawalFee,
+  MIN_TRANSFER,
+  MIN_WITHDRAWAL,
+} from "@/utils/fees";
+import { DepositSheet } from "@/components/DepositSheet";
 
 export const Route = createFileRoute("/wallet")({
   component: WalletPage,
@@ -170,10 +176,16 @@ function WalletPage() {
               onClick={() => setShowTransfer(true)}
               className="rounded-full border border-border bg-background px-3 py-2 text-[11px] font-semibold text-foreground"
             >
-              <span className="inline-flex items-center gap-1.5"><ArrowLeftRight className="h-3.5 w-3.5" />Transfer</span>
+              <span className="inline-flex items-center gap-1.5">
+                <ArrowLeftRight className="h-3.5 w-3.5" />
+                Transfer
+              </span>
             </button>
             <button
-              onClick={() => { if (!requireAuth()) return; setShowDeposit(true); }}
+              onClick={() => {
+                if (!requireAuth()) return;
+                setShowDeposit(true);
+              }}
               className="rounded-full gradient-primary px-4 py-2 text-xs font-semibold text-primary-foreground"
             >
               Deposit
@@ -185,9 +197,7 @@ function WalletPage() {
       <section className="px-5 pt-5">
         <div className="relative overflow-hidden rounded-2xl gradient-primary p-5 text-primary-foreground">
           <p className="text-xs uppercase tracking-widest opacity-80">Available Balance</p>
-          <p className="mt-1 font-display text-3xl font-bold">
-            {fmt(wallet?.balance || 0)}
-          </p>
+          <p className="mt-1 font-display text-3xl font-bold">{fmt(wallet?.balance || 0)}</p>
           <p className="mt-0.5 text-xs opacity-80">Locked: {fmt(wallet?.locked || 0)}</p>
 
           <div className="mt-4 grid grid-cols-3 gap-2">
@@ -198,13 +208,19 @@ function WalletPage() {
               <ArrowDownToLine className="h-3.5 w-3.5" /> Deposit
             </button>
             <button
-              onClick={() => { if (!requireAuth()) return; setShowWithdraw(true); }}
+              onClick={() => {
+                if (!requireAuth()) return;
+                setShowWithdraw(true);
+              }}
               className="flex items-center justify-center gap-1.5 rounded-lg bg-white/20 py-2 text-xs font-semibold hover:bg-white/30"
             >
               <ArrowUpFromLine className="h-3.5 w-3.5" /> Withdraw
             </button>
             <button
-              onClick={() => { if (!requireAuth()) return; setShowTransfer(true); }}
+              onClick={() => {
+                if (!requireAuth()) return;
+                setShowTransfer(true);
+              }}
               className="flex items-center justify-center gap-1.5 rounded-lg bg-white/20 py-2 text-xs font-semibold hover:bg-white/30"
             >
               <Send className="h-3.5 w-3.5" /> Transfer
@@ -215,7 +231,11 @@ function WalletPage() {
 
       <section className="mt-4 grid grid-cols-4 gap-2 px-5">
         <StatCard label="Total Deposits" value={fmt(stats.totalDeposits)} tone="success" />
-        <StatCard label="Total Withdrawals" value={fmt(stats.totalWithdrawals)} tone="destructive" />
+        <StatCard
+          label="Total Withdrawals"
+          value={fmt(stats.totalWithdrawals)}
+          tone="destructive"
+        />
         <StatCard label="Pending" value={stats.pending.toString()} tone="warning" />
         <StatCard label="Referral Earnings" value={fmt(stats.referralEarnings)} tone="gold" />
       </section>
@@ -312,15 +332,7 @@ function WalletPage() {
 }
 
 // ─── Stat Card ──────────────────────────────────────────────────────────
-function StatCard({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone?: string;
-}) {
+function StatCard({ label, value, tone }: { label: string; value: string; tone?: string }) {
   const colorClasses = {
     success: "bg-success/10 text-success",
     destructive: "bg-destructive/10 text-destructive",
@@ -340,273 +352,6 @@ function StatCard({
   );
 }
 
-// ─── Deposit Sheet ──────────────────────────────────────────────────────
-function DepositSheet({ onClose, user, onSuccess }: any) {
-  const { requireAuth } = useRequireAuth();
-  const [amount, setAmount] = useState("");
-  const [phone, setPhone] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState<"form" | "processing" | "waiting" | "success" | "failed">("form");
-  const [depositPhone, setDepositPhone] = useState("");
-  const pollRef = useRef<number | null>(null);
-  const attemptsRef = useRef(0);
-
-  const stopPolling = () => {
-    if (pollRef.current) {
-      clearTimeout(pollRef.current);
-      pollRef.current = null;
-    }
-  };
-
-  const refreshBalance = async () => {
-    try {
-      const data = await apiRequest('/wallet/available-balance?mode=real');
-      if (data?.data?.available !== undefined) {
-        // trigger parent refresh via onSuccess
-        onSuccess();
-      }
-    } catch {
-      // ignore
-    }
-  };
-
-  const pollDepositStatus = async (checkoutRequestId: string) => {
-    if (attemptsRef.current >= 20) {
-      stopPolling();
-      setStep("failed");
-      return;
-    }
-
-    attemptsRef.current += 1;
-
-    try {
-      const statusData = await apiRequest(`/wallet/deposit/status/${checkoutRequestId}`);
-      const status = String(statusData?.data?.status || "").toLowerCase();
-
-      if (status === "completed") {
-        stopPolling();
-        setStep("success");
-        onSuccess();
-        toast.success(`Deposit successful! KES ${amount} has been added to your wallet.`);
-        setTimeout(() => onClose(), 3000);
-      } else if (status === "failed") {
-        stopPolling();
-        setStep("failed");
-        toast.error("Deposit failed or was cancelled. Please try again.");
-        setTimeout(() => onClose(), 4000);
-      } else {
-        pollRef.current = window.setTimeout(() => pollDepositStatus(checkoutRequestId), 3000);
-      }
-    } catch (err) {
-      pollRef.current = window.setTimeout(() => pollDepositStatus(checkoutRequestId), 3000);
-    }
-  };
-
-  useEffect(() => {
-    return () => stopPolling();
-  }, []);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
-    if (!requireAuth()) return;
-    if (!amount || !phone) return;
-
-    let cleanPhone = phone.replace(/\D/g, "");
-    if (cleanPhone.startsWith("0")) cleanPhone = "254" + cleanPhone.slice(1);
-    if (!cleanPhone.startsWith("254")) cleanPhone = "254" + cleanPhone;
-
-    if (cleanPhone.length !== 12) {
-      toast.error("Enter a valid Safaricom phone number");
-      return;
-    }
-
-    setLoading(true);
-    setStep("processing");
-
-    try {
-      const token = (await supabase.auth.getSession()).data.session?.access_token;
-      const response = await fetch(`${API_BASE}/api/p/deposit`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          amount: parseInt(amount),
-          phone: cleanPhone,
-          userId: user.id,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data?.success && data?.data?.checkoutRequestId) {
-        setDepositPhone(cleanPhone);
-        setStep("waiting");
-        attemptsRef.current = 0;
-        pollDepositStatus(data.data.checkoutRequestId);
-      } else {
-        throw new Error(data?.message || "Failed to initiate payment");
-      }
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Failed to initiate deposit");
-      setStep("form");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (step === "success") {
-    return (
-      <div className="fixed inset-0 z-50 grid place-items-center bg-black/50">
-        <div className="w-full max-w-sm rounded-2xl bg-card p-6 text-center">
-          <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-success/15 text-success">
-            <TrendingUp className="h-8 w-8" />
-          </div>
-          <p className="mt-3 text-lg font-bold">Deposit Successful</p>
-          <p className="text-xs text-muted-foreground">
-            Deposit successful! KES {amount} has been added to your wallet.
-          </p>
-          <button
-            onClick={onClose}
-            className="mt-4 w-full rounded-xl gradient-primary py-3 text-sm font-semibold text-primary-foreground"
-          >
-            Done
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (step === "failed") {
-    return (
-      <div className="fixed inset-0 z-50 grid place-items-center bg-black/50">
-        <div className="w-full max-w-sm rounded-2xl bg-card p-6 text-center">
-          <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-destructive/15 text-destructive">
-            <X className="h-8 w-8" />
-          </div>
-          <p className="mt-3 text-lg font-bold">Deposit Failed</p>
-          <p className="text-xs text-muted-foreground">
-            Taking longer than expected. If you entered your PIN, refresh the page in a minute to see your updated balance.
-          </p>
-          <button
-            onClick={onClose}
-            className="mt-4 w-full rounded-xl gradient-primary py-3 text-sm font-semibold text-primary-foreground"
-          >
-            Done
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (step === "processing") {
-    return (
-      <div className="fixed inset-0 z-50 grid place-items-center bg-black/50">
-        <div className="w-full max-w-sm rounded-2xl bg-card p-6 text-center">
-          <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-warning/15 text-warning">
-            <Loader2 className="h-7 w-7 animate-spin" />
-          </div>
-          <p className="mt-4 text-lg font-bold">Processing your request...</p>
-          <p className="mt-2 text-xs text-muted-foreground">
-            You will receive an M-Pesa prompt shortly.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (step === "waiting") {
-    return (
-      <div className="fixed inset-0 z-50 grid place-items-center bg-black/50">
-        <div className="w-full max-w-sm rounded-2xl bg-card p-6 text-center">
-          <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-warning/15 text-warning">
-            <Loader2 className="h-7 w-7 animate-spin" />
-          </div>
-          <p className="mt-4 text-lg font-bold">M-Pesa prompt sent</p>
-          <p className="mt-2 text-xs text-muted-foreground">
-            M-Pesa prompt sent to {depositPhone}. Enter your PIN to confirm.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-end sm:place-items-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md max-h-[95vh] overflow-y-auto rounded-t-3xl bg-card p-5 shadow-2xl sm:rounded-3xl pb-20">
-        <div className="flex items-center justify-between border-b border-border pb-3">
-          <button
-            onClick={onClose}
-            className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-          <h3 className="text-base font-bold">Deposit via M-Pesa</h3>
-          <button
-            onClick={onClose}
-            className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-          <div>
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Amount (KES)
-            </label>
-            <input
-              type="number"
-              min="1"
-              required
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
-              placeholder="e.g. 500"
-            />
-          </div>
-          <div>
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              M-Pesa Phone Number
-            </label>
-            <input
-              type="tel"
-              required
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
-              placeholder="0712345678"
-            />
-            <p className="mt-1 text-[10px] text-muted-foreground">
-              Enter the phone number registered with M-Pesa.
-            </p>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading || !amount || parseInt(amount) < MIN_DEPOSIT}
-            className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50"
-          >
-            {loading ? "Processing..." : "Send STK Push"}
-          </button>
-          {amount && parseInt(amount) < MIN_DEPOSIT && (
-            <p className="text-[11px] text-destructive">Minimum deposit is KES {MIN_DEPOSIT}</p>
-          )}
-          {amount && parseInt(amount) >= MIN_DEPOSIT && (
-            <p className="text-[11px] text-muted-foreground">
-              You will receive: KES {Math.max(0, parseInt(amount) - calculateDepositFee(parseInt(amount)))} (Fee: KES {calculateDepositFee(parseInt(amount))})
-            </p>
-          )}
-        </form>
-      </div>
-    </div>
-  );
-}
-
 // ─── Withdraw Sheet ─────────────────────────────────────────────────────
 function WithdrawSheet({ onClose, user, balance, onSuccess }: any) {
   const { requireAuth } = useRequireAuth();
@@ -614,13 +359,15 @@ function WithdrawSheet({ onClose, user, balance, onSuccess }: any) {
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [availableBalance, setAvailableBalance] = useState(balance);
-  const [withdrawStatus, setWithdrawStatus] = useState<"idle" | "processing" | "success" | "failed">("idle");
+  const [withdrawStatus, setWithdrawStatus] = useState<
+    "idle" | "processing" | "success" | "failed"
+  >("idle");
 
   useEffect(() => {
     let cancelled = false;
     const fetchAvailable = async () => {
       try {
-        const data = await apiRequest('/wallet/available-balance?mode=real');
+        const data = await apiRequest("/wallet/available-balance?mode=real");
         if (!cancelled && data?.data?.available !== undefined) {
           setAvailableBalance(data.data.available);
         }
@@ -629,12 +376,14 @@ function WithdrawSheet({ onClose, user, balance, onSuccess }: any) {
       }
     };
     fetchAvailable();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const refreshBalance = async () => {
     try {
-      const data = await apiRequest('/wallet/available-balance?mode=real');
+      const data = await apiRequest("/wallet/available-balance?mode=real");
       if (data?.data?.available !== undefined) {
         setAvailableBalance(data.data.available);
       }
@@ -661,8 +410,8 @@ function WithdrawSheet({ onClose, user, balance, onSuccess }: any) {
     setLoading(true);
     setWithdrawStatus("processing");
     try {
-      const result = await apiRequest('/wallet/withdraw/b2c', {
-        method: 'POST',
+      const result = await apiRequest("/wallet/withdraw/b2c", {
+        method: "POST",
         body: JSON.stringify({ amount: numAmount, phone: cleanPhone }),
       });
 
@@ -730,7 +479,9 @@ function WithdrawSheet({ onClose, user, balance, onSuccess }: any) {
 
   return (
     <SheetShell title="Withdraw Funds" onClose={onClose}>
-      <p className="text-xs text-muted-foreground">Withdraw to your M-Pesa account via Palpluss B2C.</p>
+      <p className="text-xs text-muted-foreground">
+        Withdraw to your M-Pesa account via Palpluss B2C.
+      </p>
       <p className="mt-1 text-sm font-semibold">Available: {fmt(availableBalance)}</p>
       <form onSubmit={handleSubmit} className="mt-4 space-y-4">
         <div>
@@ -748,11 +499,15 @@ function WithdrawSheet({ onClose, user, balance, onSuccess }: any) {
             placeholder="e.g. 500"
           />
           {amount && parseInt(amount) < MIN_WITHDRAWAL && (
-            <p className="mt-1 text-[11px] text-destructive">Minimum withdrawal is KES {MIN_WITHDRAWAL}</p>
+            <p className="mt-1 text-[11px] text-destructive">
+              Minimum withdrawal is KES {MIN_WITHDRAWAL}
+            </p>
           )}
           {amount && parseInt(amount) >= MIN_WITHDRAWAL && (
             <p className="mt-1 text-[11px] text-muted-foreground">
-              You will receive: KES {Math.max(0, parseInt(amount) - calculateWithdrawalFee(parseInt(amount)))} (Fee: KES {calculateWithdrawalFee(parseInt(amount))})
+              You will receive: KES{" "}
+              {Math.max(0, parseInt(amount) - calculateWithdrawalFee(parseInt(amount)))} (Fee: KES{" "}
+              {calculateWithdrawalFee(parseInt(amount))})
             </p>
           )}
         </div>
@@ -771,7 +526,12 @@ function WithdrawSheet({ onClose, user, balance, onSuccess }: any) {
         </div>
         <button
           type="submit"
-          disabled={loading || !amount || parseInt(amount) < MIN_WITHDRAWAL || parseInt(amount) > availableBalance}
+          disabled={
+            loading ||
+            !amount ||
+            parseInt(amount) < MIN_WITHDRAWAL ||
+            parseInt(amount) > availableBalance
+          }
           className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50"
         >
           {loading ? "Processing..." : "Withdraw"}
@@ -800,8 +560,8 @@ function TransferSheet({ onClose, user, balance, onSuccess }: any) {
 
     setLoading(true);
     try {
-      await apiRequest('/wallet/transfer', {
-        method: 'POST',
+      await apiRequest("/wallet/transfer", {
+        method: "POST",
         body: JSON.stringify({ amount: numAmount, recipient }),
       });
       toast.success("Transfer completed");
@@ -847,17 +607,23 @@ function TransferSheet({ onClose, user, balance, onSuccess }: any) {
             placeholder="e.g. 500"
           />
           {amount && parseInt(amount) < MIN_TRANSFER && (
-            <p className="mt-1 text-[11px] text-destructive">Minimum transfer is KES {MIN_TRANSFER}</p>
+            <p className="mt-1 text-[11px] text-destructive">
+              Minimum transfer is KES {MIN_TRANSFER}
+            </p>
           )}
           {amount && parseInt(amount) >= MIN_TRANSFER && (
             <p className="mt-1 text-[11px] text-muted-foreground">
-              Recipient will receive: KES {Math.max(0, parseInt(amount) - calculateTransferFee(parseInt(amount)))} (Fee: KES {calculateTransferFee(parseInt(amount))})
+              Recipient will receive: KES{" "}
+              {Math.max(0, parseInt(amount) - calculateTransferFee(parseInt(amount)))} (Fee: KES{" "}
+              {calculateTransferFee(parseInt(amount))})
             </p>
           )}
         </div>
         <button
           type="submit"
-          disabled={loading || !amount || parseInt(amount) < MIN_TRANSFER || parseInt(amount) > balance}
+          disabled={
+            loading || !amount || parseInt(amount) < MIN_TRANSFER || parseInt(amount) > balance
+          }
           className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50"
         >
           {loading ? "Processing..." : "Transfer"}

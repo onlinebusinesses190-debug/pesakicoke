@@ -21,6 +21,7 @@ import { apiRequest } from "@/utils/api";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { createClient } from "@supabase/supabase-js";
 import { toast } from "sonner";
+import { DepositSheet } from "@/components/DepositSheet";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface NseStock {
@@ -105,13 +106,9 @@ function StockCard({
             {initials}
           </div>
           <div className="min-w-0">
-            <h3 className="font-bold text-white text-sm truncate leading-tight">
-              {stock.name}
-            </h3>
+            <h3 className="font-bold text-white text-sm truncate leading-tight">{stock.name}</h3>
             <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-              <span className="text-xs font-mono text-blue-400">
-                {stock.symbol}
-              </span>
+              <span className="text-xs font-mono text-blue-400">{stock.symbol}</span>
               <span className="text-[10px] text-muted-foreground bg-white/5 px-1.5 py-0.5 rounded truncate max-w-[100px]">
                 {stock.sector}
               </span>
@@ -120,14 +117,16 @@ function StockCard({
         </div>
 
         <div className="text-right flex-shrink-0">
-          <div className="font-mono font-bold text-white text-sm">
-            KES {stock.price.toFixed(2)}
-          </div>
+          <div className="font-mono font-bold text-white text-sm">KES {stock.price.toFixed(2)}</div>
           <div className={`text-xs flex items-center justify-end gap-1 mt-0.5 ${changeColor}`}>
             <ChangeIcon size={11} />
-            <span>{isPositive ? "+" : ""}{stock.change.toFixed(2)}</span>
+            <span>
+              {isPositive ? "+" : ""}
+              {stock.change.toFixed(2)}
+            </span>
             <span className="opacity-70">
-              ({isPositive ? "+" : ""}{stock.changePercent.toFixed(2)}%)
+              ({isPositive ? "+" : ""}
+              {stock.changePercent.toFixed(2)}%)
             </span>
           </div>
           {stock.volume !== undefined && (
@@ -152,7 +151,7 @@ export const Route = createFileRoute("/trading/invest")({
 function InvestmentPage() {
   const search = Route.useSearch();
   const navigate = useNavigate();
-  const { requireAuth } = useRequireAuth();
+  const { requireAuth, user } = useRequireAuth();
   const mode = search.mode === "real" ? "real" : "demo";
 
   const [stocks, setStocks] = useState<NseStock[]>([]);
@@ -169,6 +168,7 @@ function InvestmentPage() {
   const [isPlacing, setIsPlacing] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
   const [updatingBalance, setUpdatingBalance] = useState(false);
+  const [showDeposit, setShowDeposit] = useState(false);
 
   // ── Auth check ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -176,9 +176,11 @@ function InvestmentPage() {
       try {
         const supabase = createClient(
           import.meta.env.VITE_SUPABASE_URL,
-          import.meta.env.VITE_SUPABASE_ANON_KEY
+          import.meta.env.VITE_SUPABASE_ANON_KEY,
         );
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         if (!session) {
           navigate({ to: "/auth" });
         }
@@ -201,6 +203,11 @@ function InvestmentPage() {
     } finally {
       setUpdatingBalance(false);
     }
+  };
+
+  // Refresh balance after a successful deposit (used by the shared DepositSheet).
+  const refreshRealBalance = () => {
+    if (mode === "real") fetchBalance();
   };
 
   useEffect(() => {
@@ -245,6 +252,11 @@ function InvestmentPage() {
   const handlePlacePrediction = async () => {
     if (!selectedStock || !prediction) return;
     if (mode !== "demo" && !requireAuth()) return;
+    if (mode === "real" && balance !== null && balance < Number(amount)) {
+      toast.error("Insufficient balance. Please deposit to continue.");
+      setShowDeposit(true);
+      return;
+    }
     setIsPlacing(true);
 
     try {
@@ -272,7 +284,12 @@ function InvestmentPage() {
         setTimeout(() => navigate({ to: "/auth" }), 1000);
         return;
       }
-      toast.error(err.message || "Failed to place prediction");
+      if (/insufficient/i.test(err.message || "")) {
+        toast.error("Insufficient balance. Please deposit to continue.");
+        setShowDeposit(true);
+      } else {
+        toast.error(err.message || "Failed to place prediction");
+      }
     } finally {
       setIsPlacing(false);
     }
@@ -286,10 +303,11 @@ function InvestmentPage() {
   };
 
   // ── Derived ────────────────────────────────────────────────────────────────
-  const filtered = stocks.filter((s) =>
-    s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.sector.toLowerCase().includes(searchTerm.toLowerCase())
+  const filtered = stocks.filter(
+    (s) =>
+      s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.sector.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const formattedTime = updatedAt
@@ -354,12 +372,12 @@ function InvestmentPage() {
             {updatingBalance && <span className="text-gray-400 text-[8px] animate-pulse">⋯</span>}
           </div>
           {!isDemo && (
-            <Link
-              to="/wallet"
+            <button
+              onClick={() => setShowDeposit(true)}
               className="flex items-center gap-0.5 bg-green-600 hover:bg-green-500 text-white text-[10px] md:text-xs font-bold px-2 py-1 rounded-lg transition-colors"
             >
               <PlusCircle size={14} className="h-3 w-3 md:h-4 md:w-4" /> Deposit
-            </Link>
+            </button>
           )}
           <span className="text-[8px] md:text-[10px] text-gray-400 hidden sm:inline">
             {isDemo ? "🎮 FUN" : "🔴 REAL"}
@@ -400,7 +418,10 @@ function InvestmentPage() {
         </button>
 
         <div className="relative flex-1 md:w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+            size={16}
+          />
           <input
             type="text"
             placeholder="Search stocks..."
@@ -435,13 +456,12 @@ function InvestmentPage() {
         <div className="flex items-start gap-3 p-4 rounded-xl border border-blue-500/20 bg-blue-500/5">
           <Moon size={18} className="mt-0.5 flex-shrink-0 text-blue-400" />
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-sm text-blue-300">
-              NSE Market is Currently Closed
-            </p>
+            <p className="font-semibold text-sm text-blue-300">NSE Market is Currently Closed</p>
             <p className="text-xs mt-0.5 text-blue-400/70 leading-relaxed">
               The Nairobi Securities Exchange trades{" "}
-              <strong>Monday – Friday, 9:00 AM – 3:00 PM EAT</strong>.
-              Stock prices shown are the most recent closing prices — some counters may not display if they had no activity on the last trading day.
+              <strong>Monday – Friday, 9:00 AM – 3:00 PM EAT</strong>. Stock prices shown are the
+              most recent closing prices — some counters may not display if they had no activity on
+              the last trading day.
             </p>
             <div className="flex items-center gap-1.5 mt-2 text-xs text-blue-400/60">
               <Clock size={11} />
@@ -540,7 +560,7 @@ function InvestmentPage() {
                                 {val.toFixed(2)}
                               </div>
                             </div>
-                          )
+                          ),
                       )}
                     </div>
                   )}
@@ -597,29 +617,22 @@ function InvestmentPage() {
                   <div className="flex justify-between text-xs text-muted-foreground px-1">
                     <span>Potential Payout (30% Profit):</span>
                     <span className="text-emerald-400 font-bold">
-                      {amount
-                        ? `KES ${(Number(amount) * 1.3).toFixed(2)}`
-                        : "KES 0.00"}
+                      {amount ? `KES ${(Number(amount) * 1.3).toFixed(2)}` : "KES 0.00"}
                     </span>
                   </div>
                 </div>
 
                 <button
                   onClick={handlePlacePrediction}
-                  disabled={
-                    !prediction || Number(amount) < 10 || isPlacing || !marketOpen
-                  }
+                  disabled={!prediction || Number(amount) < 10 || isPlacing || !marketOpen}
                   className="w-full py-4 text-base font-black rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:scale-100"
                 >
-                  {isPlacing
-                    ? "PLACING..."
-                    : !marketOpen
-                    ? "MARKET CLOSED"
-                    : "PLACE PREDICTION →"}
+                  {isPlacing ? "PLACING..." : !marketOpen ? "MARKET CLOSED" : "PLACE PREDICTION →"}
                 </button>
 
                 <p className="text-[11px] text-center text-muted-foreground leading-relaxed">
-                  Results are settled against official NSE closing prices. Market closes at 15:00 EAT.
+                  Results are settled against official NSE closing prices. Market closes at 15:00
+                  EAT.
                 </p>
               </div>
             ) : (
@@ -631,6 +644,15 @@ function InvestmentPage() {
           </div>
         </div>
       </div>
+
+      {showDeposit && (
+        <DepositSheet
+          onClose={() => setShowDeposit(false)}
+          user={user}
+          onSuccess={refreshRealBalance}
+          onDepositComplete={refreshRealBalance}
+        />
+      )}
     </div>
   );
 }

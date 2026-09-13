@@ -5,6 +5,7 @@ import { Activity, RefreshCw, Timer, ArrowLeft, PlusCircle } from "lucide-react"
 import { apiRequest } from "@/utils/api";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { createClient } from "@supabase/supabase-js";
+import { DepositSheet } from "@/components/DepositSheet";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 const DURATIONS = [
@@ -61,7 +62,7 @@ export const Route = createFileRoute("/trading/fx")({
 function TradingPage() {
   const search = Route.useSearch();
   const navigate = useNavigate();
-  const { requireAuth } = useRequireAuth();
+  const { requireAuth, user } = useRequireAuth();
   const mode = search.mode === "real" ? "real" : "demo";
 
   const [data, setData] = useState<any[]>([]);
@@ -70,7 +71,7 @@ function TradingPage() {
   const [loading, setLoading] = useState(true);
 
   const [stake, setStake] = useState<number>(10);
-  const [selectedDuration, setSelectedDuration] = useState<typeof DURATIONS[0]>(DURATIONS[0]);
+  const [selectedDuration, setSelectedDuration] = useState<(typeof DURATIONS)[0]>(DURATIONS[0]);
   const [tradeActive, setTradeActive] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [tradeDirection, setTradeDirection] = useState<"UP" | "DOWN" | null>(null);
@@ -83,6 +84,7 @@ function TradingPage() {
   const [balance, setBalance] = useState<number | null>(null);
   const [updatingBalance, setUpdatingBalance] = useState(false);
   const [markers, setMarkers] = useState<any[]>([]);
+  const [showDeposit, setShowDeposit] = useState(false);
 
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const tradeIdRef = useRef<string | null>(null);
@@ -97,9 +99,11 @@ function TradingPage() {
     const checkAuth = async () => {
       const supabase = createClient(
         import.meta.env.VITE_SUPABASE_URL,
-        import.meta.env.VITE_SUPABASE_ANON_KEY
+        import.meta.env.VITE_SUPABASE_ANON_KEY,
       );
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) navigate({ to: "/auth" });
     };
     checkAuth();
@@ -118,7 +122,12 @@ function TradingPage() {
     }
   }, []);
 
-  useEffect(() => { fetchBalance(); }, [fetchBalance]);
+  useEffect(() => {
+    fetchBalance();
+  }, [fetchBalance]);
+
+  // Refresh balance after a successful deposit (used by the shared DepositSheet).
+  const refreshRealBalance = () => fetchBalance();
 
   const fetchOpenPositions = useCallback(async () => {
     try {
@@ -129,28 +138,31 @@ function TradingPage() {
     }
   }, []);
 
-  const fetchPrice = useCallback(async (isInitial = false) => {
-    try {
-      if (isInitial) setLoading(true);
-      const result = await apiRequest(`/market/price?pair=${pair}`);
-      const price = result.price;
-      setCurrentPrice(price);
-      if (isInitial) {
-        const initial = generateInitialData(50, price);
-        setData(initial);
+  const fetchPrice = useCallback(
+    async (isInitial = false) => {
+      try {
+        if (isInitial) setLoading(true);
+        const result = await apiRequest(`/market/price?pair=${pair}`);
+        const price = result.price;
+        setCurrentPrice(price);
+        if (isInitial) {
+          const initial = generateInitialData(50, price);
+          setData(initial);
+        }
+      } catch (err) {
+        console.error("Fetch error:", err);
+        const fallbackPrice = 150.0;
+        setCurrentPrice(fallbackPrice);
+        if (isInitial) {
+          const initial = generateInitialData(50, fallbackPrice);
+          setData(initial);
+        }
+      } finally {
+        if (isInitial) setLoading(false);
       }
-    } catch (err) {
-      console.error("Fetch error:", err);
-      const fallbackPrice = 150.0;
-      setCurrentPrice(fallbackPrice);
-      if (isInitial) {
-        const initial = generateInitialData(50, fallbackPrice);
-        setData(initial);
-      }
-    } finally {
-      if (isInitial) setLoading(false);
-    }
-  }, [pair]);
+    },
+    [pair],
+  );
 
   useEffect(() => {
     fetchPrice(true);
@@ -233,6 +245,11 @@ function TradingPage() {
       setTradeError("Minimum stake is KES 10");
       return;
     }
+    if (mode === "real" && balance !== null && balance < stake) {
+      setTradeError("Insufficient balance. Please deposit to continue.");
+      setShowDeposit(true);
+      return;
+    }
 
     setTradeError(null);
     setTradeActive(true);
@@ -282,7 +299,13 @@ function TradingPage() {
         setMarkers([]);
       }
     } catch (err: any) {
-      setTradeError(err.message || "An error occurred");
+      const msg = err.message || "An error occurred";
+      if (/insufficient/i.test(msg)) {
+        setTradeError("Insufficient balance. Please deposit to continue.");
+        setShowDeposit(true);
+      } else {
+        setTradeError(msg);
+      }
       setTradeActive(false);
       setMarkers([]);
     }
@@ -353,7 +376,11 @@ function TradingPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
-          <Link to="/trading" className="text-gray-400 hover:text-white transition-colors" title="Back to Trading Hub">
+          <Link
+            to="/trading"
+            className="text-gray-400 hover:text-white transition-colors"
+            title="Back to Trading Hub"
+          >
             <ArrowLeft size={24} />
           </Link>
           <h1 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2">
@@ -377,16 +404,30 @@ function TradingPage() {
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1 bg-[#181d29] px-2 py-1 rounded-lg text-xs">
             <span className="text-gray-500">{isDemo ? "Demo" : "Bal"}:</span>
-            <span className="font-bold text-white">{currentBalance !== null ? currentBalance.toFixed(2) : "0.00"} KES</span>
+            <span className="font-bold text-white">
+              {currentBalance !== null ? currentBalance.toFixed(2) : "0.00"} KES
+            </span>
             {updatingBalance && <span className="text-gray-400 text-[8px] animate-pulse">⋯</span>}
           </div>
           {!isDemo && (
-            <Link to="/wallet" className="flex items-center gap-0.5 bg-green-600 hover:bg-green-500 text-white text-[10px] md:text-xs font-bold px-2 py-1 rounded-lg transition-colors">
+            <button
+              onClick={() => setShowDeposit(true)}
+              className="flex items-center gap-0.5 bg-green-600 hover:bg-green-500 text-white text-[10px] md:text-xs font-bold px-2 py-1 rounded-lg transition-colors"
+            >
               <PlusCircle size={14} className="h-3 w-3 md:h-4 md:w-4" /> Deposit
-            </Link>
+            </button>
           )}
-          <span className="text-[8px] md:text-[10px] text-gray-400 hidden sm:inline">{isDemo ? "🎮 FUN" : "🔴 REAL"}</span>
-          <button onClick={() => { setLoading(true); fetchPrice(true); }} className="p-1 hover:bg-white/5 rounded-lg transition-colors text-muted-foreground" title="Refresh">
+          <span className="text-[8px] md:text-[10px] text-gray-400 hidden sm:inline">
+            {isDemo ? "🎮 FUN" : "🔴 REAL"}
+          </span>
+          <button
+            onClick={() => {
+              setLoading(true);
+              fetchPrice(true);
+            }}
+            className="p-1 hover:bg-white/5 rounded-lg transition-colors text-muted-foreground"
+            title="Refresh"
+          >
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
           </button>
           <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/10 text-emerald-500 rounded border border-emerald-500/20 text-[10px] font-semibold tracking-wide">
@@ -415,7 +456,9 @@ function TradingPage() {
           <option value="XAU/USD">XAU/USD</option>
         </select>
         <span className="text-muted-foreground text-sm">•</span>
-        <span className={`text-xs font-mono font-bold ${currentPrice ? "text-emerald-400" : "text-zinc-500"}`}>
+        <span
+          className={`text-xs font-mono font-bold ${currentPrice ? "text-emerald-400" : "text-zinc-500"}`}
+        >
           {currentPrice ? currentPrice.toFixed(currentPrice > 50 ? 2 : 4) : "Loading..."}
         </span>
       </div>
@@ -434,7 +477,9 @@ function TradingPage() {
           {tradeActive && timeRemaining !== null && timeRemaining > 0 && (
             <div className="absolute top-4 right-4 bg-black/80 backdrop-blur-sm border border-[#dcb13c]/30 rounded-lg px-4 py-2 flex items-center gap-2">
               <Timer className="h-4 w-4 text-[#dcb13c]" />
-              <span className="text-white font-mono text-sm font-bold">{formatTime(timeRemaining)}</span>
+              <span className="text-white font-mono text-sm font-bold">
+                {formatTime(timeRemaining)}
+              </span>
             </div>
           )}
 
@@ -448,7 +493,9 @@ function TradingPage() {
         {/* Controls */}
         <div className="w-full lg:w-[380px] shrink-0 bg-[#0b0e14] border border-[#1e2330] rounded-xl p-4 flex flex-col gap-4">
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-widest block">Stake (KES)</label>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-widest block">
+              Stake (KES)
+            </label>
             <input
               type="number"
               min="10"
@@ -473,7 +520,9 @@ function TradingPage() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-widest block">Duration</label>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-widest block">
+              Duration
+            </label>
             <div className="grid grid-cols-3 gap-2">
               {DURATIONS.map((d) => (
                 <button
@@ -493,16 +542,38 @@ function TradingPage() {
           </div>
 
           <div className="flex justify-between items-center text-sm font-mono px-2">
-            <div className="text-gray-400">Ask: <span className="text-gray-200">{ask.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}</span></div>
-            <div className="text-gray-500 text-xs">Spread: {spread.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}</div>
-            <div className="text-gray-400">Bid: <span className="text-gray-200">{bid.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}</span></div>
+            <div className="text-gray-400">
+              Ask:{" "}
+              <span className="text-gray-200">
+                {ask.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}
+              </span>
+            </div>
+            <div className="text-gray-500 text-xs">
+              Spread: {spread.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}
+            </div>
+            <div className="text-gray-400">
+              Bid:{" "}
+              <span className="text-gray-200">
+                {bid.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}
+              </span>
+            </div>
           </div>
 
           {entryPrice !== null && (
             <div className="flex justify-between text-xs text-gray-500 px-2">
-              <span>Entry: <span className="text-white font-mono">{entryPrice.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}</span></span>
+              <span>
+                Entry:{" "}
+                <span className="text-white font-mono">
+                  {entryPrice.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}
+                </span>
+              </span>
               {exitPrice !== null && (
-                <span>Exit: <span className="text-white font-mono">{exitPrice.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}</span></span>
+                <span>
+                  Exit:{" "}
+                  <span className="text-white font-mono">
+                    {exitPrice.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}
+                  </span>
+                </span>
               )}
             </div>
           )}
@@ -530,15 +601,21 @@ function TradingPage() {
             </button>
           </div>
 
-          {tradeError && <div className="text-center text-red-500 text-sm font-medium">{tradeError}</div>}
+          {tradeError && (
+            <div className="text-center text-red-500 text-sm font-medium">{tradeError}</div>
+          )}
 
-          <div className="text-center text-xs text-gray-500">Mode: <span className="text-gray-300 font-medium capitalize">{mode}</span></div>
+          <div className="text-center text-xs text-gray-500">
+            Mode: <span className="text-gray-300 font-medium capitalize">{mode}</span>
+          </div>
         </div>
       </div>
 
       {/* Open Positions */}
       <div className="bg-[#0b0e14] border border-[#1e2330] rounded-xl p-4 flex flex-col gap-3">
-        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-widest block">Open Positions ({openPositions.length})</h2>
+        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-widest block">
+          Open Positions ({openPositions.length})
+        </h2>
         <div className="flex flex-col gap-2">
           {openPositions.length === 0 ? (
             <p className="text-sm text-gray-600 text-center py-4">No open positions.</p>
@@ -547,15 +624,22 @@ function TradingPage() {
               const isBuy = pos.direction === "up" || pos.direction === "UP";
               let profitMock = 0;
               if (pos.market === pair && currentPrice) {
-                const diff = isBuy ? currentPrice - pos.entry_price : pos.entry_price - currentPrice;
+                const diff = isBuy
+                  ? currentPrice - pos.entry_price
+                  : pos.entry_price - currentPrice;
                 if (diff > 0) profitMock = pos.amount * 0.2;
                 else if (diff < 0) profitMock = -pos.amount;
               }
               const profitColor = profitMock >= 0 ? "text-emerald-500" : "text-red-500";
               return (
-                <div key={pos.id} className="flex items-center justify-between p-3 bg-[#131720] rounded-lg border border-[#1e2330]">
+                <div
+                  key={pos.id}
+                  className="flex items-center justify-between p-3 bg-[#131720] rounded-lg border border-[#1e2330]"
+                >
                   <div className="flex items-center gap-3">
-                    <div className={`text-[10px] font-bold px-2 py-0.5 rounded ${isBuy ? "bg-[#236e40] text-emerald-100" : "bg-[#6e2525] text-red-100"} uppercase`}>
+                    <div
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded ${isBuy ? "bg-[#236e40] text-emerald-100" : "bg-[#6e2525] text-red-100"} uppercase`}
+                    >
                       {isBuy ? "Buy" : "Sell"}
                     </div>
                     <div className="font-semibold text-sm text-gray-200">{pos.market}</div>
@@ -563,7 +647,8 @@ function TradingPage() {
                   </div>
                   <div className="flex items-center gap-4">
                     <div className={`text-sm font-mono font-medium ${profitColor} w-20 text-right`}>
-                      {profitMock > 0 ? "+" : ""}{profitMock.toFixed(2)} KES
+                      {profitMock > 0 ? "+" : ""}
+                      {profitMock.toFixed(2)} KES
                     </div>
                     <button
                       onClick={() => handleCloseTrade(pos.id)}
@@ -579,6 +664,15 @@ function TradingPage() {
           )}
         </div>
       </div>
+
+      {showDeposit && (
+        <DepositSheet
+          onClose={() => setShowDeposit(false)}
+          user={user}
+          onSuccess={refreshRealBalance}
+          onDepositComplete={refreshRealBalance}
+        />
+      )}
     </div>
   );
 }

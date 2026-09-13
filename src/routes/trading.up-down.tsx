@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 import { io, Socket } from "socket.io-client";
 import { apiRequest } from "@/utils/api";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { DepositSheet } from "@/components/DepositSheet";
 
 type RoundState = "open" | "locked" | "result";
 
@@ -35,7 +36,13 @@ const TOTAL_SECONDS = 10;
 const DEMO_BALANCE_KEY = "pesaki_updown_demo_balance";
 const INITIAL_DEMO_BALANCE = 10000;
 
-function CountdownRing({ secondsLeft, total = TOTAL_SECONDS }: { secondsLeft: number; total?: number }) {
+function CountdownRing({
+  secondsLeft,
+  total = TOTAL_SECONDS,
+}: {
+  secondsLeft: number;
+  total?: number;
+}) {
   const r = 40;
   const circ = 2 * Math.PI * r;
   const pct = Math.max(0, secondsLeft / total);
@@ -73,7 +80,7 @@ export const Route = createFileRoute("/trading/up-down")({
 function UpDownGame() {
   const search = Route.useSearch();
   const navigate = useNavigate();
-  const { requireAuth } = useRequireAuth();
+  const { requireAuth, user } = useRequireAuth();
   const mode = search.mode === "real" ? "real" : "demo";
 
   const socketRef = useRef<Socket | null>(null);
@@ -88,11 +95,14 @@ function UpDownGame() {
     userWon: boolean | null;
     profit: number | null;
   } | null>(null);
-  const [myPosition, setMyPosition] = useState<{ direction: "up" | "down"; amount: number } | null>(null);
+  const [myPosition, setMyPosition] = useState<{ direction: "up" | "down"; amount: number } | null>(
+    null,
+  );
   const [amount, setAmount] = useState("100");
   const [executingOrder, setExecutingOrder] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
   const [updatingBalance, setUpdatingBalance] = useState(false);
+  const [showDeposit, setShowDeposit] = useState(false);
   const [flash, setFlash] = useState<"up" | "down" | null>(null);
 
   const currentRoundIdRef = useRef<string | null>(null);
@@ -114,9 +124,11 @@ function UpDownGame() {
     const checkAuth = async () => {
       const supabase = createClient(
         import.meta.env.VITE_SUPABASE_URL,
-        import.meta.env.VITE_SUPABASE_ANON_KEY
+        import.meta.env.VITE_SUPABASE_ANON_KEY,
       );
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) navigate({ to: "/auth" });
     };
     checkAuth();
@@ -137,6 +149,11 @@ function UpDownGame() {
     }
   };
 
+  // Refresh balance after a successful deposit (used by the shared DepositSheet).
+  const refreshRealBalance = () => {
+    if (mode === "real") fetchRealBalance();
+  };
+
   useEffect(() => {
     if (mode === "real") fetchRealBalance();
   }, [mode]);
@@ -148,9 +165,11 @@ function UpDownGame() {
     const connect = async () => {
       const supabase = createClient(
         import.meta.env.VITE_SUPABASE_URL,
-        import.meta.env.VITE_SUPABASE_ANON_KEY
+        import.meta.env.VITE_SUPABASE_ANON_KEY,
       );
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session?.access_token) return;
 
       // ✅ Use WS_URL for WebSocket
@@ -217,10 +236,11 @@ function UpDownGame() {
                 closePrice: data.closePrice,
                 direction: winningDirection,
               }
-            : null
+            : null,
         );
 
-        const userWon = myPosition && winningDirection ? myPosition.direction === winningDirection : false;
+        const userWon =
+          myPosition && winningDirection ? myPosition.direction === winningDirection : false;
         const profit = userWon && myPosition ? myPosition.amount * 0.5 : null;
 
         setLastResult({
@@ -279,7 +299,8 @@ function UpDownGame() {
   // ── Handle order ──────────────────────────────────────────────────────────
   const handleOrder = useCallback(
     (direction: "up" | "down") => {
-      if (!socketRef.current || !round || round.state !== "open" || myPosition || executingOrder) return;
+      if (!socketRef.current || !round || round.state !== "open" || myPosition || executingOrder)
+        return;
       if (!isDemo && !requireAuth()) return;
       const stake = Number(amount);
       if (isNaN(stake) || stake <= 0) return;
@@ -299,6 +320,11 @@ function UpDownGame() {
         });
         // The backend will return the result; we'll update demo balance in the result handler.
       } else {
+        if (balance !== null && balance < stake) {
+          alert("Insufficient balance. Please deposit to continue.");
+          setShowDeposit(true);
+          return;
+        }
         setExecutingOrder(true);
         socketRef.current.emit("PLACE_POSITION", {
           roundId: round.id,
@@ -308,7 +334,7 @@ function UpDownGame() {
         });
       }
     },
-    [round, myPosition, executingOrder, amount, mode, demoBalance]
+    [round, myPosition, executingOrder, amount, mode, demoBalance, balance],
   );
 
   const priceChange =
@@ -336,8 +362,8 @@ function UpDownGame() {
             flash === "up"
               ? "rgba(16,185,129,0.12)"
               : flash === "down"
-              ? "rgba(239,68,68,0.12)"
-              : "transparent",
+                ? "rgba(239,68,68,0.12)"
+                : "transparent",
           opacity: flash ? 1 : 0,
         }}
       />
@@ -390,18 +416,20 @@ function UpDownGame() {
               {updatingBalance && <span className="text-gray-400 text-[8px] animate-pulse">⋯</span>}
             </div>
             {!isDemo && (
-              <Link
-                to="/wallet"
+              <button
+                onClick={() => setShowDeposit(true)}
                 className="flex items-center gap-0.5 bg-green-600 hover:bg-green-500 text-white text-[10px] md:text-xs font-bold px-2 py-1 rounded-lg transition-colors"
               >
                 <PlusCircle size={14} className="h-3 w-3 md:h-4 md:w-4" /> Deposit
-              </Link>
+              </button>
             )}
             <span className="text-[8px] md:text-[10px] text-gray-400 hidden sm:inline">
               {isDemo ? "🎮 FUN" : "🔴 REAL"}
             </span>
             {/* Connection status dot */}
-            <div className={`w-2 h-2 rounded-full ${connected ? "bg-emerald-400" : "bg-red-500"}`} />
+            <div
+              className={`w-2 h-2 rounded-full ${connected ? "bg-emerald-400" : "bg-red-500"}`}
+            />
           </div>
         </div>
 
@@ -420,8 +448,8 @@ function UpDownGame() {
                   h.direction === "up"
                     ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400"
                     : h.direction === "down"
-                    ? "bg-red-500/20 border-red-500/50 text-red-400"
-                    : "bg-zinc-500/20 border-zinc-500/50 text-zinc-400"
+                      ? "bg-red-500/20 border-red-500/50 text-red-400"
+                      : "bg-zinc-500/20 border-zinc-500/50 text-zinc-400"
                 }`}
               >
                 {h.direction === "up" ? "↑" : h.direction === "down" ? "↓" : "–"}
@@ -437,17 +465,17 @@ function UpDownGame() {
               round?.state === "open"
                 ? "bg-emerald-500/20 text-emerald-400"
                 : round?.state === "locked"
-                ? "bg-amber-500/20 text-amber-400"
-                : "bg-indigo-500/20 text-indigo-400"
+                  ? "bg-amber-500/20 text-amber-400"
+                  : "bg-indigo-500/20 text-indigo-400"
             }`}
           >
             {round?.state === "open"
               ? "🟢 Accepting orders"
               : round?.state === "locked"
-              ? "🔒 Locked — fetching result..."
-              : round?.state === "result"
-              ? "📊 Round result"
-              : "⏳ Waiting for round..."}
+                ? "🔒 Locked — fetching result..."
+                : round?.state === "result"
+                  ? "📊 Round result"
+                  : "⏳ Waiting for round..."}
           </div>
 
           {/* Price + Timer */}
@@ -466,8 +494,8 @@ function UpDownGame() {
                   lastResult.direction === "up"
                     ? "text-emerald-400"
                     : lastResult.direction === "down"
-                    ? "text-red-400"
-                    : "text-zinc-400"
+                      ? "text-red-400"
+                      : "text-zinc-400"
                 }`}
               >
                 <div className="flex items-center gap-2 text-4xl">
@@ -499,7 +527,9 @@ function UpDownGame() {
               </div>
             )}
 
-            {round?.state === "open" && <CountdownRing secondsLeft={secondsLeft} total={TOTAL_SECONDS} />}
+            {round?.state === "open" && (
+              <CountdownRing secondsLeft={secondsLeft} total={TOTAL_SECONDS} />
+            )}
 
             {round?.state === "locked" && (
               <div className="flex items-center gap-2 text-amber-400 animate-pulse">
@@ -530,8 +560,8 @@ function UpDownGame() {
                 myPosition?.direction === "up"
                   ? "bg-emerald-500/30 border-emerald-500 text-emerald-300"
                   : canPlaceOrder
-                  ? "bg-emerald-500/10 border-emerald-500/60 text-emerald-400 hover:bg-emerald-500/20"
-                  : "bg-white/5 border-white/10 text-zinc-600 cursor-not-allowed opacity-50"
+                    ? "bg-emerald-500/10 border-emerald-500/60 text-emerald-400 hover:bg-emerald-500/20"
+                    : "bg-white/5 border-white/10 text-zinc-600 cursor-not-allowed opacity-50"
               }`}
             >
               {executingOrder && myPosition === null ? (
@@ -548,8 +578,8 @@ function UpDownGame() {
                 myPosition?.direction === "down"
                   ? "bg-red-500/30 border-red-500 text-red-300"
                   : canPlaceOrder
-                  ? "bg-red-500/10 border-red-500/60 text-red-400 hover:bg-red-500/20"
-                  : "bg-white/5 border-white/10 text-zinc-600 cursor-not-allowed opacity-50"
+                    ? "bg-red-500/10 border-red-500/60 text-red-400 hover:bg-red-500/20"
+                    : "bg-white/5 border-white/10 text-zinc-600 cursor-not-allowed opacity-50"
               }`}
             >
               {executingOrder && myPosition === null ? (
@@ -564,10 +594,14 @@ function UpDownGame() {
           {/* Amount */}
           <div className="px-6 pb-6 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">Amount (KES)</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+                Amount (KES)
+              </span>
               <span className="text-xs text-zinc-500">
                 Target Gain:{" "}
-                <span className="text-white font-bold">KES {(Number(amount) * 0.5).toFixed(2)}</span>
+                <span className="text-white font-bold">
+                  KES {(Number(amount) * 0.5).toFixed(2)}
+                </span>
               </span>
             </div>
             <div className="grid grid-cols-4 gap-2">
@@ -602,6 +636,15 @@ function UpDownGame() {
           </div>
         </div>
       </div>
+
+      {showDeposit && (
+        <DepositSheet
+          onClose={() => setShowDeposit(false)}
+          user={user}
+          onSuccess={refreshRealBalance}
+          onDepositComplete={refreshRealBalance}
+        />
+      )}
     </>
   );
 }

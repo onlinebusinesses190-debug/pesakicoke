@@ -7,6 +7,7 @@ import { createClient } from "@supabase/supabase-js";
 import { apiRequest } from "@/utils/api";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { AviatorCanvas } from "@/components/aviator/AviatorCanvas";
+import { DepositSheet } from "@/components/DepositSheet";
 
 type GameStatus = "WAITING" | "FLYING" | "CRASHED";
 
@@ -49,7 +50,7 @@ export const Route = createFileRoute("/trading/aviator")({
 function AviatorPage() {
   const search = Route.useSearch();
   const navigate = useNavigate();
-  const { requireAuth } = useRequireAuth();
+  const { requireAuth, user } = useRequireAuth();
   const mode = search.mode === "real" ? "real" : "demo";
 
   const [status, setStatus] = useState<GameStatus>("WAITING");
@@ -58,6 +59,7 @@ function AviatorPage() {
   const [waitTime, setWaitTime] = useState(0);
   const [balance, setBalance] = useState<number | null>(null);
   const [updatingBalance, setUpdatingBalance] = useState(false);
+  const [showDeposit, setShowDeposit] = useState(false);
 
   // ── Demo balance ──────────────────────────────────────────────────────────
   const [demoBalance, setDemoBalance] = useState<number>(() => {
@@ -97,9 +99,11 @@ function AviatorPage() {
       try {
         const supabase = createClient(
           import.meta.env.VITE_SUPABASE_URL,
-          import.meta.env.VITE_SUPABASE_ANON_KEY
+          import.meta.env.VITE_SUPABASE_ANON_KEY,
         );
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         if (!session) {
           navigate({ to: "/auth" });
         }
@@ -142,6 +146,10 @@ function AviatorPage() {
   }, []);
 
   // ── Place bet (Allocation 1) ──────────────────────────────────────────────
+  const promptDeposit = () => {
+    if (mode === "real") setShowDeposit(true);
+  };
+
   const placeBet1 = async () => {
     if (status !== "WAITING" || isBetting1) return;
     if (mode !== "demo" && !requireAuth()) return;
@@ -155,6 +163,12 @@ function AviatorPage() {
       }
       updateDemoBalance(demoBalance - betAmount1);
     } else {
+      if (balance !== null && balance < betAmount1) {
+        alert("Insufficient balance. Please deposit to continue.");
+        promptDeposit();
+        setIsBetting1(false);
+        return;
+      }
       try {
         const res = await apiRequest("/games/aviator/bet", {
           method: "POST",
@@ -166,7 +180,9 @@ function AviatorPage() {
           fetchRealBalance();
         }
       } catch (err: any) {
-        alert(err.message || "Failed to place allocation 1");
+        const msg = err.message || "Failed to place allocation 1";
+        if (/insufficient/i.test(msg)) promptDeposit();
+        alert(msg);
         setIsBetting1(false);
       }
     }
@@ -186,6 +202,12 @@ function AviatorPage() {
       }
       updateDemoBalance(demoBalance - betAmount2);
     } else {
+      if (balance !== null && balance < betAmount2) {
+        alert("Insufficient balance. Please deposit to continue.");
+        promptDeposit();
+        setIsBetting2(false);
+        return;
+      }
       try {
         const res = await apiRequest("/games/aviator/bet", {
           method: "POST",
@@ -197,7 +219,9 @@ function AviatorPage() {
           fetchRealBalance();
         }
       } catch (err: any) {
-        alert(err.message || "Failed to place allocation 2");
+        const msg = err.message || "Failed to place allocation 2";
+        if (/insufficient/i.test(msg)) promptDeposit();
+        alert(msg);
         setIsBetting2(false);
       }
     }
@@ -271,12 +295,14 @@ function AviatorPage() {
   useEffect(() => {
     const supabase = createClient(
       import.meta.env.VITE_SUPABASE_URL,
-      import.meta.env.VITE_SUPABASE_ANON_KEY
+      import.meta.env.VITE_SUPABASE_ANON_KEY,
     );
 
     const initGame = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         if (!session) return;
 
         const socket = io(`${WS_URL}/aviator`, {
@@ -437,12 +463,12 @@ function AviatorPage() {
           </div>
           {/* Deposit button (only for real mode) */}
           {!isDemo && (
-            <Link
-              to="/wallet"
+            <button
+              onClick={() => setShowDeposit(true)}
               className="flex items-center gap-0.5 bg-green-600 hover:bg-green-500 text-white text-[10px] md:text-xs font-bold px-1.5 md:px-3 py-0.5 md:py-1.5 rounded-lg transition-colors"
             >
               <PlusCircle size={14} className="h-3 w-3 md:h-4 md:w-4" /> Deposit
-            </Link>
+            </button>
           )}
           <span className="text-[8px] md:text-[10px] text-gray-400 hidden sm:inline">
             {isDemo ? "🎮 FUN" : "🔴 REAL"}
@@ -459,7 +485,10 @@ function AviatorPage() {
             </div>
             <div className="absolute top-1 right-1 z-20 flex gap-1">
               {recentHistory.map((val, i) => (
-                <div key={i} className="bg-black/50 backdrop-blur-sm px-1 py-0.5 rounded text-[8px] font-bold text-white border border-white/10">
+                <div
+                  key={i}
+                  className="bg-black/50 backdrop-blur-sm px-1 py-0.5 rounded text-[8px] font-bold text-white border border-white/10"
+                >
                   {val.toFixed(2)}x
                 </div>
               ))}
@@ -475,7 +504,11 @@ function AviatorPage() {
                 >
                   <div className="bg-green-500/20 backdrop-blur-sm px-4 py-2 rounded-2xl border border-green-500/50">
                     <span className="text-2xl font-black text-green-400">
-                      🎉 +{(betAmount1 * cashOutMultiplier1 || betAmount2 * cashOutMultiplier2).toFixed(2)} KES
+                      🎉 +
+                      {(betAmount1 * cashOutMultiplier1 || betAmount2 * cashOutMultiplier2).toFixed(
+                        2,
+                      )}{" "}
+                      KES
                     </span>
                   </div>
                 </motion.div>
@@ -491,13 +524,13 @@ function AviatorPage() {
               {isWaiting ? "Next round in" : isFlying ? "Round in progress" : "Crashed"}
             </div>
             <div className="text-xl font-bold text-white">
-              {isWaiting ? (
-                displayCountdown > 0 ? `${displayCountdown}s` : "⏳"
-              ) : isFlying ? (
-                "🔴 LIVE"
-              ) : (
-                "💥 CRASHED"
-              )}
+              {isWaiting
+                ? displayCountdown > 0
+                  ? `${displayCountdown}s`
+                  : "⏳"
+                : isFlying
+                  ? "🔴 LIVE"
+                  : "💥 CRASHED"}
             </div>
           </div>
 
@@ -512,7 +545,9 @@ function AviatorPage() {
                     onClick={() => setBetAmount1(v)}
                     disabled={isBetting1 || isFlying}
                     className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
-                      betAmount1 === v ? "bg-[#dcb13c] text-black" : "bg-white/5 text-gray-300 hover:bg-white/10"
+                      betAmount1 === v
+                        ? "bg-[#dcb13c] text-black"
+                        : "bg-white/5 text-gray-300 hover:bg-white/10"
                     } disabled:opacity-50`}
                   >
                     {v}
@@ -532,7 +567,9 @@ function AviatorPage() {
                   className="w-full h-9 bg-orange-500 hover:bg-orange-400 text-black font-bold text-sm rounded-lg transition-all active:scale-95 flex flex-col items-center justify-center"
                 >
                   <span>CASH OUT</span>
-                  <span className="text-[10px] opacity-80">{(betAmount1 * multiplier).toFixed(2)} KES</span>
+                  <span className="text-[10px] opacity-80">
+                    {(betAmount1 * multiplier).toFixed(2)} KES
+                  </span>
                 </button>
               ) : (
                 <button
@@ -560,7 +597,9 @@ function AviatorPage() {
                     onClick={() => setBetAmount2(v)}
                     disabled={isBetting2 || isFlying}
                     className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
-                      betAmount2 === v ? "bg-[#dcb13c] text-black" : "bg-white/5 text-gray-300 hover:bg-white/10"
+                      betAmount2 === v
+                        ? "bg-[#dcb13c] text-black"
+                        : "bg-white/5 text-gray-300 hover:bg-white/10"
                     } disabled:opacity-50`}
                   >
                     {v}
@@ -580,7 +619,9 @@ function AviatorPage() {
                   className="w-full h-9 bg-orange-500 hover:bg-orange-400 text-black font-bold text-sm rounded-lg transition-all active:scale-95 flex flex-col items-center justify-center"
                 >
                   <span>CASH OUT</span>
-                  <span className="text-[10px] opacity-80">{(betAmount2 * multiplier).toFixed(2)} KES</span>
+                  <span className="text-[10px] opacity-80">
+                    {(betAmount2 * multiplier).toFixed(2)} KES
+                  </span>
                 </button>
               ) : (
                 <button
@@ -606,7 +647,9 @@ function AviatorPage() {
             </div>
             <div className="bg-[#0f0f1a] border border-white/10 rounded-xl p-2 text-center">
               <span className="block">Best</span>
-              <span className="text-white font-bold">{history.length > 0 ? Math.max(...history).toFixed(2) : '--'}x</span>
+              <span className="text-white font-bold">
+                {history.length > 0 ? Math.max(...history).toFixed(2) : "--"}x
+              </span>
             </div>
           </div>
         </div>
@@ -625,6 +668,15 @@ function AviatorPage() {
           </div>
         </div>
       </div>
+
+      {showDeposit && (
+        <DepositSheet
+          onClose={() => setShowDeposit(false)}
+          user={user}
+          onSuccess={fetchRealBalance}
+          onDepositComplete={fetchRealBalance}
+        />
+      )}
     </div>
   );
 }
