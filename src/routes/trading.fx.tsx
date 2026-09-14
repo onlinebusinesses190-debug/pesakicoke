@@ -1,11 +1,21 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { TradingChart } from "@/components/fx/TradingChart";
-import { Activity, RefreshCw, Timer, ArrowLeft, PlusCircle } from "lucide-react";
+import { TradingChart, type FxMarker } from "@/components/fx/TradingChart";
+import {
+  Activity,
+  RefreshCw,
+  Timer,
+  ArrowLeft,
+  PlusCircle,
+  Clock,
+  TrendingUp,
+  TrendingDown,
+} from "lucide-react";
 import { apiRequest } from "@/utils/api";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { createClient } from "@supabase/supabase-js";
 import { DepositSheet } from "@/components/DepositSheet";
+import { toast } from "sonner";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 const DURATIONS = [
@@ -83,8 +93,22 @@ function TradingPage() {
 
   const [balance, setBalance] = useState<number | null>(null);
   const [updatingBalance, setUpdatingBalance] = useState(false);
-  const [markers, setMarkers] = useState<any[]>([]);
+  const [markers, setMarkers] = useState<FxMarker[]>([]);
+  const [pendingMarkerPositions, setPendingMarkerPositions] = useState<
+    { id: string; x: number; y: number }[]
+  >([]);
   const [showDeposit, setShowDeposit] = useState(false);
+
+  // Per-trade stats shown in the header.
+  const [todayPnl, setTodayPnl] = useState(0);
+  const [activeTrades, setActiveTrades] = useState(0);
+  const [winningTrades, setWinningTrades] = useState(0);
+
+  // In-flight trade id + expiry timestamp (used for auto-resume on reload).
+  const activeTradeIdRef = useRef<string | null>(null);
+  const activeTradeExpiryRef = useRef<string | null>(null);
+  const settleInFlightRef = useRef(false);
+  const startTimerRef = useRef<(n: number) => void>(() => {});
 
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const tradeIdRef = useRef<string | null>(null);
@@ -128,6 +152,89 @@ function TradingPage() {
 
   // Refresh balance after a successful deposit (used by the shared DepositSheet).
   const refreshRealBalance = () => fetchBalance();
+
+  // ── Fetch the user's recent Binary FX trades + per-trade stats ──────────
+  const fetchTrades = useCallback(async () => {
+    try {
+      const res = await apiRequest("/games/fx/trades?limit=200");
+      if (res.success && Array.isArray(res.data)) {
+        setMarkers(
+          res.data.map((t: any) => ({
+            time: Math.floor(new Date(t.entry_time).getTime() / 1000),
+            price: Number(t.entry_price),
+            type: t.direction === "buy" ? "buy" : "sell",
+            status: t.status,
+          })),
+        );
+        const today = new Date().toDateString();
+        let pnl = 0;
+        let active = 0;
+        let wins = 0;
+        for (const t of res.data) {
+          if (t.status === "pending") active++;
+          else if (t.status === "won") {
+            wins++;
+            pnl += Number(t.payout_amount);
+          } else if (t.status === "lost") pnl -= Number(t.stake);
+        }
+        setWinningTrades(wins);
+        setActiveTrades(active);
+        setTodayPnl(pnl);
+      }
+    } catch (err) {
+      console.error("Failed to fetch fx trades:", err);
+    }
+  }, []);
+
+  // Auto-resume: if a pending trade's expiry has passed, settle it now using
+  // the current market price. This keeps markers correct across page reloads.
+  const maybeResumePendingTrade = useCallback(async () => {
+    if (settleInFlightRef.current) return;
+    try {
+      const res = await apiRequest("/games/fx/trades?limit=200");
+      if (!res.success || !Array.isArray(res.data)) return;
+      const pending = res.data.find((t: any) => t.status === "pending");
+      if (!pending) return;
+      const expiry = new Date(pending.expiry_time).getTime();
+      if (expiry > Date.now()) {
+        // Still running — restart the live countdown so the user can watch it finish.
+        activeTradeIdRef.current = pending.id;
+        activeTradeExpiryRef.current = pending.expiry_time;
+        const remainingMs = expiry - Date.now();
+        const remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
+        setTradeActive(true);
+        tradeActiveRef.current = true;
+        setTimeRemaining(remainingSec);
+        startTimerRef.current(remainingSec);
+        return;
+      }
+      // Expired → settle with the current price.
+      settleInFlightRef.current = true;
+      activeTradeIdRef.current = pending.id;
+      const priceRes = await apiRequest(`/market/price?pair=${pending.pair}`);
+      const expiryPrice = Number(priceRes.price);
+      const settleRes = await apiRequest(`/games/fx/trade/${pending.id}/settle`, {
+        method: "POST",
+        body: JSON.stringify({ expiryPrice }),
+      });
+      if (settleRes.success) {
+        toast(
+          settleRes.outcome === "won"
+            ? `🎉 WON! +${(Number(pending.stake) * 0.5).toFixed(2)} KES`
+            : `💀 LOST! -${Number(pending.stake).toFixed(2)} KES`,
+        );
+        setTradeResult(settleRes.outcome);
+        setExitPrice(expiryPrice);
+        setBalance(settleRes.newBalance ?? balance);
+        fetchBalance();
+      }
+      fetchTrades();
+    } catch (err) {
+      console.error("Auto-resume settle failed:", err);
+    } finally {
+      settleInFlightRef.current = false;
+    }
+  }, [fetchBalance, fetchTrades, balance]);
 
   const fetchOpenPositions = useCallback(async () => {
     try {
@@ -185,57 +292,74 @@ function TradingPage() {
   }, [pair, fetchOpenPositions]);
 
   const startTimer = (durationInSeconds: number) => {
+    startTimerRef.current = startTimer;
     setTimeRemaining(durationInSeconds);
     tradeActiveRef.current = true;
 
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
 
+    // 100ms tick so the countdown feels live.
     timerIntervalRef.current = setInterval(() => {
       setTimeRemaining((prev) => {
         if (prev === null || prev <= 0) {
           clearInterval(timerIntervalRef.current!);
           timerIntervalRef.current = null;
-          if (tradeActiveRef.current && tradeIdRef.current) {
-            closeTradeAutomatically(tradeIdRef.current);
+          if (tradeActiveRef.current && activeTradeIdRef.current) {
+            settleTrade(activeTradeIdRef.current);
           }
           return 0;
         }
-        return prev - 1;
+        return prev - 0.1;
       });
-    }, 1000);
+    }, 100);
   };
 
-  const closeTradeAutomatically = async (tradeId: string) => {
+  // Keep the latest direction/entry-time in refs so settleTrade can update
+  // the correct pending marker when the countdown hits zero.
+  const directionRef = useRef<"buy" | "sell">("buy");
+  const entryTimeRef = useRef<number | null>(null);
+
+  // ── Settle an active trade when the countdown hits zero ────────────────
+  const settleTrade = async (tradeId: string) => {
     if (!tradeActiveRef.current) return;
     tradeActiveRef.current = false;
+    setTradeActive(false);
 
-    const exit = currentPrice || 0;
+    const exit = currentPrice || entryPrice || 0;
     setExitPrice(exit);
 
-    if (entryPrice !== null && tradeDirection) {
-      const diff = tradeDirection === "UP" ? exit - entryPrice : entryPrice - exit;
-      const won = diff > 0;
-      setTradeResult(won ? "won" : "lost");
-      setMarkers([]);
+    try {
+      const res = await apiRequest(`/games/fx/trade/${tradeId}/settle`, {
+        method: "POST",
+        body: JSON.stringify({ expiryPrice: exit }),
+      });
 
-      setTimeout(() => {
-        setTradeResult(null);
-        setEntryPrice(null);
-        setExitPrice(null);
-        setTradeDirection(null);
-        setTimeRemaining(null);
-        tradeIdRef.current = null;
-      }, 3000);
+      if (res.success) {
+        const outcome = res.outcome;
+        setTradeResult(outcome);
+        // Flip the pending marker to its final colour (won=green / lost=red).
+        setMarkers((prev) =>
+          prev.map((m) =>
+            m.time === entryTimeRef.current && m.type === directionRef.current
+              ? { ...m, status: outcome }
+              : m,
+          ),
+        );
 
-      if (won) {
-        console.log(`🎉 Won! +${stake * 0.2} KES`);
+        if (outcome === "won") {
+          toast(`🎉 WON! +${(stake * 0.5).toFixed(2)} KES`, { duration: 4000 });
+        } else {
+          toast(`💀 LOST! -${stake.toFixed(2)} KES`, { duration: 4000 });
+        }
+        setBalance(res.newBalance ?? balance);
+        fetchTrades();
         fetchBalance();
       } else {
-        console.log(`💀 Lost! -${stake} KES`);
-        fetchBalance();
+        setTradeError(res.error || "Failed to settle trade");
       }
+    } catch (err: any) {
+      setTradeError(err.message || "Failed to settle trade");
     }
-    setTradeActive(false);
   };
 
   const handleTrade = async (direction: "buy" | "sell") => {
@@ -253,51 +377,49 @@ function TradingPage() {
 
     setTradeError(null);
     setTradeActive(true);
-    const dir = direction === "buy" ? "UP" : "DOWN";
-    setTradeDirection(dir);
-    setEntryPrice(currentPrice);
-    setExitPrice(null);
     setTradeResult(null);
+    setExitPrice(null);
 
-    const markerColor = direction === "buy" ? "#26a69a" : "#ef5350";
-    const markerShape = direction === "buy" ? "arrowUp" : "arrowDown";
-    const newMarker = {
-      time: Math.floor(Date.now() / 1000),
-      position: "aboveBar",
-      color: markerColor,
-      shape: markerShape,
-      text: direction === "buy" ? "BUY ▲" : "SELL ▼",
-    };
-    setMarkers([newMarker]);
+    // Entry price: Ask for BUY, Bid for SELL.
+    const entryPrice = direction === "buy" ? ask : bid;
+    setEntryPrice(entryPrice);
 
     let durationSeconds = selectedDuration.value;
     if (selectedDuration.unit === "minutes") {
       durationSeconds = selectedDuration.value * 60;
     }
 
-    // Backend schema (predictionSchema) only accepts `windowMinutes`
-    // (a positive number). Convert any seconds-based duration to minutes
-    // so the value is always > 0 and matches the expected field.
-    const windowMinutes =
-      selectedDuration.unit === "minutes" ? selectedDuration.value : selectedDuration.value / 60;
+    // Immediate permanent marker on the chart (pending -> pulsing until settle).
+    const entryTime = Math.floor(Date.now() / 1000);
+    directionRef.current = direction;
+    entryTimeRef.current = entryTime;
+    const pendingMarker: FxMarker = {
+      time: entryTime,
+      price: entryPrice,
+      type: direction,
+      status: "pending",
+    };
+    setMarkers([pendingMarker]);
 
     try {
-      const res = await apiRequest("/games/prediction/place", {
+      const res = await apiRequest("/games/fx/trade", {
         method: "POST",
         body: JSON.stringify({
-          amount: stake,
+          pair,
+          direction,
+          stake,
+          duration: durationSeconds,
           mode,
-          market: pair,
-          direction: dir,
-          windowMinutes,
+          entryPrice,
         }),
       });
 
       if (res.success) {
-        tradeIdRef.current = res.data?.id || `trade_${Date.now()}`;
+        activeTradeIdRef.current = res.tradeId;
+        activeTradeExpiryRef.current = res.expiresAt;
+        setBalance(res.newBalance ?? balance);
         startTimer(durationSeconds);
-        fetchOpenPositions();
-        fetchBalance();
+        fetchTrades();
       } else {
         setTradeError(res.error || "Failed to place trade");
         setTradeActive(false);
@@ -346,7 +468,7 @@ function TradingPage() {
   const formatTime = (seconds: number | null) => {
     if (seconds === null) return "--:--";
     const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+    const secs = Math.floor(seconds % 60);
     if (mins > 0) return `${mins}m ${secs}s`;
     return `${secs}s`;
   };
@@ -375,6 +497,21 @@ function TradingPage() {
 
   const isDemo = mode === "demo";
   const currentBalance = isDemo ? 10000 : balance;
+
+  // Load persisted trades + stats, and auto-resume any pending trade.
+  useEffect(() => {
+    let cancelled = false;
+    const init = async () => {
+      await fetchTrades();
+      await maybeResumePendingTrade();
+      if (!cancelled) fetchBalance();
+    };
+    init();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
 
   return (
     <div className="space-y-4 max-w-5xl mx-auto pb-20 lg:pb-6 px-4">
@@ -413,6 +550,21 @@ function TradingPage() {
               {currentBalance !== null ? currentBalance.toFixed(2) : "0.00"} KES
             </span>
             {updatingBalance && <span className="text-gray-400 text-[8px] animate-pulse">⋯</span>}
+          </div>
+          <div className="flex items-center gap-1 bg-[#181d29] px-2 py-1 rounded-lg text-xs">
+            <span className={todayPnl >= 0 ? "text-emerald-400" : "text-red-400"}>
+              {todayPnl >= 0 ? "+" : ""}
+              {todayPnl.toFixed(2)} KES
+            </span>
+            <span className="text-gray-500">P&L</span>
+          </div>
+          <div className="flex items-center gap-1 bg-[#181d29] px-2 py-1 rounded-lg text-xs">
+            <span className="text-white">{activeTrades}</span>
+            <span className="text-gray-500">active</span>
+          </div>
+          <div className="flex items-center gap-1 bg-[#181d29] px-2 py-1 rounded-lg text-xs">
+            <span className="text-emerald-400">{winningTrades}</span>
+            <span className="text-gray-500">wins</span>
           </div>
           {!isDemo && (
             <button
@@ -476,8 +628,25 @@ function TradingPage() {
               <Activity className="animate-pulse text-primary" size={32} />
             </div>
           ) : (
-            <TradingChart data={data} markers={markers} colors={{ backgroundColor: "#151924" }} />
+            <TradingChart
+              data={data}
+              markers={markers}
+              colors={{ backgroundColor: "#151924" }}
+              onPendingMarkerPosition={setPendingMarkerPositions}
+            />
           )}
+
+          {/* Pulsing pending-marker overlay (on top of the chart) */}
+          {pendingMarkerPositions.map((c) => (
+            <div
+              key={c.id}
+              className="absolute w-4 h-4 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+              style={{ left: c.x, top: c.y }}
+            >
+              <span className="absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75 animate-ping" />
+              <span className="relative inline-flex rounded-full h-4 w-4 bg-amber-400 border-2 border-black" />
+            </div>
+          ))}
 
           {tradeActive && timeRemaining !== null && timeRemaining > 0 && (
             <div className="absolute top-4 right-4 bg-black/80 backdrop-blur-sm border border-[#dcb13c]/30 rounded-lg px-4 py-2 flex items-center gap-2">
@@ -663,6 +832,51 @@ function TradingPage() {
                       Close
                     </button>
                   </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* Binary FX Trade History (markers persisted in fx_trades) */}
+      <div className="bg-[#0b0e14] border border-[#1e2330] rounded-xl p-4 flex flex-col gap-3">
+        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-widest block">
+          Trade History
+        </h2>
+        <div className="flex flex-col gap-2">
+          {markers.length === 0 ? (
+            <p className="text-sm text-gray-600 text-center py-4">
+              No trades yet. Place a BUY or SELL to start.
+            </p>
+          ) : (
+            markers.map((m, i) => {
+              const isBuy = m.type === "buy";
+              const statusColor =
+                m.status === "won"
+                  ? "text-emerald-400"
+                  : m.status === "lost"
+                    ? "text-red-400"
+                    : "text-amber-400";
+              const statusLabel =
+                m.status === "won" ? "WON" : m.status === "lost" ? "LOST" : "PENDING";
+              return (
+                <div
+                  key={`${m.time}-${m.type}-${m.price}-${i}`}
+                  className="flex items-center justify-between p-3 bg-[#131720] rounded-lg border border-[#1e2330]"
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded ${isBuy ? "bg-[#236e40] text-emerald-100" : "bg-[#6e2525] text-red-100"}`}
+                    >
+                      {isBuy ? "BUY ▲" : "SELL ▼"}
+                    </div>
+                    <div className="font-semibold text-sm text-gray-200">{pair}</div>
+                    <div className="text-xs text-gray-500 font-mono">
+                      {m.price.toFixed(currentPrice && currentPrice > 50 ? 2 : 4)}
+                    </div>
+                  </div>
+                  <div className={`text-xs font-bold uppercase ${statusColor}`}>{statusLabel}</div>
                 </div>
               );
             })
