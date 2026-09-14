@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { ArrowLeft, TrendingUp, X, Loader2 } from "lucide-react";
 import { apiRequest } from "@/utils/api";
 import { supabase } from "@/integrations/supabase/client";
-import { calculateDepositFee, MIN_DEPOSIT } from "@/utils/fees";
+import { MIN_DEPOSIT } from "@/utils/fees";
 
 const API_BASE = import.meta.env.VITE_PESAKI_API_URL || "https://pesaki-server.onrender.com";
 
@@ -264,9 +264,7 @@ export function DepositSheet({ onClose, user, onSuccess, onDepositComplete }: De
           )}
           {amount && parseInt(amount) >= MIN_DEPOSIT && (
             <p className="text-[11px] text-muted-foreground">
-              You will receive: KES{" "}
-              {Math.max(0, parseInt(amount) - calculateDepositFee(parseInt(amount)))} (Fee: KES{" "}
-              {calculateDepositFee(parseInt(amount))})
+              You will receive: KES {parseInt(amount)} (No deposit fee)
             </p>
           )}
         </form>

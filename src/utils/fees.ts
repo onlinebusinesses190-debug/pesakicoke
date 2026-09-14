@@ -2,12 +2,10 @@ export const MIN_DEPOSIT = 10;
 export const MIN_TRANSFER = 10;
 export const MIN_WITHDRAWAL = 50;
 
-export const calculateDepositFee = (amount: number): number => {
-  if (!Number.isFinite(amount) || amount <= 0) return 0;
-  if (amount <= 100) return 2;
-  if (amount <= 400) return 6;
-  if (amount <= 1000) return 14;
-  return 30;
+// Deposit fee is waived across all of PESAKI: users receive the full
+// deposited amount. Transfer and withdrawal fees are unchanged.
+export const calculateDepositFee = (_amount: number): number => {
+  return 0;
 };
 
 export const calculateTransferFee = (amount: number): number => {
