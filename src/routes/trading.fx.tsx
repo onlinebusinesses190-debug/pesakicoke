@@ -94,7 +94,7 @@ function TradingPage() {
   const [balance, setBalance] = useState<number | null>(null);
   const [updatingBalance, setUpdatingBalance] = useState(false);
   const [markers, setMarkers] = useState<FxMarker[]>([]);
-  const [pendingMarkerPositions, setPendingMarkerPositions] = useState<
+  const [pendingMarkerPositions, setMarkerPositions] = useState<
     { id: string; x: number; y: number }[]
   >([]);
   const [showDeposit, setShowDeposit] = useState(false);
@@ -114,6 +114,9 @@ function TradingPage() {
   const tradeIdRef = useRef<string | null>(null);
   const tradeActiveRef = useRef(false);
   const tickIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Ref to the chart wrapper so the Pocket Option marker overlay can measure
+  // the chart width and extend each horizontal price line to the right edge.
+  const overlayRef = useRef<HTMLDivElement | null>(null);
 
   const spread = currentPrice && currentPrice > 50 ? 0.1 : 0.0002;
   const ask = currentPrice ? currentPrice + spread / 2 : 0;
@@ -159,12 +162,22 @@ function TradingPage() {
       const res = await apiRequest("/games/fx/trades?limit=200");
       if (res.success && Array.isArray(res.data)) {
         setMarkers(
-          res.data.map((t: any) => ({
-            time: Math.floor(new Date(t.entry_time).getTime() / 1000),
-            price: Number(t.entry_price),
-            type: t.direction === "buy" ? "buy" : "sell",
-            status: t.status,
-          })),
+          res.data.map((t: any) => {
+            const entrySec = Math.floor(new Date(t.entry_time).getTime() / 1000);
+            const expiresMs = new Date(t.expiry_time).getTime();
+            const remaining =
+              t.status === "pending" ? Math.max(0, Math.ceil((expiresMs - Date.now()) / 1000)) : 0;
+            return {
+              id: t.id,
+              time: entrySec,
+              price: Number(t.entry_price),
+              type: t.direction === "buy" ? "buy" : "sell",
+              stake: Number(t.stake),
+              status: t.status,
+              remainingSeconds: remaining,
+              expiresAt: expiresMs,
+            };
+          }),
         );
         const today = new Date().toDateString();
         let pnl = 0;
@@ -226,6 +239,9 @@ function TradingPage() {
         setTradeResult(settleRes.outcome);
         setExitPrice(expiryPrice);
         setBalance(settleRes.newBalance ?? balance);
+        // Rebuild the resumed marker from the fetched trade so the chart
+        // reflects the settled outcome.
+        fetchTrades();
         fetchBalance();
       }
       fetchTrades();
@@ -318,6 +334,9 @@ function TradingPage() {
   // the correct pending marker when the countdown hits zero.
   const directionRef = useRef<"buy" | "sell">("buy");
   const entryTimeRef = useRef<number | null>(null);
+  // With multiple concurrent trades, refs only hold the latest trade, so
+  // also map tradeId -> marker id to settle the right marker.
+  const pendingMarkerByTradeRef = useRef<Map<string, string>>(new Map());
 
   // ── Settle an active trade when the countdown hits zero ────────────────
   const settleTrade = async (tradeId: string) => {
@@ -337,17 +356,15 @@ function TradingPage() {
       if (res.success) {
         const outcome = res.outcome;
         setTradeResult(outcome);
-        // Flip the pending marker to its final colour (won=green / lost=red).
-        setMarkers((prev) =>
-          prev.map((m) =>
-            m.time === entryTimeRef.current && m.type === directionRef.current
-              ? { ...m, status: outcome }
-              : m,
-          ),
-        );
+        // Flip the pending marker for THIS trade to its final colour
+        // (won=green / lost=red). With multiple concurrent trades we must
+        // key off the trade id, not the latest refs.
+        const markerId = pendingMarkerByTradeRef.current.get(tradeId);
+        setMarkers((prev) => prev.map((m) => (m.id === markerId ? { ...m, status: outcome } : m)));
+        pendingMarkerByTradeRef.current.delete(tradeId);
 
         if (outcome === "won") {
-          toast(`🎉 WON! +${(stake * 0.5).toFixed(2)} KES`, { duration: 4000 });
+          toast(`🎉 WON! +${(res.payoutAmount ?? stake * 0.5).toFixed(2)} KES`, { duration: 4000 });
         } else {
           toast(`💀 LOST! -${stake.toFixed(2)} KES`, { duration: 4000 });
         }
@@ -390,16 +407,22 @@ function TradingPage() {
     }
 
     // Immediate permanent marker on the chart (pending -> pulsing until settle).
+    // Accumulate so multiple trades can be open at once (Pocket Option style).
     const entryTime = Math.floor(Date.now() / 1000);
+    const expiresAtMs = Date.now() + durationSeconds * 1000;
     directionRef.current = direction;
     entryTimeRef.current = entryTime;
     const pendingMarker: FxMarker = {
+      id: `pending-${entryTime}-${direction}`,
       time: entryTime,
       price: entryPrice,
       type: direction,
+      stake,
       status: "pending",
+      remainingSeconds: durationSeconds,
+      expiresAt: expiresAtMs,
     };
-    setMarkers([pendingMarker]);
+    setMarkers((prev) => [...prev, pendingMarker]);
 
     try {
       const res = await apiRequest("/games/fx/trade", {
@@ -417,13 +440,14 @@ function TradingPage() {
       if (res.success) {
         activeTradeIdRef.current = res.tradeId;
         activeTradeExpiryRef.current = res.expiresAt;
+        pendingMarkerByTradeRef.current.set(res.tradeId, pendingMarker.id);
         setBalance(res.newBalance ?? balance);
         startTimer(durationSeconds);
         fetchTrades();
       } else {
         setTradeError(res.error || "Failed to place trade");
         setTradeActive(false);
-        setMarkers([]);
+        setMarkers((prev) => prev.filter((m) => m.id !== pendingMarker.id));
       }
     } catch (err: any) {
       const msg = err.message || "An error occurred";
@@ -434,7 +458,7 @@ function TradingPage() {
         setTradeError(msg);
       }
       setTradeActive(false);
-      setMarkers([]);
+      setMarkers((prev) => prev.filter((m) => m.id !== pendingMarker.id));
     }
   };
 
@@ -464,6 +488,22 @@ function TradingPage() {
       if (tickIntervalRef.current) clearInterval(tickIntervalRef.current);
     };
   }, []);
+
+  // ── Live countdown tick: update remainingSeconds on every pending marker ──
+  useEffect(() => {
+    const hasPending = markers.some((m) => m.status === "pending");
+    if (!hasPending) return;
+    const id = setInterval(() => {
+      setMarkers((prev) =>
+        prev.map((m) => {
+          if (m.status !== "pending") return m;
+          const remaining = Math.max(0, Math.ceil((m.expiresAt - Date.now()) / 1000));
+          return { ...m, remainingSeconds: remaining };
+        }),
+      );
+    }, 1000);
+    return () => clearInterval(id);
+  }, [markers.some((m) => m.status === "pending")]);
 
   const formatTime = (seconds: number | null) => {
     if (seconds === null) return "--:--";
@@ -632,21 +672,117 @@ function TradingPage() {
               data={data}
               markers={markers}
               colors={{ backgroundColor: "#151924" }}
-              onPendingMarkerPosition={setPendingMarkerPositions}
+              onMarkerPosition={setMarkerPositions}
             />
           )}
 
-          {/* Pulsing pending-marker overlay (on top of the chart) */}
-          {pendingMarkerPositions.map((c) => (
-            <div
-              key={c.id}
-              className="absolute w-4 h-4 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-              style={{ left: c.x, top: c.y }}
-            >
-              <span className="absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75 animate-ping" />
-              <span className="relative inline-flex rounded-full h-4 w-4 bg-amber-400 border-2 border-black" />
-            </div>
-          ))}
+          {/* Pocket Option–style marker overlays: triangle + stake label +
+          live countdown + horizontal price line extending right */}
+          <div ref={overlayRef} className="absolute inset-0 pointer-events-none">
+            {pendingMarkerPositions.map((c) => {
+              const m = markers.find((x) => x.id === c.id);
+              if (!m) return null;
+              const isBuy = m.type === "buy";
+              const color =
+                m.status === "won"
+                  ? "#22c55e"
+                  : m.status === "lost"
+                    ? "#ef4444"
+                    : isBuy
+                      ? "#22c55e"
+                      : "#ef4444";
+              const chartWidth = overlayRef.current?.clientWidth ?? 0;
+              const lineToRight = chartWidth > 0 ? Math.max(0, chartWidth - c.x) : 10000;
+              return (
+                <div key={c.id} className="absolute inset-0 pointer-events-none">
+                  {/* Horizontal price line from the entry candle to the right edge */}
+                  <div
+                    className="absolute top-0"
+                    style={{
+                      left: c.x,
+                      top: c.y,
+                      width: lineToRight,
+                      height: 1,
+                      background: color,
+                      opacity: 0.55,
+                    }}
+                  />
+                  <div
+                    className="absolute"
+                    style={{
+                      left: c.x - 1,
+                      top: c.y - 1,
+                      width: 3,
+                      height: 3,
+                      background: color,
+                      borderRadius: "50%",
+                    }}
+                  />
+                  {/* Direction triangle at the entry price */}
+                  <div className="absolute -translate-x-1/2" style={{ left: c.x, top: c.y, color }}>
+                    <svg width="14" height="14" viewBox="0 0 14 14">
+                      {isBuy ? (
+                        <polygon
+                          points="7,2 13,12 1,12"
+                          fill={color}
+                          stroke="#000"
+                          strokeWidth="0.5"
+                        />
+                      ) : (
+                        <polygon
+                          points="7,12 13,2 1,2"
+                          fill={color}
+                          stroke="#000"
+                          strokeWidth="0.5"
+                        />
+                      )}
+                      {m.status === "won" && (
+                        <text
+                          x="7"
+                          y="9"
+                          textAnchor="middle"
+                          fill="#000"
+                          fontSize="7"
+                          fontWeight="bold"
+                        >
+                          ✓
+                        </text>
+                      )}
+                      {m.status === "lost" && (
+                        <text
+                          x="7"
+                          y="8"
+                          textAnchor="middle"
+                          fill="#fff"
+                          fontSize="7"
+                          fontWeight="bold"
+                        >
+                          ✕
+                        </text>
+                      )}
+                    </svg>
+                  </div>
+                  {/* Stake label above the marker */}
+                  <div
+                    className="absolute -translate-x-1/2 text-[9px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap"
+                    style={{ left: c.x, top: c.y - 26, background: color, color: "#000" }}
+                  >
+                    ▲ {m.stake}
+                  </div>
+                  {/* Live countdown below the marker (pending only) */}
+                  {m.status === "pending" && (
+                    <div
+                      className="absolute -translate-x-1/2 text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-black/70 text-amber-300 whitespace-nowrap"
+                      style={{ left: c.x, top: c.y + 8 }}
+                    >
+                      {String(Math.floor(m.remainingSeconds / 60)).padStart(2, "0")}:
+                      {String(m.remainingSeconds % 60).padStart(2, "0")}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
 
           {tradeActive && timeRemaining !== null && timeRemaining > 0 && (
             <div className="absolute top-4 right-4 bg-black/80 backdrop-blur-sm border border-[#dcb13c]/30 rounded-lg px-4 py-2 flex items-center gap-2">
@@ -862,7 +998,7 @@ function TradingPage() {
                 m.status === "won" ? "WON" : m.status === "lost" ? "LOST" : "PENDING";
               return (
                 <div
-                  key={`${m.time}-${m.type}-${m.price}-${i}`}
+                  key={m.id}
                   className="flex items-center justify-between p-3 bg-[#131720] rounded-lg border border-[#1e2330]"
                 >
                   <div className="flex items-center gap-3">

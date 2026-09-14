@@ -1,31 +1,23 @@
-import {
-  createChart,
-  ColorType,
-  IChartApi,
-  ISeriesApi,
-  SeriesMarker,
-  UTCTimestamp,
-} from "lightweight-charts";
+import { createChart, ColorType, IChartApi, ISeriesApi, SeriesMarker } from "lightweight-charts";
 import { useEffect, useRef, useState } from "react";
 
-// Marker shape the Binary FX page supplies. Each trade leaves a permanent
-// marker on the chart at its entry price; the marker reflects the outcome
-// once the trade settles.
+// ─── Pocket Option–style marker supplied by the Binary FX page ──────────────
 export type FxMarker = {
+  id: string;
   time: number; // unix seconds
   price: number;
   type: "buy" | "sell";
+  stake: number;
   status: "pending" | "won" | "lost";
+  remainingSeconds: number; // live countdown, updated by the parent
+  expiresAt: number; // unix ms, used to compute the countdown
   label?: string;
 };
 
-// Lightweight-charts marker item.
-type LcMarker = SeriesMarker<number>;
-
-const markerColors = {
-  won: "#22c55e", // green
-  lost: "#ef4444", // red
-  pending: "#fbbf24", // amber
+const markerColor = (m: FxMarker) => {
+  if (m.status === "won") return "#22c55e"; // green
+  if (m.status === "lost") return "#ef4444"; // red
+  return m.type === "buy" ? "#22c55e" : "#ef4444"; // pending keeps direction colour
 };
 
 const buildLcMarkers = (markers: FxMarker[]): SeriesMarker<"time">[] => {
@@ -33,9 +25,9 @@ const buildLcMarkers = (markers: FxMarker[]): SeriesMarker<"time">[] => {
     const isBuy = m.type === "buy";
     // BUY sits below the candle, SELL above it.
     const position: "belowBar" | "aboveBar" = isBuy ? "belowBar" : "aboveBar";
-    // lightweight-charts only supports circle/square/arrowUp/arrowDown.
     const shape: "arrowUp" | "arrowDown" = isBuy ? "arrowUp" : "arrowDown";
-    const color = markerColors[m.status];
+    const color = markerColor(m);
+    // Show a check on wins, an X on losses, nothing on pending.
     const text = m.status === "won" ? "W" : m.status === "lost" ? "L" : undefined;
     return { time: m.time as any, position, color, shape, text };
   });
@@ -45,19 +37,18 @@ export const TradingChart = ({
   data,
   markers = [],
   colors: { backgroundColor = "transparent", textColor = "silver" } = {},
-  onPendingMarkerPosition,
+  onMarkerPosition,
 }: {
   data: any[];
   markers?: FxMarker[];
   colors?: any;
-  // Optional callback fired each frame with pixel coords of pending markers,
-  // so the parent can render a pulsing HTML overlay on top of the chart.
-  onPendingMarkerPosition?: (coords: { id: string; x: number; y: number }[]) => void;
+  // Fired each frame with pixel coords for every marker, so the parent can
+  // render the stake label + live countdown HTML overlay on top of the chart.
+  onMarkerPosition?: (coords: { id: string; x: number; y: number }[]) => void;
 }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
-  const [pendingMarkers, setPendingMarkers] = useState<FxMarker[]>([]);
 
   useEffect(() => {
     if (!data || data.length === 0) return;
@@ -127,29 +118,26 @@ export const TradingChart = ({
     }
   }, [markers]);
 
-  // Track pending markers so we can pulse an HTML overlay on top.
+  // ── Frame loop: locate every marker so the parent can overlay the
+  //    stake label + live countdown + horizontal price line in HTML. ──
   useEffect(() => {
-    setPendingMarkers((markers || []).filter((m) => m.status === "pending"));
-  }, [markers]);
-
-  // ── Frame loop: locate pending markers and report pixel coords ──
-  useEffect(() => {
-    if (pendingMarkers.length === 0 || !chartRef.current || !seriesRef.current) return;
+    if (markers.length === 0 || !chartRef.current || !seriesRef.current) return;
 
     let cancelled = false;
     const tick = () => {
       if (cancelled) return;
       const chart = chartRef.current;
-      if (!chart) return;
+      const series = seriesRef.current;
+      if (!chart || !series) return;
       const coords: { id: string; x: number; y: number }[] = [];
-      for (const m of pendingMarkers) {
+      for (const m of markers) {
         const x = chart.timeScale().timeToCoordinate(m.time as any);
-        const y = seriesRef.current!.priceToCoordinate(m.price);
+        const y = series.priceToCoordinate(m.price);
         if (x != null && y != null) {
-          coords.push({ id: `${m.time}-${m.type}-${m.price}`, x, y });
+          coords.push({ id: m.id, x, y });
         }
       }
-      onPendingMarkerPosition?.(coords);
+      onMarkerPosition?.(coords);
       requestAnimationFrame(tick);
     };
     const id = requestAnimationFrame(tick);
@@ -157,7 +145,7 @@ export const TradingChart = ({
       cancelled = true;
       cancelAnimationFrame(id);
     };
-  }, [pendingMarkers, onPendingMarkerPosition]);
+  }, [markers, onMarkerPosition]);
 
   if (!data || data.length === 0) {
     return (
