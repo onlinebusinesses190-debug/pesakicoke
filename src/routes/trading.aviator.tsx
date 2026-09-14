@@ -172,7 +172,7 @@ function AviatorPage() {
       try {
         const res = await apiRequest("/games/aviator/bet", {
           method: "POST",
-          body: JSON.stringify({ amount: betAmount1, mode }),
+          body: JSON.stringify({ amount: betAmount1, mode, slot: 1 }),
         });
         if (res.newBalance !== undefined) {
           setBalance(res.newBalance);
@@ -211,7 +211,7 @@ function AviatorPage() {
       try {
         const res = await apiRequest("/games/aviator/bet", {
           method: "POST",
-          body: JSON.stringify({ amount: betAmount2, mode }),
+          body: JSON.stringify({ amount: betAmount2, mode, slot: 2 }),
         });
         if (res.newBalance !== undefined) {
           setBalance(res.newBalance);
@@ -240,7 +240,8 @@ function AviatorPage() {
       setCashOutMultiplier1(currentMultiplier);
       setIsBetting1(false);
     } else {
-      socketRef.current.emit("CASHOUT");
+      // Emit slot-scoped cashout; update UI optimistically on success.
+      socketRef.current.emit("CASHOUT", { slot: 1 });
     }
   };
 
@@ -257,7 +258,8 @@ function AviatorPage() {
       setCashOutMultiplier2(currentMultiplier);
       setIsBetting2(false);
     } else {
-      socketRef.current.emit("CASHOUT");
+      // Emit slot-scoped cashout; update UI optimistically on success.
+      socketRef.current.emit("CASHOUT", { slot: 2 });
     }
   };
 
@@ -358,13 +360,19 @@ function AviatorPage() {
 
         socket.on("CASHED_OUT", (data) => {
           if (mode === "real") {
-            if (isBetting1 && !cashedOut1) {
+            // The server echoes back which slot was cashed out. Update the
+            // matching slot immediately (mirrors the demo branch) and refresh
+            // the real balance so the displayed balance reflects the gain.
+            const slot = data.slot === 2 ? 2 : 1;
+            if (slot === 1 && !cashedOut1) {
               setCashedOut1(true);
               setCashOutMultiplier1(data.multiplier);
-            }
-            if (isBetting2 && !cashedOut2) {
+            } else if (slot === 2 && !cashedOut2) {
               setCashedOut2(true);
               setCashOutMultiplier2(data.multiplier);
+            }
+            if (data.newBalance !== undefined) {
+              setBalance(data.newBalance);
             }
             fetchRealBalance();
           }
