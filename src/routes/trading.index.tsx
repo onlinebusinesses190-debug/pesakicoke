@@ -101,13 +101,13 @@ function TradingPage() {
               </p>
               <div className="mt-3 flex gap-2">
                 <button
-                  onClick={() => openGame("/trading/fx", "demo")}
+                  onClick={() => setShowForexGate(true)}
                   className="inline-flex flex-1 items-center justify-center gap-1 rounded-full border border-border bg-background px-3 py-2 text-xs font-semibold"
                 >
                   <Play className="h-3 w-3" /> Demo
                 </button>
                 <button
-                  onClick={() => openGame("/trading/fx", "real")}
+                  onClick={() => setShowForexGate(true)}
                   className="inline-flex flex-1 items-center justify-center gap-1 rounded-full gradient-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
                 >
                   Real Mode

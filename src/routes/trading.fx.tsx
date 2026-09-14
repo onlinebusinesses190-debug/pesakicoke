@@ -109,6 +109,10 @@ function TradingPage() {
   const activeTradeExpiryRef = useRef<string | null>(null);
   const settleInFlightRef = useRef(false);
   const startTimerRef = useRef<(n: number) => void>(() => {});
+  // Per-trade-id in-flight guard. A single trade cannot be placed twice in
+  // a row, but multiple different trades CAN run concurrently (Pocket Option
+  // multi-trade style) - so we key off the trade id, not a shared boolean.
+  const placingTradeIdsRef = useRef<Set<string>>(new Set());
 
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const tradeIdRef = useRef<string | null>(null);
@@ -380,7 +384,7 @@ function TradingPage() {
   };
 
   const handleTrade = async (direction: "buy" | "sell") => {
-    if (!currentPrice || tradeActive) return;
+    if (!currentPrice) return;
     if (mode !== "demo" && !requireAuth()) return;
     if (stake < 10) {
       setTradeError("Minimum stake is KES 10");
@@ -392,8 +396,13 @@ function TradingPage() {
       return;
     }
 
+    // Per-trade-id guard: block re-placing the SAME trade, but allow other
+    // trades to run concurrently (Pocket Option multi-trade style).
+    const tradeKey = direction + "-" + stake + "-" + selectedDuration.label + "-" + pair;
+    if (placingTradeIdsRef.current.has(tradeKey)) return;
+    placingTradeIdsRef.current.add(tradeKey);
+
     setTradeError(null);
-    setTradeActive(true);
     setTradeResult(null);
     setExitPrice(null);
 
@@ -446,9 +455,9 @@ function TradingPage() {
         fetchTrades();
       } else {
         setTradeError(res.error || "Failed to place trade");
-        setTradeActive(false);
         setMarkers((prev) => prev.filter((m) => m.id !== pendingMarker.id));
       }
+      placingTradeIdsRef.current.delete(tradeKey);
     } catch (err: any) {
       const msg = err.message || "An error occurred";
       if (/insufficient/i.test(msg)) {
@@ -457,8 +466,8 @@ function TradingPage() {
       } else {
         setTradeError(msg);
       }
-      setTradeActive(false);
       setMarkers((prev) => prev.filter((m) => m.id !== pendingMarker.id));
+      placingTradeIdsRef.current.delete(tradeKey);
     }
   };
 
@@ -490,8 +499,8 @@ function TradingPage() {
   }, []);
 
   // ── Live countdown tick: update remainingSeconds on every pending marker ──
+  const hasPending = markers.some((m) => m.status === "pending");
   useEffect(() => {
-    const hasPending = markers.some((m) => m.status === "pending");
     if (!hasPending) return;
     const id = setInterval(() => {
       setMarkers((prev) =>
@@ -503,7 +512,7 @@ function TradingPage() {
       );
     }, 1000);
     return () => clearInterval(id);
-  }, [markers.some((m) => m.status === "pending")]);
+  }, [hasPending]);
 
   const formatTime = (seconds: number | null) => {
     if (seconds === null) return "--:--";
@@ -891,7 +900,7 @@ function TradingPage() {
           <div className="flex gap-4">
             <button
               onClick={() => handleTrade("buy")}
-              disabled={loading || !currentPrice || tradeActive}
+              disabled={loading || !currentPrice}
               className="flex-1 py-4 bg-[#236e40] hover:bg-[#28814a] text-white font-bold rounded-lg flex flex-col items-center justify-center transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="uppercase tracking-wider text-sm mb-1">Buy</span>
@@ -901,7 +910,7 @@ function TradingPage() {
             </button>
             <button
               onClick={() => handleTrade("sell")}
-              disabled={loading || !currentPrice || tradeActive}
+              disabled={loading || !currentPrice}
               className="flex-1 py-4 bg-[#6e2525] hover:bg-[#852c2c] text-white font-bold rounded-lg flex flex-col items-center justify-center transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="uppercase tracking-wider text-sm mb-1">Sell</span>
