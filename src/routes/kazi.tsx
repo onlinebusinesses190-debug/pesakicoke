@@ -722,10 +722,16 @@ function WorkerApplications({ apps, onChat, onRefresh, user }: any) {
 function ActiveContracts({ contracts, onRefresh, user }: any) {
   const { requireAuth } = useRequireAuth();
   const [starting, setStarting] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [refundJob, setRefundJob] = useState<any>(null);
+  const [refundReason, setRefundReason] = useState("");
+  const [dispute, setDispute] = useState<any>(null);
+  const [disputeResponse, setDisputeResponse] = useState<"accepted" | "declined">("accepted");
+  const [disputeReason, setDisputeReason] = useState("");
 
-  const handleStartJob = async (contractId: string) => {
+  const handleStartJob = async (jobId: string) => {
     if (!requireAuth()) return;
-    setStarting(contractId);
+    setStarting(jobId);
     try {
       const supabase = createClient(
         import.meta.env.VITE_SUPABASE_URL!,
@@ -740,7 +746,7 @@ function ActiveContracts({ contracts, onRefresh, user }: any) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ contractId }),
+        body: JSON.stringify({ jobId }),
       });
 
       const result = await response.json();
@@ -749,6 +755,180 @@ function ActiveContracts({ contracts, onRefresh, user }: any) {
       onRefresh();
     } catch (err: any) {
       toast.error(err.message || "Failed to start job");
+    } finally {
+      setStarting(null);
+    }
+  };
+
+  const handleConfirmDone = async (jobId: string) => {
+    if (!requireAuth()) return;
+    setConfirming(jobId);
+    try {
+      const supabase = createClient(
+        import.meta.env.VITE_SUPABASE_URL!,
+        import.meta.env.VITE_SUPABASE_ANON_KEY!
+      );
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+
+      const response = await fetch(`${API_BASE}/kazi/confirm-done`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ jobId }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Failed to confirm done");
+
+      toast.success("Job confirmed done! Funds released to worker.");
+      onRefresh();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to confirm done");
+    } finally {
+      setConfirming(null);
+    }
+  };
+
+  const handleRequestRefund = async () => {
+    if (!requireAuth() || !refundJob) return;
+    if (!refundReason.trim()) {
+      toast.error("Please provide a reason");
+      return;
+    }
+    setStarting(refundJob.id);
+    try {
+      const supabase = createClient(
+        import.meta.env.VITE_SUPABASE_URL!,
+        import.meta.env.VITE_SUPABASE_ANON_KEY!
+      );
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+
+      const response = await fetch(`${API_BASE}/kazi/request-refund`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ jobId: refundJob.id, reason: refundReason.trim() }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Failed to request refund");
+
+      toast.success("Withdrawal request sent to worker.");
+      setRefundJob(null);
+      setRefundReason("");
+      onRefresh();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to request refund");
+    } finally {
+      setStarting(null);
+    }
+  };
+
+  const handleAcceptJob = async (jobId: string) => {
+    if (!requireAuth()) return;
+    setStarting(jobId);
+    try {
+      const supabase = createClient(
+        import.meta.env.VITE_SUPABASE_URL!,
+        import.meta.env.VITE_SUPABASE_ANON_KEY!
+      );
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+
+      const response = await fetch(`${API_BASE}/kazi/accept-job`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ jobId }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Failed to accept job");
+
+      toast.success("Job accepted! Escrow is now locked.");
+      onRefresh();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to accept job");
+    } finally {
+      setStarting(null);
+    }
+  };
+
+  const handleDisputeRespond = async () => {
+    if (!requireAuth() || !dispute) return;
+    if (disputeResponse === "declined" && !disputeReason.trim()) {
+      toast.error("Please provide a reason when declining");
+      return;
+    }
+    setStarting(dispute.id);
+    try {
+      const supabase = createClient(
+        import.meta.env.VITE_SUPABASE_URL!,
+        import.meta.env.VITE_SUPABASE_ANON_KEY!
+      );
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+
+      const response = await fetch(`${API_BASE}/kazi/dispute/${dispute.id}/respond`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          response: disputeResponse,
+          reason: disputeReason.trim() || undefined,
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Failed to respond");
+
+      toast.success(disputeResponse === "accepted" ? "Withdrawal approved." : "Withdrawal declined.");
+      setDispute(null);
+      setDisputeReason("");
+      onRefresh();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to respond");
+    } finally {
+      setStarting(null);
+    }
+  };
+
+  const handleWithdraw = async (contractId: string) => {
+    if (!requireAuth()) return;
+    setStarting(contractId);
+    try {
+      const supabase = createClient(
+        import.meta.env.VITE_SUPABASE_URL!,
+        import.meta.env.VITE_SUPABASE_ANON_KEY!
+      );
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+
+      const response = await fetch(`${API_BASE}/kazi/withdraw`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ contractId }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "Withdrawal failed");
+      toast.success("Payment withdrawn successfully!");
+      onRefresh();
+    } catch (err: any) {
+      toast.error(err.message || "Withdrawal failed");
     } finally {
       setStarting(null);
     }
@@ -809,36 +989,168 @@ function ActiveContracts({ contracts, onRefresh, user }: any) {
               </div>
             </div>
 
-            {isEmployer && c.status === 'active' && c.amount_released === 0 && (
+            {isEmployer && c.status === 'active' && !c.job_done && (
+              <div className="mt-3 space-y-2">
+                {!c.worker_accepted && (
+                  <p className="text-xs text-muted-foreground">Waiting for worker to accept the job.</p>
+                )}
+                {c.worker_accepted && (
+                  <button
+                    onClick={() => handleStartJob(c.job_id)}
+                    disabled={starting === c.job_id}
+                    className="w-full rounded-full gradient-primary py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+                  >
+                    {starting === c.job_id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin inline" />
+                    ) : (
+                      '▶ Start Job'
+                    )}
+                  </button>
+                )}
+                <button
+                  onClick={() => handleConfirmDone(c.job_id)}
+                  disabled={confirming === c.job_id}
+                  className="w-full rounded-full gradient-primary py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+                >
+                  {confirming === c.job_id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin inline" />
+                  ) : (
+                    '✓ Confirm Job Done'
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setRefundJob(c);
+                    setRefundReason("");
+                  }}
+                  disabled={starting === c.id}
+                  className="w-full rounded-full border border-border py-2 text-xs font-semibold"
+                >
+                  Request Withdrawal
+                </button>
+              </div>
+            )}
+
+            {!isEmployer && c.status === 'active' && !c.worker_accepted && (
               <button
-                onClick={() => handleStartJob(c.id)}
-                disabled={starting === c.id}
+                onClick={() => handleAcceptJob(c.job_id)}
+                disabled={starting === c.job_id}
+                className="mt-3 w-full rounded-full gradient-primary py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                {starting === c.job_id ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin inline" />
+                ) : (
+                  'Accept Job'
+                )}
+              </button>
+            )}
+
+            {!isEmployer && c.status === 'active' && c.worker_accepted && !c.job_done && (
+              <p className="mt-3 text-xs text-muted-foreground">
+                ⏳ Waiting for employer to confirm the job is done.
+              </p>
+            )}
+
+            {!isEmployer && c.job_done && (
+              <button
+                onClick={() => handleWithdraw(c.id)}
+                disabled={starting === c.id || Number(c.amount_released) <= 0}
                 className="mt-3 w-full rounded-full gradient-primary py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
               >
                 {starting === c.id ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin inline" />
                 ) : (
-                  'Start Job & Release First Payout'
+                  `Withdraw ${fmt(c.amount_released)}`
                 )}
               </button>
             )}
 
-            {isEmployer && c.status === 'active' && c.amount_released > 0 && (
-              <p className="mt-2 text-xs text-muted-foreground">
-                Next payout will be released automatically based on the job duration.
-              </p>
-            )}
-
-            {!isEmployer && c.status === 'active' && c.amount_released > 0 && (
-              <p className="mt-2 text-xs text-success">
-                ✅ {fmt(c.amount_released)} available for withdrawal
+            {isEmployer && c.job_done && (
+              <p className="mt-3 text-xs text-success">
+                ✅ Job completed. Funds released to worker.
               </p>
             )}
           </Card>
         );
       })}
+
     </div>
   );
+
+  if (refundJob) {
+    return (
+      <SheetShell title="Request Withdrawal" onClose={() => { setRefundJob(null); setRefundReason(""); }}>
+        <div className="space-y-4">
+          <div className="rounded-xl bg-warning/10 p-3 text-xs text-warning-foreground">
+            <p className="font-semibold">⚠️ Employer early withdrawal</p>
+            <p>The worker has accepted the job. If you request withdrawal, the worker must respond within 7 days. If they do not respond, you will automatically receive 90% (10% service fee retained).</p>
+          </div>
+          <div>
+            <FieldLabel>Reason (required)</FieldLabel>
+            <textarea
+              rows={3}
+              value={refundReason}
+              onChange={(e) => setRefundReason(e.target.value)}
+              className={inputCls}
+              placeholder="Explain why you want to withdraw the funds..."
+            />
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => { setRefundJob(null); setRefundReason(""); }} className="flex-1 rounded-full border border-border py-2.5 text-xs font-semibold">Cancel</button>
+            <button onClick={handleRequestRefund} disabled={!!starting} className="flex-1 rounded-full gradient-primary py-2.5 text-xs font-semibold text-primary-foreground disabled:opacity-50">
+              Send Request
+            </button>
+          </div>
+        </div>
+      </SheetShell>
+    );
+  }
+
+  if (dispute) {
+    return (
+      <SheetShell title="Respond to Withdrawal Request" onClose={() => { setDispute(null); setDisputeReason(""); }}>
+        <div className="space-y-4">
+          <div className="rounded-xl bg-primary/5 p-3 text-xs">
+            <p className="font-semibold">{dispute.employer_reason}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => setDisputeResponse("accepted")}
+              className={`rounded-xl border p-3 text-xs font-semibold ${disputeResponse === "accepted" ? "border-success bg-success/5" : "border-border"}`}
+            >
+              Accept
+            </button>
+            <button
+              onClick={() => setDisputeResponse("declined")}
+              className={`rounded-xl border p-3 text-xs font-semibold ${disputeResponse === "declined" ? "border-destructive bg-destructive/5" : "border-border"}`}
+            >
+              Decline
+            </button>
+          </div>
+          {disputeResponse === "declined" && (
+            <div>
+              <FieldLabel>Reason (required)</FieldLabel>
+              <textarea
+                rows={3}
+                value={disputeReason}
+                onChange={(e) => setDisputeReason(e.target.value)}
+                className={inputCls}
+                placeholder="Explain why you are declining..."
+              />
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button onClick={() => { setDispute(null); setDisputeReason(""); }} className="flex-1 rounded-full border border-border py-2.5 text-xs font-semibold">Cancel</button>
+            <button onClick={handleDisputeRespond} disabled={!!starting} className="flex-1 rounded-full gradient-primary py-2.5 text-xs font-semibold text-primary-foreground disabled:opacity-50">
+              Submit Response
+            </button>
+          </div>
+        </div>
+      </SheetShell>
+    );
+  }
+
+  return null;
 }
 
 // ─── Sheets ──────────────────────────────────────────────────────────────────
@@ -996,6 +1308,52 @@ function PostJobSheet({ onClose, onSuccess, user }: any) {
     setForm((f) => ({ ...f, [k]: v }));
   };
 
+  const [step, setStep] = useState<"form" | "pay" | "processing" | "waiting" | "success">("form");
+  const [paymentSource, setPaymentSource] = useState<"wallet" | "banking" | "mpesa">("wallet");
+  const [mpesaPhone, setMpesaPhone] = useState("");
+  const [checkoutId, setCheckoutId] = useState<string | null>(null);
+  const pollRef = useRef<number | null>(null);
+  const attemptsRef = useRef(0);
+
+  const stopPolling = () => {
+    if (pollRef.current) {
+      clearTimeout(pollRef.current);
+      pollRef.current = null;
+    }
+  };
+
+  const pollJobPayment = async (checkoutRequestId: string) => {
+    if (attemptsRef.current >= 20) {
+      stopPolling();
+      setStep("success");
+      toast.success("Job posted and paid!");
+      onSuccess();
+      return;
+    }
+    attemptsRef.current += 1;
+    try {
+      const res = await fetch(`${API_BASE}/wallet/deposit/status/${checkoutRequestId}`);
+      const data = await res.json();
+      const status = String(data?.data?.status || "").toLowerCase();
+      if (status === "completed") {
+        stopPolling();
+        setStep("success");
+        toast.success("Job posted and paid!");
+        onSuccess();
+      } else if (status === "failed") {
+        stopPolling();
+        setStep("form");
+        toast.error("Payment failed. Please try again.");
+      } else {
+        pollRef.current = window.setTimeout(() => pollJobPayment(checkoutRequestId), 3000);
+      }
+    } catch {
+      pollRef.current = window.setTimeout(() => pollJobPayment(checkoutRequestId), 3000);
+    }
+  };
+
+  useEffect(() => () => stopPolling(), []);
+
   const supabase = createClient(
     import.meta.env.VITE_SUPABASE_URL!,
     import.meta.env.VITE_SUPABASE_ANON_KEY!
@@ -1004,10 +1362,27 @@ function PostJobSheet({ onClose, onSuccess, user }: any) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!requireAuth()) return;
+    if (step !== "form") return;
+    setStep("pay");
+  }
+
+  async function payNow() {
+    if (!requireAuth()) return;
     setLoading(true);
+    setStep("processing");
     try {
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
+
+      const body: any = {
+        ...form,
+        accommodation,
+        requirements: checked,
+        paymentSource,
+      };
+      if (paymentSource === "mpesa") {
+        body.phone = mpesaPhone;
+      }
 
       const response = await fetch(`${API_BASE}/kazi/post-job`, {
         method: "POST",
@@ -1015,22 +1390,25 @@ function PostJobSheet({ onClose, onSuccess, user }: any) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          ...form,
-          accommodation,
-          requirements: checked,
-        }),
+        body: JSON.stringify(body),
       });
 
       const result = await response.json();
-      if (!response.ok) throw new Error(result.message || "Failed to post job");
+      if (!response.ok) throw new Error(result.error || result.message || "Failed to post job");
 
-      toast.success('Job posted successfully!');
-      setDone(true);
-      onSuccess();
+      if (paymentSource === "mpesa" && result.payment?.checkoutRequestId) {
+        setCheckoutId(result.payment.checkoutRequestId);
+        setStep("waiting");
+        attemptsRef.current = 0;
+        pollJobPayment(result.payment.checkoutRequestId);
+      } else {
+        setStep("success");
+        toast.success("Job posted and paid!");
+        onSuccess();
+      }
     } catch (err: any) {
-      toast.error(err.message || 'Failed to post job');
-      console.error(err);
+      toast.error(err.message || "Failed to post job");
+      setStep("form");
     } finally {
       setLoading(false);
     }
@@ -1038,8 +1416,57 @@ function PostJobSheet({ onClose, onSuccess, user }: any) {
 
   return (
     <SheetShell title="Post a Job" onClose={onClose}>
-      {done ? (
-        <SuccessBlock message="Your job is now live and visible in Find Work. 10% platform fee will be deducted upon hiring." onClose={onClose} />
+      {step === "success" ? (
+        <SuccessBlock message="Your job is now live and visible in Find Work. Money is held in escrow." onClose={onClose} />
+      ) : step === "waiting" ? (
+        <div className="py-8 text-center">
+          <Loader2 className="mx-auto h-10 w-10 animate-spin text-warning" />
+          <p className="mt-4 text-base font-bold">M-Pesa prompt sent</p>
+          <p className="mt-1 text-xs text-muted-foreground">Check your phone and enter your PIN to pay KES {form.payAmount}.</p>
+        </div>
+      ) : step === "processing" ? (
+        <div className="py-8 text-center">
+          <Loader2 className="mx-auto h-10 w-10 animate-spin text-primary" />
+          <p className="mt-4 text-base font-bold">Processing payment…</p>
+        </div>
+      ) : step === "pay" ? (
+        <div className="space-y-4">
+          <div className="rounded-xl bg-primary/5 p-3 text-xs">
+            <p className="font-semibold">Pay {fmt(form.payAmount)} upfront to post this job</p>
+            <p className="mt-1 text-muted-foreground">Money goes into escrow. It is fully refundable until the worker accepts the job.</p>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {(["wallet", "banking", "mpesa"] as const).map((s) => (
+              <button
+                key={s}
+                onClick={() => setPaymentSource(s)}
+                className={`rounded-xl border p-3 text-xs font-semibold transition-all ${
+                  paymentSource === s ? "border-primary bg-primary/5" : "border-border"
+                }`}
+              >
+                {s === "wallet" ? "Wallet" : s === "banking" ? "Banking Hub" : "M-Pesa"}
+              </button>
+            ))}
+          </div>
+          {paymentSource === "mpesa" && (
+            <div>
+              <FieldLabel>M-Pesa phone number</FieldLabel>
+              <input
+                type="tel"
+                value={mpesaPhone}
+                onChange={(e) => setMpesaPhone(e.target.value)}
+                className={inputCls}
+                placeholder="0712345678"
+              />
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button onClick={() => setStep("form")} className="flex-1 rounded-full border border-border py-2.5 text-xs font-semibold">Back</button>
+            <button onClick={payNow} disabled={loading || (paymentSource === "mpesa" && !mpesaPhone)} className="flex-1 rounded-full gradient-primary py-2.5 text-xs font-semibold text-primary-foreground disabled:opacity-50">
+              Pay {fmt(form.payAmount)}
+            </button>
+          </div>
+        </div>
       ) : (
         <form className="space-y-3" onSubmit={submit}>
           <div><FieldLabel>Job title</FieldLabel><input required value={form.title} onChange={set("title")} className={inputCls} placeholder="e.g. Live-in House Help" /></div>
