@@ -493,7 +493,7 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
       const workerAmount = Math.round(Number(escrow.amount) * (1 - FEE_RATE));
       const feeAmount = Number(escrow.amount) - workerAmount;
 
-      const { data: creditData, error: creditError } = await supabase.rpc('credit_wallet', {
+      const { data: _creditData, error: creditError } = await supabase.rpc('credit_wallet', {
         p_user_id: escrow.worker_id,
         p_amount: workerAmount,
         p_mode: 'real',
@@ -632,7 +632,7 @@ return reply.send({ success: true, workerAmount, feeAmount });
         return reply.status(400).send({ error: 'No funds available to withdraw' });
       }
 
-      const { data: creditData, error: creditError } = await supabase.rpc('credit_wallet', {
+const { data: _creditData, error: creditError } = await supabase.rpc('credit_wallet', {
         p_user_id: user.id,
         p_amount: Number(escrow.released_amount),
         p_mode: 'real',
@@ -882,12 +882,11 @@ return reply.send({ success: true, workerAmount, feeAmount });
   });
 
   // GET /kazi/escrow/:jobId
-  server.get('/kazi/escrow/:jobId', async (request: FastifyRequest, reply: FastifyReply) => {
+server.get('/kazi/escrow/:jobId', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
       if (!token) return reply.status(401).send({ error: 'Unauthorized' });
 
-      const user = await getUserFromToken(token);
       const { jobId } = request.params as { jobId: string };
 
       const { data: escrow, error } = await supabase
@@ -978,7 +977,7 @@ return reply.send({ success: true, workerAmount, feeAmount });
 
         const localRequestId = 'kazi_' + user.id + '_' + job.id + '_' + Date.now();
 
-        const { data: mpesaDeposit, error: mpesaError } = await supabase
+        const { data: _mpesaDeposit, error: mpesaError } = await supabase
           .from('mpesa_deposits')
           .insert({
             user_id: user.id,
@@ -1120,7 +1119,7 @@ return reply.send({ success: true, workerAmount, feeAmount });
       }
 
       // Create the escrow record now that payment has cleared
-      const { data: escrow, error: escrowError } = await supabase
+      const { data: _escrow, error: escrowError } = await supabase
         .from('kazi_escrow')
         .insert({
           job_id: jobId,

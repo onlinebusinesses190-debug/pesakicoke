@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import fastify from 'fastify';
 import cors from '@fastify/cors';
+import multipart from '@fastify/multipart';
 import { env } from './config/env';
 import { logger } from './utils/logger';
 import { initSocket } from './socket';
@@ -26,6 +27,7 @@ const startServer = async () => {
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     });
 
+    await server.register(multipart);
     await setupRateLimit(server);
 
     // Register old routes from api/routes (does not include wallet now)

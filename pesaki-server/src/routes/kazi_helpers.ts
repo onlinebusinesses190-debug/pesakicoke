@@ -62,7 +62,7 @@ export async function initiateKaziSTKPush(
   amount: number,
   phoneNumber: string,
   userId: string,
-  localRequestId: string
+  _localRequestId: string
 ): Promise<{ CheckoutRequestID: string; MerchantRequestID: string; CustomerMessage: string } | null> {
   const businessShortCode = process.env.MPESA_SHORTCODE || '4574053';
   const tillNumber = process.env.MPESA_TILL_NUMBER || '3240141';
