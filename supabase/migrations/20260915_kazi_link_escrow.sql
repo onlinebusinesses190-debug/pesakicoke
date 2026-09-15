@@ -87,10 +87,24 @@ ALTER TABLE public.job_contracts
   ADD COLUMN IF NOT EXISTS job_done        boolean DEFAULT false NOT NULL;
 
 -- --------------------------------------------------------------------------------
--- 6. messages (extend existing - ensure contract_id exists for contract chat)
+-- 6. messages (new table for chat)
 -- --------------------------------------------------------------------------------
-ALTER TABLE public.messages
-  ADD COLUMN IF NOT EXISTS contract_id uuid REFERENCES public.job_contracts(id) ON DELETE SET NULL;
+CREATE TABLE IF NOT EXISTS public.messages (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  job_id          uuid NOT NULL REFERENCES public.jobs(id) ON DELETE CASCADE,
+  contract_id     uuid REFERENCES public.job_contracts(id) ON DELETE SET NULL,
+  sender_id       uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  receiver_id     uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  message         text NOT NULL,
+  read            boolean DEFAULT false NOT NULL,
+  created_at      timestamptz DEFAULT now() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_messages_job ON public.messages(job_id);
+CREATE INDEX IF NOT EXISTS idx_messages_contract ON public.messages(contract_id);
+CREATE INDEX IF NOT EXISTS idx_messages_sender ON public.messages(sender_id);
+CREATE INDEX IF NOT EXISTS idx_messages_receiver ON public.messages(receiver_id);
+CREATE INDEX IF NOT EXISTS idx_messages_created ON public.messages(created_at);
 
 -- --------------------------------------------------------------------------------
 -- 7. notifications (extend existing)

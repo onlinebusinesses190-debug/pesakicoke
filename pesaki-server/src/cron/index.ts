@@ -80,6 +80,123 @@ const processMaturedItems = async (table: 'locked_savings' | 'investments') => {
   }
 };
 
+const autoReleaseKaziDisputes = async () => {
+  try {
+    const now = new Date().toISOString();
+
+    const { data: disputes, error } = await supabase
+      .from('kazi_disputes')
+      .select('*, kazi_escrow!inner (*)')
+      .is('worker_responded_at', null)
+      .lte('auto_release_at', now)
+      .limit(100);
+
+    if (error) {
+      logger.error({ error }, 'Failed to fetch kazi disputes for auto-release');
+      return;
+    }
+
+    if (!disputes || disputes.length === 0) return;
+
+    for (const dispute of disputes) {
+      const escrow = dispute.kazi_escrow;
+      if (!escrow) continue;
+
+      const employerAmount = Math.round(Number(escrow.amount) * (1 - 0.10));
+      const feeAmount = Number(escrow.amount) - employerAmount;
+
+      // Mark dispute as timed out
+      await supabase
+        .from('kazi_disputes')
+        .update({ worker_response: 'timeout', worker_responded_at: now })
+        .eq('id', dispute.id);
+
+      // Release 90% to employer, keep 10% service fee
+      await supabase
+        .from('kazi_escrow')
+        .update({
+          status: 'refunded',
+          released_amount: employerAmount,
+          fee_amount: feeAmount,
+          released_at: now,
+          updated_at: now,
+        })
+        .eq('id', escrow.id);
+
+      await supabase
+        .from('jobs')
+        .update({ status: 'cancelled' })
+        .eq('id', dispute.job_id);
+
+      logger.info(
+        { disputeId: dispute.id, jobId: dispute.job_id, employerAmount },
+        'KAZI dispute auto-released (7-day timeout)'
+      );
+    }
+  } catch (error) {
+    logger.error(error, 'Error auto-releasing KAZI disputes');
+  }
+};
+
+const handleStuckKaziJobs = async () => {
+  try {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: jobs, error } = await supabase
+      .from('jobs')
+      .select('id, title, employer_id, hired_worker_id, created_at')
+      .eq('status', 'hired')
+      .lte('created_at', cutoff)
+      .limit(50);
+
+    if (error) {
+      logger.error({ error }, 'Failed to fetch stuck kazi jobs');
+      return;
+    }
+
+    if (!jobs || jobs.length === 0) return;
+
+    for (const job of jobs) {
+      // Check if worker has accepted (contract exists with worker_accepted = true)
+      const { data: contract } = await supabase
+        .from('job_contracts')
+        .select('worker_accepted')
+        .eq('job_id', job.id)
+        .single();
+
+      if (contract?.worker_accepted) continue; // Worker already accepted, not stuck
+
+      // Cancel the job and notify employer
+      await supabase
+        .from('jobs')
+        .update({ status: 'cancelled', hired_worker_id: null })
+        .eq('id', job.id);
+
+      // Update applications back to Pending (so other workers can apply)
+      await supabase
+        .from('applications')
+        .update({ status: 'Pending' })
+        .eq('job_id', job.id)
+        .eq('worker_id', job.hired_worker_id);
+
+      // Notify employer
+      await supabase.from('notifications').insert({
+        user_id: job.employer_id,
+        title: 'Job cancelled - no response',
+        body: `Worker did not accept "${job.title}" within 24 hours. Job has been re-listed.`,
+        related_job_id: job.id,
+        read: false,
+        kazi_type: 'cancelled_timeout',
+        created_at: new Date().toISOString(),
+      });
+
+      logger.info({ jobId: job.id }, 'Stuck KAZI job cancelled (24h no acceptance)');
+    }
+  } catch (error) {
+    logger.error(error, 'Error handling stuck KAZI jobs');
+  }
+};
+
 export const initCronJobs = () => {
   logger.info('Initializing Node-Cron schedules...');
 
@@ -97,6 +214,16 @@ export const initCronJobs = () => {
   cron.schedule('0 * * * *', () => {
     processMaturedItems('locked_savings');
     processMaturedItems('investments');
+  });
+
+  // Every 5 minutes: auto-release KAZI disputes after 7-day worker timeout
+  cron.schedule('*/5 * * * *', () => {
+    autoReleaseKaziDisputes();
+  });
+
+  // Hourly: cancel stuck KAZI jobs where worker hasn't accepted after 24 hours
+  cron.schedule('0 * * * *', () => {
+    handleStuckKaziJobs();
   });
 
   // Fire once on startup to warm up cache

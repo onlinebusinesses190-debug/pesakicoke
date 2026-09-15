@@ -874,7 +874,97 @@ const { data: _creditData, error: creditError } = await supabase.rpc('credit_wal
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return reply.send(disputes || []);
+return reply.send(disputes || []);
+    } catch (err) {
+      console.error(err);
+      return reply.status(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  // GET /kazi/messages — fetch chat messages for a job
+  server.get('/kazi/messages', async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const token = request.headers.authorization?.replace('Bearer ', '');
+      if (!token) return reply.status(401).send({ error: 'Unauthorized' });
+
+      const user = await getUserFromToken(token);
+      const { jobId } = request.query as { jobId: string };
+
+      if (!jobId) return reply.status(400).send({ error: 'jobId is required' });
+
+      // Verify user is part of this job (either employer or hired worker)
+      const { data: job } = await supabase
+        .from('jobs')
+        .select('employer_id, hired_worker_id')
+        .eq('id', jobId)
+        .single();
+
+      if (!job || (job.employer_id !== user.id && job.hired_worker_id !== user.id)) {
+        return reply.status(403).send({ error: 'Unauthorized: not part of this job' });
+      }
+
+      const { data: messages, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('job_id', jobId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      return reply.send(messages || []);
+    } catch (err) {
+      console.error(err);
+      return reply.status(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  // POST /kazi/send-message — send a chat message
+  server.post('/kazi/send-message', async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const token = request.headers.authorization?.replace('Bearer ', '');
+      if (!token) return reply.status(401).send({ error: 'Unauthorized' });
+
+      const user = await getUserFromToken(token);
+      const body = request.body as any;
+      const { jobId, receiverId, message } = body;
+
+      if (!jobId || !receiverId || !message) {
+        return reply.status(400).send({ error: 'jobId, receiverId, and message are required' });
+      }
+
+      // Verify user is part of this job
+      const { data: job } = await supabase
+        .from('jobs')
+        .select('employer_id, hired_worker_id')
+        .eq('id', jobId)
+        .single();
+
+      if (!job || (job.employer_id !== user.id && job.hired_worker_id !== user.id)) {
+        return reply.status(403).send({ error: 'Unauthorized: not part of this job' });
+      }
+
+      const { data: newMessage, error } = await supabase
+        .from('messages')
+        .insert({
+          job_id: jobId,
+          sender_id: user.id,
+          receiver_id: receiverId,
+          message,
+          read: false,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Notify receiver
+      await notifyUser(
+        receiverId,
+        'New message',
+        `You have a new message regarding job ${jobId}`,
+        { jobId, type: 'message' }
+      );
+
+      return reply.send(newMessage);
     } catch (err) {
       console.error(err);
       return reply.status(500).send({ error: 'Internal server error' });
@@ -1154,6 +1244,33 @@ server.get('/kazi/escrow/:jobId', async (request: FastifyRequest, reply: Fastify
     } catch (err) {
       console.error('Error in /kazi/mpesa/job-payment-callback:', err);
       return reply.status(200).send({ ResultCode: 0, ResultDesc: 'Accepted' });
+    }
+  });
+
+  // GET /kazi/mpesa/job-status/:checkoutRequestId — check kazi job payment status
+  server.get('/kazi/mpesa/job-status/:checkoutRequestId', async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const token = request.headers.authorization?.replace('Bearer ', '');
+      if (!token) return reply.status(401).send({ error: 'Unauthorized' });
+
+      const user = await getUserFromToken(token);
+      const { checkoutRequestId } = request.params as { checkoutRequestId: string };
+
+      const { data: deposit, error } = await supabase
+        .from('mpesa_deposits')
+        .select('*, jobs!kazi_job_id (id, status)')
+        .eq('checkout_request_id', checkoutRequestId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (error || !deposit) {
+        return reply.status(404).send({ error: 'Payment not found' });
+      }
+
+      return reply.send({ status: deposit.status });
+    } catch (err) {
+      console.error('Error in /kazi/mpesa/job-status:', err);
+      return reply.status(500).send({ error: 'Internal server error' });
     }
   });
 }

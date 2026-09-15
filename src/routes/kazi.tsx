@@ -425,6 +425,8 @@ function JobCard({ job, onApply }: { job: Job; onApply: () => void }) {
 
 // ─── Employer View ──────────────────────────────────────────────────────────
 function EmployerView({ postedJobs, jobApplicants, onChat, onHire, onRefresh }: any) {
+  const [viewProfileApp, setViewProfileApp] = useState<Application | null>(null);
+
   if (postedJobs.length === 0) {
     return (
       <section className="mt-6 px-5">
@@ -470,6 +472,7 @@ function EmployerView({ postedJobs, jobApplicants, onChat, onHire, onRefresh }: 
                       application={app}
                       onChat={() => onChat(job.id, app)}
                       onHire={() => onHire(app)}
+                      onViewProfile={() => setViewProfileApp(app)}
                     />
                   ))}
                   {applicants.length > 3 && (
@@ -487,8 +490,12 @@ function EmployerView({ postedJobs, jobApplicants, onChat, onHire, onRefresh }: 
   );
 }
 
+{viewProfileApp && (
+  <ApplicantProfileModal application={viewProfileApp} onClose={() => setViewProfileApp(null)} />
+)}
+
 // ─── Applicant Mini Card ──────────────────────────────────────────────────
-function ApplicantMiniCard({ application, onChat, onHire }: any) {
+function ApplicantMiniCard({ application, onChat, onHire, onViewProfile }: any) {
   return (
     <div className="flex items-center gap-3 rounded-xl border border-border p-2.5">
       <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-bold text-primary">
@@ -509,6 +516,12 @@ function ApplicantMiniCard({ application, onChat, onHire }: any) {
         >
           <MessageCircle className="h-3.5 w-3.5" />
         </button>
+        <button
+          onClick={() => onViewProfile?.(application)}
+          className="grid h-8 w-8 place-items-center rounded-full border border-border text-muted-foreground hover:bg-muted"
+        >
+          <Eye className="h-3.5 w-3.5" />
+        </button>
         {application.status !== 'Hired' && (
           <button
             onClick={onHire}
@@ -519,6 +532,43 @@ function ApplicantMiniCard({ application, onChat, onHire }: any) {
         )}
       </div>
     </div>
+  );
+}
+
+// ─── Applicant Profile Modal ───────────────────────────────────────────────
+function ApplicantProfileModal({ application, onClose }: any) {
+  return (
+    <SheetShell title="Applicant Profile" onClose={onClose}>
+      <div className="space-y-4">
+        <div className="flex items-center gap-4">
+          <div className="grid h-20 w-20 shrink-0 place-items-center rounded-full bg-primary/10 text-2xl font-bold text-primary">
+            {application.photo_url ? (
+              <img src={application.photo_url} alt="" className="h-20 w-20 rounded-full object-cover" />
+            ) : (
+              application.applicant_name.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase()
+            )}
+          </div>
+          <div>
+            <p className="text-xl font-bold">{application.applicant_name}</p>
+            <p className="text-sm text-muted-foreground">{application.location}</p>
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-muted/50 p-3 space-y-2 text-sm">
+          <div className="flex justify-between"><span className="text-muted-foreground">Phone</span><span>{application.phone}</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Email</span><span>{application.email}</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Experience</span><span>{application.experience} years</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Availability</span><span>{application.availability}</span></div>
+        </div>
+
+        {application.additional_description && (
+          <div className="rounded-xl bg-muted/50 p-3">
+            <p className="text-xs font-semibold text-muted-foreground mb-1">Additional Info</p>
+            <p className="text-sm">{application.additional_description}</p>
+          </div>
+        )}
+      </div>
+    </SheetShell>
   );
 }
 
@@ -1204,6 +1254,135 @@ export function FileField({
   );
 }
 
+// ─── PhotoUpload ─────────────────────────────────────────────────────────────
+function PhotoUpload({ onPhotoUrl }: { onPhotoUrl: (url: string | null) => void }) {
+  const [preview, setPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  const supabase = createClient(
+    import.meta.env.VITE_SUPABASE_URL!,
+    import.meta.env.VITE_SUPABASE_ANON_KEY!
+  );
+
+  const handleFileSelect = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be less than 5MB');
+      return;
+    }
+
+    // Create local preview immediately
+    const objectUrl = URL.createObjectURL(file);
+    setPreview(objectUrl);
+
+    // Upload to Supabase Storage
+    setUploading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const filename = `kazi-applicant-photos/${user.id}-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.\-]/g, '_')}`;
+      const { error: uploadError } = await supabase.storage
+        .from('kazi-applicant-photos')
+        .upload(filename, file, {
+          contentType: file.type,
+          upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('kazi-applicant-photos')
+        .getPublicUrl(filename);
+
+      onPhotoUrl(urlData.publicUrl);
+      toast.success('Photo uploaded');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to upload photo');
+      onPhotoUrl(null);
+      setPreview(null);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleFileSelect(file);
+    // Reset input so same file can be selected again
+    e.target.value = '';
+  };
+
+  const clearPhoto = () => {
+    if (preview) URL.revokeObjectURL(preview);
+    setPreview(null);
+    onPhotoUrl(null);
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          className="rounded-xl border border-border bg-card p-3 text-xs font-semibold flex flex-col items-center gap-1"
+        >
+          <Upload className="h-5 w-5" />
+          <span>Choose from gallery</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => cameraInputRef.current?.click()}
+          disabled={uploading}
+          className="rounded-xl border border-border bg-card p-3 text-xs font-semibold flex flex-col items-center gap-1"
+        >
+          <span className="text-lg">📷</span>
+          <span>Take photo</span>
+        </button>
+      </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+      {preview && (
+        <div className="relative rounded-xl border border-border overflow-hidden">
+          <img src={preview} alt="Preview" className="w-full h-40 object-cover" />
+          {uploading && (
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-white" />
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={clearPhoto}
+            className="absolute top-2 right-2 rounded-full bg-destructive/90 text-destructive-foreground p-1"
+            disabled={uploading}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── ApplyJobSheet ──────────────────────────────────────────────────────────
 function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
   const { requireAuth } = useRequireAuth();
@@ -1220,6 +1399,10 @@ function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
   });
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const handlePhotoUrl = (url: string | null) => {
+    setForm(f => ({ ...f, photo_url: url || '' }));
+  };
 
   const supabase = createClient(
     import.meta.env.VITE_SUPABASE_URL!,
@@ -1282,7 +1465,10 @@ function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
             <div><FieldLabel>Experience</FieldLabel><select required value={form.experience} onChange={set("experience")} className={inputCls}><option value="">Select</option><option>Less than 1</option><option>1-3</option><option>3-5</option><option>5+</option></select></div>
             <div><FieldLabel>Availability</FieldLabel><select required value={form.availability} onChange={set("availability")} className={inputCls}><option value="">Select</option><option>Immediate</option><option>1 week</option><option>2 weeks</option></select></div>
           </div>
-          <div><FieldLabel>Photo (URL or upload later)</FieldLabel><input value={form.photo_url} onChange={set("photo_url")} className={inputCls} placeholder="https://..." /></div>
+          <div>
+            <FieldLabel>Photo (optional)</FieldLabel>
+            <PhotoUpload onPhotoUrl={handlePhotoUrl} />
+          </div>
           <button type="submit" disabled={submitting} className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50">
             {submitting ? <Loader2 className="h-4 w-4 animate-spin inline" /> : 'Submit Application'}
           </button>
@@ -1332,9 +1518,11 @@ function PostJobSheet({ onClose, onSuccess, user }: any) {
     }
     attemptsRef.current += 1;
     try {
-      const res = await fetch(`${API_BASE}/wallet/deposit/status/${checkoutRequestId}`);
+      const res = await fetch(`${API_BASE}/kazi/mpesa/job-status/${checkoutRequestId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const data = await res.json();
-      const status = String(data?.data?.status || "").toLowerCase();
+      const status = String(data?.status || "").toLowerCase();
       if (status === "completed") {
         stopPolling();
         setStep("success");
@@ -1623,6 +1811,8 @@ function ChatSheet({ application, job, onClose, user }: any) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const mountedRef = useRef(true);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const supabase = createClient(
     import.meta.env.VITE_SUPABASE_URL!,
@@ -1630,6 +1820,7 @@ function ChatSheet({ application, job, onClose, user }: any) {
   );
 
   const fetchMessages = async () => {
+    if (!mountedRef.current) return;
     try {
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
@@ -1637,14 +1828,14 @@ function ChatSheet({ application, job, onClose, user }: any) {
       const response = await fetch(`${API_BASE}/kazi/messages?jobId=${job.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (response.ok) {
+      if (response.ok && mountedRef.current) {
         const data = await response.json();
         setMessages(data);
       }
     } catch (err) {
       console.error('Failed to fetch messages:', err);
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   };
 
@@ -1681,13 +1872,19 @@ function ChatSheet({ application, job, onClose, user }: any) {
   };
 
   useEffect(() => {
+    mountedRef.current = true;
     fetchMessages();
-    const interval = setInterval(fetchMessages, 5000);
-    return () => clearInterval(interval);
+    intervalRef.current = setInterval(fetchMessages, 5000);
+    return () => {
+      mountedRef.current = false;
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
   }, [job.id]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (mountedRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
 
   const otherUser = application.worker_id === user?.id ? 'Employer' : application.applicant_name;
@@ -1765,7 +1962,8 @@ function NotifSheet({ notifications, onClose }: any) {
         <div className="space-y-2.5">
           {notifications.map((n: any) => (
             <Card key={n.id} className="!p-3.5">
-              <p className="text-sm">{n.message}</p>
+              <p className="text-sm font-semibold">{n.title || 'Notification'}</p>
+              <p className="mt-0.5 text-sm text-muted-foreground">{n.body || n.message || ''}</p>
               <p className="mt-0.5 text-[10px] text-muted-foreground">{new Date(n.created_at).toLocaleString()}</p>
             </Card>
           ))}
