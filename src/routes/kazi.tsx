@@ -10,7 +10,7 @@ import { Card, Badge, SectionTitle } from "@/components/ui-bits";
 import { useAuth } from "@/hooks/useAuth";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { toast } from "sonner";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
 import { fmt } from "@/lib/mock";
 
 export const Route = createFileRoute("/kazi")({
@@ -113,11 +113,6 @@ function KaziPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [messageInput, setMessageInput] = useState("");
   const hasFetched = useRef(false);
-
-  const supabase = createClient(
-    import.meta.env.VITE_SUPABASE_URL!,
-    import.meta.env.VITE_SUPABASE_ANON_KEY!
-  );
 
   const getAuthToken = async () => {
     const { data } = await supabase.auth.getSession();
@@ -664,10 +659,6 @@ function WorkerApplications({ apps, onChat, onRefresh, user }: any) {
     if (!requireAuth()) return;
     setWithdrawing(contractId);
     try {
-      const supabase = createClient(
-        import.meta.env.VITE_SUPABASE_URL!,
-        import.meta.env.VITE_SUPABASE_ANON_KEY!
-      );
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
 
@@ -784,10 +775,6 @@ function ActiveContracts({ contracts, onRefresh, user }: any) {
     if (!requireAuth()) return;
     setStarting(jobId);
     try {
-      const supabase = createClient(
-        import.meta.env.VITE_SUPABASE_URL!,
-        import.meta.env.VITE_SUPABASE_ANON_KEY!
-      );
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
 
@@ -815,10 +802,6 @@ function ActiveContracts({ contracts, onRefresh, user }: any) {
     if (!requireAuth()) return;
     setConfirming(jobId);
     try {
-      const supabase = createClient(
-        import.meta.env.VITE_SUPABASE_URL!,
-        import.meta.env.VITE_SUPABASE_ANON_KEY!
-      );
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
 
@@ -851,10 +834,6 @@ function ActiveContracts({ contracts, onRefresh, user }: any) {
     }
     setStarting(refundJob.id);
     try {
-      const supabase = createClient(
-        import.meta.env.VITE_SUPABASE_URL!,
-        import.meta.env.VITE_SUPABASE_ANON_KEY!
-      );
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
 
@@ -885,10 +864,6 @@ function ActiveContracts({ contracts, onRefresh, user }: any) {
     if (!requireAuth()) return;
     setStarting(jobId);
     try {
-      const supabase = createClient(
-        import.meta.env.VITE_SUPABASE_URL!,
-        import.meta.env.VITE_SUPABASE_ANON_KEY!
-      );
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
 
@@ -921,10 +896,6 @@ function ActiveContracts({ contracts, onRefresh, user }: any) {
     }
     setStarting(dispute.id);
     try {
-      const supabase = createClient(
-        import.meta.env.VITE_SUPABASE_URL!,
-        import.meta.env.VITE_SUPABASE_ANON_KEY!
-      );
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
 
@@ -958,10 +929,6 @@ function ActiveContracts({ contracts, onRefresh, user }: any) {
     if (!requireAuth()) return;
     setStarting(contractId);
     try {
-      const supabase = createClient(
-        import.meta.env.VITE_SUPABASE_URL!,
-        import.meta.env.VITE_SUPABASE_ANON_KEY!
-      );
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
 
@@ -1262,11 +1229,6 @@ function PhotoUpload({ onPhotoUrl }: { onPhotoUrl: (url: string | null) => void 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  const supabase = createClient(
-    import.meta.env.VITE_SUPABASE_URL!,
-    import.meta.env.VITE_SUPABASE_ANON_KEY!
-  );
-
   const handleFileSelect = async (file: File) => {
     if (!file.type.startsWith('image/')) {
       toast.error('Please select an image file');
@@ -1405,11 +1367,6 @@ function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
     setForm(f => ({ ...f, photo_url: url || '' }));
   };
 
-  const supabase = createClient(
-    import.meta.env.VITE_SUPABASE_URL!,
-    import.meta.env.VITE_SUPABASE_ANON_KEY!
-  );
-
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!requireAuth()) return;
@@ -1542,11 +1499,6 @@ function PostJobSheet({ onClose, onSuccess, user }: any) {
   };
 
   useEffect(() => () => stopPolling(), []);
-
-  const supabase = createClient(
-    import.meta.env.VITE_SUPABASE_URL!,
-    import.meta.env.VITE_SUPABASE_ANON_KEY!
-  );
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -1704,10 +1656,6 @@ function HireSheet({ app, onClose, onHireSuccess, user }: any) {
     if (!requireAuth()) return;
     setLoading(true);
     try {
-      const supabase = createClient(
-        import.meta.env.VITE_SUPABASE_URL!,
-        import.meta.env.VITE_SUPABASE_ANON_KEY!
-      );
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
 
@@ -1814,11 +1762,6 @@ function ChatSheet({ application, job, onClose, user }: any) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const supabase = createClient(
-    import.meta.env.VITE_SUPABASE_URL!,
-    import.meta.env.VITE_SUPABASE_ANON_KEY!
-  );
 
   const fetchMessages = async () => {
     if (!mountedRef.current) return;

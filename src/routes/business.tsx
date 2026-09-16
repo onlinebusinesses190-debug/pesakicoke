@@ -8,7 +8,7 @@ import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Stat, SectionTitle, Badge } from "@/components/ui-bits";
 import { fmt } from "@/lib/mock";
 import { FileField, SuccessBlock } from "./kazi";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
@@ -74,11 +74,6 @@ function BusinessPage() {
   const [openApps, setOpenApps] = useState(0);
   const [approvedApps, setApprovedApps] = useState(0);
   const [repaymentStatus, setRepaymentStatus] = useState("On time");
-
-  const supabase = createClient(
-    import.meta.env.VITE_SUPABASE_URL!,
-    import.meta.env.VITE_SUPABASE_ANON_KEY!
-  );
 
   const fetchData = async () => {
     // ✅ If no user, stop loading and return
@@ -368,10 +363,6 @@ function StartupForm({ onBack, onClose, user, onSuccess }: any) {
   const [slot, setSlot] = useState<"morning" | "afternoon">("morning");
   const [date, setDate] = useState("");
   const [loading, setLoading] = useState(false);
-  const supabase = createClient(
-    import.meta.env.VITE_SUPABASE_URL!,
-    import.meta.env.VITE_SUPABASE_ANON_KEY!
-  );
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -475,10 +466,6 @@ function ExistingForm({ onBack, onClose, user, onSuccess }: any) {
   const [submitted, setSubmitted] = useState(false);
   const [agree, setAgree] = useState(false);
   const [loading, setLoading] = useState(false);
-  const supabase = createClient(
-    import.meta.env.VITE_SUPABASE_URL!,
-    import.meta.env.VITE_SUPABASE_ANON_KEY!
-  );
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
