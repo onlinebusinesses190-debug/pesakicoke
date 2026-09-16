@@ -83,14 +83,11 @@ function BusinessPage() {
       return;
     }
 
-    // ✅ Prevent multiple simultaneous fetches
+    // ✅ Prevent multiple simultaneous fetches (guard for manual calls like onSuccess)
     if (hasFetched.current) {
       console.log("⏭️ Already fetched – skipping");
       return;
     }
-
-    hasFetched.current = true;
-    setLoading(true);
 
     try {
       console.log("🟢 Fetching applications...");
@@ -143,6 +140,7 @@ function BusinessPage() {
   useEffect(() => {
     // ✅ Only fetch if user exists and we haven't fetched yet
     if (user && !hasFetched.current) {
+      hasFetched.current = true; // Set synchronously BEFORE async call to prevent StrictMode double-fetch
       fetchData();
     }
     // ✅ If no user, make sure loading is false
@@ -160,7 +158,6 @@ function BusinessPage() {
   };
 
   if (loading) {
-    console.log("⏳ Still loading – showing spinner");
     return (
       <AppShell>
         <PageHeader title="Business Hub" subtitle="Fund. Build. Scale." />
@@ -171,7 +168,6 @@ function BusinessPage() {
     );
   }
 
-  console.log("✅ Rendering main content");
   return (
     <AppShell>
       <PageHeader title="Business Hub" subtitle="Fund. Build. Scale." />

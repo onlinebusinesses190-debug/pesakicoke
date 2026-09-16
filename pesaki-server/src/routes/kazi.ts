@@ -1045,8 +1045,35 @@ server.get('/kazi/escrow/:jobId', async (request: FastifyRequest, reply: Fastify
         .single();
 
       if (insertError) {
-        console.error('Supabase insert error:', insertError);
-        return reply.status(500).send({ error: 'Database error: ' + insertError.message });
+        console.error('[kazi/post-job] Supabase insert error:', {
+          message: insertError.message,
+          code: insertError.code,
+          details: insertError.details,
+          hint: insertError.hint,
+          columns: Object.keys({
+            employer_id: user.id,
+            title,
+            category,
+            location,
+            pay_label: pay,
+            pay_amount: amount,
+            duration,
+            description,
+            accommodation: accommodation || false,
+            requirements: requirements || [],
+            status: 'open',
+            escrow_amount: amount,
+            escrow_status: 'held',
+            badge: 'Hot',
+            created_at: new Date().toISOString(),
+          }),
+        });
+        return reply.status(500).send({ 
+          error: 'Database error: ' + insertError.message,
+          code: insertError.code,
+          details: insertError.details,
+          hint: insertError.hint,
+        });
       }
 
       if (source === 'mpesa') {
@@ -1143,8 +1170,19 @@ server.get('/kazi/escrow/:jobId', async (request: FastifyRequest, reply: Fastify
 
       return reply.status(201).send({ job, escrow });
     } catch (err: any) {
-      console.error('Error in /kazi/post-job:', err);
-      return reply.status(500).send({ error: err.message || 'Internal server error' });
+      console.error('[kazi/post-job] ERROR:', {
+        message: err.message,
+        code: err.code,
+        details: err.details,
+        hint: err.hint,
+        stack: err.stack,
+        body: request.body,
+      });
+      return reply.status(500).send({
+        error: err.message || 'Internal server error',
+        details: err.toString(),
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+      });
     }
   });
 // POST /kazi/mpesa/job-payment-callback â€” M-Pesa callback for KAZI job payments
