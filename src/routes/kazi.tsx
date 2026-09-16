@@ -436,63 +436,64 @@ function EmployerView({ postedJobs, jobApplicants, onChat, onHire, onRefresh }: 
   }
 
   return (
-    <section className="mt-5 px-5">
-      <SectionTitle title={`My posted jobs (${postedJobs.length})`} />
-      <div className="space-y-3">
-        {postedJobs.map((job: Job) => {
-          const applicants = jobApplicants[job.id] || [];
-          const hired = applicants.filter((a: any) => a.status === 'Hired');
-          const pending = applicants.filter((a: any) => a.status === 'Pending');
+    <>
+      <section className="mt-5 px-5">
+        <SectionTitle title={`My posted jobs (${postedJobs.length})`} />
+        <div className="space-y-3">
+          {postedJobs.map((job: Job) => {
+            const applicants = jobApplicants[job.id] || [];
+            const hired = applicants.filter((a: any) => a.status === 'Hired');
+            const pending = applicants.filter((a: any) => a.status === 'Pending');
 
-          return (
-            <Card key={job.id} className="!p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm font-semibold">{job.title}</p>
-                  <p className="text-xs text-muted-foreground">{job.location} · {job.duration}</p>
-                  <p className="mt-1 text-sm font-bold text-primary">{job.pay}</p>
+            return (
+              <Card key={job.id} className="!p-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm font-semibold">{job.title}</p>
+                    <p className="text-xs text-muted-foreground">{job.location} · {job.duration}</p>
+                    <p className="mt-1 text-sm font-bold text-primary">{job.pay}</p>
+                  </div>
+                  <Badge tone={job.status === 'open' ? 'success' : 'warning'}>
+                    {job.status}
+                  </Badge>
                 </div>
-                <Badge tone={job.status === 'open' ? 'success' : 'warning'}>
-                  {job.status}
-                </Badge>
-              </div>
 
-              <div className="mt-3 flex gap-4 text-xs">
-                <span>Applicants: <strong>{applicants.length}</strong></span>
-                <span>Pending: <strong>{pending.length}</strong></span>
-                <span>Hired: <strong>{hired.length}</strong></span>
-              </div>
-
-              {applicants.length > 0 && (
-                <div className="mt-3 space-y-2">
-                  <p className="text-[11px] font-semibold text-muted-foreground">Recent applicants:</p>
-                  {applicants.slice(0, 3).map((app: Application) => (
-                    <ApplicantMiniCard
-                      key={app.id}
-                      application={app}
-                      onChat={() => onChat(job.id, app)}
-                      onHire={() => onHire(app)}
-                      onViewProfile={() => setViewProfileApp(app)}
-                    />
-                  ))}
-                  {applicants.length > 3 && (
-                    <button className="text-xs text-primary font-semibold">
-                      View all {applicants.length} applicants
-                    </button>
-                  )}
+                <div className="mt-3 flex gap-4 text-xs">
+                  <span>Applicants: <strong>{applicants.length}</strong></span>
+                  <span>Pending: <strong>{pending.length}</strong></span>
+                  <span>Hired: <strong>{hired.length}</strong></span>
                 </div>
-              )}
-            </Card>
-          );
-        })}
-      </div>
-    </section>
+
+                {applicants.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-[11px] font-semibold text-muted-foreground">Recent applicants:</p>
+                    {applicants.slice(0, 3).map((app: Application) => (
+                      <ApplicantMiniCard
+                        key={app.id}
+                        application={app}
+                        onChat={() => onChat(job.id, app)}
+                        onHire={() => onHire(app)}
+                        onViewProfile={() => setViewProfileApp(app)}
+                      />
+                    ))}
+                    {applicants.length > 3 && (
+                      <button className="text-xs text-primary font-semibold">
+                        View all {applicants.length} applicants
+                      </button>
+                    )}
+                  </div>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      </section>
+      {viewProfileApp && (
+        <ApplicantProfileModal application={viewProfileApp} onClose={() => setViewProfileApp(null)} />
+      )}
+    </>
   );
 }
-
-{viewProfileApp && (
-  <ApplicantProfileModal application={viewProfileApp} onClose={() => setViewProfileApp(null)} />
-)}
 
 // ─── Applicant Mini Card ──────────────────────────────────────────────────
 function ApplicantMiniCard({ application, onChat, onHire, onViewProfile }: any) {
