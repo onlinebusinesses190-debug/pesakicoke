@@ -404,6 +404,10 @@ BEGIN
   WHERE id = referral_record.referrer_id
   FOR UPDATE;
 
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('processed', false, 'reason', 'profile_not_found');
+  END IF;
+
   SELECT *
   INTO referred_profile
   FROM public.profiles
