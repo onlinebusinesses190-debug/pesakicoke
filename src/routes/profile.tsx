@@ -32,7 +32,7 @@ import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Badge, SectionTitle, Stat } from "@/components/ui-bits";
 import { toast } from "sonner";
 import { apiRequest } from "@/utils/api";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({
@@ -203,10 +203,6 @@ function ProfilePage() {
   const fetchProfileData = useCallback(async () => {
     try {
       setLoading(true);
-      const supabase = createClient(
-        import.meta.env.VITE_SUPABASE_URL,
-        import.meta.env.VITE_SUPABASE_ANON_KEY,
-      );
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -264,10 +260,6 @@ function ProfilePage() {
   // ── Sign out ──────────────────────────────────────────────────────────────
   const signOut = async () => {
     try {
-      const supabase = createClient(
-        import.meta.env.VITE_SUPABASE_URL,
-        import.meta.env.VITE_SUPABASE_ANON_KEY,
-      );
       await supabase.auth.signOut();
       toast.success("Signed out");
       navigate({ to: "/auth" });
