@@ -4,6 +4,7 @@ import { env } from '../config/env';
 import { credit } from '../wallet/service';
 import { calculateDepositFee, MIN_DEPOSIT } from '../utils/fees';
 import { supabase } from '../lib/supabase';
+import { processReferralOnDeposit } from './referrals';
 
 interface AccessTokenResponse {
   access_token: string;
@@ -499,7 +500,7 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
 
         const { data: deposit, error: depositError } = await supabase
           .from('mpesa_deposits')
-          .select('user_id, amount, status')
+          .select('id, user_id, amount, status')
           .eq('checkout_request_id', checkoutRequestId)
           .single();
 
@@ -551,6 +552,18 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
           .update({ status: 'completed' })
           .eq('checkout_request_id', checkoutRequestId)
           .eq('status', 'pending');
+
+        const referralResult = await processReferralOnDeposit(
+          deposit.user_id,
+          finalAmount,
+          deposit.id
+        );
+        if (referralResult.success && referralResult.processed) {
+          logger.info(
+            { userId: deposit.user_id, amount: finalAmount },
+            'Referral reward processed after deposit'
+          );
+        }
 
         logger.info(
           { userId: deposit.user_id, amount: finalAmount, mpesaReceipt, checkoutRequestId },
