@@ -48,33 +48,6 @@ function removeLocalStorage(key: string): void {
   }
 }
 
-async function applyPendingReferralCode(): Promise<boolean> {
-  const refCode = getLocalStorage("pendingReferralCode")?.trim();
-  if (!refCode) return false;
-
-  try {
-    await apiRequest("/referrals/apply", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: refCode }),
-    });
-    removeLocalStorage("pendingReferralCode");
-    removeLocalStorage("referralManualAt");
-    setPendingRefCode("");
-    toast.success("Referral code applied!");
-    return true;
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "";
-    if (message.includes("Authentication required")) return false;
-
-    removeLocalStorage("pendingReferralCode");
-    removeLocalStorage("referralManualAt");
-    setPendingRefCode("");
-    toast.warning("Signup successful — referral could not be applied.");
-    return false;
-  }
-}
-
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
@@ -94,6 +67,33 @@ function AuthPage() {
   // Referral code state
   const [pendingRefCode, setPendingRefCode] = useState("");
   const [refManuallyEntered, setRefManuallyEntered] = useState(false);
+
+  async function applyPendingReferralCode(): Promise<boolean> {
+    const refCode = getLocalStorage("pendingReferralCode")?.trim();
+    if (!refCode) return false;
+
+    try {
+      await apiRequest("/referrals/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: refCode }),
+      });
+      removeLocalStorage("pendingReferralCode");
+      removeLocalStorage("referralManualAt");
+      setPendingRefCode("");
+      toast.success("Referral code applied!");
+      return true;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "";
+      if (message.includes("Authentication required")) return false;
+
+      removeLocalStorage("pendingReferralCode");
+      removeLocalStorage("referralManualAt");
+      setPendingRefCode("");
+      toast.warning("Signup successful — referral could not be applied.");
+      return false;
+    }
+  }
 
   // Read redirect target from query string
   const search = useRouterState({ select: (s) => s.location.search });

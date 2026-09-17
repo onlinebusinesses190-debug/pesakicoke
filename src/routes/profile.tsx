@@ -444,7 +444,7 @@ function ProfilePage() {
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Stat label="Total referrals" value={String(totalReferrals)} tone="primary" />
           <Stat label="Qualified" value={String(qualifiedReferrals)} tone="success" />
-          <Stat label="Pending" value={String(pendingReferrals)} tone="warning" />
+          <Stat label="Pending" value={String(pendingReferrals)} tone="primary" />
           <Stat label="Total earnings" value={fmt(totalEarnings)} tone="gold" />
         </div>
 
