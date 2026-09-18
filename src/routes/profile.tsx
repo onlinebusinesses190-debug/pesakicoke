@@ -269,17 +269,40 @@ function ProfilePage() {
   };
 
   // ── Copy referral code ────────────────────────────────────────────────────
+  async function copyToClipboard(text: string): Promise<boolean> {
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch {}
+    }
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.top = "-9999px";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+
+  // ── Copy referral code ────────────────────────────────────────────
   const copyRef = async () => {
     if (!referrals.referralCode) {
       toast.error("Referral code is not available yet");
       return;
     }
-
-    try {
-      await navigator.clipboard.writeText(referrals.referralCode);
+    const ok = await copyToClipboard(referrals.referralCode);
+    if (ok) {
       toast.success("Referral code copied");
-    } catch {
-      toast.error("Could not copy code");
+    } else {
+      toast.error(`Copy failed — select manually: ${referrals.referralCode}`);
     }
   };
 
@@ -289,16 +312,15 @@ function ProfilePage() {
       toast.error("Referral link is not available yet");
       return;
     }
-
-    try {
-      await navigator.clipboard.writeText(referrals.referralLink);
+    const ok = await copyToClipboard(referrals.referralLink);
+    if (ok) {
       toast.success("Referral link copied");
-    } catch {
-      toast.error("Could not copy link");
+    } else {
+      toast.error(`Copy failed — select manually: ${referrals.referralLink}`);
     }
   };
 
-  // ── WhatsApp share with exact text ──────────────────────────
+  // ── WhatsApp share ──────────────────────────────────────────
   const shareWhatsApp = async () => {
     if (!referrals.referralCode) {
       toast.error("Referral code is not available yet");
@@ -306,8 +328,35 @@ function ProfilePage() {
     }
 
     const text = `Join PESAKI with my code: ${referrals.referralCode} — ${referrals.referralLink}`;
-    const waUrl = `${WHATSAPP_URL}?text=${encodeURIComponent(text)}`;
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(waUrl, "_blank", "noopener,noreferrer");
+  };
+
+  // ── Referral helpers ──────────────────────────────────
+  const EARNING_WINDOW_DAYS = 7;
+
+  const earningWindowEnd = (joinedAt: string): Date => {
+    const end = new Date(joinedAt);
+    end.setDate(end.getDate() + EARNING_WINDOW_DAYS);
+    return end;
+  };
+
+  const isWithinEarningWindow = (joinedAt: string): boolean => {
+    return new Date() < earningWindowEnd(joinedAt);
+  };
+
+  const earnedFromUser = (referredUserId: string): number => {
+    return earningsLog
+      .filter((e) => e.referredUserId === referredUserId)
+      .reduce((sum, e) => sum + e.amount, 0);
+  };
+
+  const formatSource = (source?: string): string => {
+    if (!source) return "Referral reward";
+    return source
+      .split("_")
+      .map((w) => (w[0] ? w[0].toUpperCase() + w.slice(1) : ""))
+      .join(" ");
   };
 
   if (loading) {
@@ -485,26 +534,39 @@ function ProfilePage() {
                           year: "numeric",
                         })}
                       </p>
+                      <p className="truncate text-[10px] text-muted-foreground">
+                        {isWithinEarningWindow(user.joinedAt)
+                          ? `Earning until ${earningWindowEnd(user.joinedAt).toLocaleDateString("en-KE", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })}`
+                          : "Earning window closed"}
+                      </p>
                     </div>
                     <Badge
                       tone={
-                        user.status === "qualified"
-                          ? "success"
-                          : user.status === "pending"
-                            ? "warning"
-                            : "neutral"
+                        !isWithinEarningWindow(user.joinedAt)
+                          ? "neutral"
+                          : user.status === "qualified"
+                            ? "success"
+                            : user.status === "rejected"
+                              ? "destructive"
+                              : "warning"
                       }
                     >
-                      {user.status === "qualified"
-                        ? "Qualified"
-                        : user.status === "pending"
-                          ? "Pending"
-                          : "Rejected"}
+                      {!isWithinEarningWindow(user.joinedAt)
+                        ? "Expired"
+                        : user.status === "qualified"
+                          ? "Qualified"
+                          : user.status === "rejected"
+                            ? "Rejected"
+                            : "Pending"}
                     </Badge>
                     <p
-                      className={`text-sm font-bold ${user.earned > 0 ? "text-success" : "text-muted-foreground"}`}
+                      className={`text-sm font-bold ${earnedFromUser(user.id) > 0 ? "text-success" : "text-muted-foreground"}`}
                     >
-                      {user.earned > 0 ? `+${fmt(user.earned)}` : "—"}
+                      {earnedFromUser(user.id) > 0 ? `+${fmt(earnedFromUser(user.id))}` : "—"}
                     </p>
                   </li>
                 ))}
@@ -531,9 +593,12 @@ function ProfilePage() {
                       <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold">
-                        {entry.description || "Referral reward"}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-semibold">
+                          {entry.description || "Referral reward"}
+                        </p>
+                        <Badge tone="gold">{formatSource(entry.source)}</Badge>
+                      </div>
                       <p className="truncate text-[11px] text-muted-foreground">
                         {new Date(entry.createdAt).toLocaleDateString("en-KE", {
                           day: "numeric",
@@ -557,27 +622,13 @@ function ProfilePage() {
         <section className="mt-5">
           <SectionTitle title="How It Works" />
           <Card className="!p-4">
-            <ol className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <ol className="grid grid-cols-2 gap-3 sm:grid-cols-5">
               {[
-                {
-                  step: "1",
-                  title: "Share your code",
-                  desc: "Send your referral link",
-                  icon: Share2,
-                },
-                {
-                  step: "2",
-                  title: "Friend signs up",
-                  desc: "They join with your code",
-                  icon: Users,
-                },
-                {
-                  step: "3",
-                  title: "Deposit 100+",
-                  desc: "Their first deposit qualifies",
-                  icon: Clock,
-                },
-                { step: "4", title: "Earn KES 20", desc: "Your friend gets KES 10", icon: Trophy },
+                { step: "1", title: "Share your referral code with friends", desc: "", icon: Share2 },
+                { step: "2", title: "When they sign up and make a deposit of KES 100+", desc: "You earn 10% of it", icon: Users },
+                { step: "3", title: "For 7 days after they sign up", desc: "You keep earning 10% of every deposit they make", icon: Clock },
+                { step: "4", title: "They get a KES 10 welcome bonus", desc: "On their first deposit", icon: Gift },
+                { step: "5", title: "Rewards are credited automatically", desc: "To your PESAKI wallet", icon: Trophy },
               ].map((item) => (
                 <div
                   key={item.step}

@@ -285,6 +285,7 @@ function AuthPage() {
                   value={pendingRefCode}
                   onChange={(e) => {
                     setPendingRefCode(e.target.value);
+                    setLocalStorage("pendingReferralCode", e.target.value.trim());
                     if (!getLocalStorage("referralManualAt")) {
                       setLocalStorage("referralManualAt", String(Date.now()));
                     }
