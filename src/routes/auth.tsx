@@ -8,6 +8,10 @@ import { toast } from "sonner";
 // Helper: format phone
 function formatPhoneNumber(raw: string): string {
   let cleaned = raw.replace(/\D/g, "");
+  if (raw.startsWith("+")) return raw;
+  if (cleaned.startsWith("254") && cleaned.length === 12) {
+    return "+" + cleaned;
+  }
   if (cleaned.startsWith("0") && cleaned.length === 10) {
     cleaned = "254" + cleaned.slice(1);
     return "+" + cleaned;
@@ -16,7 +20,6 @@ function formatPhoneNumber(raw: string): string {
     cleaned = "254" + cleaned;
     return "+" + cleaned;
   }
-  if (raw.startsWith("+")) return raw;
   return raw;
 }
 
@@ -148,12 +151,17 @@ function AuthPage() {
             ? await supabase.auth.signInWithPassword({ email, password })
             : await supabase.auth.signInWithPassword({ phone: formatPhoneNumber(phone), password });
         if (result.error) throw result.error;
-        await applyPendingReferralCode();
         const target = redirectParam.startsWith("/") ? redirectParam : "/";
         navigate({ to: target });
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      const message = err instanceof Error ? err.message : "";
+      if (message.includes("Invalid login credentials")) {
+        setMode("signup");
+        setError("Account not found — create one to continue.");
+        return;
+      }
+      setError(message || "Something went wrong.");
     } finally {
       setLoading(false);
     }
