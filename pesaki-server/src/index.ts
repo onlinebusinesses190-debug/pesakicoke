@@ -44,7 +44,16 @@ const startServer = async () => {
 
     // Add dummy endpoints for missing ones
     server.get('/user/stats', async (_request, reply) => {
-      return reply.send({ totalReferrals: 0, totalEarnings: 0, activeReferrals: 0 });
+      return reply.send({
+        activeTrades: 0,
+        tradesChange: 0,
+        jobsCompleted: 0,
+        jobsChange: 0,
+        investmentGrowth: '0%',
+        growthChange: 0,
+        businessesFunded: 0,
+        activeBusinesses: 0,
+      });
     });
     server.get('/trading/opportunities', async (_request, reply) => {
       return reply.send([]);

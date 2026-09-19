@@ -47,7 +47,25 @@ export default async function walletRoutes(server: FastifyInstance) {
         return reply.status(500).send({ error: 'Database error' });
       }
 
-      return reply.send(wallet);
+      // ─── Fetch referral earnings for dashboard ──────────────────────
+      let referralEarnings = 0;
+      try {
+        const { data: referralRows } = await supabase
+          .from('wallet_ledger')
+          .select('amount')
+          .eq('user_id', user.id)
+          .eq('type', 'referral')
+          .eq('mode', 'credit');
+        referralEarnings = (referralRows || []).reduce((sum, r) => sum + Number(r.amount), 0);
+      } catch (e) { /* ignore */ }
+
+      return reply.send({
+        balance: wallet.balance || 0,
+        demo_balance: wallet.demo_balance || 0,
+        locked: wallet.locked || 0,
+        totalEarnings: referralEarnings,
+        referralEarnings,
+      });
     } catch (err: any) {
       console.error('Unexpected error in /wallet/balance:', err);
       return reply.status(500).send({ error: err.message || 'Internal server error' });
@@ -75,7 +93,7 @@ export default async function walletRoutes(server: FastifyInstance) {
         return reply.status(500).send({ error: 'Database error' });
       }
 
-      const txWithStatus = transactions?.map(tx => ({ ...tx, status: 'completed' })) || [];
+      const txWithStatus = transactions?.map(tx => ({ ...tx, date: tx.created_at, status: 'completed' })) || [];
 
       return reply.send(txWithStatus);
     } catch (err: any) {
