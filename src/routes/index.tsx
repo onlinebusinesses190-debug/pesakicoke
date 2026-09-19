@@ -59,7 +59,7 @@ function HomePage() {
   const [loading, setLoading] = useState(true);
 
   const navigate = useNavigate();
-  const { requireAuth } = useRequireAuth();
+  const { requireAuth, user } = useRequireAuth();
 
   // Inline sheets on the Home dashboard (no redirect to /wallet).
   const [showDeposit, setShowDeposit] = useState(false);
@@ -526,14 +526,14 @@ function HomePage() {
       {showDeposit && (
         <DepositSheet
           onClose={() => setShowDeposit(false)}
-          user={null}
+          user={user}
           onSuccess={refreshBalance}
         />
       )}
       {showWithdraw && (
         <WithdrawSheet
           onClose={() => setShowWithdraw(false)}
-          user={null}
+          user={user}
           balance={balance}
           onSuccess={refreshBalance}
         />
@@ -541,7 +541,7 @@ function HomePage() {
       {showTransfer && (
         <TransferSheet
           onClose={() => setShowTransfer(false)}
-          user={null}
+          user={user}
           balance={balance}
           onSuccess={refreshBalance}
         />
