@@ -209,6 +209,7 @@ CREATE TABLE IF NOT EXISTS public.referrals (
   status text NOT NULL DEFAULT 'pending'
     CHECK (status IN ('pending', 'qualified', 'rejected')),
   first_deposit_amount numeric DEFAULT 0,
+  first_deposit_id uuid,
   referrer_bonus_paid numeric DEFAULT 0,
   welcome_bonus_paid numeric DEFAULT 0,
   qualified_at timestamptz,
@@ -376,8 +377,9 @@ DECLARE
   referral_record public.referrals%ROWTYPE;
   referrer_profile public.profiles%ROWTYPE;
   referred_profile public.profiles%ROWTYPE;
+  min_deposit_for_referral constant numeric := 100;
 BEGIN
-  IF p_deposit_amount IS NULL OR p_deposit_amount < 100 THEN
+  IF p_deposit_amount IS NULL OR p_deposit_amount < min_deposit_for_referral THEN
     RETURN jsonb_build_object('processed', false, 'reason', 'deposit_below_threshold');
   END IF;
 
@@ -509,6 +511,7 @@ BEGIN
   SET status = 'qualified',
       qualified_at = now(),
       first_deposit_amount = p_deposit_amount,
+      first_deposit_id = p_deposit_id,
       referrer_bonus_paid = 20,
       welcome_bonus_paid = 10,
       updated_at = now()

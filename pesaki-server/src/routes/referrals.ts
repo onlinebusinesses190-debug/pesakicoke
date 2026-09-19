@@ -322,10 +322,10 @@ export default async function referralRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       const { userId, amount, depositId = null } = request.body || {};
 
-      if (!userId || amount === undefined || amount === null || !depositId) {
+      if (!userId || amount === undefined || amount === null) {
         return reply.code(400).send({
           success: false,
-          error: 'userId, amount, and depositId are required',
+          error: 'userId and amount are required',
         });
       }
 
