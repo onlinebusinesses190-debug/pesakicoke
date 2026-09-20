@@ -104,7 +104,7 @@ BEGIN
   END IF;
 
   INSERT INTO public.wallets(user_id, balance, demo_balance, created_at, updated_at)
-    VALUES (p_user_id, 0, 0, now(), now())
+    VALUES (p_user_id, 0, 10000, now(), now())
     ON CONFLICT (user_id) DO NOTHING;
 
   IF lower(p_mode) = 'real' THEN
@@ -122,7 +122,7 @@ BEGIN
   END IF;
 
   INSERT INTO public.wallet_ledger (user_id, type, mode, amount, description, created_at)
-  VALUES (p_user_id, 'credit', 'credit', p_amount, p_description, now());
+  VALUES (p_user_id, 'deposit', 'credit', p_amount, p_description, now());
 
   RETURN new_balance;
 END;
@@ -178,7 +178,7 @@ BEGIN
   END IF;
 
   INSERT INTO public.wallet_ledger (user_id, type, mode, amount, description, created_at)
-  VALUES (p_user_id, 'debit', 'debit', p_amount, p_description, now());
+  VALUES (p_user_id, 'withdrawal', 'debit', p_amount, p_description, now());
 
   RETURN new_balance;
 END;

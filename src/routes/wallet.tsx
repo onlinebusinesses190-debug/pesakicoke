@@ -15,6 +15,7 @@ import {
   Filter,
   ArrowLeftRight,
   Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { fmt } from "@/lib/mock";
 import { apiRequest } from "@/utils/api";
@@ -173,6 +174,15 @@ function WalletPage() {
         subtitle="Manage your funds"
         right={
           <div className="flex items-center gap-2">
+            <button
+              onClick={refreshWallet}
+              className="rounded-full border border-border bg-background px-3 py-2 text-[11px] font-semibold text-foreground"
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <RefreshCw className="h-3.5 w-3.5" />
+                Refresh
+              </span>
+            </button>
             <button
               onClick={() => setShowTransfer(true)}
               className="rounded-full border border-border bg-background px-3 py-2 text-[11px] font-semibold text-foreground"

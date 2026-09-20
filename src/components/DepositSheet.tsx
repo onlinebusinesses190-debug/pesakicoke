@@ -36,9 +36,12 @@ export function DepositSheet({ onClose, user, onSuccess, onDepositComplete }: De
   };
 
   const pollDepositStatus = async (checkoutRequestId: string) => {
-    if (attemptsRef.current >= 20) {
+    if (attemptsRef.current >= 30) {
       stopPolling();
       setStep("failed");
+      toast("Taking longer than expected. If you entered your PIN, please use the refresh button below to check your updated balance.", {
+        duration: 15000,
+      });
       return;
     }
 
@@ -145,7 +148,7 @@ export function DepositSheet({ onClose, user, onSuccess, onDepositComplete }: De
     );
   }
 
-  if (step === "failed") {
+   if (step === "failed") {
     return (
       <div className="fixed inset-0 z-50 grid place-items-center bg-black/50">
         <div className="w-full max-w-sm rounded-2xl bg-card p-6 text-center">
@@ -154,15 +157,24 @@ export function DepositSheet({ onClose, user, onSuccess, onDepositComplete }: De
           </div>
           <p className="mt-3 text-lg font-bold">Deposit Failed</p>
           <p className="text-xs text-muted-foreground">
-            Taking longer than expected. If you entered your PIN, refresh the page in a minute to
-            see your updated balance.
+            Taking longer than expected. If you entered your PIN, the deposit may
+            still have gone through. Use the refresh button to check your updated
+            balance.
           </p>
-          <button
-            onClick={onClose}
-            className="mt-4 w-full rounded-xl gradient-primary py-3 text-sm font-semibold text-primary-foreground"
-          >
-            Done
-          </button>
+          <div className="mt-4 flex gap-2">
+            <button
+              onClick={onSuccess}
+              className="flex-1 rounded-xl border border-border py-2.5 text-sm font-semibold"
+            >
+              Refresh Balance
+            </button>
+            <button
+              onClick={onClose}
+              className="flex-1 rounded-xl gradient-primary py-2.5 text-sm font-semibold text-primary-foreground"
+            >
+              Done
+            </button>
+          </div>
         </div>
       </div>
     );

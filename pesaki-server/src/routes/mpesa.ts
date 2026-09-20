@@ -498,19 +498,34 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
           }
         }
 
+        const requestId = `${checkoutRequestId}_${mpesaReceipt || 'noreceipt'}`;
+
+        logger.info(
+          { requestId, checkoutRequestId, callbackAmount, mpesaReceipt, resultCode, resultDesc },
+          'M-Pesa callback: payment confirmed, finding deposit record'
+        );
+
         const { data: deposit, error: depositError } = await supabase
           .from('mpesa_deposits')
           .select('id, user_id, amount, status')
           .eq('checkout_request_id', checkoutRequestId)
-          .single();
+          .maybeSingle();
 
         if (depositError || !deposit) {
-          logger.error({ checkoutRequestId, depositError }, 'Deposit record not found');
+          logger.error(
+            { requestId, checkoutRequestId, depositError: depositError?.message },
+            'M-Pesa callback: deposit record not found — money may have been received but cannot credit'
+          );
           return reply.code(200).send({ ResultCode: 0, ResultDesc: 'Accepted' });
         }
 
+        logger.info(
+          { requestId, checkoutRequestId, depositId: deposit.id, userId: deposit.user_id, currentStatus: deposit.status },
+          'M-Pesa callback: deposit record found'
+        );
+
         if (deposit.status === 'completed') {
-          logger.info({ checkoutRequestId }, 'Deposit already processed');
+          logger.info({ requestId, depositId: deposit.id }, 'M-Pesa callback: deposit already completed, skipping');
           return reply.code(200).send({ ResultCode: 0, ResultDesc: 'Accepted' });
         }
 
@@ -518,14 +533,23 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
 
         if (!Number.isFinite(finalAmount) || finalAmount <= 0) {
           logger.error(
-            { checkoutRequestId, callbackAmount, depositAmount: deposit.amount },
-            'Invalid payment amount in callback'
+            { requestId, checkoutRequestId, callbackAmount, depositAmount: deposit.amount },
+            'M-Pesa callback: invalid payment amount'
           );
+          await supabase
+            .from('mpesa_deposits')
+            .update({ status: 'failed', mpesa_receipt: mpesaReceipt || null })
+            .eq('id', deposit.id);
           return reply.code(200).send({ ResultCode: 0, ResultDesc: 'Accepted' });
         }
 
         const depositFee = calculateDepositFee(finalAmount);
         const netAmount = Math.max(0, finalAmount - depositFee);
+
+        logger.info(
+          { requestId, userId: deposit.user_id, grossAmount: finalAmount, fee: depositFee, netAmount },
+          'M-Pesa callback: crediting wallet'
+        );
 
         const creditResult = await credit(
           deposit.user_id,
@@ -537,21 +561,42 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
         if (!creditResult.success) {
           logger.error(
             {
+              requestId,
               userId: deposit.user_id,
               amount: finalAmount,
               checkoutRequestId,
               error: creditResult.error,
             },
-            'Failed to credit wallet'
+            'M-Pesa callback: FAILED to credit wallet'
           );
           return reply.code(200).send({ ResultCode: 0, ResultDesc: 'Accepted' });
         }
 
-        await supabase
+        logger.info(
+          { requestId, userId: deposit.user_id, newBalance: creditResult.newBalance },
+          'M-Pesa callback: wallet credited successfully'
+        );
+
+        const { error: updateError } = await supabase
           .from('mpesa_deposits')
-          .update({ status: 'completed' })
-          .eq('checkout_request_id', checkoutRequestId)
+          .update({
+            status: 'completed',
+            mpesa_receipt: mpesaReceipt || null,
+          })
+          .eq('id', deposit.id)
           .eq('status', 'pending');
+
+        if (updateError) {
+          logger.error(
+            { requestId, depositId: deposit.id, updateError: updateError.message },
+            'M-Pesa callback: failed to update deposit status to completed'
+          );
+        } else {
+          logger.info(
+            { requestId, depositId: deposit.id, userId: deposit.user_id, amount: netAmount, mpesaReceipt },
+            'M-Pesa callback: deposit marked as completed and wallet credited'
+          );
+        }
 
         const referralResult = await processReferralOnDeposit(
           deposit.user_id,
@@ -560,17 +605,10 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
         );
         if (referralResult.success && referralResult.processed) {
           logger.info(
-            { userId: deposit.user_id, amount: finalAmount },
-            'Referral reward processed after deposit'
+            { requestId, userId: deposit.user_id, amount: finalAmount },
+            'M-Pesa callback: referral reward processed after deposit'
           );
         }
-
-        logger.info(
-          { userId: deposit.user_id, amount: finalAmount, mpesaReceipt, checkoutRequestId },
-          'M-Pesa payment successful and wallet credited'
-        );
-
-        return reply.code(200).send({ ResultCode: 0, ResultDesc: 'Accepted' });
       } catch (error) {
         logger.error(error, 'Error processing M-Pesa callback');
         return reply.code(200).send({ ResultCode: 0, ResultDesc: 'Accepted' });
