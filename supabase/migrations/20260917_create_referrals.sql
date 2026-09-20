@@ -209,7 +209,7 @@ CREATE TABLE IF NOT EXISTS public.referrals (
   status text NOT NULL DEFAULT 'pending'
     CHECK (status IN ('pending', 'qualified', 'rejected')),
   first_deposit_amount numeric DEFAULT 0,
-  first_deposit_id uuid,
+  first_deposit_id text,
   referrer_bonus_paid numeric DEFAULT 0,
   welcome_bonus_paid numeric DEFAULT 0,
   qualified_at timestamptz,

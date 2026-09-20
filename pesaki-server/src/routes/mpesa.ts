@@ -601,20 +601,54 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
         // Fire referral processing AFTER wallet credit, in its own try/catch
         // so it never blocks or breaks the deposit credit
         try {
+          logger.info(
+            { checkoutRequestId, userId: deposit.user_id, amount: deposit.amount, depositId: deposit.id },
+            'M-Pesa callback: calling processReferralOnDeposit'
+          );
           const referralResult = await processReferralOnDeposit(
             deposit.user_id,
             deposit.amount,
             checkoutRequestId
           );
-          logger.info(
-            { checkoutRequestId, userId: deposit.user_id, amount: deposit.amount, referralResult },
-            'Referral processing completed'
-          );
-        } catch (referralErr) {
+          if (referralResult.success && referralResult.processed) {
+            logger.info(
+              {
+                checkoutRequestId,
+                userId: deposit.user_id,
+                amount: deposit.amount,
+                referralResult,
+              },
+              'M-Pesa callback: Referral processing completed (bonus paid)'
+            );
+          } else if (referralResult.success) {
+            logger.info(
+              {
+                checkoutRequestId,
+                userId: deposit.user_id,
+                amount: deposit.amount,
+                reason: referralResult.reason,
+                error: referralResult.error,
+                referralResult,
+              },
+              'M-Pesa callback: Referral processing completed (skipped)'
+            );
+          } else {
+            logger.error(
+              {
+                checkoutRequestId,
+                userId: deposit.user_id,
+                amount: deposit.amount,
+                error: referralResult.error,
+                reason: referralResult.reason,
+              },
+              'M-Pesa callback: Referral processing failed'
+            );
+          }
+        } catch (referralErr: any) {
           // Never let referral errors break the callback
           logger.error(
-            { referralErr, userId: deposit.user_id, checkoutRequestId },
-            'Referral processing failed (deposit already credited)'
+            { referralErr: referralErr?.message || String(referralErr), userId: deposit.user_id, checkoutRequestId },
+            'M-Pesa callback: Referral processing threw exception (deposit already credited)'
           );
         }
       } catch (error) {

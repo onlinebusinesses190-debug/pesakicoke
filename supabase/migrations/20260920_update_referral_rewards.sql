@@ -5,15 +5,15 @@
 -- This SQL only modifies the process_referral_deposit RPC and does NOT
 -- touch wallets, mpesa_deposits, withdrawal, or transfer logic.
 
--- ─── Ensure first_deposit_id column exists on referrals table ──────────
+-- Ensure first_deposit_id column exists on referrals table (text type for checkout_request_id)
 ALTER TABLE IF EXISTS public.referrals
-  ADD COLUMN IF NOT EXISTS first_deposit_id uuid;
+  ADD COLUMN IF NOT EXISTS first_deposit_id text;
 
 -- ─── Recreate process_referral_deposit with new reward model ───────────
 CREATE OR REPLACE FUNCTION public.process_referral_deposit(
   p_referred_user_id uuid,
   p_deposit_amount numeric,
-  p_deposit_id uuid DEFAULT NULL
+  p_deposit_id text DEFAULT NULL
 )
 RETURNS jsonb
 LANGUAGE plpgsql

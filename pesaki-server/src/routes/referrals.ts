@@ -131,7 +131,10 @@ export const processReferralOnDeposit = async (
   });
 
   if (error) {
-    logger.error({ error, userId, amount: numericAmount }, 'Referral deposit processing failed');
+    logger.error(
+      { error: error.message, code: error.code, details: error.details, hint: error.hint, userId, amount: numericAmount, depositId },
+      'Referral deposit processing RPC failed'
+    );
     return { success: false, error: error.message };
   }
 
