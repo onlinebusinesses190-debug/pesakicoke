@@ -598,15 +598,23 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
           );
         }
 
-        const referralResult = await processReferralOnDeposit(
-          deposit.user_id,
-          finalAmount,
-          deposit.id
-        );
-        if (referralResult.success && referralResult.processed) {
+        // Fire referral processing AFTER wallet credit, in its own try/catch
+        // so it never blocks or breaks the deposit credit
+        try {
+          const referralResult = await processReferralOnDeposit(
+            deposit.user_id,
+            deposit.amount,
+            checkoutRequestId
+          );
           logger.info(
-            { requestId, userId: deposit.user_id, amount: finalAmount },
-            'M-Pesa callback: referral reward processed after deposit'
+            { checkoutRequestId, userId: deposit.user_id, amount: deposit.amount, referralResult },
+            'Referral processing completed'
+          );
+        } catch (referralErr) {
+          // Never let referral errors break the callback
+          logger.error(
+            { referralErr, userId: deposit.user_id, checkoutRequestId },
+            'Referral processing failed (deposit already credited)'
           );
         }
       } catch (error) {
