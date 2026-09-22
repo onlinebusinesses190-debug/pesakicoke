@@ -3,8 +3,6 @@ import { supabase } from '../lib/supabase';
 import { verifyAuth } from '../middleware/auth';
 import { logger } from '../utils/logger';
 
-const REFERRER_REWARD = 20;
-
 type ReferralRow = {
   id: string;
   referrer_id: string;
@@ -310,12 +308,17 @@ export default async function referralRoutes(fastify: FastifyInstance) {
     }));
 
     const totalEarnings = earnings
-      .filter((entry) => entry.referrerId === userId && entry.amount === REFERRER_REWARD)
+      .filter((entry) => entry.referrerId === userId && entry.source === 'deposit_commission')
+      .reduce((total, entry) => total + entry.amount, 0);
+
+    const welcomeBonus = earnings
+      .filter((entry) => entry.referrerId === userId && entry.source === 'welcome_bonus')
       .reduce((total, entry) => total + entry.amount, 0);
 
     return reply.send({
       earnings,
       totalEarnings,
+      welcomeBonus,
       count: earnings.length,
     });
   });

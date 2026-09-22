@@ -75,7 +75,9 @@ function WalletPage() {
   const [showDeposit, setShowDeposit] = useState(false);
   const [showWithdraw, setShowWithdraw] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
-  const [filter, setFilter] = useState<"all" | "deposit" | "withdrawal" | "trading">("all");
+  const [filter, setFilter] = useState<"all" | "deposit" | "withdrawal" | "trading" | "transfer">(
+    "all",
+  );
   const hasFetched = useRef(false);
 
   const getAuthToken = async () => {
@@ -149,12 +151,27 @@ function WalletPage() {
 
   const filteredTransactions = transactions.filter((tx) => {
     if (tx.mode === "demo") return false;
-    if (filter === "all") return true;
-    if (filter === "deposit") return tx.type === "deposit";
-    if (filter === "withdrawal") return tx.type === "withdrawal";
-    if (filter === "trading")
-      return tx.type === "game_win" || tx.type === "game_loss" || tx.type === "market";
-    return true;
+    if (tx.mode === "demo" || /demo/i.test(tx.description || "")) return false;
+    switch (filter) {
+      case "all":
+        return true;
+      case "deposit":
+        return tx.type === "deposit";
+      case "withdrawal":
+        return tx.type === "withdrawal";
+      case "trading":
+        return (
+          tx.type === "game_win" ||
+          tx.type === "game_loss" ||
+          tx.type === "market" ||
+          tx.type === "bet" ||
+          tx.type === "win"
+        );
+      case "transfer":
+        return tx.type === "transfer";
+      default:
+        return true;
+    }
   });
 
   if (loading) {
@@ -266,6 +283,7 @@ function WalletPage() {
             { key: "deposit", label: "Deposit" },
             { key: "withdrawal", label: "Withdrawal" },
             { key: "trading", label: "Trading" },
+            { key: "transfer", label: "Transfer" },
           ].map((tab) => (
             <button
               key={tab.key}

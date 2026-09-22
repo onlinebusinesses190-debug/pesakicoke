@@ -22,9 +22,8 @@ import {
   ExternalLink,
   Share2,
   Users,
-  Clock,
-  Trophy,
   Calendar,
+  Trophy,
   Link as LinkIcon,
   RefreshCw,
 } from "lucide-react";
@@ -161,6 +160,7 @@ function ProfilePage() {
   const [earningsLog, setEarningsLog] = useState<EarningsEntry[]>([]);
   const [refLoading, setRefLoading] = useState(false);
   const [refError, setRefError] = useState<string | null>(null);
+  const [welcomeBonus, setWelcomeBonus] = useState(0);
 
   const fetchReferralData = useCallback(async () => {
     setRefLoading(true);
@@ -186,8 +186,9 @@ function ProfilePage() {
       }
 
       if (earningsResult.status === "fulfilled") {
-        const data = earningsResult.value as { earnings?: EarningsEntry[] };
+        const data = earningsResult.value as { earnings?: EarningsEntry[]; welcomeBonus?: number };
         setEarningsLog(Array.isArray(data.earnings) ? data.earnings.slice(0, 20) : []);
+        setWelcomeBonus(Number(data.welcomeBonus || 0));
       }
 
       if (meResult.status === "rejected" || earningsResult.status === "rejected") {
@@ -333,21 +334,9 @@ function ProfilePage() {
   };
 
   // ── Referral helpers ──────────────────────────────────
-  const EARNING_WINDOW_DAYS = 7;
-
-  const earningWindowEnd = (joinedAt: string): Date => {
-    const end = new Date(joinedAt);
-    end.setDate(end.getDate() + EARNING_WINDOW_DAYS);
-    return end;
-  };
-
-  const isWithinEarningWindow = (joinedAt: string): boolean => {
-    return new Date() < earningWindowEnd(joinedAt);
-  };
-
   const earnedFromUser = (referredUserId: string): number => {
     return earningsLog
-      .filter((e) => e.referredUserId === referredUserId)
+      .filter((e) => e.referredUserId === referredUserId && e.source === "deposit_commission")
       .reduce((sum, e) => sum + e.amount, 0);
   };
 
@@ -357,6 +346,20 @@ function ProfilePage() {
       .split("_")
       .map((w) => (w[0] ? w[0].toUpperCase() + w.slice(1) : ""))
       .join(" ");
+  };
+
+  const statusLabel = (status: "pending" | "qualified" | "rejected"): string => {
+    if (status === "qualified") return "Qualified";
+    if (status === "rejected") return "Rejected";
+    return "Pending";
+  };
+
+  const statusTone = (
+    status: "pending" | "qualified" | "rejected",
+  ): "warning" | "success" | "destructive" => {
+    if (status === "qualified") return "success";
+    if (status === "rejected") return "destructive";
+    return "warning";
   };
 
   if (loading) {
@@ -428,7 +431,7 @@ function ProfilePage() {
             <Gift className="absolute -right-3 -top-3 h-24 w-24 opacity-20" />
             <p className="text-xs font-semibold uppercase tracking-wider">Invite & Earn</p>
             <p className="mt-1 text-lg font-bold">
-              Share your code and earn when a friend deposits KES 100+
+              Share your code and earn when a friend signs up and deposits
             </p>
 
             <div className="mt-4 grid gap-3 rounded-xl bg-foreground/10 p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
@@ -482,11 +485,12 @@ function ProfilePage() {
           </Link>
         )}
 
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
           <Stat label="Total referrals" value={String(totalReferrals)} tone="primary" />
           <Stat label="Qualified" value={String(qualifiedReferrals)} tone="success" />
           <Stat label="Pending" value={String(pendingReferrals)} tone="primary" />
-          <Stat label="Total earnings" value={fmt(totalEarnings)} tone="gold" />
+          <Stat label="Referral earnings" value={fmt(totalEarnings)} tone="gold" />
+          <Stat label="Welcome bonus" value={fmt(welcomeBonus)} tone="primary" />
         </div>
 
         {refLoading && (
@@ -534,35 +538,8 @@ function ProfilePage() {
                           year: "numeric",
                         })}
                       </p>
-                      <p className="truncate text-[10px] text-muted-foreground">
-                        {isWithinEarningWindow(user.joinedAt)
-                          ? `Earning until ${earningWindowEnd(user.joinedAt).toLocaleDateString("en-KE", {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            })}`
-                          : "Earning window closed"}
-                      </p>
                     </div>
-                    <Badge
-                      tone={
-                        !isWithinEarningWindow(user.joinedAt)
-                          ? "neutral"
-                          : user.status === "qualified"
-                            ? "success"
-                            : user.status === "rejected"
-                              ? "destructive"
-                              : "warning"
-                      }
-                    >
-                      {!isWithinEarningWindow(user.joinedAt)
-                        ? "Expired"
-                        : user.status === "qualified"
-                          ? "Qualified"
-                          : user.status === "rejected"
-                            ? "Rejected"
-                            : "Pending"}
-                    </Badge>
+                    <Badge tone={statusTone(user.status)}>{statusLabel(user.status)}</Badge>
                     <p
                       className={`text-sm font-bold ${earnedFromUser(user.id) > 0 ? "text-success" : "text-muted-foreground"}`}
                     >
@@ -622,13 +599,32 @@ function ProfilePage() {
         <section className="mt-5">
           <SectionTitle title="How It Works" />
           <Card className="!p-4">
-            <ol className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            <ol className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[
-                { step: "1", title: "Share your referral code with friends", desc: "", icon: Share2 },
-                { step: "2", title: "When they sign up and make a deposit of KES 100+", desc: "You earn 10% of it", icon: Users },
-                { step: "3", title: "For 7 days after they sign up", desc: "You keep earning 10% of every deposit they make", icon: Clock },
-                { step: "4", title: "They get a KES 10 welcome bonus", desc: "On their first deposit", icon: Gift },
-                { step: "5", title: "Rewards are credited automatically", desc: "To your PESAKI wallet", icon: Trophy },
+                {
+                  step: "1",
+                  title: "Share your referral code with friends",
+                  desc: "",
+                  icon: Share2,
+                },
+                {
+                  step: "2",
+                  title: "When they sign up and make a deposit",
+                  desc: "You earn 10% of it",
+                  icon: Users,
+                },
+                {
+                  step: "3",
+                  title: "They get a KES 10 welcome bonus",
+                  desc: "On their first deposit",
+                  icon: Gift,
+                },
+                {
+                  step: "4",
+                  title: "Rewards are credited automatically",
+                  desc: "To your PESAKI wallet",
+                  icon: Trophy,
+                },
               ].map((item) => (
                 <div
                   key={item.step}

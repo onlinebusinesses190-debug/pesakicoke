@@ -304,31 +304,51 @@ export default async function walletRoutes(server: FastifyInstance) {
         return digits;
       })();
 
+      // ─── Fetch sender and recipient profiles ───────────────────────────
+      const { data: senderProfile } = await supabase
+        .from('profiles')
+        .select('full_name, phone, email')
+        .eq('id', user.id)
+        .single();
+
+      const senderName = senderProfile?.full_name || senderProfile?.email?.split('@')[0] || 'PESAKI member';
+      const senderPhone = senderProfile?.phone || '';
+      const senderEmail = senderProfile?.email || '';
+
       // Try phone lookup first
       let recipientUser: { id: string } | null = null;
       const { data: byPhone } = await supabase
         .from('profiles')
-        .select('id')
+        .select('id, full_name, phone, email')
         .eq('phone', normalizedPhone)
         .maybeSingle();
 
+      let recipientProfile: { full_name?: string | null; phone?: string | null; email?: string | null } | null = null;
+
       if (byPhone?.id) {
         recipientUser = byPhone;
+        recipientProfile = byPhone;
       } else {
         // Fall back to case-insensitive email lookup
         const { data: byEmail } = await supabase
           .from('profiles')
-          .select('id')
+          .select('id, full_name, phone, email')
           .ilike('email', trimmed)
           .maybeSingle();
-        recipientUser = byEmail;
+        if (byEmail?.id) {
+          recipientUser = byEmail;
+          recipientProfile = byEmail;
+        }
       }
 
       if (!recipientUser) {
         return reply.status(404).send({ error: 'Recipient not found. Check the phone number or email and try again.' });
       }
 
-      // Get sender balance
+      const recipientName = recipientProfile?.full_name || recipientProfile?.email?.split('@')[0] || 'PESAKI member';
+      const recipientPhone = recipientProfile?.phone || '';
+
+      // ─── Get sender balance ────────────────────────────────────────────
       const { data: senderWallet, error: senderError } = await supabase
         .from('wallets')
         .select('balance')
@@ -343,13 +363,13 @@ export default async function walletRoutes(server: FastifyInstance) {
       const fee = calculateTransferFee(amount);
       const recipientGets = Math.max(0, amount - fee);
 
-      // Deduct from sender
+      // ─── Deduct from sender ────────────────────────────────────────────
       await supabase
         .from('wallets')
         .update({ balance: senderWallet.balance - amount })
         .eq('user_id', user.id);
 
-      // Credit recipient
+      // ─── Credit recipient ───────────────────────────────────────────────
       const { data: recipientWallet, error: recipError } = await supabase
         .from('wallets')
         .select('balance')
@@ -363,25 +383,33 @@ export default async function walletRoutes(server: FastifyInstance) {
         .update({ balance: (recipientWallet.balance || 0) + recipientGets })
         .eq('user_id', recipientUser.id);
 
-      // Ledger entries
+      // ─── Generate shared transfer reference ────────────────────────────
+      const transferRef = crypto.randomUUID();
+
+      // ─── Ledger entries with shared transfer reference ───────────────
+      const receiverDisplay = recipientPhone || recipientName;
+      const senderDisplay = senderPhone || senderEmail || senderName;
+
       await supabase.from('wallet_ledger').insert([
         {
           user_id: user.id,
           amount,
           type: 'transfer',
           mode: 'debit',
-          description: `Transfer to ${recipient} (Fee: ${fee}, Recipient gets: ${recipientGets})`,
+          description: `Transfer to ${recipientName} (${receiverDisplay})`,
+          reference_id: transferRef,
         },
         {
           user_id: recipientUser.id,
           amount: recipientGets,
           type: 'transfer',
           mode: 'credit',
-          description: `Transfer from ${user.email || user.id} (Fee: ${fee})`,
+          description: `Transfer from ${senderName} (${senderDisplay})`,
+          reference_id: transferRef,
         },
       ]);
 
-      return reply.send({ success: true, message: 'Transfer completed', fee, recipientGets });
+      return reply.send({ success: true, message: 'Transfer completed', fee, recipientGets, reference_id: transferRef });
     } catch (err: any) {
       console.error('Transfer error:', err);
       return reply.status(500).send({ error: err.message || 'Internal server error' });
