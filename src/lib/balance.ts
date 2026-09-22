@@ -26,19 +26,9 @@ type State = {
 const STORAGE_KEY = "pesaki:balance:v1";
 
 const initial: State = {
-  available: 84250,
-  locked: [
-    { id: "l1", name: "12-Month Growth Lock", amount: 120000, apy: 8,  days: 214, total: 365 },
-    { id: "l2", name: "6-Month Balanced Lock", amount: 60000,  apy: 6,  days: 45,  total: 180 },
-  ],
-  transactions: [
-    { id: "tx1", type: "Deposit",         amount: 15000,  date: "Today, 10:24", status: "Completed" },
-    { id: "tx2", type: "Job Earnings",    amount: 4500,   date: "Today, 08:11", status: "Completed" },
-    { id: "tx3", type: "Trading",         amount: -1200,  date: "Yesterday",    status: "Completed" },
-    { id: "tx4", type: "Withdrawal",      amount: -8000,  date: "Yesterday",    status: "Pending"   },
-    { id: "tx5", type: "Savings",         amount: -5000,  date: "Jun 18",       status: "Completed" },
-    { id: "tx6", type: "Business Funding",amount: 50000,  date: "Jun 15",       status: "Completed" },
-  ],
+  available: 0,
+  locked: [],
+  transactions: [],
 };
 
 function load(): State {

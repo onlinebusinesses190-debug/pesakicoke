@@ -148,6 +148,7 @@ function WalletPage() {
   };
 
   const filteredTransactions = transactions.filter((tx) => {
+    if (tx.mode === "demo") return false;
     if (filter === "all") return true;
     if (filter === "deposit") return tx.type === "deposit";
     if (filter === "withdrawal") return tx.type === "withdrawal";

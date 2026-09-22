@@ -85,6 +85,7 @@ export default async function walletRoutes(server: FastifyInstance) {
         .from('wallet_ledger')
         .select('id, type, amount, mode, description, created_at')
         .eq('user_id', user.id)
+        .neq('mode', 'demo')
         .order('created_at', { ascending: false })
         .limit(50);
 

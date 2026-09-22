@@ -137,7 +137,7 @@ function HomePage() {
 
         const txData = await apiRequest("/wallet/transactions?limit=5");
         if (isMounted.current) {
-          setTransactions(txData || []);
+          setTransactions((txData || []).filter((tx: any) => tx.mode !== "demo"));
         }
 
         // 3. Fetch stats (optional)
