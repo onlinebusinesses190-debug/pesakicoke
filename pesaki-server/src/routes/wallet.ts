@@ -83,9 +83,9 @@ export default async function walletRoutes(server: FastifyInstance) {
 
       const { data: transactions, error: txError } = await supabase
         .from('wallet_ledger')
-        .select('id, type, amount, mode, description, created_at')
+        .select('id, type, amount, mode, description, created_at, reference_id')
         .eq('user_id', user.id)
-        .neq('mode', 'demo')
+        .eq('is_demo', false)
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -117,7 +117,8 @@ export default async function walletRoutes(server: FastifyInstance) {
         .select('amount')
         .eq('user_id', user.id)
         .eq('mode', 'credit')
-        .eq('type', 'deposit');
+        .eq('type', 'deposit')
+        .eq('is_demo', false);
 
       if (depError) throw depError;
 
@@ -126,7 +127,8 @@ export default async function walletRoutes(server: FastifyInstance) {
         .select('amount')
         .eq('user_id', user.id)
         .eq('mode', 'debit')
-        .eq('type', 'withdrawal');
+        .eq('type', 'withdrawal')
+        .eq('is_demo', false);
 
       if (wdError) throw wdError;
 

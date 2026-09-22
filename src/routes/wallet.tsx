@@ -151,7 +151,7 @@ function WalletPage() {
 
   const filteredTransactions = transactions.filter((tx) => {
     if (tx.mode === "demo") return false;
-    if (tx.mode === "demo" || /demo/i.test(tx.description || "")) return false;
+    if (/demo/i.test(tx.description || "")) return false;
     switch (filter) {
       case "all":
         return true;

@@ -4,7 +4,6 @@ import { env } from '../config/env';
 import { credit } from '../wallet/service';
 import { calculateDepositFee, MIN_DEPOSIT } from '../utils/fees';
 import { supabase } from '../lib/supabase';
-import { processReferralOnDeposit } from './referrals';
 
 interface AccessTokenResponse {
   access_token: string;
@@ -598,58 +597,24 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
           );
         }
 
-        // Fire referral processing AFTER wallet credit, in its own try/catch
-        // so it never blocks or breaks the deposit credit
+        // ─── Trigger referral processing (non-blocking) ─────────────────────
         try {
-          logger.info(
-            { checkoutRequestId, userId: deposit.user_id, amount: deposit.amount, depositId: deposit.id },
-            'M-Pesa callback: calling processReferralOnDeposit'
+          const { data: refResult, error: refError } = await supabase.rpc(
+            "process_referral_deposit",
+            {
+              p_referred_user_id: deposit.user_id,
+              p_deposit_amount: deposit.amount,
+              p_deposit_id: checkoutRequestId,
+            }
           );
-          const referralResult = await processReferralOnDeposit(
-            deposit.user_id,
-            deposit.amount,
-            checkoutRequestId
-          );
-          if (referralResult.success && referralResult.processed) {
-            logger.info(
-              {
-                checkoutRequestId,
-                userId: deposit.user_id,
-                amount: deposit.amount,
-                referralResult,
-              },
-              'M-Pesa callback: Referral processing completed (bonus paid)'
-            );
-          } else if (referralResult.success) {
-            logger.info(
-              {
-                checkoutRequestId,
-                userId: deposit.user_id,
-                amount: deposit.amount,
-                reason: referralResult.reason,
-                error: referralResult.error,
-                referralResult,
-              },
-              'M-Pesa callback: Referral processing completed (skipped)'
-            );
+
+          if (refError) {
+            logger.error({ refError, checkoutRequestId }, "Referral RPC error");
           } else {
-            logger.error(
-              {
-                checkoutRequestId,
-                userId: deposit.user_id,
-                amount: deposit.amount,
-                error: referralResult.error,
-                reason: referralResult.reason,
-              },
-              'M-Pesa callback: Referral processing failed'
-            );
+            logger.info({ refResult, checkoutRequestId }, "Referral RPC result");
           }
-        } catch (referralErr: any) {
-          // Never let referral errors break the callback
-          logger.error(
-            { referralErr: referralErr?.message || String(referralErr), userId: deposit.user_id, checkoutRequestId },
-            'M-Pesa callback: Referral processing threw exception (deposit already credited)'
-          );
+        } catch (refErr) {
+          logger.error({ refErr, checkoutRequestId }, "Referral call threw");
         }
       } catch (error) {
         logger.error(error, 'Error processing M-Pesa callback');
