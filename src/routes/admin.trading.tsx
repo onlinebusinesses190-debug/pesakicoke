@@ -1,20 +1,71 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { AdminPageHeader, AdminCard, KPI, StatusPill } from "@/components/AdminShell";
-import { adminTrading, fmtCompact } from "@/lib/admin-mock";
+import { fmtCompact } from "@/lib/admin-utils";
+import { apiRequest } from "@/utils/api";
+import { useAdminAuth } from "@/hooks/useAdmin";
+import { toast } from "sonner";
+
+interface TradingProduct {
+  product: string;
+  users: number;
+  volume: number;
+  status: string;
+}
 
 export const Route = createFileRoute("/admin/trading")({
   component: AdminTrading,
 });
 
 function AdminTrading() {
-  const volume = adminTrading.reduce((s, t) => s + t.volume, 0);
-  const users = adminTrading.reduce((s, t) => s + t.users, 0);
+  const { loading: authLoading } = useAdminAuth();
+  const [products, setProducts] = useState<TradingProduct[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (authLoading) return;
+    apiRequest<{
+      success: boolean;
+      products: TradingProduct[];
+      totalVolume: number;
+      totalUsers: number;
+    }>("/admin/trading/summary")
+      .then((res) => {
+        setProducts(res.products || []);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Trading fetch error:", err);
+        toast.error("Could not load trading data");
+        setLoading(false);
+      });
+  }, [authLoading]);
+
+  const volume = products.reduce((s, t) => s + t.volume, 0);
+  const users = products.reduce((s, t) => s + t.users, 0);
+
+  if (authLoading || loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">Loading trading data…</p>
+      </div>
+    );
+  }
+
   return (
     <>
-      <AdminPageHeader title="Trading Products" subtitle="Monitor and configure platform trading games." />
+      <AdminPageHeader
+        title="Trading Products"
+        subtitle="Monitor and configure platform trading games."
+      />
 
       <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <KPI label="Active Traders" value={users.toLocaleString()} hint="Across all products" tone="success" />
+        <KPI
+          label="Active Traders"
+          value={users.toLocaleString()}
+          hint="Across all products"
+          tone="success"
+        />
         <KPI label="24h Volume" value={fmtCompact(volume)} hint="All products" tone="gold" />
         <KPI label="House Edge" value="6.2%" hint="Avg." />
         <KPI label="Flagged Trades" value="9" hint="Anti-fraud" tone="destructive" />
@@ -34,14 +85,18 @@ function AdminTrading() {
                 </tr>
               </thead>
               <tbody>
-                {adminTrading.map((p) => (
+                {products.map((p) => (
                   <tr key={p.product} className="border-b border-border/60 last:border-0">
                     <td className="py-3 pr-3 font-medium">{p.product}</td>
                     <td className="py-3 pr-3 text-right">{p.users.toLocaleString()}</td>
                     <td className="py-3 pr-3 text-right font-semibold">{fmtCompact(p.volume)}</td>
-                    <td className="py-3 pr-3"><StatusPill status={p.status} /></td>
+                    <td className="py-3 pr-3">
+                      <StatusPill status={p.status} />
+                    </td>
                     <td className="py-3">
-                      <button className="text-xs font-semibold text-primary hover:underline">Configure</button>
+                      <button className="text-xs font-semibold text-primary hover:underline">
+                        Configure
+                      </button>
                     </td>
                   </tr>
                 ))}

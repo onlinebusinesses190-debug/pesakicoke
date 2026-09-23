@@ -17,6 +17,7 @@ import { mpesaRoutes } from './routes/mpesa';
 import { palplussRoutes } from './routes/palpluss';
 import { bankingRoutes } from './routes/banking';
 import referralRoutes from './routes/referrals';
+import adminRoutes from './routes/admin';
 
 const startServer = async () => {
   try {
@@ -41,6 +42,7 @@ const startServer = async () => {
     server.register(palplussRoutes);
     server.register(bankingRoutes);
     server.register(referralRoutes);
+    server.register(adminRoutes);
 
     // Add dummy endpoints for missing ones
     server.get('/user/stats', async (_request, reply) => {
