@@ -1,22 +1,42 @@
 import { Link, useRouterState, type LinkProps } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
 import {
-  LayoutDashboard, Users, Wallet, Briefcase, Building2, Landmark,
-  LineChart, Bell, LifeBuoy, Share2, BarChart3, Search, Menu, X, Shield,
+  LayoutDashboard,
+  Users,
+  Wallet,
+  Briefcase,
+  Building2,
+  Landmark,
+  LineChart,
+  Bell,
+  LifeBuoy,
+  Share2,
+  BarChart3,
+  Search,
+  Menu,
+  X,
+  Shield,
+  Clock,
+  ArrowLeftRight,
+  FileText,
 } from "lucide-react";
 
-const nav: { to: LinkProps["to"]; label: string; icon: typeof Users }[] = [
-  { to: "/admin",               label: "Dashboard",     icon: LayoutDashboard },
-  { to: "/admin/users",         label: "Users & KYC",   icon: Users },
-  { to: "/admin/finance",       label: "Finance",       icon: Wallet },
-  { to: "/admin/kazi",          label: "KAZI Link",     icon: Briefcase },
-  { to: "/admin/business",      label: "Business",      icon: Building2 },
-  { to: "/admin/banking",       label: "Banking Plans", icon: Landmark },
-  { to: "/admin/trading",       label: "Trading",       icon: LineChart },
+const nav: { to: LinkProps["to"]; label: string; icon: React.ElementType }[] = [
+  { to: "/admin", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/admin/users", label: "Users & KYC", icon: Users },
+  { to: "/admin/finance", label: "Finance", icon: Wallet },
+  { to: "/admin/transactions", label: "Transactions", icon: ArrowLeftRight },
+  { to: "/admin/deposits", label: "Deposits", icon: Clock },
+  { to: "/admin/withdrawals", label: "Withdrawals", icon: Clock },
+  { to: "/admin/referrals", label: "Referrals", icon: Share2 },
+  { to: "/admin/kazi", label: "KAZI Link", icon: Briefcase },
+  { to: "/admin/business", label: "Business", icon: Building2 },
+  { to: "/admin/banking", label: "Banking", icon: Landmark },
+  { to: "/admin/trading", label: "Trading", icon: LineChart },
   { to: "/admin/notifications", label: "Notifications", icon: Bell },
-  { to: "/admin/support",       label: "Support",       icon: LifeBuoy },
-  { to: "/admin/commissions",   label: "Commissions",   icon: Share2 },
-  { to: "/admin/reports",       label: "Reports",       icon: BarChart3 },
+  { to: "/admin/support", label: "Support", icon: LifeBuoy },
+  { to: "/admin/reports", label: "Reports", icon: BarChart3 },
+  { to: "/admin/actions", label: "Audit Log", icon: FileText },
 ];
 
 export function AdminShell({ children }: { children: ReactNode }) {
@@ -39,7 +59,9 @@ export function AdminShell({ children }: { children: ReactNode }) {
             </span>
             <span className="flex flex-col leading-tight">
               <span className="font-display text-base font-bold tracking-tight">PESAKI</span>
-              <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Admin Console</span>
+              <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                Admin Console
+              </span>
             </span>
           </Link>
           <button
@@ -53,7 +75,10 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <nav className="px-3 py-4">
           <ul className="space-y-1">
             {nav.map((item) => {
-              const active = item.to === "/admin" ? pathname === "/admin" : pathname.startsWith(item.to as string);
+              const active =
+                item.to === "/admin"
+                  ? pathname === "/admin"
+                  : pathname.startsWith(item.to as string);
               const Icon = item.icon;
               return (
                 <li key={item.to as string}>
@@ -75,7 +100,9 @@ export function AdminShell({ children }: { children: ReactNode }) {
             })}
           </ul>
           <div className="mt-6 rounded-xl border border-border bg-muted/50 p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">System</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              System
+            </p>
             <p className="mt-1 text-xs text-foreground">All services operational</p>
             <div className="mt-2 flex items-center gap-1.5">
               <span className="h-2 w-2 animate-pulse rounded-full bg-success" />
@@ -108,10 +135,15 @@ export function AdminShell({ children }: { children: ReactNode }) {
             />
           </div>
           <div className="ml-auto flex items-center gap-3">
-            <Link to="/" className="hidden text-xs font-medium text-muted-foreground hover:text-foreground sm:inline">
+            <Link
+              to="/"
+              className="hidden text-xs font-medium text-muted-foreground hover:text-foreground sm:inline"
+            >
               ← Back to app
             </Link>
-            <span className="grid h-9 w-9 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">AD</span>
+            <span className="grid h-9 w-9 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+              AD
+            </span>
           </div>
         </header>
         <main className="px-4 py-6 sm:px-6 lg:px-8">{children}</main>
@@ -121,8 +153,14 @@ export function AdminShell({ children }: { children: ReactNode }) {
 }
 
 export function AdminPageHeader({
-  title, subtitle, actions,
-}: { title: string; subtitle?: string; actions?: ReactNode }) {
+  title,
+  subtitle,
+  actions,
+}: {
+  title: string;
+  subtitle?: string;
+  actions?: ReactNode;
+}) {
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
       <div>
@@ -135,10 +173,28 @@ export function AdminPageHeader({
 }
 
 export function AdminCard({
-  children, className = "", title, action,
-}: { children: ReactNode; className?: string; title?: string; action?: ReactNode }) {
+  children,
+  className = "",
+  title,
+  action,
+  tone,
+}: {
+  children: ReactNode;
+  className?: string;
+  title?: string;
+  action?: ReactNode;
+  tone?: "primary" | "gold" | "success" | "destructive";
+}) {
+  const toneClasses: Record<string, string> = {
+    gold: "border-gold/30",
+    success: "border-success/30",
+    destructive: "border-destructive/30",
+    primary: "border-primary/30",
+  };
   return (
-    <div className={`rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)] ${className}`}>
+    <div
+      className={`rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)] ${className} ${tone ? toneClasses[tone] : ""}`}
+    >
       {title && (
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-foreground">{title}</h3>
@@ -151,8 +207,16 @@ export function AdminCard({
 }
 
 export function KPI({
-  label, value, hint, tone = "primary",
-}: { label: string; value: string; hint?: string; tone?: "primary" | "gold" | "success" | "destructive" }) {
+  label,
+  value,
+  hint,
+  tone = "primary",
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  tone?: "primary" | "gold" | "success" | "destructive";
+}) {
   const tones: Record<string, string> = {
     primary: "text-primary bg-primary/10",
     gold: "text-gold-foreground bg-gold/15",
@@ -162,8 +226,12 @@ export function KPI({
   return (
     <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
-        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${tones[tone]}`}>{tone === "destructive" ? "Alert" : "Live"}</span>
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          {label}
+        </p>
+        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${tones[tone]}`}>
+          {tone === "destructive" ? "Alert" : "Live"}
+        </span>
       </div>
       <p className="mt-2 text-2xl font-bold tracking-tight">{value}</p>
       {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
@@ -180,6 +248,7 @@ export function StatusPill({ status }: { status: string }) {
     Approved: "bg-success/15 text-success",
     Resolved: "bg-success/15 text-success",
     Disbursed: "bg-primary/10 text-primary",
+    Paid: "bg-success/15 text-success",
     Pending: "bg-warning/20 text-warning-foreground",
     Reviewing: "bg-warning/20 text-warning-foreground",
     "In Review": "bg-warning/20 text-warning-foreground",
@@ -191,9 +260,24 @@ export function StatusPill({ status }: { status: string }) {
     Rejected: "bg-destructive/15 text-destructive",
     Failed: "bg-destructive/15 text-destructive",
     Flagged: "bg-destructive/15 text-destructive",
+    Banned: "bg-destructive/15 text-destructive",
+    Qualified: "bg-success/15 text-success",
+    pending: "bg-warning/20 text-warning-foreground",
+    qualified: "bg-success/15 text-success",
+    rejected: "bg-destructive/15 text-destructive",
+    open: "bg-primary/10 text-primary",
+    hired: "bg-primary/10 text-primary",
+    in_progress: "bg-warning/20 text-warning-foreground",
+    completed: "bg-success/15 text-success",
+    cancelled: "bg-muted text-muted-foreground",
+    disputed: "bg-destructive/15 text-destructive",
+    active: "bg-success/15 text-success",
+    matured: "bg-primary/10 text-primary",
   };
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${map[status] ?? "bg-muted text-muted-foreground"}`}>
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${map[status] ?? "bg-muted text-muted-foreground"}`}
+    >
       {status}
     </span>
   );

@@ -28,18 +28,17 @@ function AdminCommissions() {
     if (authLoading) return;
     apiRequest<{
       success: boolean;
-      tiers: CommissionTier[];
-      totalPaid: number;
-      activeAffiliates: number;
+      data: { tiers: CommissionTier[]; totalPaid: number; activeAffiliates: number };
     }>("/admin/commissions/referrals")
       .then((res) => {
-        setTiers(res.tiers || []);
-        setTotalPaid(res.totalPaid || 0);
-        setActiveAffiliates(res.activeAffiliates || 0);
+        if (res.success && res.data) {
+          setTiers(res.data.tiers || []);
+          setTotalPaid(res.data.totalPaid || 0);
+          setActiveAffiliates(res.data.activeAffiliates || 0);
+        }
         setLoading(false);
       })
-      .catch((err) => {
-        console.error("Commissions fetch error:", err);
+      .catch(() => {
         toast.error("Could not load commissions data");
         setLoading(false);
       });
@@ -47,7 +46,7 @@ function AdminCommissions() {
 
   if (authLoading || loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex h-64 items-center justify-center">
         <p className="text-muted-foreground">Loading commissions data…</p>
       </div>
     );

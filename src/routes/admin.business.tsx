@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AdminPageHeader, AdminCard, KPI, StatusPill } from "@/components/AdminShell";
 import { fmtKES, fmtCompact } from "@/lib/admin-utils";
@@ -36,24 +36,25 @@ function AdminBusiness() {
 
   useEffect(() => {
     if (authLoading) return;
-    apiRequest<{ success: boolean; applications: BusinessAppResponse[] }>(
+    apiRequest<{ success: boolean; data: BusinessAppResponse[] }>(
       "/admin/business/applications?limit=50",
     )
       .then((res) => {
-        const mapped = (res.applications || []).map((a) => ({
-          id: a.id,
-          business: a.business_name || "Unnamed",
-          owner: a.owner || "Unknown",
-          amount: Number(a.amount_requested || 0),
-          status: a.status,
-          repaid: 0,
-          created_at: a.created_at,
-        }));
-        setApps(mapped);
+        if (res.success && Array.isArray(res.data)) {
+          const mapped = res.data.map((a) => ({
+            id: a.id,
+            business: a.business_name || "Unnamed",
+            owner: a.owner || "Unknown",
+            amount: Number(a.amount_requested || 0),
+            status: a.status,
+            repaid: 0,
+            created_at: a.created_at,
+          }));
+          setApps(mapped);
+        }
         setLoading(false);
       })
-      .catch((err) => {
-        console.error("Business fetch error:", err);
+      .catch(() => {
         toast.error("Could not load business data");
         setLoading(false);
       });
@@ -69,7 +70,7 @@ function AdminBusiness() {
 
   if (authLoading || loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex h-64 items-center justify-center">
         <p className="text-muted-foreground">Loading business data…</p>
       </div>
     );
@@ -122,7 +123,9 @@ function AdminBusiness() {
               <tbody>
                 {apps.map((f) => (
                   <tr key={f.id} className="border-b border-border/60 last:border-0">
-                    <td className="py-3 pr-3 font-mono text-xs text-muted-foreground">{f.id}</td>
+                    <td className="py-3 pr-3 font-mono text-xs text-muted-foreground">
+                      {f.id.slice(0, 8)}…
+                    </td>
                     <td className="py-3 pr-3 font-medium">{f.business}</td>
                     <td className="py-3 pr-3 text-muted-foreground">{f.owner}</td>
                     <td className="py-3 pr-3 text-right font-semibold">{fmtKES(f.amount)}</td>

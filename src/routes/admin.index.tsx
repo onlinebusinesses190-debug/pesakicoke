@@ -47,29 +47,41 @@ function AdminDashboard() {
 
   useEffect(() => {
     if (authLoading) return;
-    apiRequest("/admin/dashboard")
-      .then(
-        (res: {
-          success: boolean;
-          stats: DashboardStats;
-          revenueSeries: RevenuePoint[];
-          recentTransactions: Transaction[];
-        }) => {
-          setStats(res.stats);
-          setRevenueSeries(res.revenueSeries || []);
-          setAdminTx(res.recentTransactions || []);
-          setLoading(false);
-        },
-      )
-      .catch((err) => {
-        console.error("Dashboard fetch error:", err);
+
+    apiRequest<{
+      success: boolean;
+      data: DashboardStats & {
+        revenueSeries: RevenuePoint[];
+        recentTransactions: Transaction[];
+      };
+    }>("/admin/dashboard")
+      .then((res) => {
+        if (res.success && res.data) {
+          setStats({
+            totalUsers: res.data.totalUsers,
+            activeUsers: res.data.activeUsers,
+            pendingKyc: res.data.pendingKyc,
+            totalDeposits: res.data.totalDeposits,
+            totalWithdrawals: res.data.totalWithdrawals,
+            pendingWithdrawals: res.data.pendingWithdrawals,
+            platformRevenue: res.data.platformRevenue,
+            openTickets: res.data.openTickets,
+            activeJobs: res.data.activeJobs,
+            fundedBusinesses: res.data.fundedBusinesses,
+          });
+          setRevenueSeries(res.data.revenueSeries || []);
+          setAdminTx(res.data.recentTransactions || []);
+        }
+        setLoading(false);
+      })
+      .catch(() => {
         setLoading(false);
       });
   }, [authLoading]);
 
   if (authLoading || loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex h-64 items-center justify-center">
         <p className="text-muted-foreground">Loading dashboard…</p>
       </div>
     );
@@ -77,7 +89,7 @@ function AdminDashboard() {
 
   if (!stats) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex h-64 items-center justify-center">
         <p className="text-muted-foreground">No data available.</p>
       </div>
     );
@@ -162,7 +174,7 @@ function AdminDashboard() {
         <AdminCard
           title="Recent transactions"
           action={
-            <a className="text-xs font-semibold text-primary" href="/admin/finance">
+            <a className="text-xs font-semibold text-primary" href="/admin/transactions">
               View all
             </a>
           }

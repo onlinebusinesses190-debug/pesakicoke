@@ -1,9 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState, useCallback } from "react";
 import { AdminPageHeader, AdminCard, KPI, StatusPill } from "@/components/AdminShell";
 import { apiRequest } from "@/utils/api";
 import { useAdminAuth } from "@/hooks/useAdmin";
 import { toast } from "sonner";
+import { RefreshCw } from "lucide-react";
 
 interface Ticket {
   id: string;
@@ -34,21 +35,22 @@ function AdminSupport() {
 
   const fetchTickets = useCallback(() => {
     if (authLoading) return;
-    apiRequest<{ success: boolean; tickets: TicketResponse[] }>("/admin/support/tickets?limit=50")
+    apiRequest<{ success: boolean; data: TicketResponse[] }>("/admin/support/tickets?limit=50")
       .then((res) => {
-        const mapped = (res.tickets || []).map((t) => ({
-          id: t.id,
-          user: t.user || "Unknown",
-          subject: t.subject || "",
-          priority: t.priority || "med",
-          status: t.status || "open",
-          created_at: t.created_at,
-        }));
-        setTickets(mapped);
+        if (res.success && Array.isArray(res.data)) {
+          const mapped = res.data.map((t) => ({
+            id: t.id,
+            user: t.user || "Unknown",
+            subject: t.subject || "",
+            priority: t.priority || "med",
+            status: t.status || "open",
+            created_at: t.created_at,
+          }));
+          setTickets(mapped);
+        }
         setLoading(false);
       })
-      .catch((err) => {
-        console.error("Support tickets fetch error:", err);
+      .catch(() => {
         toast.error("Could not load tickets");
         setLoading(false);
       });
@@ -56,7 +58,7 @@ function AdminSupport() {
 
   useEffect(() => {
     fetchTickets();
-  }, [authLoading, fetchTickets]);
+  }, [fetchTickets]);
 
   const openCount = tickets.filter((t) => t.status === "open").length;
   const inReviewCount = tickets.filter((t) => t.status === "in_review").length;
@@ -64,11 +66,21 @@ function AdminSupport() {
 
   if (authLoading || loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex h-64 items-center justify-center">
         <p className="text-muted-foreground">Loading tickets…</p>
       </div>
     );
   }
+
+  const resolveTicket = async (id: string) => {
+    try {
+      await apiRequest(`/admin/support/tickets/${id}/resolve`, { method: "POST" });
+      fetchTickets();
+      toast.success("Ticket resolved");
+    } catch {
+      toast.error("Failed to resolve ticket");
+    }
+  };
 
   return (
     <>
@@ -108,7 +120,9 @@ function AdminSupport() {
               <tbody>
                 {tickets.map((t) => (
                   <tr key={t.id} className="border-b border-border/60 last:border-0">
-                    <td className="py-3 pr-3 font-mono text-xs text-muted-foreground">{t.id}</td>
+                    <td className="py-3 pr-3 font-mono text-xs text-muted-foreground">
+                      {t.id.slice(0, 8)}…
+                    </td>
                     <td className="py-3 pr-3 font-medium">{t.user}</td>
                     <td className="py-3 pr-3">{t.subject}</td>
                     <td className="py-3 pr-3">
@@ -131,17 +145,7 @@ function AdminSupport() {
                     </td>
                     <td className="py-3">
                       <button
-                        onClick={async () => {
-                          try {
-                            await apiRequest(`/admin/support/ticket/${t.id}/resolve`, {
-                              method: "POST",
-                            });
-                            fetchTickets();
-                            toast.success("Ticket resolved");
-                          } catch (err) {
-                            toast.error("Failed to resolve ticket");
-                          }
-                        }}
+                        onClick={() => resolveTicket(t.id)}
                         className="text-xs font-semibold text-primary hover:underline"
                       >
                         Resolve

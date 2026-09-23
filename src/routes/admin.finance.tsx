@@ -13,16 +13,6 @@ interface FinanceStats {
   platformRevenue: number;
 }
 
-interface Transaction {
-  id: string;
-  user: string;
-  type: string;
-  amount: number;
-  method: string;
-  status: string;
-  date: string;
-}
-
 interface Withdrawal {
   id: string;
   user_id: string;
@@ -32,6 +22,16 @@ interface Withdrawal {
   status: string;
   user: string;
   created_at: string;
+}
+
+interface Transaction {
+  id: string;
+  user: string;
+  type: string;
+  amount: number;
+  method: string;
+  status: string;
+  date: string;
 }
 
 interface MethodShare {
@@ -73,18 +73,17 @@ function AdminFinance() {
     if (authLoading) return;
 
     Promise.all([
-      apiRequest("/admin/finance/stats"),
-      apiRequest<{ success: boolean; withdrawals: Withdrawal[] }>("/admin/finance/withdrawals"),
-      apiRequest<{ success: boolean; transactions: Transaction[] }>("/admin/finance/transactions"),
+      apiRequest<{ success: boolean; data: FinanceStats }>("/admin/finance/stats"),
+      apiRequest<{ success: boolean; data: Withdrawal[] }>("/admin/finance/withdrawals"),
+      apiRequest<{ success: boolean; data: Transaction[] }>("/admin/finance/transactions"),
     ])
       .then(([statsRes, wdRes, txRes]) => {
-        setStats(statsRes.stats || null);
-        setWithdrawals(wdRes.withdrawals || []);
-        setAdminTx(txRes.transactions || []);
+        if (statsRes.success) setStats(statsRes.data || null);
+        if (wdRes.success && Array.isArray(wdRes.data)) setWithdrawals(wdRes.data);
+        if (txRes.success && Array.isArray(txRes.data)) setAdminTx(txRes.data);
         setLoading(false);
       })
-      .catch((err) => {
-        console.error("Finance fetch error:", err);
+      .catch(() => {
         toast.error("Could not load finance data");
         setLoading(false);
       });
@@ -95,7 +94,7 @@ function AdminFinance() {
 
   if (authLoading || loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex h-64 items-center justify-center">
         <p className="text-muted-foreground">Loading finance data…</p>
       </div>
     );
@@ -137,7 +136,7 @@ function AdminFinance() {
         <AdminCard title="Pending withdrawals" className="lg:col-span-2">
           <ul className="space-y-3 text-sm">
             {pendingWithdrawals.length === 0 ? (
-              <li className="text-center text-muted-foreground py-8">No pending withdrawals.</li>
+              <li className="py-8 text-center text-muted-foreground">No pending withdrawals.</li>
             ) : (
               pendingWithdrawals.map((w) => (
                 <li
@@ -147,7 +146,7 @@ function AdminFinance() {
                   <div>
                     <p className="font-semibold">{w.user}</p>
                     <p className="text-xs text-muted-foreground">
-                      {w.reference} · {w.phone} ·{" "}
+                      {w.reference} · {w.phone} ·
                       {w.created_at ? new Date(w.created_at).toLocaleDateString("en-KE") : ""}
                     </p>
                   </div>
@@ -156,15 +155,11 @@ function AdminFinance() {
                     <div className="mt-1 flex justify-end gap-2">
                       <button
                         onClick={async () => {
-                          try {
-                            await apiRequest(`/admin/finance/withdrawal/${w.id}/approve`, {
-                              method: "POST",
-                            });
-                            setWithdrawals(withdrawals.filter((x) => x.id !== w.id));
-                            toast.success("Withdrawal approved");
-                          } catch (err) {
-                            toast.error("Failed to approve");
-                          }
+                          await apiRequest(`/admin/withdrawals/${w.id}/approve`, {
+                            method: "POST",
+                          });
+                          setWithdrawals(withdrawals.filter((x) => x.id !== w.id));
+                          toast.success("Withdrawal approved");
                         }}
                         className="rounded-md bg-success px-3 py-1 text-xs font-semibold text-success-foreground"
                       >
@@ -172,16 +167,12 @@ function AdminFinance() {
                       </button>
                       <button
                         onClick={async () => {
-                          try {
-                            await apiRequest(`/admin/finance/withdrawal/${w.id}/reject`, {
-                              method: "POST",
-                              body: JSON.stringify({ reason: "Fraud investigation" }),
-                            });
-                            setWithdrawals(withdrawals.filter((x) => x.id !== w.id));
-                            toast.success("Withdrawal rejected");
-                          } catch (err) {
-                            toast.error("Failed to reject");
-                          }
+                          await apiRequest(`/admin/withdrawals/${w.id}/reject`, {
+                            method: "POST",
+                            body: JSON.stringify({ reason: "Fraud investigation" }),
+                          });
+                          setWithdrawals(withdrawals.filter((x) => x.id !== w.id));
+                          toast.success("Withdrawal rejected");
                         }}
                         className="rounded-md border border-border px-3 py-1 text-xs font-semibold"
                       >
@@ -222,9 +213,11 @@ function AdminFinance() {
               <tbody>
                 {adminTx.map((t) => (
                   <tr key={t.id} className="border-b border-border/60 last:border-0">
-                    <td className="py-3 pr-3 font-mono text-xs text-muted-foreground">{t.id}</td>
+                    <td className="py-3 pr-3 font-mono text-xs text-muted-foreground">
+                      {t.id.slice(0, 8)}…
+                    </td>
                     <td className="py-3 pr-3 font-medium">{t.user}</td>
-                    <td className="py-3 pr-3">{t.type}</td>
+                    <td className="py-3 pr-3 capitalize">{t.type}</td>
                     <td
                       className={`py-3 pr-3 text-right font-semibold ${t.amount < 0 ? "text-destructive" : "text-success"}`}
                     >

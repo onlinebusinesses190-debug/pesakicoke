@@ -6,15 +6,6 @@ import { useAdminAuth } from "@/hooks/useAdmin";
 import { toast } from "sonner";
 import { Send } from "lucide-react";
 
-interface Notification {
-  id: string;
-  title: string;
-  body: string;
-  audience: string;
-  channel: string;
-  sent: string;
-}
-
 interface NotificationResponse {
   id: string;
   title: string;
@@ -30,26 +21,19 @@ export const Route = createFileRoute("/admin/notifications")({
 
 function AdminNotifications() {
   const { loading: authLoading } = useAdminAuth();
-  const [notifs, setNotifs] = useState<Notification[]>([]);
+  const [notifs, setNotifs] = useState<NotificationResponse[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchNotifs = useCallback(() => {
     if (authLoading) return;
-    apiRequest<{ success: boolean; notifications: NotificationResponse[] }>("/admin/notifications")
+    apiRequest<{ success: boolean; data: NotificationResponse[] }>("/admin/notifications")
       .then((res) => {
-        const mapped = (res.notifications || []).map((n) => ({
-          id: n.id,
-          title: n.title,
-          body: n.body,
-          audience: n.audience || "All users",
-          channel: n.channel || "in_app",
-          sent: n.created_at,
-        }));
-        setNotifs(mapped);
+        if (res.success && Array.isArray(res.data)) {
+          setNotifs(res.data);
+        }
         setLoading(false);
       })
-      .catch((err) => {
-        console.error("Notifications fetch error:", err);
+      .catch(() => {
         toast.error("Could not load notifications");
         setLoading(false);
       });
@@ -170,11 +154,13 @@ function AdminNotifications() {
               <li key={n.id} className="rounded-xl border border-border bg-muted/40 p-3">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-semibold">{n.title}</p>
-                  <span className="text-[10px] text-muted-foreground">{n.sent}</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {new Date(n.created_at).toLocaleDateString()}
+                  </span>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">{n.body}</p>
                 <p className="mt-2 text-[10px] uppercase tracking-wider text-primary">
-                  → {n.audience}
+                  → {n.audience || "All users"}
                 </p>
               </li>
             ))}

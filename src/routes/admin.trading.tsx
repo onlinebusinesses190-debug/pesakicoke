@@ -1,7 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState, useCallback } from "react";
 import { AdminPageHeader, AdminCard, KPI, StatusPill } from "@/components/AdminShell";
-import { fmtCompact } from "@/lib/admin-utils";
+import { fmtKES, fmtCompact } from "@/lib/admin-utils";
 import { apiRequest } from "@/utils/api";
 import { useAdminAuth } from "@/hooks/useAdmin";
 import { toast } from "sonner";
@@ -22,31 +22,34 @@ function AdminTrading() {
   const [products, setProducts] = useState<TradingProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchProducts = useCallback(() => {
     if (authLoading) return;
     apiRequest<{
       success: boolean;
-      products: TradingProduct[];
-      totalVolume: number;
-      totalUsers: number;
+      data: { products: TradingProduct[]; totalVolume: number; totalUsers: number };
     }>("/admin/trading/summary")
       .then((res) => {
-        setProducts(res.products || []);
+        if (res.success && res.data) {
+          setProducts(res.data.products || []);
+        }
         setLoading(false);
       })
-      .catch((err) => {
-        console.error("Trading fetch error:", err);
+      .catch(() => {
         toast.error("Could not load trading data");
         setLoading(false);
       });
   }, [authLoading]);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
 
   const volume = products.reduce((s, t) => s + t.volume, 0);
   const users = products.reduce((s, t) => s + t.users, 0);
 
   if (authLoading || loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex h-64 items-center justify-center">
         <p className="text-muted-foreground">Loading trading data…</p>
       </div>
     );

@@ -34,16 +34,15 @@ function AdminReports() {
     if (authLoading) return;
 
     Promise.all([
-      apiRequest<{ success: boolean; revenueSeries: RevenuePoint[] }>("/admin/reports/revenue"),
-      apiRequest<{ success: boolean; metrics: ReportMetrics }>("/admin/reports/metrics"),
+      apiRequest<{ success: boolean; data: RevenuePoint[] }>("/admin/reports/revenue"),
+      apiRequest<{ success: boolean; data: ReportMetrics }>("/admin/reports/metrics"),
     ])
       .then(([revRes, metricsRes]) => {
-        setRevenueSeries(revRes.revenueSeries || []);
-        setMetrics(metricsRes.metrics || null);
+        if (revRes.success && Array.isArray(revRes.data)) setRevenueSeries(revRes.data);
+        if (metricsRes.success && metricsRes.data) setMetrics(metricsRes.data);
         setLoading(false);
       })
-      .catch((err) => {
-        console.error("Reports fetch error:", err);
+      .catch(() => {
         toast.error("Could not load report data");
         setLoading(false);
       });
@@ -53,7 +52,7 @@ function AdminReports() {
 
   if (authLoading || loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex h-64 items-center justify-center">
         <p className="text-muted-foreground">Loading reports…</p>
       </div>
     );

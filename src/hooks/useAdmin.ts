@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/utils/api";
@@ -16,7 +16,7 @@ export function useAdminAuth() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  useEffect(() => {
+  const checkAdmin = useCallback(() => {
     if (!ready) return;
 
     if (!user) {
@@ -24,18 +24,28 @@ export function useAdminAuth() {
       return;
     }
 
-    apiRequest("/admin/me")
-      .then((res: { success: boolean; user: AdminUser }) => {
-        setIsAdmin(true);
-        setAdmin(res.user);
-        setLoading(false);
+    apiRequest<{ success: boolean; data: { id: string; email: string; role: string } }>("/admin/me")
+      .then((res) => {
+        if (res.success && res.data) {
+          setIsAdmin(true);
+          setAdmin({ id: res.data.id, email: res.data.email, role: res.data.role });
+          setLoading(false);
+        } else {
+          setIsAdmin(false);
+          setLoading(false);
+          navigate({ to: "/" });
+        }
       })
       .catch(() => {
         setIsAdmin(false);
         setLoading(false);
         navigate({ to: "/" });
       });
-  }, [ready, user, session, navigate]);
+  }, [ready, user, navigate]);
+
+  useEffect(() => {
+    checkAdmin();
+  }, [checkAdmin]);
 
   return { isAdmin, admin, loading, user };
 }

@@ -5,6 +5,7 @@ import { fmtCompact } from "@/lib/admin-utils";
 import { apiRequest } from "@/utils/api";
 import { useAdminAuth } from "@/hooks/useAdmin";
 import { toast } from "sonner";
+import { Plus } from "lucide-react";
 
 interface SavingsPlan {
   plan: string;
@@ -26,16 +27,15 @@ function AdminBanking() {
     if (authLoading) return;
     apiRequest<{
       success: boolean;
-      plans: SavingsPlan[];
-      totalLocked: number;
-      totalMembers: number;
+      data: { plans: SavingsPlan[]; totalLocked: number; totalMembers: number };
     }>("/admin/banking/summary")
       .then((res) => {
-        setPlans(res.plans || []);
+        if (res.success && res.data) {
+          setPlans(res.data.plans || []);
+        }
         setLoading(false);
       })
-      .catch((err) => {
-        console.error("Banking fetch error:", err);
+      .catch(() => {
         toast.error("Could not load banking data");
         setLoading(false);
       });
@@ -46,7 +46,7 @@ function AdminBanking() {
 
   if (authLoading || loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex h-64 items-center justify-center">
         <p className="text-muted-foreground">Loading banking data…</p>
       </div>
     );
@@ -59,7 +59,7 @@ function AdminBanking() {
         subtitle="Manage savings products, APY tiers, and member balances."
         actions={
           <button className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
-            New plan
+            <Plus className="h-4 w-4" /> New plan
           </button>
         }
       />

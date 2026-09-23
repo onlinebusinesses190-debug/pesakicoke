@@ -19,22 +19,28 @@ import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as TradingRouteImport } from './routes/trading'
 import { Route as WalletRouteImport } from './routes/wallet'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminActionsRouteImport } from './routes/admin.actions'
 import { Route as AdminBankingRouteImport } from './routes/admin.banking'
 import { Route as AdminBusinessRouteImport } from './routes/admin.business'
 import { Route as AdminCommissionsRouteImport } from './routes/admin.commissions'
+import { Route as AdminDepositsRouteImport } from './routes/admin.deposits'
 import { Route as AdminFinanceRouteImport } from './routes/admin.finance'
 import { Route as AdminKaziRouteImport } from './routes/admin.kazi'
 import { Route as AdminNotificationsRouteImport } from './routes/admin.notifications'
+import { Route as AdminReferralsRouteImport } from './routes/admin.referrals'
 import { Route as AdminReportsRouteImport } from './routes/admin.reports'
 import { Route as AdminSupportRouteImport } from './routes/admin.support'
 import { Route as AdminTradingRouteImport } from './routes/admin.trading'
+import { Route as AdminTransactionsRouteImport } from './routes/admin.transactions'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminWithdrawalsRouteImport } from './routes/admin.withdrawals'
 import { Route as TradingIndexRouteImport } from './routes/trading.index'
 import { Route as TradingAviatorRouteImport } from './routes/trading.aviator'
 import { Route as TradingFxRouteImport } from './routes/trading.fx'
 import { Route as TradingInvestRouteImport } from './routes/trading.invest'
 import { Route as TradingSpinRouteImport } from './routes/trading.spin'
 import { Route as TradingUpDownRouteImport } from './routes/trading.up-down'
+import { Route as AdminUsersUserIdRouteImport } from './routes/admin.users.$userId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -86,6 +92,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminActionsRoute = AdminActionsRouteImport.update({
+  id: '/actions',
+  path: '/actions',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminBankingRoute = AdminBankingRouteImport.update({
   id: '/banking',
   path: '/banking',
@@ -99,6 +110,11 @@ const AdminBusinessRoute = AdminBusinessRouteImport.update({
 const AdminCommissionsRoute = AdminCommissionsRouteImport.update({
   id: '/commissions',
   path: '/commissions',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminDepositsRoute = AdminDepositsRouteImport.update({
+  id: '/deposits',
+  path: '/deposits',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminFinanceRoute = AdminFinanceRouteImport.update({
@@ -116,6 +132,11 @@ const AdminNotificationsRoute = AdminNotificationsRouteImport.update({
   path: '/notifications',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminReferralsRoute = AdminReferralsRouteImport.update({
+  id: '/referrals',
+  path: '/referrals',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminReportsRoute = AdminReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
@@ -131,9 +152,19 @@ const AdminTradingRoute = AdminTradingRouteImport.update({
   path: '/trading',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminTransactionsRoute = AdminTransactionsRouteImport.update({
+  id: '/transactions',
+  path: '/transactions',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminWithdrawalsRoute = AdminWithdrawalsRouteImport.update({
+  id: '/withdrawals',
+  path: '/withdrawals',
   getParentRoute: () => AdminRoute,
 } as any)
 const TradingIndexRoute = TradingIndexRouteImport.update({
@@ -166,6 +197,11 @@ const TradingUpDownRoute = TradingUpDownRouteImport.update({
   path: '/up-down',
   getParentRoute: () => TradingRoute,
 } as any)
+const AdminUsersUserIdRoute = AdminUsersUserIdRouteImport.update({
+  id: '/$userId',
+  path: '/$userId',
+  getParentRoute: () => AdminUsersRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -177,16 +213,21 @@ export interface FileRoutesByFullPath {
   '/profile': typeof ProfileRoute
   '/trading': typeof TradingRouteWithChildren
   '/wallet': typeof WalletRoute
+  '/admin/actions': typeof AdminActionsRoute
   '/admin/banking': typeof AdminBankingRoute
   '/admin/business': typeof AdminBusinessRoute
   '/admin/commissions': typeof AdminCommissionsRoute
+  '/admin/deposits': typeof AdminDepositsRoute
   '/admin/finance': typeof AdminFinanceRoute
   '/admin/kazi': typeof AdminKaziRoute
   '/admin/notifications': typeof AdminNotificationsRoute
+  '/admin/referrals': typeof AdminReferralsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/trading': typeof AdminTradingRoute
-  '/admin/users': typeof AdminUsersRoute
+  '/admin/transactions': typeof AdminTransactionsRoute
+  '/admin/users': typeof AdminUsersRouteWithChildren
+  '/admin/withdrawals': typeof AdminWithdrawalsRoute
   '/trading/aviator': typeof TradingAviatorRoute
   '/trading/fx': typeof TradingFxRoute
   '/trading/invest': typeof TradingInvestRoute
@@ -194,6 +235,7 @@ export interface FileRoutesByFullPath {
   '/trading/up-down': typeof TradingUpDownRoute
   '/admin/': typeof AdminIndexRoute
   '/trading/': typeof TradingIndexRoute
+  '/admin/users/$userId': typeof AdminUsersUserIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -203,16 +245,21 @@ export interface FileRoutesByTo {
   '/kazi': typeof KaziRoute
   '/profile': typeof ProfileRoute
   '/wallet': typeof WalletRoute
+  '/admin/actions': typeof AdminActionsRoute
   '/admin/banking': typeof AdminBankingRoute
   '/admin/business': typeof AdminBusinessRoute
   '/admin/commissions': typeof AdminCommissionsRoute
+  '/admin/deposits': typeof AdminDepositsRoute
   '/admin/finance': typeof AdminFinanceRoute
   '/admin/kazi': typeof AdminKaziRoute
   '/admin/notifications': typeof AdminNotificationsRoute
+  '/admin/referrals': typeof AdminReferralsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/trading': typeof AdminTradingRoute
-  '/admin/users': typeof AdminUsersRoute
+  '/admin/transactions': typeof AdminTransactionsRoute
+  '/admin/users': typeof AdminUsersRouteWithChildren
+  '/admin/withdrawals': typeof AdminWithdrawalsRoute
   '/trading/aviator': typeof TradingAviatorRoute
   '/trading/fx': typeof TradingFxRoute
   '/trading/invest': typeof TradingInvestRoute
@@ -220,6 +267,7 @@ export interface FileRoutesByTo {
   '/trading/up-down': typeof TradingUpDownRoute
   '/admin': typeof AdminIndexRoute
   '/trading': typeof TradingIndexRoute
+  '/admin/users/$userId': typeof AdminUsersUserIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -232,16 +280,21 @@ export interface FileRoutesById {
   '/profile': typeof ProfileRoute
   '/trading': typeof TradingRouteWithChildren
   '/wallet': typeof WalletRoute
+  '/admin/actions': typeof AdminActionsRoute
   '/admin/banking': typeof AdminBankingRoute
   '/admin/business': typeof AdminBusinessRoute
   '/admin/commissions': typeof AdminCommissionsRoute
+  '/admin/deposits': typeof AdminDepositsRoute
   '/admin/finance': typeof AdminFinanceRoute
   '/admin/kazi': typeof AdminKaziRoute
   '/admin/notifications': typeof AdminNotificationsRoute
+  '/admin/referrals': typeof AdminReferralsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/trading': typeof AdminTradingRoute
-  '/admin/users': typeof AdminUsersRoute
+  '/admin/transactions': typeof AdminTransactionsRoute
+  '/admin/users': typeof AdminUsersRouteWithChildren
+  '/admin/withdrawals': typeof AdminWithdrawalsRoute
   '/trading/aviator': typeof TradingAviatorRoute
   '/trading/fx': typeof TradingFxRoute
   '/trading/invest': typeof TradingInvestRoute
@@ -249,6 +302,7 @@ export interface FileRoutesById {
   '/trading/up-down': typeof TradingUpDownRoute
   '/admin/': typeof AdminIndexRoute
   '/trading/': typeof TradingIndexRoute
+  '/admin/users/$userId': typeof AdminUsersUserIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -262,16 +316,21 @@ export interface FileRouteTypes {
     | '/profile'
     | '/trading'
     | '/wallet'
+    | '/admin/actions'
     | '/admin/banking'
     | '/admin/business'
     | '/admin/commissions'
+    | '/admin/deposits'
     | '/admin/finance'
     | '/admin/kazi'
     | '/admin/notifications'
+    | '/admin/referrals'
     | '/admin/reports'
     | '/admin/support'
     | '/admin/trading'
+    | '/admin/transactions'
     | '/admin/users'
+    | '/admin/withdrawals'
     | '/trading/aviator'
     | '/trading/fx'
     | '/trading/invest'
@@ -279,6 +338,7 @@ export interface FileRouteTypes {
     | '/trading/up-down'
     | '/admin/'
     | '/trading/'
+    | '/admin/users/$userId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -288,16 +348,21 @@ export interface FileRouteTypes {
     | '/kazi'
     | '/profile'
     | '/wallet'
+    | '/admin/actions'
     | '/admin/banking'
     | '/admin/business'
     | '/admin/commissions'
+    | '/admin/deposits'
     | '/admin/finance'
     | '/admin/kazi'
     | '/admin/notifications'
+    | '/admin/referrals'
     | '/admin/reports'
     | '/admin/support'
     | '/admin/trading'
+    | '/admin/transactions'
     | '/admin/users'
+    | '/admin/withdrawals'
     | '/trading/aviator'
     | '/trading/fx'
     | '/trading/invest'
@@ -305,6 +370,7 @@ export interface FileRouteTypes {
     | '/trading/up-down'
     | '/admin'
     | '/trading'
+    | '/admin/users/$userId'
   id:
     | '__root__'
     | '/'
@@ -316,16 +382,21 @@ export interface FileRouteTypes {
     | '/profile'
     | '/trading'
     | '/wallet'
+    | '/admin/actions'
     | '/admin/banking'
     | '/admin/business'
     | '/admin/commissions'
+    | '/admin/deposits'
     | '/admin/finance'
     | '/admin/kazi'
     | '/admin/notifications'
+    | '/admin/referrals'
     | '/admin/reports'
     | '/admin/support'
     | '/admin/trading'
+    | '/admin/transactions'
     | '/admin/users'
+    | '/admin/withdrawals'
     | '/trading/aviator'
     | '/trading/fx'
     | '/trading/invest'
@@ -333,6 +404,7 @@ export interface FileRouteTypes {
     | '/trading/up-down'
     | '/admin/'
     | '/trading/'
+    | '/admin/users/$userId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -419,6 +491,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/actions': {
+      id: '/admin/actions'
+      path: '/actions'
+      fullPath: '/admin/actions'
+      preLoaderRoute: typeof AdminActionsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/banking': {
       id: '/admin/banking'
       path: '/banking'
@@ -438,6 +517,13 @@ declare module '@tanstack/react-router' {
       path: '/commissions'
       fullPath: '/admin/commissions'
       preLoaderRoute: typeof AdminCommissionsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/deposits': {
+      id: '/admin/deposits'
+      path: '/deposits'
+      fullPath: '/admin/deposits'
+      preLoaderRoute: typeof AdminDepositsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/finance': {
@@ -461,6 +547,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminNotificationsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/referrals': {
+      id: '/admin/referrals'
+      path: '/referrals'
+      fullPath: '/admin/referrals'
+      preLoaderRoute: typeof AdminReferralsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/reports': {
       id: '/admin/reports'
       path: '/reports'
@@ -482,11 +575,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminTradingRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/transactions': {
+      id: '/admin/transactions'
+      path: '/transactions'
+      fullPath: '/admin/transactions'
+      preLoaderRoute: typeof AdminTransactionsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/users': {
       id: '/admin/users'
       path: '/users'
       fullPath: '/admin/users'
       preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/withdrawals': {
+      id: '/admin/withdrawals'
+      path: '/withdrawals'
+      fullPath: '/admin/withdrawals'
+      preLoaderRoute: typeof AdminWithdrawalsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/trading/': {
@@ -531,34 +638,63 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TradingUpDownRouteImport
       parentRoute: typeof TradingRoute
     }
+    '/admin/users/$userId': {
+      id: '/admin/users/$userId'
+      path: '/$userId'
+      fullPath: '/admin/users/$userId'
+      preLoaderRoute: typeof AdminUsersUserIdRouteImport
+      parentRoute: typeof AdminUsersRoute
+    }
   }
 }
 
+interface AdminUsersRouteChildren {
+  AdminUsersUserIdRoute: typeof AdminUsersUserIdRoute
+}
+
+const AdminUsersRouteChildren: AdminUsersRouteChildren = {
+  AdminUsersUserIdRoute: AdminUsersUserIdRoute,
+}
+
+const AdminUsersRouteWithChildren = AdminUsersRoute._addFileChildren(
+  AdminUsersRouteChildren,
+)
+
 interface AdminRouteChildren {
+  AdminActionsRoute: typeof AdminActionsRoute
   AdminBankingRoute: typeof AdminBankingRoute
   AdminBusinessRoute: typeof AdminBusinessRoute
   AdminCommissionsRoute: typeof AdminCommissionsRoute
+  AdminDepositsRoute: typeof AdminDepositsRoute
   AdminFinanceRoute: typeof AdminFinanceRoute
   AdminKaziRoute: typeof AdminKaziRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
+  AdminReferralsRoute: typeof AdminReferralsRoute
   AdminReportsRoute: typeof AdminReportsRoute
   AdminSupportRoute: typeof AdminSupportRoute
   AdminTradingRoute: typeof AdminTradingRoute
-  AdminUsersRoute: typeof AdminUsersRoute
+  AdminTransactionsRoute: typeof AdminTransactionsRoute
+  AdminUsersRoute: typeof AdminUsersRouteWithChildren
+  AdminWithdrawalsRoute: typeof AdminWithdrawalsRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminActionsRoute: AdminActionsRoute,
   AdminBankingRoute: AdminBankingRoute,
   AdminBusinessRoute: AdminBusinessRoute,
   AdminCommissionsRoute: AdminCommissionsRoute,
+  AdminDepositsRoute: AdminDepositsRoute,
   AdminFinanceRoute: AdminFinanceRoute,
   AdminKaziRoute: AdminKaziRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,
+  AdminReferralsRoute: AdminReferralsRoute,
   AdminReportsRoute: AdminReportsRoute,
   AdminSupportRoute: AdminSupportRoute,
   AdminTradingRoute: AdminTradingRoute,
-  AdminUsersRoute: AdminUsersRoute,
+  AdminTransactionsRoute: AdminTransactionsRoute,
+  AdminUsersRoute: AdminUsersRouteWithChildren,
+  AdminWithdrawalsRoute: AdminWithdrawalsRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
 

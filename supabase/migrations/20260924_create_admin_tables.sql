@@ -93,6 +93,11 @@ RETURNS TABLE (
   banned           boolean,
   kyc_status       text,
   balance          numeric,
+  locked           numeric,
+  demo_balance     numeric,
+  referral_code    text,
+  referred_by_email text,
+  flagged          boolean,
   last_sign_in_at  timestamptz,
   created_at       timestamptz
 )
@@ -107,16 +112,20 @@ BEGIN
     p.full_name,
     p.phone,
     COALESCE(p.banned, false),
-    CASE
-      WHEN u.email_confirmed_at IS NOT NULL THEN 'Verified'
-      ELSE 'Pending'
-    END,
+    p.kyc_status,
     COALESCE(w.balance, 0),
+    COALESCE(w.locked, 0),
+    COALESCE(w.demo_balance, 0),
+    p.referral_code,
+    ref.email AS referred_by_email,
+    false AS flagged,
     u.last_sign_in_at,
     u.created_at
   FROM auth.users u
   LEFT JOIN public.profiles p ON p.id = u.id
   LEFT JOIN public.wallets w ON w.user_id = u.id
+  LEFT JOIN public.profiles ref_profile ON ref_profile.id = p.referred_by
+  LEFT JOIN auth.users ref ON ref.id = p.referred_by
   WHERE (p_search = ''
          OR u.email ILIKE '%' || p_search || '%'
          OR p.full_name ILIKE '%' || p_search || '%'
