@@ -26,24 +26,54 @@ function AuthPage() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [loginMethod, setLoginMethod] = useState<"email" | "phone">("phone");
   const [name, setName] = useState("");
+  const [dob, setDob] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [agreeTerms, setAgreeTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
   // Uses the app-wide singleton — avoids spawning a new GoTrueClient on every render.
 
+  function isUnder18(dobStr: string): boolean {
+    if (!dobStr) return true;
+    const today = new Date();
+    const birth = new Date(dobStr);
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    return age < 18;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setInfo(null);
+
+    if (mode === "signup") {
+      if (!agreeTerms) {
+        setError("You must agree to the Terms of Service and Privacy Policy.");
+        return;
+      }
+      if (!dob) {
+        setError("Date of birth is required.");
+        return;
+      }
+      if (isUnder18(dob)) {
+        setError("You must be at least 18 years old to use PESAKI.");
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
       if (mode === "signup") {
-        const options = { emailRedirectTo: window.location.origin, data: { full_name: name } };
+        const options = { emailRedirectTo: window.location.origin, data: { full_name: name, date_of_birth: dob } };
         const result = loginMethod === "email"
           ? await supabase.auth.signUp({ email, password, options })
           : await supabase.auth.signUp({ phone: formatPhoneNumber(phone), password, options });
@@ -98,16 +128,28 @@ function AuthPage() {
 
           <form onSubmit={handleSubmit} className="space-y-3">
             {mode === "signup" && (
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground">Full name</label>
-                <input
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  required
-                  className="input"
-                  placeholder="Jane Otieno"
-                />
-              </div>
+              <>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground">Full name</label>
+                  <input
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    required
+                    className="input"
+                    placeholder="Jane Otieno"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground">Date of birth</label>
+                  <input
+                    type="date"
+                    value={dob}
+                    onChange={e => setDob(e.target.value)}
+                    required
+                    className="input"
+                  />
+                </div>
+              </>
             )}
 
             <div className="flex gap-2 text-xs">
@@ -172,6 +214,27 @@ function AuthPage() {
                 placeholder="••••••••"
               />
             </div>
+
+            {mode === "signup" && (
+              <label className="flex items-start gap-2 rounded-xl border border-border p-3 text-xs">
+                <input
+                  type="checkbox"
+                  checked={agreeTerms}
+                  onChange={e => setAgreeTerms(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 accent-primary"
+                />
+                <span>
+                  I agree to the{" "}
+                  <a href="/terms" target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">
+                    Terms of Service
+                  </a>{" "}
+                  and{" "}
+                  <a href="/privacy" target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">
+                    Privacy Policy
+                  </a>.
+                </span>
+              </label>
+            )}
 
             {error && <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">{error}</p>}
             {info && <p className="rounded-lg bg-success/10 px-3 py-2 text-xs font-medium text-success">{info}</p>}

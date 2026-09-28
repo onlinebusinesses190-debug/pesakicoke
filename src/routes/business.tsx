@@ -362,6 +362,7 @@ function FundingSheet({ mode, setMode, onClose, user, onSuccess }: any) {
 function StartupForm({ onBack, onClose, user, onSuccess }: any) {
   const [done, setDone] = useState(false);
   const [agree, setAgree] = useState(false);
+  const [consentFinancial, setConsentFinancial] = useState(false);
   const [slot, setSlot] = useState<"morning" | "afternoon">("morning");
   const [date, setDate] = useState("");
   const [loading, setLoading] = useState(false);
@@ -373,6 +374,7 @@ function StartupForm({ onBack, onClose, user, onSuccess }: any) {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!agree) return;
+    if (!consentFinancial) return;
     setLoading(true);
     const formData = new FormData(e.currentTarget);
     try {
@@ -395,6 +397,7 @@ function StartupForm({ onBack, onClose, user, onSuccess }: any) {
           expected_profit: formData.get('expected_profit'),
           training_date: date,
           training_slot: slot,
+          consent_financial_data: consentFinancial,
         }
       }]);
       if (error) throw error;
@@ -460,7 +463,8 @@ function StartupForm({ onBack, onClose, user, onSuccess }: any) {
         </div>
         <SectionHeader n={6} title="Terms" />
         <label className="mt-3 flex items-start gap-2 rounded-xl border border-border p-3 text-xs"><input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" /><span>I agree to return a percentage of my monthly profit to PESAKI until the full amount is repaid.</span></label>
-        <button type="submit" disabled={!agree || loading} className="mt-5 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50">{loading ? "Submitting..." : "Submit Application"}</button>
+        <label className="mt-3 flex items-start gap-2 rounded-xl border border-border p-3 text-xs"><input type="checkbox" checked={consentFinancial} onChange={(e) => setConsentFinancial(e.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" /><span>I consent to my financial data being processed for funding review.</span></label>
+        <button type="submit" disabled={!agree || !consentFinancial || loading} className="mt-5 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50">{loading ? "Submitting..." : "Submit Application"}</button>
       </form>
     </SheetShell>
   );
@@ -469,6 +473,7 @@ function StartupForm({ onBack, onClose, user, onSuccess }: any) {
 function ExistingForm({ onBack, onClose, user, onSuccess }: any) {
   const [submitted, setSubmitted] = useState(false);
   const [agree, setAgree] = useState(false);
+  const [consentFinancial, setConsentFinancial] = useState(false);
   const [loading, setLoading] = useState(false);
   const supabase = createClient(
     import.meta.env.VITE_SUPABASE_URL!,
@@ -478,6 +483,7 @@ function ExistingForm({ onBack, onClose, user, onSuccess }: any) {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!agree) return;
+    if (!consentFinancial) return;
     setLoading(true);
     const formData = new FormData(e.currentTarget);
     try {
@@ -497,6 +503,7 @@ function ExistingForm({ onBack, onClose, user, onSuccess }: any) {
           reason: formData.get('reason'),
           repayment_plan: formData.get('repayment_plan'),
           purpose: formData.get('purpose'),
+          consent_financial_data: consentFinancial,
         }
       }]);
       if (error) throw error;
@@ -561,7 +568,8 @@ function ExistingForm({ onBack, onClose, user, onSuccess }: any) {
           </div>
           <SectionHeader n={5} title="Terms" />
           <label className="mt-3 flex items-start gap-2 rounded-xl border border-border p-3 text-xs"><input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" /><span>I agree to return a percentage of my monthly profit to PESAKI until the full amount is repaid.</span></label>
-          <button type="submit" disabled={!agree || loading} className="mt-5 h-11 w-full rounded-xl gradient-gold text-sm font-semibold text-gold-foreground disabled:opacity-50">{loading ? "Submitting..." : "Submit Application"}</button>
+          <label className="mt-3 flex items-start gap-2 rounded-xl border border-border p-3 text-xs"><input type="checkbox" checked={consentFinancial} onChange={(e) => setConsentFinancial(e.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" /><span>I consent to my financial data being processed for funding review.</span></label>
+          <button type="submit" disabled={!agree || !consentFinancial || loading} className="mt-5 h-11 w-full rounded-xl gradient-gold text-sm font-semibold text-gold-foreground disabled:opacity-50">{loading ? "Submitting..." : "Submit Application"}</button>
         </form>
       )}
     </SheetShell>
@@ -577,14 +585,11 @@ function InfoSheet({ which, onClose }: { which: "invest" | "guide"; onClose: () 
           <p className="text-xs text-muted-foreground">Track businesses you've co-funded through PESAKI and your projected returns.</p>
           <div className="rounded-2xl gradient-primary p-4 text-primary-foreground">
             <p className="text-[11px] uppercase tracking-widest opacity-80">Total invested</p>
-            <p className="mt-1 text-2xl font-bold">KES 175,000</p>
-            <p className="mt-1 text-xs opacity-90">Avg. return · +14.2% p.a.</p>
+            <p className="mt-1 text-2xl font-bold">KES 0</p>
+            <p className="mt-1 text-xs opacity-90">Avg. return · TBD</p>
           </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between rounded-xl border border-border p-3">
-              <div><p className="text-sm font-semibold">Wanjiku's Bakery</p><p className="text-[11px] text-muted-foreground">KES 75,000 invested</p></div>
-              <span className="text-xs font-bold text-success">+18%</span>
-            </div>
+          <div className="rounded-2xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
+            No investments yet. Be the first to co-fund a business.
           </div>
         </div>
       ) : (

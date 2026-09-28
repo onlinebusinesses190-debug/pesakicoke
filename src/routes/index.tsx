@@ -272,10 +272,10 @@ function HomePage() {
           <Sparkles className="absolute -right-2 -top-2 h-24 w-24 opacity-20" />
           <p className="text-[11px] font-semibold uppercase tracking-wider">Featured</p>
           <h3 className="mt-1 max-w-[80%] text-lg font-bold leading-snug">
-            Grow your savings at 12% APY
+            Save and earn interest
           </h3>
           <p className="mt-1 max-w-[85%] text-xs opacity-80">
-            Lock funds for 90 days and earn premium interest.
+            Lock funds for 90 days and earn competitive interest. Past performance does not predict future returns.
           </p>
           <Link
             to="/banking"

@@ -380,10 +380,7 @@ function PersonalForm({ onClose, defaultName, defaultEmail }: { onClose: () => v
       onSubmit={(e) => { e.preventDefault(); toast.success("Profile updated"); setDone(true); }}
     >
       <div><label className={label}>Full name</label><input required defaultValue={defaultName} className={inputCls} /></div>
-      <div className="grid grid-cols-2 gap-3">
-        <div><label className={label}>ID number</label><input required className={inputCls} placeholder="1234••••" /></div>
-        <div><label className={label}>Date of birth</label><input required type="date" className={inputCls} /></div>
-      </div>
+      <div><label className={label}>Date of birth</label><input required type="date" className={inputCls} /></div>
       <div><label className={label}>Email</label><input required type="email" defaultValue={defaultEmail} className={inputCls} /></div>
       <div><label className={label}>Home address</label><input required className={inputCls} placeholder="Estate, City" /></div>
       <button type="submit" className="mt-2 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground">Save changes</button>

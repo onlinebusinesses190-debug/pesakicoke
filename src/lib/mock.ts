@@ -33,10 +33,10 @@ export const transactions = [
 ];
 
 export const tradingProducts = [
-  { key: "binary",   name: "Binary FX",        desc: "Trade market movements and predict price direction.", stat: "1,284 active traders", color: "primary" },
-  { key: "updown",   name: "Up & Down",        desc: "Quick predictions on short-term price moves.",         stat: "92% payout",          color: "gold"    },
+  { key: "binary",   name: "Binary FX",        desc: "Trade market movements and predict price direction.", stat: "Active traders", color: "primary" },
+  { key: "updown",   name: "Up & Down",        desc: "Quick predictions on short-term price moves.",         stat: "50% payout",          color: "gold"    },
   { key: "avi",      name: "Avimarket",        desc: "Live multiplier game with cash-out anytime.",          stat: "x1.45 last round",    color: "success" },
-  { key: "invest",   name: "Invest Prediction",desc: "Predict long-term asset performance.",                 stat: "+18.4% avg.",         color: "primary" },
+  { key: "invest",   name: "Invest Prediction",desc: "Predict long-term asset performance.",                 stat: "Speculative",         color: "primary" },
   { key: "spin",     name: "Market Spin",      desc: "Daily market spin for instant rewards.",               stat: "Resets in 04:12:33",  color: "gold"    },
 ];
 
@@ -45,12 +45,7 @@ export const jobCategories = [
   "Plumbers", "Electricians", "Security Guards", "Event Workers", "Casual Labourers",
 ];
 
-export const workers = [
-  { name: "Grace Wanjiru",  loc: "Nairobi, Karen",   rating: 4.9, jobs: 84, skills: ["House Help", "Cooking"], badge: "Top Rated" },
-  { name: "James Otieno",   loc: "Mombasa, Nyali",   rating: 4.7, jobs: 52, skills: ["Driver", "Mechanic"],    badge: "Verified" },
-  { name: "Aisha Hassan",   loc: "Kisumu",           rating: 4.8, jobs: 36, skills: ["Tutor", "English"],      badge: "Verified" },
-  { name: "Peter Mwangi",   loc: "Nakuru",           rating: 4.6, jobs: 18, skills: ["Plumber"],               badge: "New Worker" },
-];
+export const workers: any[] = [];
 
 export const savingsGoals = [
   { name: "School Fees",       saved: 42000,  target: 80000,  apy: "10%" },
@@ -65,10 +60,7 @@ export const businessApps = [
   { name: "Salon Renovation",    amount: 80000,  status: "Disbursed",  repaid: 22000  },
 ];
 
-export const successStories = [
-  { name: "Wanjiku's Bakery",  grew: "3x revenue", quote: "PESAKI funded our second oven and packaging line." },
-  { name: "Tech4Kids Academy", grew: "5 branches", quote: "From one classroom to five — funded in 18 months." },
-];
+export const successStories: any[] = [];
 
 export function fmt(n: number) {
   const sign = n < 0 ? "-" : "";

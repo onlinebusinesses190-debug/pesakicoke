@@ -59,6 +59,16 @@ export function AppShell({ children }: { children: ReactNode }) {
           })}
         </ul>
       </nav>
+
+      {/* Business details footer */}
+      <footer className="border-t border-border bg-card/50 px-5 py-3 text-center">
+        <p className="text-[10px] leading-relaxed text-muted-foreground">
+          PESAKI is operated by Pesaki Marketing. Location: Nairobi, Kenya.{" "}
+          <a href="mailto:support@pesaki.co.ke" className="font-semibold text-primary hover:underline">
+            support@pesaki.co.ke
+          </a>
+        </p>
+      </footer>
     </div>
   );
 }

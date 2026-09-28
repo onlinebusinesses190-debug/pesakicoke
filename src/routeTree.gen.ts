@@ -14,8 +14,12 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as BankingRouteImport } from './routes/banking'
 import { Route as BusinessRouteImport } from './routes/business'
+import { Route as CookiesRouteImport } from './routes/cookies'
 import { Route as KaziRouteImport } from './routes/kazi'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as RefundRouteImport } from './routes/refund'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as TradingRouteImport } from './routes/trading'
 import { Route as WalletRouteImport } from './routes/wallet'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
@@ -66,14 +70,34 @@ const BusinessRoute = BusinessRouteImport.update({
   path: '/business',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CookiesRoute = CookiesRouteImport.update({
+  id: '/cookies',
+  path: '/cookies',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const KaziRoute = KaziRouteImport.update({
   id: '/kazi',
   path: '/kazi',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RefundRoute = RefundRouteImport.update({
+  id: '/refund',
+  path: '/refund',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TradingRoute = TradingRouteImport.update({
@@ -203,8 +227,12 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/banking': typeof BankingRoute
   '/business': typeof BusinessRoute
+  '/cookies': typeof CookiesRoute
   '/kazi': typeof KaziRoute
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
+  '/refund': typeof RefundRoute
+  '/terms': typeof TermsRoute
   '/trading': typeof TradingRouteWithChildren
   '/wallet': typeof WalletRoute
   '/admin/actions': typeof AdminActionsRoute
@@ -235,8 +263,12 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/banking': typeof BankingRoute
   '/business': typeof BusinessRoute
+  '/cookies': typeof CookiesRoute
   '/kazi': typeof KaziRoute
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
+  '/refund': typeof RefundRoute
+  '/terms': typeof TermsRoute
   '/wallet': typeof WalletRoute
   '/admin/actions': typeof AdminActionsRoute
   '/admin/banking': typeof AdminBankingRoute
@@ -268,8 +300,12 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/banking': typeof BankingRoute
   '/business': typeof BusinessRoute
+  '/cookies': typeof CookiesRoute
   '/kazi': typeof KaziRoute
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
+  '/refund': typeof RefundRoute
+  '/terms': typeof TermsRoute
   '/trading': typeof TradingRouteWithChildren
   '/wallet': typeof WalletRoute
   '/admin/actions': typeof AdminActionsRoute
@@ -303,8 +339,12 @@ export interface FileRouteTypes {
     | '/auth'
     | '/banking'
     | '/business'
+    | '/cookies'
     | '/kazi'
+    | '/privacy'
     | '/profile'
+    | '/refund'
+    | '/terms'
     | '/trading'
     | '/wallet'
     | '/admin/actions'
@@ -335,8 +375,12 @@ export interface FileRouteTypes {
     | '/auth'
     | '/banking'
     | '/business'
+    | '/cookies'
     | '/kazi'
+    | '/privacy'
     | '/profile'
+    | '/refund'
+    | '/terms'
     | '/wallet'
     | '/admin/actions'
     | '/admin/banking'
@@ -367,8 +411,12 @@ export interface FileRouteTypes {
     | '/auth'
     | '/banking'
     | '/business'
+    | '/cookies'
     | '/kazi'
+    | '/privacy'
     | '/profile'
+    | '/refund'
+    | '/terms'
     | '/trading'
     | '/wallet'
     | '/admin/actions'
@@ -401,8 +449,12 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   BankingRoute: typeof BankingRoute
   BusinessRoute: typeof BusinessRoute
+  CookiesRoute: typeof CookiesRoute
   KaziRoute: typeof KaziRoute
+  PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
+  RefundRoute: typeof RefundRoute
+  TermsRoute: typeof TermsRoute
   TradingRoute: typeof TradingRouteWithChildren
   WalletRoute: typeof WalletRoute
 }
@@ -444,6 +496,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BusinessRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cookies': {
+      id: '/cookies'
+      path: '/cookies'
+      fullPath: '/cookies'
+      preLoaderRoute: typeof CookiesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/kazi': {
       id: '/kazi'
       path: '/kazi'
@@ -451,11 +510,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KaziRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/profile': {
       id: '/profile'
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/refund': {
+      id: '/refund'
+      path: '/refund'
+      fullPath: '/refund'
+      preLoaderRoute: typeof RefundRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/trading': {
@@ -706,8 +786,12 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   BankingRoute: BankingRoute,
   BusinessRoute: BusinessRoute,
+  CookiesRoute: CookiesRoute,
   KaziRoute: KaziRoute,
+  PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
+  RefundRoute: RefundRoute,
+  TermsRoute: TermsRoute,
   TradingRoute: TradingRouteWithChildren,
   WalletRoute: WalletRoute,
 }

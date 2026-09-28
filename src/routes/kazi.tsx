@@ -890,6 +890,7 @@ export function FileField({
 function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
   const [done, setDone] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [consentShared, setConsentShared] = useState(false);
   const [form, setForm] = useState({
     applicantName: user?.user_metadata?.full_name || "",
     phone: user?.user_metadata?.phone || "",
@@ -909,6 +910,10 @@ function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!consentShared) {
+      toast.error("You must consent to your profile being shared with employers.");
+      return;
+    }
     setSubmitting(true);
     try {
       const { data } = await supabase.auth.getSession();
@@ -929,6 +934,7 @@ function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
           experience: form.experience,
           availability: form.availability,
           photo_url: form.photo_url,
+          consent_shared: consentShared,
         }),
       });
 
@@ -963,6 +969,17 @@ function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
             <div><FieldLabel>Availability</FieldLabel><select required value={form.availability} onChange={set("availability")} className={inputCls}><option value="">Select</option><option>Immediate</option><option>1 week</option><option>2 weeks</option></select></div>
           </div>
           <div><FieldLabel>Photo (URL or upload later)</FieldLabel><input value={form.photo_url} onChange={set("photo_url")} className={inputCls} placeholder="https://..." /></div>
+          <label className="flex items-start gap-2 rounded-xl border border-border p-3 text-xs">
+            <input
+              type="checkbox"
+              checked={consentShared}
+              onChange={(e) => setConsentShared(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-primary"
+            />
+            <span>
+              I consent to my profile being shared with employers for this application.
+            </span>
+          </label>
           <button type="submit" disabled={submitting} className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50">
             {submitting ? <Loader2 className="h-4 w-4 animate-spin inline" /> : 'Submit Application'}
           </button>

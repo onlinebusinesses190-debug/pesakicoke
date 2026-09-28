@@ -449,7 +449,8 @@ function ActionSheet({ action, onClose, onSuccess }: { action: ActionKey; onClos
 
         {action === "invest" && (
           <div className="mt-3 rounded-lg bg-gold/10 p-3 text-xs">
-            <div className="flex justify-between"><span className="text-muted-foreground">Est. annual return</span><span className="font-bold text-success">+ {fmt(Math.round(amount * 0.15))}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Est. annual return</span><span className="font-bold text-success">Up to 15% p.a.</span></div>
+            <p className="mt-1 text-[10px] text-muted-foreground">Returns are not guaranteed. Past performance does not predict future results.</p>
           </div>
         )}
 
