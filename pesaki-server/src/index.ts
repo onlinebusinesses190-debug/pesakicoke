@@ -12,6 +12,7 @@ import { setupRateLimit } from "./middleware/rateLimit";
 
 import walletRoutes from "./routes/wallet";
 import kaziRoutes from "./routes/kazi";
+import userRoutes from "./routes/user";
 import { mpesaRoutes } from "./routes/mpesa";
 import { palplussRoutes } from "./routes/palpluss";
 import adminRoutes from "./routes/admin";
@@ -34,6 +35,7 @@ const startServer = async () => {
     // Register new routes explicitly (these override if there's a conflict)
     server.register(walletRoutes);
     server.register(kaziRoutes);
+    server.register(userRoutes);
     server.register(mpesaRoutes);
     server.register(palplussRoutes);
     server.register(adminRoutes);

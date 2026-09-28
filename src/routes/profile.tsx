@@ -3,11 +3,13 @@ import { useState, useEffect } from "react";
 import {
   User, KeyRound, Phone, Gift, ShieldCheck, Bell,
   HelpCircle, MessageCircle, FileText, Lock, Info, LogOut, LogIn, Copy, ChevronRight, X, ArrowLeft, CheckCircle2, ExternalLink,
+  Trash2, AlertTriangle,
 } from "lucide-react";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Badge, SectionTitle } from "@/components/ui-bits";
 import { toast } from "sonner";
 import { createClient } from "@supabase/supabase-js";
+import { apiRequest } from "@/utils/api";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({
@@ -26,6 +28,7 @@ type ModalKey =
   | "notifications"
   | "help" | "support"
   | "terms" | "privacy" | "agreement" | "about"
+  | "deleteAccount"
   | null;
 
 const groups: { title: string; items: { label: string; icon: any; key: Exclude<ModalKey, null> }[] }[] = [
@@ -290,6 +293,31 @@ function ProfilePage() {
         </section>
       )}
 
+      {!guest && (
+        <section className="mt-5 px-5">
+          <SectionTitle title="Danger Zone" />
+          <Card className="!p-4">
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-destructive/15 text-destructive">
+                <Trash2 className="h-4 w-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">Delete my account</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  Permanently delete your account and personal data. This action cannot be undone.
+                </p>
+              </div>
+              <button
+                onClick={() => setModal("deleteAccount")}
+                className="shrink-0 rounded-lg bg-destructive/10 px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/20"
+              >
+                Delete
+              </button>
+            </div>
+          </Card>
+        </section>
+      )}
+
       <p className="mt-6 px-5 pb-4 text-center text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
         PESAKI v1.0 · Africa's Digital Wealth Ecosystem
       </p>
@@ -350,6 +378,7 @@ function ProfileModal({ which, onClose, email, name }: { which: Exclude<ModalKey
     privacy: "Privacy Policy",
     agreement: "User Agreement",
     about: "About PESAKI",
+    deleteAccount: "Delete Account",
   };
 
   return (
@@ -365,6 +394,7 @@ function ProfileModal({ which, onClose, email, name }: { which: Exclude<ModalKey
       {which === "privacy" && <LegalBlock body={PRIVACY} />}
       {which === "agreement" && <LegalBlock body={AGREEMENT} />}
       {which === "about" && <AboutBlock />}
+      {which === "deleteAccount" && <DeleteAccountModal onClose={onClose} />}
     </SheetShell>
   );
 }
@@ -590,6 +620,100 @@ function AboutBlock() {
         <p className="font-semibold">Contact</p>
         <p className="mt-1 text-muted-foreground">WhatsApp: +254 140 399 389</p>
         <p className="text-muted-foreground">Email: hello@pesaki.app</p>
+      </div>
+    </div>
+  );
+}
+
+function DeleteAccountModal({ onClose }: { onClose: () => void }) {
+  const [confirmText, setConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const handleDelete = async () => {
+    if (confirmText !== "DELETE") return;
+    setDeleting(true);
+    try {
+      await apiRequest("/user/delete-account", { method: "DELETE" });
+      setDone(true);
+      toast.success("Your account has been deleted.");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete account.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  if (done) {
+    return (
+      <div className="py-6 text-center">
+        <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-success/15 text-success">
+          <CheckCircle2 className="h-6 w-6" />
+        </div>
+        <p className="mt-3 text-base font-bold">Account deleted</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Your account and personal data have been permanently deleted.
+        </p>
+        <button
+          onClick={onClose}
+          className="mt-4 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground"
+        >
+          Close
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-destructive/15 text-destructive">
+        <AlertTriangle className="h-7 w-7" />
+      </div>
+      <div className="text-center">
+        <h3 className="text-base font-bold">Delete your account?</h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          This will permanently delete your account, anonymize your personal data, zero out your wallet balances, and ban your login. This action cannot be undone.
+        </p>
+      </div>
+
+      <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-xs">
+        <p className="font-semibold text-destructive">What will be deleted:</p>
+        <ul className="mt-1 list-disc space-y-1 pl-4 text-muted-foreground">
+          <li>Profile information (name, email, phone, DOB)</li>
+          <li>Wallet balances and transaction history</li>
+          <li>KAZI applications and contracts</li>
+          <li>Notifications and messages</li>
+          <li>Savings goals and business applications</li>
+        </ul>
+        <p className="mt-2 text-muted-foreground">
+          Some records are retained for the legally required 7-year period with personal identifiers removed.
+        </p>
+      </div>
+
+      <div>
+        <label className={label}>Type <span className="font-bold text-destructive">DELETE</span> to confirm</label>
+        <input
+          value={confirmText}
+          onChange={(e) => setConfirmText(e.target.value)}
+          className={inputCls}
+          placeholder="DELETE"
+        />
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          onClick={onClose}
+          className="flex-1 rounded-xl border border-border py-2.5 text-sm font-semibold hover:bg-muted"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleDelete}
+          disabled={confirmText !== "DELETE" || deleting}
+          className="flex-1 rounded-xl bg-destructive py-2.5 text-sm font-semibold text-destructive-foreground disabled:opacity-50"
+        >
+          {deleting ? "Deleting..." : "Delete Account"}
+        </button>
       </div>
     </div>
   );
