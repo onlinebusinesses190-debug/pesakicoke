@@ -19,6 +19,7 @@ import { Route as KaziRouteImport } from './routes/kazi'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as RefundRouteImport } from './routes/refund'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as TradingRouteImport } from './routes/trading'
 import { Route as WalletRouteImport } from './routes/wallet'
@@ -93,6 +94,11 @@ const ProfileRoute = ProfileRouteImport.update({
 const RefundRoute = RefundRouteImport.update({
   id: '/refund',
   path: '/refund',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TermsRoute = TermsRouteImport.update({
@@ -232,6 +238,7 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/refund': typeof RefundRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
   '/trading': typeof TradingRouteWithChildren
   '/wallet': typeof WalletRoute
@@ -268,6 +275,7 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/refund': typeof RefundRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
   '/wallet': typeof WalletRoute
   '/admin/actions': typeof AdminActionsRoute
@@ -305,6 +313,7 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/refund': typeof RefundRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
   '/trading': typeof TradingRouteWithChildren
   '/wallet': typeof WalletRoute
@@ -344,6 +353,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/profile'
     | '/refund'
+    | '/sitemap.xml'
     | '/terms'
     | '/trading'
     | '/wallet'
@@ -380,6 +390,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/profile'
     | '/refund'
+    | '/sitemap.xml'
     | '/terms'
     | '/wallet'
     | '/admin/actions'
@@ -416,6 +427,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/profile'
     | '/refund'
+    | '/sitemap.xml'
     | '/terms'
     | '/trading'
     | '/wallet'
@@ -454,6 +466,7 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
   RefundRoute: typeof RefundRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TermsRoute: typeof TermsRoute
   TradingRoute: typeof TradingRouteWithChildren
   WalletRoute: typeof WalletRoute
@@ -529,6 +542,13 @@ declare module '@tanstack/react-router' {
       path: '/refund'
       fullPath: '/refund'
       preLoaderRoute: typeof RefundRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/terms': {
@@ -791,6 +811,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
   RefundRoute: RefundRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   TermsRoute: TermsRoute,
   TradingRoute: TradingRouteWithChildren,
   WalletRoute: WalletRoute,

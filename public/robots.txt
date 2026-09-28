@@ -1,0 +1,7 @@
+# https://www.robotstxt.org/robotstxt.html
+# Allows all crawlers and points to the sitemap
+
+User-agent: *
+Disallow:
+
+Sitemap: https://pesaki.co.ke/sitemap.xml
