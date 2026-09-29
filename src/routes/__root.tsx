@@ -126,41 +126,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/fdeb1878-8ad9-4c0d-8b3b-d767051054a3/id-preview-76e24141--66b9a5aa-fbc6-43c7-a488-530b18a42bd2.lovable.app-1783818751962.png",
       },
       { name: "twitter:image:alt", content: "PESAKI — Africa's Digital Wealth Ecosystem" },
-      {
-        tag: "script",
-        type: "application/ld+json",
-        children: JSON.stringify({
-          "@context": "https://schema.org",
-          "@type": "WebSite",
-          name: "PESAKI",
-          url: "https://pesaki.co.ke/",
-          description:
-            "Africa's Digital Wealth Ecosystem — jobs, business funding, banking and wallet in one mobile app.",
-          publisher: {
-            "@type": "Organization",
-            name: "PESAKI",
-            logo: {
-              "@type": "ImageObject",
-              url: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/fdeb1878-8ad9-4c0d-8b3b-d767051054a3/id-preview-76e24141--66b9a5aa-fbc6-43c7-a488-530b18a42bd2.lovable.app-1783818751962.png",
-            },
-            sameAs: ["https://pesaki.co.ke/"],
-          },
-          inLanguage: "en-KE",
-        }),
-      },
-      {
-        tag: "script",
-        type: "application/ld+json",
-        children: JSON.stringify({
-          "@context": "https://schema.org",
-          "@type": "Organization",
-          name: "PESAKI",
-          url: "https://pesaki.co.ke/",
-          logo: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/fdeb1878-8ad9-4c0d-8b3b-d767051054a3/id-preview-76e24141--66b9a5aa-fbc6-43c7-a488-530b18a42bd2.lovable.app-1783818751962.png",
-          foundingLocation: "Nairobi, Kenya",
-          foundingDate: "2025",
-        }),
-      },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -179,10 +144,46 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 });
 
 function RootShell({ children }: { children: ReactNode }) {
+  const websiteSchema = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "PESAKI",
+    url: "https://pesaki.co.ke/",
+    description: "Africa's Digital Wealth Ecosystem — jobs, business funding, banking and wallet in one mobile app.",
+    publisher: {
+      "@type": "Organization",
+      name: "PESAKI",
+      logo: {
+        "@type": "ImageObject",
+        url: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/fdeb1878-8ad9-4c0d-8b3b-d767051054a3/id-preview-76e24141--66b9a5aa-fbc6-43c7-a488-530b18a42bd2.lovable.app-1783818751962.png",
+      },
+      sameAs: ["https://pesaki.co.ke/"],
+    },
+    inLanguage: "en-KE",
+  };
+
+  const organizationSchema = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "PESAKI",
+    url: "https://pesaki.co.ke/",
+    logo: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/fdeb1878-8ad9-4c0d-8b3b-d767051054a3/id-preview-76e24141--66b9a5aa-fbc6-43c7-a488-530b18a42bd2.lovable.app-1783818751962.png",
+    foundingLocation: "Nairobi, Kenya",
+    foundingDate: "2025",
+  };
+
   return (
     <html lang="en">
       <head>
         <HeadContent />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+        />
       </head>
       <body>
         {children}
