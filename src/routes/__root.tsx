@@ -74,7 +74,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-   head: () => ({
+  head: () => ({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
@@ -82,26 +82,85 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "robots", content: "index, follow" },
       { name: "googlebot", content: "index, follow" },
       { name: "author", content: "PESAKI" },
-      { name: "keywords", content: "PESAKI, Nairobi, Kenya, mobile money, M-Pesa, trading, FX, binary options, up down, aviator, micro-jobs, kazi, business funding, savings, wallet" },
+      {
+        name: "keywords",
+        content:
+          "PESAKI, Nairobi, Kenya, mobile money, M-Pesa, jobs, kazi, business funding, savings, wallet, digital banking, fintech, Africa",
+      },
       { name: "geo.region", content: "KE-Nairobi" },
       { name: "geo.country", content: "Kenya" },
-      { title: "PESAKI — Dashboard" },
-      { name: "description", content: "Your PESAKI dashboard: wallet, earnings, trades, jobs, and opportunities." },
-      { property: "og:title", content: "PESAKI — Dashboard" },
-      { property: "og:description", content: "Your PESAKI dashboard: wallet, earnings, trades, jobs, and opportunities." },
+      { title: "PESAKI — Africa's Digital Wealth Ecosystem" },
+      {
+        name: "description",
+        content:
+          "PESAKI is Africa's digital wealth ecosystem — jobs, business funding, banking and wallet in one mobile app. Built in Nairobi, Kenya.",
+      },
+      { property: "og:title", content: "PESAKI — Africa's Digital Wealth Ecosystem" },
+      {
+        property: "og:description",
+        content:
+          "PESAKI is Africa's digital wealth ecosystem — jobs, business funding, banking and wallet in one mobile app. Built in Nairobi, Kenya.",
+      },
       { property: "og:type", content: "website" },
       { property: "og:url", content: "https://pesaki.co.ke/" },
       { property: "og:site_name", content: "PESAKI" },
       { property: "og:locale", content: "en_KE" },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/fdeb1878-8ad9-4c0d-8b3b-d767051054a3/id-preview-76e24141--66b9a5aa-fbc6-43c7-a488-530b18a42bd2.lovable.app-1783818751962.png" },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/fdeb1878-8ad9-4c0d-8b3b-d767051054a3/id-preview-76e24141--66b9a5aa-fbc6-43c7-a488-530b18a42bd2.lovable.app-1783818751962.png",
+      },
       { property: "og:image:width", content: "1200" },
       { property: "og:image:height", content: "630" },
       { property: "og:image:alt", content: "PESAKI — Africa's Digital Wealth Ecosystem" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "PESAKI — Dashboard" },
-      { name: "twitter:description", content: "Your PESAKI dashboard: wallet, earnings, trades, jobs, and opportunities." },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/fdeb1878-8ad9-4c0d-8b3b-d767051054a3/id-preview-76e24141--66b9a5aa-fbc6-43c7-a488-530b18a42bd2.lovable.app-1783818751962.png" },
+      { name: "twitter:title", content: "PESAKI — Africa's Digital Wealth Ecosystem" },
+      {
+        name: "twitter:description",
+        content:
+          "PESAKI is Africa's digital wealth ecosystem — jobs, business funding, banking and wallet in one mobile app. Built in Nairobi, Kenya.",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/fdeb1878-8ad9-4c0d-8b3b-d767051054a3/id-preview-76e24141--66b9a5aa-fbc6-43c7-a488-530b18a42bd2.lovable.app-1783818751962.png",
+      },
       { name: "twitter:image:alt", content: "PESAKI — Africa's Digital Wealth Ecosystem" },
+      {
+        tag: "script",
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          name: "PESAKI",
+          url: "https://pesaki.co.ke/",
+          description:
+            "Africa's Digital Wealth Ecosystem — jobs, business funding, banking and wallet in one mobile app.",
+          publisher: {
+            "@type": "Organization",
+            name: "PESAKI",
+            logo: {
+              "@type": "ImageObject",
+              url: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/fdeb1878-8ad9-4c0d-8b3b-d767051054a3/id-preview-76e24141--66b9a5aa-fbc6-43c7-a488-530b18a42bd2.lovable.app-1783818751962.png",
+            },
+            sameAs: ["https://pesaki.co.ke/"],
+          },
+          inLanguage: "en-KE",
+        }),
+      },
+      {
+        tag: "script",
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "Organization",
+          name: "PESAKI",
+          url: "https://pesaki.co.ke/",
+          logo: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/fdeb1878-8ad9-4c0d-8b3b-d767051054a3/id-preview-76e24141--66b9a5aa-fbc6-43c7-a488-530b18a42bd2.lovable.app-1783818751962.png",
+          foundingLocation: "Nairobi, Kenya",
+          foundingDate: "2025",
+        }),
+      },
     ],
     links: [
       { rel: "stylesheet", href: appCss },

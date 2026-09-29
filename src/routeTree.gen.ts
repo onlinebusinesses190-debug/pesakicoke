@@ -10,15 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AboutRouteImport } from './routes/about'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as BankingRouteImport } from './routes/banking'
 import { Route as BusinessRouteImport } from './routes/business'
+import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CookiesRouteImport } from './routes/cookies'
 import { Route as KaziRouteImport } from './routes/kazi'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as RefundRouteImport } from './routes/refund'
+import { Route as SecurityRouteImport } from './routes/security'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as TradingRouteImport } from './routes/trading'
@@ -51,6 +54,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -69,6 +77,11 @@ const BankingRoute = BankingRouteImport.update({
 const BusinessRoute = BusinessRouteImport.update({
   id: '/business',
   path: '/business',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CookiesRoute = CookiesRouteImport.update({
@@ -94,6 +107,11 @@ const ProfileRoute = ProfileRouteImport.update({
 const RefundRoute = RefundRouteImport.update({
   id: '/refund',
   path: '/refund',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SecurityRoute = SecurityRouteImport.update({
+  id: '/security',
+  path: '/security',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -229,15 +247,18 @@ const AdminUsersUserIdRoute = AdminUsersUserIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/banking': typeof BankingRoute
   '/business': typeof BusinessRoute
+  '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
   '/kazi': typeof KaziRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/refund': typeof RefundRoute
+  '/security': typeof SecurityRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
   '/trading': typeof TradingRouteWithChildren
@@ -267,14 +288,17 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
   '/banking': typeof BankingRoute
   '/business': typeof BusinessRoute
+  '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
   '/kazi': typeof KaziRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/refund': typeof RefundRoute
+  '/security': typeof SecurityRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
   '/wallet': typeof WalletRoute
@@ -304,15 +328,18 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/banking': typeof BankingRoute
   '/business': typeof BusinessRoute
+  '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
   '/kazi': typeof KaziRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/refund': typeof RefundRoute
+  '/security': typeof SecurityRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
   '/trading': typeof TradingRouteWithChildren
@@ -344,15 +371,18 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/about'
     | '/admin'
     | '/auth'
     | '/banking'
     | '/business'
+    | '/contact'
     | '/cookies'
     | '/kazi'
     | '/privacy'
     | '/profile'
     | '/refund'
+    | '/security'
     | '/sitemap.xml'
     | '/terms'
     | '/trading'
@@ -382,14 +412,17 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/about'
     | '/auth'
     | '/banking'
     | '/business'
+    | '/contact'
     | '/cookies'
     | '/kazi'
     | '/privacy'
     | '/profile'
     | '/refund'
+    | '/security'
     | '/sitemap.xml'
     | '/terms'
     | '/wallet'
@@ -418,15 +451,18 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/about'
     | '/admin'
     | '/auth'
     | '/banking'
     | '/business'
+    | '/contact'
     | '/cookies'
     | '/kazi'
     | '/privacy'
     | '/profile'
     | '/refund'
+    | '/security'
     | '/sitemap.xml'
     | '/terms'
     | '/trading'
@@ -457,15 +493,18 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AboutRoute: typeof AboutRoute
   AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRoute
   BankingRoute: typeof BankingRoute
   BusinessRoute: typeof BusinessRoute
+  ContactRoute: typeof ContactRoute
   CookiesRoute: typeof CookiesRoute
   KaziRoute: typeof KaziRoute
   PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
   RefundRoute: typeof RefundRoute
+  SecurityRoute: typeof SecurityRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TermsRoute: typeof TermsRoute
   TradingRoute: typeof TradingRouteWithChildren
@@ -479,6 +518,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -507,6 +553,13 @@ declare module '@tanstack/react-router' {
       path: '/business'
       fullPath: '/business'
       preLoaderRoute: typeof BusinessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cookies': {
@@ -542,6 +595,13 @@ declare module '@tanstack/react-router' {
       path: '/refund'
       fullPath: '/refund'
       preLoaderRoute: typeof RefundRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/security': {
+      id: '/security'
+      path: '/security'
+      fullPath: '/security'
+      preLoaderRoute: typeof SecurityRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sitemap.xml': {
@@ -802,15 +862,18 @@ const TradingRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AboutRoute: AboutRoute,
   AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRoute,
   BankingRoute: BankingRoute,
   BusinessRoute: BusinessRoute,
+  ContactRoute: ContactRoute,
   CookiesRoute: CookiesRoute,
   KaziRoute: KaziRoute,
   PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
   RefundRoute: RefundRoute,
+  SecurityRoute: SecurityRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TermsRoute: TermsRoute,
   TradingRoute: TradingRouteWithChildren,

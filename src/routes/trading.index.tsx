@@ -1,30 +1,65 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { TrendingUp, Zap, Plane, BarChart3, RefreshCw, Play, DollarSign, AlertTriangle, X, ChevronRight } from "lucide-react";
+import {
+  TrendingUp,
+  Zap,
+  Plane,
+  BarChart3,
+  RefreshCw,
+  Play,
+  DollarSign,
+  AlertTriangle,
+  X,
+  ChevronRight,
+} from "lucide-react";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Badge } from "@/components/ui-bits";
 import { tradingProducts } from "@/lib/mock";
+import { createClient } from "@supabase/supabase-js";
 
 export const Route = createFileRoute("/trading/")({
+  beforeLoad: async () => {
+    const supabase = createClient(
+      import.meta.env.VITE_SUPABASE_URL,
+      import.meta.env.VITE_SUPABASE_ANON_KEY,
+    );
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) {
+      throw { to: "/auth" };
+    }
+  },
   head: () => ({
     meta: [
       { title: "Trading — PESAKI" },
-      { name: "description", content: "Forex, Binary FX, Up & Down, Avimarket, Invest Prediction and Market Spin — all PESAKI trading products in one place." },
+      {
+        name: "description",
+        content:
+          "Forex, Binary FX, Up & Down, Avimarket, Invest Prediction and Market Spin — all PESAKI trading products in one place.",
+      },
     ],
   }),
   component: TradingPage,
 });
 
 const icons: Record<string, React.ComponentType<{ className?: string }>> = {
-  binary: BarChart3, updown: TrendingUp, avi: Plane, invest: Zap, spin: RefreshCw,
+  binary: BarChart3,
+  updown: TrendingUp,
+  avi: Plane,
+  invest: Zap,
+  spin: RefreshCw,
 };
 
-const routeFor: Record<string, "/trading/fx" | "/trading/up-down" | "/trading/aviator" | "/trading/invest" | "/trading/spin"> = {
+const routeFor: Record<
+  string,
+  "/trading/fx" | "/trading/up-down" | "/trading/aviator" | "/trading/invest" | "/trading/spin"
+> = {
   binary: "/trading/fx",
   updown: "/trading/up-down",
-  avi:    "/trading/aviator",
+  avi: "/trading/aviator",
   invest: "/trading/invest",
-  spin:   "/trading/spin",
+  spin: "/trading/spin",
 };
 
 function TradingPage() {
@@ -32,7 +67,11 @@ function TradingPage() {
 
   return (
     <AppShell>
-      <PageHeader title="Trading Floor" subtitle="Predict. Trade. Earn." right={<Badge tone="success">Live</Badge>} />
+      <PageHeader
+        title="Trading Floor"
+        subtitle="Predict. Trade. Earn."
+        right={<Badge tone="success">Live</Badge>}
+      />
 
       <section className="px-5 pt-5">
         <div className="gradient-primary rounded-2xl p-5 text-primary-foreground">
@@ -54,12 +93,20 @@ function TradingPage() {
                 <h3 className="truncate text-base font-bold">Forex Trading</h3>
                 <Badge tone="gold">Advanced</Badge>
               </div>
-              <p className="mt-0.5 text-xs text-muted-foreground">Trade major currency pairs with leverage. Requires prior experience.</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Trade major currency pairs with leverage. Requires prior experience.
+              </p>
               <div className="mt-3 flex gap-2">
-                <button onClick={() => setShowForexGate(true)} className="inline-flex flex-1 items-center justify-center gap-1 rounded-full border border-border bg-background px-3 py-2 text-xs font-semibold">
+                <button
+                  onClick={() => setShowForexGate(true)}
+                  className="inline-flex flex-1 items-center justify-center gap-1 rounded-full border border-border bg-background px-3 py-2 text-xs font-semibold"
+                >
                   <Play className="h-3 w-3" /> Demo
                 </button>
-                <button onClick={() => setShowForexGate(true)} className="inline-flex flex-1 items-center justify-center gap-1 rounded-full gradient-primary px-3 py-2 text-xs font-semibold text-primary-foreground">
+                <button
+                  onClick={() => setShowForexGate(true)}
+                  className="inline-flex flex-1 items-center justify-center gap-1 rounded-full gradient-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
+                >
                   Real Mode
                 </button>
               </div>
@@ -73,11 +120,15 @@ function TradingPage() {
           return (
             <Card key={p.key} className="!p-4">
               <div className="flex items-start gap-3">
-                <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl ${
-                  tone === "gold" ? "gradient-gold text-gold-foreground"
-                  : tone === "success" ? "bg-success/15 text-success"
-                  : "gradient-primary text-primary-foreground"
-                }`}>
+                <span
+                  className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl ${
+                    tone === "gold"
+                      ? "gradient-gold text-gold-foreground"
+                      : tone === "success"
+                        ? "bg-success/15 text-success"
+                        : "gradient-primary text-primary-foreground"
+                  }`}
+                >
                   <Icon className="h-6 w-6" />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -87,10 +138,16 @@ function TradingPage() {
                   </div>
                   <p className="mt-0.5 text-xs text-muted-foreground">{p.desc}</p>
                   <div className="mt-3 flex gap-2">
-                    <Link to={routeFor[p.key]} className="inline-flex flex-1 items-center justify-center gap-1 rounded-full border border-border bg-background px-3 py-2 text-xs font-semibold">
+                    <Link
+                      to={routeFor[p.key]}
+                      className="inline-flex flex-1 items-center justify-center gap-1 rounded-full border border-border bg-background px-3 py-2 text-xs font-semibold"
+                    >
                       <Play className="h-3 w-3" /> Demo
                     </Link>
-                    <Link to={routeFor[p.key]} className="inline-flex flex-1 items-center justify-center gap-1 rounded-full gradient-primary px-3 py-2 text-xs font-semibold text-primary-foreground">
+                    <Link
+                      to={routeFor[p.key]}
+                      className="inline-flex flex-1 items-center justify-center gap-1 rounded-full gradient-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
+                    >
                       Real Mode
                     </Link>
                   </div>
@@ -111,15 +168,24 @@ function TradingPage() {
           <div className="relative z-10 w-full max-w-md rounded-t-3xl bg-card p-5 shadow-2xl sm:rounded-3xl">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-base font-bold">Experience required</h3>
-              <button onClick={() => setShowForexGate(false)} className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground">
+              <button
+                onClick={() => setShowForexGate(false)}
+                className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground"
+              >
                 <X className="h-4 w-4" />
               </button>
             </div>
             <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-gold/15 text-gold-foreground">
               <AlertTriangle className="h-7 w-7" />
             </div>
-            <p className="mt-4 text-center text-sm font-semibold">Sorry, before participating in forex trading you should have at least a 1 month experience in binary trading.</p>
-            <p className="mt-2 text-center text-xs text-muted-foreground">Build up your skills on Binary FX first — it's the safest way to learn market direction.</p>
+            <p className="mt-4 text-center text-sm font-semibold">
+              Sorry, before participating in forex trading you should have at least a 1 month
+              experience in binary trading.
+            </p>
+            <p className="mt-2 text-center text-xs text-muted-foreground">
+              Build up your skills on Binary FX first — it's the safest way to learn market
+              direction.
+            </p>
 
             <Link
               to="/trading/fx"

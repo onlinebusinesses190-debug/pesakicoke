@@ -11,17 +11,20 @@ const BASE_URL = "https://pesaki.co.ke";
 
 const PAGES = [
   { path: "/",            priority: 1.0, changefreq: "daily"    },
-  { path: "/trading",     priority: 0.9, changefreq: "weekly"   },
-  { path: "/kazi",        priority: 0.8, changefreq: "daily"    },
+  { path: "/kazi",        priority: 0.9, changefreq: "daily"    },
+  { path: "/banking",     priority: 0.8, changefreq: "weekly"   },
   { path: "/business",    priority: 0.8, changefreq: "weekly"   },
-  { path: "/banking",     priority: 0.9, changefreq: "weekly"   },
-  { path: "/wallet",      priority: 0.9, changefreq: "weekly"   },
-  { path: "/profile",     priority: 0.6, changefreq: "monthly"  },
-  { path: "/privacy",     priority: 0.5, changefreq: "yearly"   },
-  { path: "/terms",       priority: 0.5, changefreq: "yearly"   },
-  { path: "/refund",      priority: 0.4, changefreq: "yearly"   },
-  { path: "/cookies",     priority: 0.4, changefreq: "yearly"   },
-  { path: "/auth",        priority: 0.5, changefreq: "monthly"  },
+  { path: "/about",       priority: 0.7, changefreq: "monthly"  },
+  { path: "/security",    priority: 0.6, changefreq: "monthly"  },
+  { path: "/contact",     priority: 0.6, changefreq: "monthly"  },
+  { path: "/wallet",      priority: 0.8, changefreq: "weekly"   },
+  { path: "/profile",     priority: 0.5, changefreq: "monthly"  },
+  { path: "/privacy",     priority: 0.3, changefreq: "yearly"   },
+  { path: "/terms",       priority: 0.3, changefreq: "yearly"   },
+  { path: "/refund",      priority: 0.3, changefreq: "yearly"   },
+  { path: "/cookies",     priority: 0.3, changefreq: "yearly"   },
+  { path: "/auth",        priority: 0.4, changefreq: "monthly"  },
+  { path: "/trading",     priority: 0.2, changefreq: "monthly"  },
 ];
 
 function SitemapPage() {

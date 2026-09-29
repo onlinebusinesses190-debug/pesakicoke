@@ -1,5 +1,6 @@
 # https://www.robotstxt.org/robotstxt.html
-# Allows all crawlers and points to the sitemap
+# Allows crawlers and points to the sitemap
+# Trading content is behind authentication and not indexed
 
 User-agent: *
 Disallow:
