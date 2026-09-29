@@ -12,15 +12,18 @@ export default defineConfig({
   tanstackStart: {
     server: { entry: "server" },
   },
+  nitro: {
+    preset: "vercel",
+  },
   vite: {
     plugins: [
       VitePWA({
         registerType: "autoUpdate",
         publicDir: resolve(process.cwd(), ".output/public"),
         workbox: {
-          globPatterns: ["index.html", "**/*.{js,css,html,ico,png,svg,woff2}"],
+          globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
           globDirectory: resolve(process.cwd(), ".output/public"),
-          navigateFallback: "/index.html",
+          navigateFallback: "/",
           navigateFallbackDenylist: [
             /^\/api\//,
             /^\/functions\//,
@@ -29,6 +32,9 @@ export default defineConfig({
           cleanupOutdatedCaches: true,
           clientsClaim: true,
           skipWaiting: true,
+        },
+        devOptions: {
+          enabled: false,
         },
       }),
     ],
