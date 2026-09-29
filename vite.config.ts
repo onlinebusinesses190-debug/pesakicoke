@@ -5,11 +5,32 @@
 //     error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { VitePWA } from "vite-plugin-pwa";
+import { resolve } from "node:path";
 
 export default defineConfig({
   tanstackStart: {
-    // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
-    // nitro/vite builds from this
     server: { entry: "server" },
+  },
+  vite: {
+    plugins: [
+      VitePWA({
+        registerType: "autoUpdate",
+        publicDir: resolve(process.cwd(), ".output/public"),
+        workbox: {
+          globPatterns: ["index.html", "**/*.{js,css,html,ico,png,svg,woff2}"],
+          globDirectory: resolve(process.cwd(), ".output/public"),
+          navigateFallback: "/index.html",
+          navigateFallbackDenylist: [
+            /^\/api\//,
+            /^\/functions\//,
+            /^\/admin\//,
+          ],
+          cleanupOutdatedCaches: true,
+          clientsClaim: true,
+          skipWaiting: true,
+        },
+      }),
+    ],
   },
 });

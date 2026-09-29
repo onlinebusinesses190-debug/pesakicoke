@@ -57,7 +57,7 @@ function HomePage() {
   const [totalEarnings, setTotalEarnings] = useState(0);
   const [referralEarnings, setTotalReferralEarnings] = useState(0);
   const [transactions, setTransactions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   const [stats, setStats] = useState([
     { label: "Active Trades", value: "0", hint: "+0", tone: "primary" as const },
@@ -81,6 +81,7 @@ function HomePage() {
       return;
     }
 
+    setLoading(true);
     const fetchAll = async () => {
       try {
         const supabase = createClient(

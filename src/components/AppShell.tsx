@@ -1,5 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   Home,
@@ -16,6 +17,7 @@ import {
   LayoutDashboard,
   UserPlus,
 } from "lucide-react";
+import { registerSW } from "virtual:pwa-register";
 
 const authedNav = [
   { to: "/", label: "Dashboard", sub: "", icon: LayoutDashboard },
@@ -43,6 +45,20 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const isAuthed = ready && !!session;
   const nav = isAuthed ? authedNav : publicNav;
+
+  useEffect(() => {
+    const updateSW = registerSW({
+      immediate: true,
+      onNeedRefresh() {
+        if (confirm("PESAKI has been updated. Reload now?")) {
+          updateSW(true);
+        }
+      },
+      onOfflineReady() {
+        console.log("PESAKI is ready for offline use");
+      },
+    });
+  }, []);
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background">
