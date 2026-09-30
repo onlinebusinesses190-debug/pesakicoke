@@ -48,13 +48,13 @@
 | `recharts` | ^2.15.4 | Charting library | Chart data (from app) | _[Open source — N/A]_ | https://recharts.org/en-US/ |
 | `lightweight-charts` | 3.8.0 | Financial charting | Chart data (from app) | _[Open source — N/A]_ | https://tradingview.github.io/lightweight-charts/ |
 | `socket.io-client` | ^4.8.1 | WebSocket client | Socket session IDs, auth tokens, game positions | _[Open source — N/A]_ | https://socket.io/privacy |
-| `sonner` | ^2.0.7 | Toast notifications | Toast content (from app) | _[Open source — N/A]_ | https://sonner-em.vercel.app/ |
+| `sonner` | ^2.0.7 | Toast notifications | Toast content (from app) | _[Open source — N/A]_ | https://www.npmjs.com/package/sonner |
 | `cmdk` | ^1.1.1 | Command palette | Keyboard input to command palette | _[Open source — N/A]_ | https://github.com/evergreen-ui/cmdk |
 | `embla-carousel-react` | ^8.6.0 | Carousel component | None | _[Open source — N/A]_ | https://www.embla-carousel.com/ |
 | `react-resizable-panels` | ^4.6.5 | Resizable layouts | Panel sizes (local state) | _[Open source — N/A]_ | https://github.com/bvaughn/react-resizable-panels |
 | `react-day-picker` | ^9.14.0 | Date picker | Date selections | _[Open source — N/A]_ | https://react-day-picker.js.org/ |
 | `input-otp` | ^1.4.2 | OTP input | OTP digits (transient, local) | _[Open source — N/A]_ | https://input-otp.hackredeye.io/ |
-| `vaul` | ^1.1.2 | Drawer component | None | _[Open source — N/A]_ | https://vaul.vercel.app/ |
+| `vaul` | ^1.1.2 | Drawer component | None | _[Open source — N/A]_ | https://www.npmjs.com/package/vaul |
 
 ### Styling / Utilities
 

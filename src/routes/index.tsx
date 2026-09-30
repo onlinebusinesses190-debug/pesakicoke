@@ -537,6 +537,8 @@ const TRUST_ITEMS = [
 ] as const;
 
 function PublicHome() {
+  /* PublicHome only ever renders for signed-out visitors (see HomePage), so
+     hub cards always route to sign up — no session flash on first paint. */
   return (
     <div className="bg-brand-paper">
       <script
@@ -637,7 +639,8 @@ function PublicHome() {
           {HUB_CARDS.map((hub) => (
             <Link
               key={hub.to}
-              to={hub.to}
+              to="/auth"
+              search={{ mode: "signup" } as never}
               className="group flex flex-col rounded-2xl border border-black/5 bg-white p-4 shadow-soft transition-transform hover:-translate-y-0.5"
             >
               <span className={`grid h-11 w-11 place-items-center rounded-full ${hub.circle}`}>
@@ -711,7 +714,8 @@ function PublicHome() {
             return (
               <Link
                 key={service.key}
-                to={service.to}
+                to="/auth"
+                search={{ mode: "signup" } as never}
                 className="group flex flex-col rounded-2xl border border-black/5 bg-white p-4 shadow-soft transition-transform hover:-translate-y-0.5"
               >
                 <span className="grid h-10 w-10 place-items-center rounded-full bg-brand-tint-green text-brand-ink">
@@ -994,14 +998,10 @@ function PublicHome() {
             );
             const className =
               "flex flex-col rounded-2xl border border-black/5 bg-white p-3.5 shadow-soft";
-            return item.to ? (
+            return (
               <Link key={item.label} to={item.to} className={className}>
                 {content}
               </Link>
-            ) : (
-              <div key={item.label} className={className}>
-                {content}
-              </div>
             );
           })}
         </div>

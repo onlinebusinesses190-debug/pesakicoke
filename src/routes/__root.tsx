@@ -108,14 +108,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:url", content: "https://pesaki.co.ke/" },
       { property: "og:site_name", content: "PESAKI" },
       { property: "og:locale", content: "en_KE" },
+      { property: "og:image", content: "https://pesaki.co.ke/icons/icon-512.png" },
+      { property: "og:image:type", content: "image/png" },
+      { property: "og:image:width", content: "512" },
+      { property: "og:image:height", content: "512" },
       {
-        property: "og:image",
-        content:
-          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/fdeb1878-8ad9-4c0d-8b3b-d767051054a3/id-preview-76e24141--66b9a5aa-fbc6-43c7-a488-530b18a42bd2.lovable.app-1783818751962.png",
+        property: "og:image:alt",
+        content: "PESAKI — One Platform. Work, Business & Financial Services.",
       },
-      { property: "og:image:width", content: "1200" },
-      { property: "og:image:height", content: "630" },
-      { property: "og:image:alt", content: "PESAKI — Africa's Digital Wealth Ecosystem" },
       { name: "twitter:card", content: "summary_large_image" },
       {
         name: "twitter:title",
@@ -126,11 +126,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content:
           "PESAKI brings together your wallet, jobs, business funding and banking in one powerful mobile app. PESAKI MARKETING, BN-6ASR2E26, registered in Kenya.",
       },
-      {
-        name: "twitter:image",
-        content:
-          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/fdeb1878-8ad9-4c0d-8b3b-d767051054a3/id-preview-76e24141--66b9a5aa-fbc6-43c7-a488-530b18a42bd2.lovable.app-1783818751962.png",
-      },
+      { name: "twitter:image", content: "https://pesaki.co.ke/icons/icon-512.png" },
       {
         name: "twitter:image:alt",
         content: "PESAKI — One Platform. Work, Business & Financial Services.",

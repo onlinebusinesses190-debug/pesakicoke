@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, SectionTitle, Badge } from "@/components/ui-bits";
-import { Shield, Lock, Key, Eye, CheckCircle2, Globe } from "lucide-react";
+import { Shield, Lock, Key, Smartphone, Eye, CheckCircle2, Globe } from "lucide-react";
 
 export const Route = createFileRoute("/security")({
   head: () => ({
