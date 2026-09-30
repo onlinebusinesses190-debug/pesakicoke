@@ -13,6 +13,7 @@ import {
   Info,
   Shield,
   Mail,
+  Scale,
   LogIn,
   LayoutDashboard,
   UserPlus,
@@ -35,8 +36,36 @@ const publicNav = [
   { to: "/business", label: "Business", sub: "Hub", icon: Building2 },
   { to: "/banking", label: "Banking", sub: "Hub", icon: Landmark },
   { to: "/about", label: "About", sub: "", icon: Info },
+  { to: "/compliance", label: "Compliance", sub: "", icon: Scale },
   { to: "/security", label: "Security", sub: "", icon: Shield },
   { to: "/contact", label: "Contact", sub: "", icon: Mail },
+] as const;
+
+const footerGroups = [
+  {
+    title: "Company",
+    links: [
+      { to: "/about", label: "About" },
+      { to: "/security", label: "Security" },
+      { to: "/contact", label: "Contact" },
+    ],
+  },
+  {
+    title: "Legal",
+    links: [
+      { to: "/compliance", label: "Compliance" },
+      { to: "/terms", label: "Terms of Service" },
+      { to: "/privacy", label: "Privacy Policy" },
+    ],
+  },
+  {
+    title: "Support",
+    links: [
+      { to: "/contact", label: "Help Center" },
+      { to: "/wallet", label: "Wallet" },
+      { to: "/profile", label: "Profile" },
+    ],
+  },
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -91,7 +120,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-md border-t border-border bg-card/90 px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl"
         aria-label="Primary"
       >
-        <ul className="grid grid-cols-7">
+        <ul className={nav.length > 7 ? "grid grid-cols-4" : "grid grid-cols-7"}>
           {nav.map((item) => {
             const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
             const Icon = item.icon;
@@ -124,14 +153,37 @@ export function AppShell({ children }: { children: ReactNode }) {
       </nav>
 
       {/* Business details footer */}
-      <footer className="border-t border-border bg-card/50 px-5 py-3 text-center">
-        <p className="text-[10px] leading-relaxed text-muted-foreground">
-          PESAKI is operated by Pesaki Marketing. Location: Nairobi, Kenya.{" "}
+      <footer className="border-t border-border bg-card/50 px-5 py-5 text-center">
+        <div className="grid grid-cols-3 gap-3">
+          {footerGroups.map((group) => (
+            <div key={group.title} className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+                {group.title}
+              </p>
+              <ul className="mt-1.5 space-y-1">
+                {group.links.map((link) => (
+                  <li key={`${group.title}-${link.label}`}>
+                    <Link
+                      to={link.to}
+                      className="block truncate text-[11px] font-medium text-foreground hover:text-primary"
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+        <p className="mt-4 text-[10px] leading-relaxed text-muted-foreground">
+          PESAKI MARKETING · BN-6ASR2E26 · Nairobi, Kenya.{" "}
           <a
-            href="mailto:support@pesaki.co.ke"
+            href="https://wa.me/254140399389"
+            target="_blank"
+            rel="noopener noreferrer"
             className="font-semibold text-primary hover:underline"
           >
-            support@pesaki.co.ke
+            Help Center
           </a>
         </p>
       </footer>

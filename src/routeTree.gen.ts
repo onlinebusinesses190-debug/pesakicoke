@@ -15,6 +15,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as BankingRouteImport } from './routes/banking'
 import { Route as BusinessRouteImport } from './routes/business'
+import { Route as ComplianceRouteImport } from './routes/compliance'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CookiesRouteImport } from './routes/cookies'
 import { Route as KaziRouteImport } from './routes/kazi'
@@ -77,6 +78,11 @@ const BankingRoute = BankingRouteImport.update({
 const BusinessRoute = BusinessRouteImport.update({
   id: '/business',
   path: '/business',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ComplianceRoute = ComplianceRouteImport.update({
+  id: '/compliance',
+  path: '/compliance',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ContactRoute = ContactRouteImport.update({
@@ -252,6 +258,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/banking': typeof BankingRoute
   '/business': typeof BusinessRoute
+  '/compliance': typeof ComplianceRoute
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
   '/kazi': typeof KaziRoute
@@ -292,6 +299,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/banking': typeof BankingRoute
   '/business': typeof BusinessRoute
+  '/compliance': typeof ComplianceRoute
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
   '/kazi': typeof KaziRoute
@@ -333,6 +341,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/banking': typeof BankingRoute
   '/business': typeof BusinessRoute
+  '/compliance': typeof ComplianceRoute
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
   '/kazi': typeof KaziRoute
@@ -376,6 +385,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/banking'
     | '/business'
+    | '/compliance'
     | '/contact'
     | '/cookies'
     | '/kazi'
@@ -416,6 +426,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/banking'
     | '/business'
+    | '/compliance'
     | '/contact'
     | '/cookies'
     | '/kazi'
@@ -456,6 +467,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/banking'
     | '/business'
+    | '/compliance'
     | '/contact'
     | '/cookies'
     | '/kazi'
@@ -498,6 +510,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   BankingRoute: typeof BankingRoute
   BusinessRoute: typeof BusinessRoute
+  ComplianceRoute: typeof ComplianceRoute
   ContactRoute: typeof ContactRoute
   CookiesRoute: typeof CookiesRoute
   KaziRoute: typeof KaziRoute
@@ -553,6 +566,13 @@ declare module '@tanstack/react-router' {
       path: '/business'
       fullPath: '/business'
       preLoaderRoute: typeof BusinessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/compliance': {
+      id: '/compliance'
+      path: '/compliance'
+      fullPath: '/compliance'
+      preLoaderRoute: typeof ComplianceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/contact': {
@@ -867,6 +887,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   BankingRoute: BankingRoute,
   BusinessRoute: BusinessRoute,
+  ComplianceRoute: ComplianceRoute,
   ContactRoute: ContactRoute,
   CookiesRoute: CookiesRoute,
   KaziRoute: KaziRoute,
