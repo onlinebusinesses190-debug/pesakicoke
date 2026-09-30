@@ -43,12 +43,32 @@
   --color-surface: var(--surface);
   --color-surface-foreground: var(--surface-foreground);
 
+  /* PESAKI premium brand palette */
+  --color-brand-deep: var(--brand-deep);
+  --color-brand-green: var(--brand-green);
+  --color-brand-gold: var(--brand-gold);
+  --color-brand-gold-deep: var(--brand-gold-deep);
+  --color-brand-tint-green: var(--brand-tint-green);
+  --color-brand-tint-gold: var(--brand-tint-gold);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-paper: var(--brand-paper);
+
   --shadow-card: 0 1px 2px oklch(0 0 0 / 0.04), 0 8px 24px -12px oklch(0.2 0.05 160 / 0.18);
   --shadow-elevated: 0 10px 40px -12px oklch(0.2 0.05 160 / 0.35);
 }
 
 :root {
   --radius: 1rem;
+
+  /* PESAKI premium brand palette (light-independent) */
+  --brand-deep: #0a2e1a;
+  --brand-green: #1a4a2a;
+  --brand-gold: #e8b330;
+  --brand-gold-deep: #b8860b;
+  --brand-tint-green: #e6f4ea;
+  --brand-tint-gold: #fdf6e3;
+  --brand-ink: #0a5c2e;
+  --brand-paper: #f8f9fa;
 
   /* Emerald Prestige — light */
   --background: oklch(0.985 0.005 150);
@@ -62,7 +82,7 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.18 0.03 165);
 
-  --primary: oklch(0.36 0.09 165);          /* deep emerald */
+  --primary: oklch(0.36 0.09 165); /* deep emerald */
   --primary-foreground: oklch(0.98 0.02 90);
 
   --secondary: oklch(0.95 0.02 160);
@@ -74,7 +94,7 @@
   --accent: oklch(0.93 0.05 160);
   --accent-foreground: oklch(0.25 0.06 165);
 
-  --gold: oklch(0.78 0.13 85);              /* premium gold */
+  --gold: oklch(0.78 0.13 85); /* premium gold */
   --gold-foreground: oklch(0.22 0.04 90);
 
   --success: oklch(0.65 0.16 155);
@@ -140,20 +160,30 @@
   * {
     border-color: var(--color-border);
   }
-  html, body {
+  html,
+  body {
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
-  h1, h2, h3, h4, h5 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5 {
     font-family: var(--font-display);
     letter-spacing: -0.02em;
   }
 }
 
 @utility gradient-primary {
-  background-image: linear-gradient(135deg, oklch(0.32 0.09 165) 0%, oklch(0.45 0.11 160) 60%, oklch(0.55 0.12 155) 100%);
+  background-image: linear-gradient(
+    135deg,
+    oklch(0.32 0.09 165) 0%,
+    oklch(0.45 0.11 160) 60%,
+    oklch(0.55 0.12 155) 100%
+  );
 }
 @utility gradient-gold {
   background-image: linear-gradient(135deg, oklch(0.82 0.14 88) 0%, oklch(0.7 0.14 75) 100%);
@@ -162,4 +192,28 @@
   background: color-mix(in oklab, var(--card) 92%, transparent);
   backdrop-filter: blur(12px);
   border: 1px solid var(--border);
+}
+
+/* PESAKI premium surfaces */
+@utility gradient-brand {
+  background-image: linear-gradient(135deg, #0a2e1a 0%, #1a4a2a 100%);
+}
+@utility gradient-brand-deep {
+  background-image: linear-gradient(160deg, #0a2e1a 0%, #14401f 55%, #1a4a2a 100%);
+}
+@utility glow-green {
+  box-shadow:
+    0 0 0 1px rgba(10, 92, 46, 0.14),
+    0 8px 20px -8px rgba(10, 92, 46, 0.5);
+}
+@utility glow-green-dark {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.22),
+    0 10px 26px -10px rgba(0, 0, 0, 0.65),
+    0 0 18px -6px rgba(232, 179, 48, 0.35);
+}
+@utility shadow-soft {
+  box-shadow:
+    0 1px 2px rgba(16, 24, 20, 0.04),
+    0 10px 24px -14px rgba(10, 46, 26, 0.28);
 }

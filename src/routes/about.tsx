@@ -1,7 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, SectionTitle } from "@/components/ui-bits";
-import { Briefcase, Building2, Landmark, Wallet, TrendingUp, Globe, Shield } from "lucide-react";
+import { PesakiLogo } from "@/components/PesakiLogo";
+import {
+  Briefcase,
+  Building2,
+  Landmark,
+  Wallet,
+  TrendingUp,
+  Globe,
+  Shield,
+  ShieldCheck,
+} from "lucide-react";
 
 export const Route = createFileRoute("/about")({
   head: () => ({
@@ -23,6 +33,21 @@ function AboutPage() {
       <PageHeader title="About PESAKI" subtitle="Africa's Digital Wealth Ecosystem" />
 
       <div className="px-5 pt-5">
+        <section className="gradient-brand-deep relative mb-6 overflow-hidden rounded-3xl p-6 text-white shadow-soft">
+          <div className="pointer-events-none absolute -right-16 -top-16 h-52 w-52 rounded-full bg-brand-gold/20 blur-3xl" />
+          <div className="relative flex flex-col items-center text-center">
+            <PesakiLogo size={64} tone="light" className="glow-green-dark" />
+            <h2 className="mt-4 font-display text-2xl font-bold tracking-tight">PESAKI</h2>
+            <p className="mt-1 text-[8px] font-medium tracking-[0.22em] text-white/70">
+              WORK • GROW • BANK
+            </p>
+            <span className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-[10px] font-medium">
+              <ShieldCheck className="h-3 w-3 text-brand-gold" />
+              PESAKI MARKETING · BN-6ASR2E26 · BRS, Kenya
+            </span>
+          </div>
+        </section>
+
         <section className="mb-6">
           <Card className="!p-5">
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -98,22 +123,27 @@ function AboutPage() {
           <Card className="!p-4">
             <ul className="space-y-2 text-sm">
               <li>
-                <span className="font-semibold">Company:</span> Pesaki Marketing
+                <span className="font-semibold">Company:</span> PESAKI MARKETING
               </li>
               <li>
-                <span className="font-semibold">Location:</span> Nairobi, Kenya
+                <span className="font-semibold">Registration:</span> BN-6ASR2E26 (BRS, Kenya)
+              </li>
+              <li>
+                <span className="font-semibold">Location:</span> Santon Business Center, Nairobi
               </li>
               <li>
                 <span className="font-semibold">Founded:</span> 2025
               </li>
               <li>
                 <span className="font-semibold">Support:</span>{" "}
-                <a href="mailto:support@pesaki.co.ke" className="text-primary font-semibold">
-                  support@pesaki.co.ke
+                <a href="mailto:pesaki777@gmail.com" className="text-primary font-semibold">
+                  pesaki777@gmail.com
                 </a>
               </li>
               <li>
-                <span className="font-semibold">Legal:</span> Registered company in Kenya
+                <Link to="/compliance" className="font-semibold text-primary hover:underline">
+                  Compliance &amp; Trust Center →
+                </Link>
               </li>
             </ul>
           </Card>

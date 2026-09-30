@@ -1,20 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Landmark, ShieldCheck, Loader2 } from "lucide-react";
+import { ShieldCheck, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { PesakiLogo } from "@/components/PesakiLogo";
 
 // Helper: format phone
 function formatPhoneNumber(raw: string): string {
-  let cleaned = raw.replace(/\D/g, '');
-  if (cleaned.startsWith('0') && cleaned.length === 10) {
-    cleaned = '254' + cleaned.slice(1);
-    return '+' + cleaned;
+  let cleaned = raw.replace(/\D/g, "");
+  if (cleaned.startsWith("0") && cleaned.length === 10) {
+    cleaned = "254" + cleaned.slice(1);
+    return "+" + cleaned;
   }
-  if (cleaned.startsWith('7') && cleaned.length === 9) {
-    cleaned = '254' + cleaned;
-    return '+' + cleaned;
+  if (cleaned.startsWith("7") && cleaned.length === 9) {
+    cleaned = "254" + cleaned;
+    return "+" + cleaned;
   }
-  if (raw.startsWith('+')) return raw;
+  if (raw.startsWith("+")) return raw;
   return raw;
 }
 
@@ -73,17 +74,22 @@ function AuthPage() {
 
     try {
       if (mode === "signup") {
-        const options = { emailRedirectTo: window.location.origin, data: { full_name: name, date_of_birth: dob } };
-        const result = loginMethod === "email"
-          ? await supabase.auth.signUp({ email, password, options })
-          : await supabase.auth.signUp({ phone: formatPhoneNumber(phone), password, options });
+        const options = {
+          emailRedirectTo: window.location.origin,
+          data: { full_name: name, date_of_birth: dob },
+        };
+        const result =
+          loginMethod === "email"
+            ? await supabase.auth.signUp({ email, password, options })
+            : await supabase.auth.signUp({ phone: formatPhoneNumber(phone), password, options });
         if (result.error) throw result.error;
         setInfo("Account created! Check your phone/email and sign in.");
         setMode("signin");
       } else {
-        const result = loginMethod === "email"
-          ? await supabase.auth.signInWithPassword({ email, password })
-          : await supabase.auth.signInWithPassword({ phone: formatPhoneNumber(phone), password });
+        const result =
+          loginMethod === "email"
+            ? await supabase.auth.signInWithPassword({ email, password })
+            : await supabase.auth.signInWithPassword({ phone: formatPhoneNumber(phone), password });
         if (result.error) throw result.error;
         // Redirect safely
         window.location.href = "/";
@@ -99,17 +105,21 @@ function AuthPage() {
     <div className="grid min-h-screen w-full place-items-center bg-muted/40 px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center text-center">
-          <span className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-lg">
-            <Landmark className="h-6 w-6" />
-          </span>
+          <PesakiLogo size={56} tone="dark" className="glow-green" />
           <h1 className="mt-3 font-display text-2xl font-bold tracking-tight">PESAKI</h1>
-          <p className="mt-1 text-xs text-muted-foreground">Earn. Invest. Grow.</p>
+          <p className="mt-1 text-[8px] font-medium tracking-[0.22em] text-muted-foreground">
+            WORK • GROW • BANK
+          </p>
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
           <div className="mb-5 grid grid-cols-2 rounded-lg bg-muted p-1 text-xs font-semibold">
             <button
-              onClick={() => { setMode("signin"); setError(null); setInfo(null); }}
+              onClick={() => {
+                setMode("signin");
+                setError(null);
+                setInfo(null);
+              }}
               className={`rounded-md py-2 transition-colors ${
                 mode === "signin" ? "bg-card text-foreground shadow" : "text-muted-foreground"
               }`}
@@ -117,7 +127,11 @@ function AuthPage() {
               Sign in
             </button>
             <button
-              onClick={() => { setMode("signup"); setError(null); setInfo(null); }}
+              onClick={() => {
+                setMode("signup");
+                setError(null);
+                setInfo(null);
+              }}
               className={`rounded-md py-2 transition-colors ${
                 mode === "signup" ? "bg-card text-foreground shadow" : "text-muted-foreground"
               }`}
@@ -133,18 +147,20 @@ function AuthPage() {
                   <label className="text-xs font-semibold text-muted-foreground">Full name</label>
                   <input
                     value={name}
-                    onChange={e => setName(e.target.value)}
+                    onChange={(e) => setName(e.target.value)}
                     required
                     className="input"
                     placeholder="Jane Otieno"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-muted-foreground">Date of birth</label>
+                  <label className="text-xs font-semibold text-muted-foreground">
+                    Date of birth
+                  </label>
                   <input
                     type="date"
                     value={dob}
-                    onChange={e => setDob(e.target.value)}
+                    onChange={(e) => setDob(e.target.value)}
                     required
                     className="input"
                   />
@@ -180,7 +196,7 @@ function AuthPage() {
                   type="email"
                   autoComplete="email"
                   value={email}
-                  onChange={e => setEmail(e.target.value)}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                   className="input"
                   placeholder="you@pesaki.africa"
@@ -193,7 +209,7 @@ function AuthPage() {
                   type="tel"
                   autoComplete="tel"
                   value={phone}
-                  onChange={e => setPhone(e.target.value)}
+                  onChange={(e) => setPhone(e.target.value)}
                   required
                   className="input"
                   placeholder="0712 345 678"
@@ -207,7 +223,7 @@ function AuthPage() {
                 type="password"
                 autoComplete={mode === "signin" ? "current-password" : "new-password"}
                 value={password}
-                onChange={e => setPassword(e.target.value)}
+                onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6}
                 className="input"
@@ -220,24 +236,43 @@ function AuthPage() {
                 <input
                   type="checkbox"
                   checked={agreeTerms}
-                  onChange={e => setAgreeTerms(e.target.checked)}
+                  onChange={(e) => setAgreeTerms(e.target.checked)}
                   className="mt-0.5 h-4 w-4 accent-primary"
                 />
                 <span>
                   I agree to the{" "}
-                  <a href="/terms" target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">
+                  <a
+                    href="/terms"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold text-primary hover:underline"
+                  >
                     Terms of Service
                   </a>{" "}
                   and{" "}
-                  <a href="/privacy" target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">
+                  <a
+                    href="/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold text-primary hover:underline"
+                  >
                     Privacy Policy
-                  </a>.
+                  </a>
+                  .
                 </span>
               </label>
             )}
 
-            {error && <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">{error}</p>}
-            {info && <p className="rounded-lg bg-success/10 px-3 py-2 text-xs font-medium text-success">{info}</p>}
+            {error && (
+              <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
+                {error}
+              </p>
+            )}
+            {info && (
+              <p className="rounded-lg bg-success/10 px-3 py-2 text-xs font-medium text-success">
+                {info}
+              </p>
+            )}
 
             <button
               type="submit"
@@ -256,7 +291,9 @@ function AuthPage() {
         </div>
 
         <p className="mt-5 text-center text-xs text-muted-foreground">
-          <a href="/" className="font-semibold text-primary hover:underline">← Back to home</a>
+          <a href="/" className="font-semibold text-primary hover:underline">
+            ← Back to home
+          </a>
         </p>
       </div>
       <style>{`

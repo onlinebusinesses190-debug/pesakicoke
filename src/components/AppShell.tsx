@@ -19,6 +19,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { registerSW } from "virtual:pwa-register";
+import { PesakiLogo, PesakiWordmark } from "@/components/PesakiLogo";
 
 const authedNav = [
   { to: "/", label: "Dashboard", sub: "", icon: LayoutDashboard },
@@ -89,13 +90,32 @@ export function AppShell({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const isLanding = pathname === "/";
+
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background">
+      {/* App header (after login) */}
+      {isAuthed && (
+        <header className="flex items-center justify-between gap-3 border-b border-border/70 bg-card/85 px-5 py-2.5 backdrop-blur-xl">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <PesakiLogo size={36} tone="dark" className="glow-green" />
+            <PesakiWordmark size="sm" tone="dark" tagline="" />
+          </div>
+          <Link
+            to="/profile"
+            aria-label="Profile"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-border bg-background text-brand-ink"
+          >
+            <User className="h-4 w-4" />
+          </Link>
+        </header>
+      )}
+
       {/* ✅ Main content – now scrollable */}
       <main className="flex-1 overflow-y-auto pb-24">{children}</main>
 
-      {/* Floating CTA for public users */}
-      {!isAuthed && ready && (
+      {/* Floating CTA for public users (landing page has its own hero CTAs) */}
+      {!isAuthed && ready && !isLanding && (
         <div className="fixed inset-x-0 bottom-20 z-40 mx-auto w-full max-w-md px-4 pointer-events-none">
           <div className="flex gap-2 pointer-events-auto">
             <Link
@@ -117,10 +137,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       )}
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-md border-t border-border bg-card/90 px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl"
+        className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-md border-t border-border/70 bg-card/92 px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-xl"
         aria-label="Primary"
       >
-        <ul className={nav.length > 7 ? "grid grid-cols-4" : "grid grid-cols-7"}>
+        <ul className={nav.length > 7 ? "grid grid-cols-8" : "grid grid-cols-7"}>
           {nav.map((item) => {
             const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
             const Icon = item.icon;
@@ -128,23 +148,32 @@ export function AppShell({ children }: { children: ReactNode }) {
               <li key={item.to} className="flex">
                 <Link
                   to={item.to}
-                  className={[
-                    "flex w-full flex-col items-center gap-0.5 rounded-xl px-1 py-1.5 text-[10px] font-medium transition-colors",
-                    active ? "text-primary" : "text-muted-foreground hover:text-foreground",
-                  ].join(" ")}
+                  className="flex w-full flex-col items-center gap-0.5 rounded-lg px-0.5 py-1 transition-colors"
                 >
+                  <Icon
+                    className={
+                      active
+                        ? "h-[18px] w-[18px] text-brand-ink"
+                        : "h-[18px] w-[18px] text-muted-foreground"
+                    }
+                    strokeWidth={active ? 2.4 : 1.9}
+                  />
                   <span
                     className={[
-                      "grid h-8 w-8 place-items-center rounded-lg transition-all",
-                      active ? "bg-primary/10" : "",
+                      "flex max-w-full flex-col items-center text-center leading-tight",
+                      active ? "text-brand-ink" : "text-muted-foreground",
                     ].join(" ")}
                   >
-                    <Icon className="h-4 w-4" strokeWidth={active ? 2.5 : 2} />
+                    <span className="truncate text-[9px] font-semibold">{item.label}</span>
+                    {item.sub && <span className="truncate text-[8px] opacity-75">{item.sub}</span>}
                   </span>
-                  <span className="flex flex-col items-center leading-tight">
-                    <span className="truncate">{item.label}</span>
-                    {item.sub && <span className="truncate text-[9px] opacity-80">{item.sub}</span>}
-                  </span>
+                  <span
+                    className={
+                      active
+                        ? "h-0.5 w-4 rounded-full bg-brand-gold"
+                        : "h-0.5 w-4 rounded-full bg-transparent"
+                    }
+                  />
                 </Link>
               </li>
             );

@@ -3,6 +3,7 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   ArrowLeftRight,
+  ArrowRight,
   LineChart,
   Bell,
   Eye,
@@ -11,15 +12,21 @@ import {
   ChevronRight,
   Sparkles,
   LogIn,
+  UserPlus,
   Briefcase,
   Building2,
   Landmark,
-  UserPlus,
-  Shield,
-  Smartphone,
+  Bot,
+  Apple,
+  ShieldCheck,
+  Lock,
+  FileText,
+  Headset,
+  CircleUser,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { AppShell } from "@/components/AppShell";
+import { PesakiLogo, PesakiWordmark } from "@/components/PesakiLogo";
 import { Card, Stat, SectionTitle, Badge } from "@/components/ui-bits";
 import { apiRequest } from "../utils/api";
 import { createClient } from "@supabase/supabase-js";
@@ -425,162 +432,209 @@ function HomePage() {
   );
 }
 
+const HUB_CARDS = [
+  {
+    title: "KAZI Link",
+    subtitle: "Find work • Hire talent",
+    to: "/kazi",
+    icon: Briefcase,
+    circle: "bg-brand-tint-green text-brand-ink",
+  },
+  {
+    title: "Business Hub",
+    subtitle: "Fund • Grow • Scale",
+    to: "/business",
+    icon: Building2,
+    circle: "bg-brand-tint-gold text-brand-gold-deep",
+  },
+  {
+    title: "Banking Hub",
+    subtitle: "Manage finances • Access services",
+    to: "/banking",
+    icon: Landmark,
+    circle: "bg-brand-tint-green text-brand-ink",
+  },
+] as const;
+
+const TRUST_INDICATORS = [
+  { icon: ShieldCheck, label: "Secure Platform" },
+  { icon: Lock, label: "Your Data Protected" },
+  { icon: FileText, label: "Transparent Policies" },
+  { icon: Headset, label: "Customer Support" },
+] as const;
+
 function PublicHome() {
   return (
-    <>
-      <section className="gradient-primary relative overflow-hidden px-5 pb-10 pt-8 text-primary-foreground">
-        <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-gold/20 blur-3xl" />
-        <div className="absolute -left-12 -bottom-12 h-48 w-48 rounded-full bg-primary/20 blur-3xl" />
-        <div className="relative text-center">
-          <h1 className="font-display text-3xl font-bold tracking-tight">
-            Africa's Digital Wealth Ecosystem
-          </h1>
-          <p className="mt-3 text-sm opacity-90">
-            PESAKI brings together your wallet, jobs, business funding and banking in one mobile
-            app.
-          </p>
+    <div className="bg-brand-paper">
+      {/* ───────────── Hero ───────────── */}
+      <section className="gradient-brand-deep relative overflow-hidden px-5 pb-9 pt-5 text-white">
+        <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-brand-gold/20 blur-3xl" />
+        <div className="pointer-events-none absolute -left-24 top-32 h-56 w-56 rounded-full bg-brand-gold/10 blur-3xl" />
+
+        {/* Header */}
+        <div className="relative flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <PesakiLogo size={44} tone="light" className="glow-green-dark" />
+            <PesakiWordmark size="lg" tone="light" />
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <Link
+              to="/profile"
+              aria-label="Notifications"
+              className="relative grid h-10 w-10 place-items-center rounded-full border border-white/25 bg-white/5 text-white/90 transition-colors hover:bg-white/10"
+            >
+              <Bell className="h-[18px] w-[18px]" />
+              <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-brand-gold ring-2 ring-brand-deep" />
+            </Link>
+            <Link
+              to="/auth"
+              search={{ mode: "signin" } as never}
+              aria-label="Account"
+              className="grid h-10 w-10 place-items-center rounded-full border border-white/25 bg-white/5 text-white/90 transition-colors hover:bg-white/10"
+            >
+              <CircleUser className="h-[18px] w-[18px]" />
+            </Link>
+          </div>
         </div>
 
-        <div className="relative mt-8 flex flex-col gap-3">
+        {/* Registered business pill */}
+        <Link
+          to="/about"
+          className="relative mt-5 flex items-center gap-2 rounded-full border border-white/15 bg-white/5 py-2 pl-3 pr-2.5 text-[11px] font-medium text-white transition-colors hover:bg-white/10"
+        >
+          <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-brand-gold" />
+          <span className="truncate">Kenyan Registered Business</span>
+          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/70" />
+        </Link>
+
+        {/* Headline */}
+        <h1 className="relative mt-6 font-display text-[40px] font-bold leading-[1.05] tracking-tight">
+          <span className="block text-white">One Platform.</span>
+          <span className="mt-1 block text-brand-gold">Work, Business &amp;</span>
+          <span className="block text-brand-gold">Financial Services.</span>
+        </h1>
+
+        <p className="relative mt-4 text-[14px] leading-relaxed text-white/85">
+          PESAKI brings together your wallet, jobs, business funding and banking in one powerful
+          mobile app.
+        </p>
+
+        {/* CTAs */}
+        <div className="relative mt-7 flex items-stretch gap-2.5">
           <Link
             to="/auth"
             search={{ mode: "signup" } as never}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-full gradient-gold px-5 text-sm font-semibold text-gold-foreground"
+            className="flex flex-[1.15] items-center justify-between gap-2 rounded-full bg-brand-gold px-5 py-3.5 text-sm font-bold text-brand-deep shadow-lg shadow-black/25 transition-opacity hover:opacity-95"
           >
-            <UserPlus className="h-4 w-4" /> Get Started
+            <span className="flex items-center gap-2">
+              <UserPlus className="h-4 w-4" /> Get Started
+            </span>
+            <ArrowRight className="h-4 w-4" />
           </Link>
           <Link
             to="/auth"
             search={{ mode: "signin" } as never}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-white/20 bg-white/10 px-5 text-sm font-semibold backdrop-blur"
+            className="flex flex-1 items-center justify-center gap-2 rounded-full border border-white/40 px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-white/10"
           >
             <LogIn className="h-4 w-4" /> Log in
           </Link>
         </div>
 
-        <div className="relative mt-8 flex items-center justify-center gap-2">
-          <Smartphone className="h-5 w-5 opacity-70" />
-          <span className="text-xs opacity-80">Available as a mobile app for Android & iOS</span>
+        {/* App availability */}
+        <div className="relative mt-6 flex items-center justify-center gap-3 text-white/75">
+          <span className="flex items-center gap-1.5 text-[11px] font-medium tracking-wide">
+            <Bot className="h-4 w-4 text-brand-gold" /> Available on Android
+          </span>
+          <span className="h-3.5 w-px bg-white/20" />
+          <span className="flex items-center gap-1.5 text-[11px] font-medium tracking-wide text-white/40">
+            <Apple className="h-4 w-4" /> iOS Coming Soon
+          </span>
         </div>
       </section>
 
-      <section className="px-5 pt-6">
-        <SectionTitle title="Everything in one app" />
+      {/* ───────────── Everything in one app ───────────── */}
+      <section className="px-5 pb-2 pt-7">
+        <h2 className="font-display text-lg font-bold tracking-tight text-brand-deep">
+          Everything in one app
+        </h2>
+        <span className="mt-2 block h-1 w-9 rounded-full bg-brand-gold" />
+
         <div className="mt-4 grid grid-cols-2 gap-3">
-          <Link
-            to="/kazi"
-            className="group relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]"
-          >
-            <span className="mb-6 grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary">
-              <Briefcase className="h-5 w-5" />
-            </span>
-            <p className="text-sm font-bold">KAZI Link</p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">Find work · Hire talent</p>
-            <ChevronRight className="absolute bottom-3 right-3 h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-          </Link>
-          <Link
-            to="/business"
-            className="group relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]"
-          >
-            <span className="mb-6 grid h-10 w-10 place-items-center rounded-xl gradient-gold text-gold-foreground">
-              <Building2 className="h-5 w-4" />
-            </span>
-            <p className="text-sm font-bold">Business Hub</p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">Fund · Grow · Scale</p>
-            <ChevronRight className="absolute bottom-3 right-3 h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-          </Link>
-          <Link
-            to="/banking"
-            className="group relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]"
-          >
-            <span className="mb-6 grid h-10 w-10 place-items-center rounded-xl bg-success/15 text-success">
-              <Landmark className="h-5 w-5" />
-            </span>
-            <p className="text-sm font-bold">Banking Hub</p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">Save · Lock · Borrow</p>
-            <ChevronRight className="absolute bottom-3 right-3 h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-          </Link>
-          <Link
-            to="/wallet"
-            className="group relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]"
-          >
-            <span className="mb-6 grid h-10 w-10 place-items-center rounded-xl gradient-primary text-primary-foreground">
-              <ArrowLeftRight className="h-5 w-5" />
-            </span>
-            <p className="text-sm font-bold">PESAKI Wallet</p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">Deposit · Send · Pay</p>
-            <ChevronRight className="absolute bottom-3 right-3 h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-          </Link>
-        </div>
-      </section>
+          {HUB_CARDS.map((hub) => (
+            <Link
+              key={hub.to}
+              to={hub.to}
+              className="group flex flex-col rounded-2xl border border-black/5 bg-white p-4 shadow-soft transition-transform hover:-translate-y-0.5"
+            >
+              <span className={`grid h-11 w-11 place-items-center rounded-full ${hub.circle}`}>
+                <hub.icon className="h-5 w-5" />
+              </span>
+              <span className="mt-4 flex items-center gap-1 text-[13px] font-bold text-brand-deep">
+                {hub.title}
+                <ChevronRight className="h-3.5 w-3.5 text-brand-ink/60 transition-transform group-hover:translate-x-0.5" />
+              </span>
+              <span className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                {hub.subtitle}
+              </span>
+            </Link>
+          ))}
 
-      <section className="mt-6 px-5">
-        <SectionTitle title="Why PESAKI?" />
-        <div className="mt-4 space-y-3">
-          <Card className="!p-4">
-            <div className="flex items-start gap-3">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-success/15 text-success">
-                <Shield className="h-5 w-5" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold">Licensed & Regulated</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Operated by Pesaki Marketing, Nairobi. Compliant with Kenyan financial
-                  regulations.
-                </p>
-              </div>
-            </div>
-          </Card>
-          <Card className="!p-4">
-            <div className="flex items-start gap-3">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-                <Smartphone className="h-5 w-5" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold">Built for Kenya</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  M-Pesa integration, local market data, and support for Kenyan businesses.
-                </p>
-              </div>
-            </div>
-          </Card>
-          <Card className="!p-4">
-            <div className="flex items-start gap-3">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl gradient-gold text-gold-foreground">
-                <TrendingUp className="h-5 w-5" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold">All-in-One Platform</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Jobs, funding, banking and wallet in a single secure app.
-                </p>
-              </div>
-            </div>
-          </Card>
-        </div>
-      </section>
-
-      <section className="mt-7 px-5">
-        <div className="relative overflow-hidden rounded-2xl gradient-gold p-6 text-center text-gold-foreground">
-          <Sparkles className="absolute -right-4 -top-4 h-20 w-20 opacity-20" />
-          <h3 className="text-lg font-bold">Ready to get started?</h3>
-          <p className="mt-1 text-xs opacity-90">
-            Join thousands of Kenyans building wealth with PESAKI today.
-          </p>
+          {/* Get Started CTA card */}
           <Link
             to="/auth"
             search={{ mode: "signup" } as never}
-            className="mt-4 inline-flex items-center justify-center gap-2 rounded-full bg-foreground px-6 py-3 text-sm font-semibold text-background"
+            className="group flex flex-col justify-between rounded-2xl gradient-brand p-4 text-white shadow-soft"
           >
-            Create Account <UserPlus className="h-4 w-4" />
+            <span className="grid h-11 w-11 place-items-center rounded-full border border-white/30">
+              <ArrowRight className="h-5 w-5" />
+            </span>
+            <span className="mt-4 flex items-center gap-1 text-[13px] font-bold">
+              Get Started
+              <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+            </span>
+            <span className="mt-1 text-[11px] text-white/70">Join PESAKI today</span>
           </Link>
         </div>
       </section>
 
-      <p className="mt-8 px-5 text-center text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-        PESAKI · Earn. Invest. Grow.
-      </p>
-    </>
+      {/* ───────────── Registered business badge ───────────── */}
+      <section className="px-5 pt-6">
+        <Link
+          to="/about"
+          className="flex items-center gap-3 rounded-2xl border border-brand-ink/15 bg-white p-4 shadow-soft transition-transform hover:-translate-y-0.5"
+        >
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand-tint-green text-brand-ink">
+            <ShieldCheck className="h-5 w-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13px] font-bold uppercase tracking-wide text-brand-deep">
+              PESAKI MARKETING
+            </span>
+            <span className="mt-0.5 block text-[11px] text-muted-foreground">
+              Registered Business Name
+            </span>
+            <span className="mt-0.5 block text-[10px] text-muted-foreground/80">
+              BN-6ASR2E26 • BRS, Kenya
+            </span>
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-brand-ink/60" />
+        </Link>
+      </section>
+
+      {/* ───────────── Trust indicators ───────────── */}
+      <section className="px-5 pb-8 pt-7">
+        <div className="grid grid-cols-4 divide-x divide-black/5 rounded-2xl bg-white py-4 shadow-soft">
+          {TRUST_INDICATORS.map((item) => (
+            <div key={item.label} className="flex flex-col items-center gap-1.5 px-1 text-center">
+              <item.icon className="h-[18px] w-[18px] text-brand-ink" />
+              <span className="text-[9.5px] font-medium leading-tight text-muted-foreground">
+                {item.label}
+              </span>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
   );
 }
 
