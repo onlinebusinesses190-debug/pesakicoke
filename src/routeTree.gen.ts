@@ -15,6 +15,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as BankingRouteImport } from './routes/banking'
 import { Route as BusinessRouteImport } from './routes/business'
+import { Route as BusinessFundingRouteImport } from './routes/business-funding'
 import { Route as ComplianceRouteImport } from './routes/compliance'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CookiesRouteImport } from './routes/cookies'
@@ -78,6 +79,11 @@ const BankingRoute = BankingRouteImport.update({
 const BusinessRoute = BusinessRouteImport.update({
   id: '/business',
   path: '/business',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BusinessFundingRoute = BusinessFundingRouteImport.update({
+  id: '/business-funding',
+  path: '/business-funding',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ComplianceRoute = ComplianceRouteImport.update({
@@ -258,6 +264,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/banking': typeof BankingRoute
   '/business': typeof BusinessRoute
+  '/business-funding': typeof BusinessFundingRoute
   '/compliance': typeof ComplianceRoute
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
@@ -299,6 +306,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/banking': typeof BankingRoute
   '/business': typeof BusinessRoute
+  '/business-funding': typeof BusinessFundingRoute
   '/compliance': typeof ComplianceRoute
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
@@ -341,6 +349,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/banking': typeof BankingRoute
   '/business': typeof BusinessRoute
+  '/business-funding': typeof BusinessFundingRoute
   '/compliance': typeof ComplianceRoute
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
@@ -385,6 +394,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/banking'
     | '/business'
+    | '/business-funding'
     | '/compliance'
     | '/contact'
     | '/cookies'
@@ -426,6 +436,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/banking'
     | '/business'
+    | '/business-funding'
     | '/compliance'
     | '/contact'
     | '/cookies'
@@ -467,6 +478,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/banking'
     | '/business'
+    | '/business-funding'
     | '/compliance'
     | '/contact'
     | '/cookies'
@@ -510,6 +522,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   BankingRoute: typeof BankingRoute
   BusinessRoute: typeof BusinessRoute
+  BusinessFundingRoute: typeof BusinessFundingRoute
   ComplianceRoute: typeof ComplianceRoute
   ContactRoute: typeof ContactRoute
   CookiesRoute: typeof CookiesRoute
@@ -566,6 +579,13 @@ declare module '@tanstack/react-router' {
       path: '/business'
       fullPath: '/business'
       preLoaderRoute: typeof BusinessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/business-funding': {
+      id: '/business-funding'
+      path: '/business-funding'
+      fullPath: '/business-funding'
+      preLoaderRoute: typeof BusinessFundingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/compliance': {
@@ -887,6 +907,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   BankingRoute: BankingRoute,
   BusinessRoute: BusinessRoute,
+  BusinessFundingRoute: BusinessFundingRoute,
   ComplianceRoute: ComplianceRoute,
   ContactRoute: ContactRoute,
   CookiesRoute: CookiesRoute,

@@ -1,7 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, SectionTitle, Badge } from "@/components/ui-bits";
-import { Shield, Lock, Key, Smartphone, Eye, CheckCircle2, Globe } from "lucide-react";
+import { Shield, Lock, Key, Eye, CheckCircle2, Globe } from "lucide-react";
 
 export const Route = createFileRoute("/security")({
   head: () => ({
@@ -10,7 +10,7 @@ export const Route = createFileRoute("/security")({
       {
         name: "description",
         content:
-          "PESAKI security: bank-grade encryption, M-Pesa secure integration, two-factor authentication, and fraud monitoring.",
+          "PESAKI security information: account protections, encrypted connections, M-Pesa payments, and how to keep your account safe.",
       },
     ],
   }),
@@ -28,10 +28,11 @@ function SecurityPage() {
             <div className="flex items-start gap-3">
               <Shield className="mt-0.5 h-6 w-6 text-success flex-shrink-0" />
               <p className="text-sm text-muted-foreground leading-relaxed">
-                At PESAKI, your security is our top priority. We use industry-leading encryption,
-                multi-layer authentication, and continuous fraud monitoring to protect your funds
-                and data. All communications are encrypted end-to-end, and we comply with Kenyan
-                financial regulations.
+                At PESAKI, protecting your account and your data is a standing priority. We use
+                standard account protections, encrypted transport for data in transit, and access
+                controls applied to the systems that hold your information. PESAKI is committed to
+                complying with applicable Kenyan laws and regulatory requirements relevant to the
+                services it provides.
               </p>
             </div>
           </Card>
@@ -46,9 +47,9 @@ function SecurityPage() {
                   <Lock className="h-5 w-5" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold">Bank-Grade Encryption</p>
+                  <p className="text-sm font-semibold">Secure Data in Transit</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    AES-256 encryption for all data at rest and TLS 1.3 for data in transit.
+                    Connections to PESAKI are encrypted using current standard transport security.
                   </p>
                 </div>
                 <Badge tone="success">Active</Badge>
@@ -61,12 +62,13 @@ function SecurityPage() {
                   <Smartphone className="h-5 w-5" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold">Two-Factor Authentication</p>
+                  <p className="text-sm font-semibold">Account Password</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    Secure your account with SMS or authenticator app verification.
+                    A strong, unique password is the main protection on your PESAKI account. Never
+                    reuse your PESAKI password on another site.
                   </p>
                 </div>
-                <Badge tone="success">Available</Badge>
+                <Badge tone="success">Required</Badge>
               </div>
             </Card>
 
@@ -76,12 +78,13 @@ function SecurityPage() {
                   <Eye className="h-5 w-5" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold">Fraud Monitoring</p>
+                  <p className="text-sm font-semibold">Transaction Review</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    AI-powered detection for suspicious transactions, 24/7.
+                    Your wallet keeps a record of deposits, withdrawals and transfers so you can
+                    check activity on your account at any time.
                   </p>
                 </div>
-                <Badge tone="success">24/7</Badge>
+                <Badge tone="success">In App</Badge>
               </div>
             </Card>
 
@@ -91,12 +94,13 @@ function SecurityPage() {
                   <Key className="h-5 w-5" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold">M-Pesa Secure Integration</p>
+                  <p className="text-sm font-semibold">M-Pesa Payments</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    Safaricom-approved integration for all M-Pesa transactions.
+                    M-Pesa deposits and withdrawals run through Safaricom's Daraja payment API. You
+                    approve every payment prompt on your own phone.
                   </p>
                 </div>
-                <Badge tone="success">Verified</Badge>
+                <Badge tone="success">In App</Badge>
               </div>
             </Card>
           </div>
@@ -109,15 +113,13 @@ function SecurityPage() {
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 text-success shrink-0" />
                 <span>
-                  Never share your password, PIN, or OTP with anyone — PESAKI will never call or
-                  email asking for these.
+                  Use a unique password and do not share your password, PIN, or OTP with anyone —
+                  PESAKI will never call or email asking for these.
                 </span>
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 text-success shrink-0" />
-                <span>
-                  Enable two-factor authentication from your Profile settings for extra protection.
-                </span>
+                <span>Always review your wallet transaction history after a payment.</span>
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 text-success shrink-0" />
@@ -134,16 +136,25 @@ function SecurityPage() {
         </section>
 
         <section className="mb-6">
-          <SectionTitle title="Regulatory Compliance" />
+          <SectionTitle title="Registration &amp; Compliance" />
           <Card className="!p-4">
             <div className="flex items-start gap-3">
               <Globe className="mt-0.5 h-6 w-6 text-primary flex-shrink-0" />
               <div className="min-w-0">
-                <p className="text-sm font-semibold">Licensed & Regulated in Kenya</p>
+                <p className="text-sm font-semibold">A registered Kenyan business</p>
                 <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                  Pesaki Marketing is registered in Kenya and complies with the Central Bank of
-                  Kenya guidelines for mobile money operators. We are committed to meeting all
-                  applicable Kenyan financial regulations.
+                  PESAKI is operated by PESAKI MARKETING, registered in Kenya under the Business
+                  Registration Service (BRS) with registration number BN-6ASR2E26. PESAKI is
+                  committed to complying with applicable Kenyan laws and regulatory requirements
+                  relevant to the services it provides.
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
+                  Registration of a business name is not a licence or an authorization to carry out
+                  activities that require separate regulatory approval. See the{" "}
+                  <Link to="/compliance" className="font-semibold text-primary hover:underline">
+                    PESAKI Compliance &amp; Trust Center
+                  </Link>{" "}
+                  for the full statement.
                 </p>
               </div>
             </div>
@@ -151,7 +162,7 @@ function SecurityPage() {
         </section>
 
         <p className="mt-8 text-center text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-          PESAKI · Secure. Trusted. Reliable.
+          PESAKI · Work. Grow. Bank.
         </p>
       </div>
     </AppShell>

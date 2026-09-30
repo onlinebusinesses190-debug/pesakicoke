@@ -47,6 +47,7 @@ const footerGroups = [
     title: "Company",
     links: [
       { to: "/about", label: "About" },
+      { to: "/business-funding", label: "Business Funding" },
       { to: "/security", label: "Security" },
       { to: "/contact", label: "Contact" },
     ],
@@ -210,7 +211,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             href="https://wa.me/254140399389"
             target="_blank"
             rel="noopener noreferrer"
-            className="font-semibold text-primary hover:underline"
+            className="font-semibold text-brand-ink hover:underline"
           >
             Help Center
           </a>

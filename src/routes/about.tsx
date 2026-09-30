@@ -57,8 +57,8 @@ function AboutPage() {
               business funding in Africa are fragmented and often out of reach for most people.
             </p>
             <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
-              Our platform serves over 100,000 users across Kenya, providing tools to earn, save,
-              invest, and build wealth — all from a single, secure app.
+              Our platform is built to serve Kenyan users with practical tools for earning, managing
+              money and growing a business, all from a single, secure app.
             </p>
           </Card>
         </section>

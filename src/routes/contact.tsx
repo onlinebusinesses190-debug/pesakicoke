@@ -1,19 +1,25 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, SectionTitle } from "@/components/ui-bits";
-import { Mail, Phone, MapPin, Clock, Send, MessageCircle } from "lucide-react";
+import { Mail, Phone, MapPin, Send, MessageCircle, Globe, ShieldCheck } from "lucide-react";
 import { useState } from "react";
+
+const WHATSAPP_NUMBER = "254140399389";
+const WHATSAPP_DISPLAY = "0140399389";
+const CONTACT_EMAIL = "pesaki777@gmail.com";
+const WEBSITE = "https://pesaki.co.ke";
 
 export const Route = createFileRoute("/contact")({
   head: () => ({
     meta: [
-      { title: "Contact PESAKI — Support" },
+      { title: "Contact PESAKI — Help Center" },
       {
         name: "description",
         content:
-          "Contact PESAKI support. We're available Monday-Friday 8am-8pm EAT. Email support@pesaki.co.ke or call +254 700 000 000.",
+          "Contact PESAKI MARKETING directly. WhatsApp Help Center 0140399389, email pesaki777@gmail.com, offices on Tom Mboya Street (under renovation) and Santon Business Center, Nairobi.",
       },
     ],
+    links: [{ rel: "canonical", href: `${WEBSITE}/contact` }],
   }),
   component: ContactPage,
 });
@@ -24,39 +30,65 @@ function ContactPage() {
   const [message, setMessage] = useState("");
   const [subject, setSubject] = useState("");
 
+  function openEmailClient() {
+    const body = [
+      `Name: ${name || "Not provided"}`,
+      `Reply email: ${email || "Not provided"}`,
+      "",
+      message || "I would like clarification about PESAKI.",
+    ].join("\n");
+
+    window.location.href = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(
+      subject ? `PESAKI enquiry — ${subject}` : "PESAKI enquiry",
+    )}&body=${encodeURIComponent(body)}`;
+  }
+
   return (
     <AppShell>
-      <PageHeader title="Contact Us" subtitle="We'd love to hear from you" />
+      <PageHeader title="Contact Us" subtitle="Ask PESAKI directly" />
 
       <div className="px-5 pt-5">
         <section className="mb-6">
-          <SectionTitle title="Get in Touch" />
+          <SectionTitle title="Reach PESAKI Directly" />
           <p className="text-sm text-muted-foreground mb-4">
-            Have a question? Want to give feedback? Reach out to our support team and we'll respond
-            within 24 hours.
+            You don't have to rely on social media, search engines or third parties to understand
+            PESAKI. For questions about your account or any PESAKI service, contact us directly or
+            visit our offices.
           </p>
 
           <div className="space-y-3">
             <Card className="!p-4">
               <div className="flex items-start gap-3">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-                  <Mail className="h-5 w-5" />
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-success/15 text-success">
+                  <MessageCircle className="h-5 w-5" />
                 </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold">Email</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">support@pesaki.co.ke</p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold">WhatsApp / Help Center</p>
+                  <a
+                    href={`https://wa.me/${WHATSAPP_NUMBER}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-0.5 block text-xs font-semibold text-primary hover:underline"
+                  >
+                    {WHATSAPP_DISPLAY}
+                  </a>
                 </div>
               </div>
             </Card>
 
             <Card className="!p-4">
               <div className="flex items-start gap-3">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-success/15 text-success">
-                  <Phone className="h-5 w-5" />
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                  <Mail className="h-5 w-5" />
                 </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold">Phone</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">+254 700 000 000</p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold">Email</p>
+                  <a
+                    href={`mailto:${CONTACT_EMAIL}`}
+                    className="mt-0.5 block break-all text-xs font-semibold text-primary hover:underline"
+                  >
+                    {CONTACT_EMAIL}
+                  </a>
                 </div>
               </div>
             </Card>
@@ -64,13 +96,18 @@ function ContactPage() {
             <Card className="!p-4">
               <div className="flex items-start gap-3">
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl gradient-gold text-gold-foreground">
-                  <MapPin className="h-5 w-5" />
+                  <Globe className="h-5 w-5" />
                 </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold">Address</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    PESAKI Offices, Nairobi, Kenya
-                  </p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold">Official website</p>
+                  <a
+                    href={WEBSITE}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-0.5 block text-xs font-semibold text-primary hover:underline"
+                  >
+                    pesaki.co.ke
+                  </a>
                 </div>
               </div>
             </Card>
@@ -78,12 +115,44 @@ function ContactPage() {
             <Card className="!p-4">
               <div className="flex items-start gap-3">
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-                  <Clock className="h-5 w-5" />
+                  <MapPin className="h-5 w-5" />
                 </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold">Support Hours</p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold">Nairobi Office</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    Mon-Fri: 8:00 AM – 8:00 PM EAT
+                    Along Tom Mboya Street, Nairobi
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Currently under renovation — contact the Help Center before visiting.
+                  </p>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="!p-4">
+              <div className="flex items-start gap-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl gradient-primary text-primary-foreground">
+                  <MapPin className="h-5 w-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold">Santon Business Center</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">Santon, Nairobi</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Confirm the best time to visit with the Help Center in advance.
+                  </p>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="!p-4">
+              <div className="flex items-start gap-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-success/15 text-success">
+                  <ShieldCheck className="h-5 w-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold">Who you are contacting</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    PESAKI MARKETING · BN-6ASR2E26 · Business Registration Service (BRS), Kenya
                   </p>
                 </div>
               </div>
@@ -94,6 +163,9 @@ function ContactPage() {
         <section className="mb-6">
           <SectionTitle title="Send a Message" />
           <Card className="!p-4">
+            <p className="mb-3 text-xs text-muted-foreground">
+              Fill this in and your email app will open a message addressed to PESAKI.
+            </p>
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-semibold text-muted-foreground uppercase">
@@ -144,23 +216,50 @@ function ContactPage() {
                 />
               </div>
               <button
-                onClick={() =>
-                  alert(
-                    `Thank you, ${name || "friend"}! We'll respond to ${email || "your email"} within 24 hours.`,
-                  )
-                }
+                onClick={openEmailClient}
                 className="w-full rounded-xl gradient-primary py-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
               >
                 <span className="flex items-center justify-center gap-1.5">
-                  <Send className="h-4 w-4" /> Send Message
+                  <Send className="h-4 w-4" /> Send via Email
                 </span>
               </button>
             </div>
           </Card>
         </section>
 
+        <section className="mb-6">
+          <SectionTitle title="Before You Proceed" />
+          <Card className="!p-4">
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Users should review the applicable{" "}
+              <a href="/terms" className="font-semibold text-primary hover:underline">
+                Terms of Service
+              </a>{" "}
+              and any service-specific agreements before proceeding. Funding, savings and any other
+              service are subject to eligibility, assessment and approval, and the terms are
+              disclosed and agreed before the service is provided.
+            </p>
+          </Card>
+        </section>
+
+        <section className="mb-6">
+          <SectionTitle title="Verified Contact Details" />
+          <Card className="!p-4">
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              PESAKI is operated by PESAKI MARKETING, business registration number BN-6ASR2E26,
+              registered through the Business Registration Service (BRS), Kenya. The official PESAKI
+              website is <span className="font-semibold text-foreground">pesaki.co.ke</span>. Full
+              company, leadership and policy information is published on the{" "}
+              <a href="/compliance" className="font-semibold text-primary hover:underline">
+                PESAKI Compliance &amp; Trust Center
+              </a>
+              .
+            </p>
+          </Card>
+        </section>
+
         <p className="mt-8 text-center text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-          PESAKI · Earn. Invest. Grow.
+          PESAKI MARKETING · BN-6ASR2E26
         </p>
       </div>
     </AppShell>

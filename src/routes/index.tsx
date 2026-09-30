@@ -23,6 +23,15 @@ import {
   FileText,
   Headset,
   CircleUser,
+  Users,
+  MapPin,
+  CheckCircle2,
+  Wallet,
+  Landmark as LandmarkIcon,
+  Scale,
+  MessageCircle,
+  CreditCard,
+  Globe,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { AppShell } from "@/components/AppShell";
@@ -31,6 +40,17 @@ import { Card, Stat, SectionTitle, Badge } from "@/components/ui-bits";
 import { apiRequest } from "../utils/api";
 import { createClient } from "@supabase/supabase-js";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  ACCOUNT_VISIBILITY,
+  COMPANY,
+  HOW_IT_WORKS,
+  OFFICES,
+  REFERRAL,
+  REGISTRATION_STATEMENT,
+  REGULATORY_STATEMENT,
+  SERVICES,
+  organizationJsonLd,
+} from "@/lib/pesaki-facts";
 
 const fmt = (amount: number) => {
   return new Intl.NumberFormat("en-KE", {
@@ -43,13 +63,20 @@ const fmt = (amount: number) => {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "PESAKI — Africa's Digital Wealth Ecosystem" },
+      { title: "PESAKI — One Platform. Work, Business & Financial Services." },
       {
         name: "description",
         content:
-          "PESAKI: Your digital wallet, KAZI jobs, business funding and banking in one app. Earn, invest, grow — built for Kenya.",
+          "PESAKI brings together your wallet, jobs, business funding and banking in one powerful mobile app. PESAKI MARKETING, BN-6ASR2E26, registered in Kenya.",
       },
+      {
+        name: "keywords",
+        content:
+          "PESAKI, PESAKI MARKETING, PESAKI Kenya, PESAKI wallet, KAZI Link PESAKI, PESAKI Business Hub, PESAKI Banking Hub, PESAKI referral, BN-6ASR2E26",
+      },
+      { property: "og:url", content: "https://pesaki.co.ke/" },
     ],
+    links: [{ rel: "canonical", href: "https://pesaki.co.ke/" }],
   }),
   component: HomePage,
 });
@@ -456,16 +483,66 @@ const HUB_CARDS = [
   },
 ] as const;
 
-const TRUST_INDICATORS = [
-  { icon: ShieldCheck, label: "Secure Platform" },
-  { icon: Lock, label: "Your Data Protected" },
-  { icon: FileText, label: "Transparent Policies" },
-  { icon: Headset, label: "Customer Support" },
+const SERVICE_ICONS = {
+  kazi: Briefcase,
+  business: Building2,
+  banking: LandmarkIcon,
+  wallet: Wallet,
+} as const;
+
+const TRUST_ITEMS = [
+  {
+    label: "Registered Kenyan business",
+    value: COMPANY.legalName,
+    icon: ShieldCheck,
+    to: "/compliance",
+  },
+  {
+    label: "Business Registration Number",
+    value: COMPANY.registrationNumber,
+    icon: Scale,
+    to: "/compliance",
+  },
+  {
+    label: "Registered through",
+    value: COMPANY.registeringAuthority,
+    icon: FileText,
+    to: "/compliance",
+  },
+  {
+    label: "Published Terms of Service",
+    value: "Read before you proceed",
+    icon: FileText,
+    to: "/terms",
+  },
+  {
+    label: "Published Privacy Policy",
+    value: "How your data is handled",
+    icon: Lock,
+    to: "/privacy",
+  },
+  { label: "Customer support", value: COMPANY.whatsapp, icon: Headset, to: "/contact" },
+  {
+    label: "Security information",
+    value: "How to keep your account safe",
+    icon: ShieldCheck,
+    to: "/security",
+  },
+  {
+    label: "Transparent compliance information",
+    value: "Registration and data protection status",
+    icon: Scale,
+    to: "/compliance",
+  },
 ] as const;
 
 function PublicHome() {
   return (
     <div className="bg-brand-paper">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd()) }}
+      />
       {/* ───────────── Hero ───────────── */}
       <section className="gradient-brand-deep relative overflow-hidden px-5 pb-9 pt-5 text-white">
         <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-brand-gold/20 blur-3xl" />
@@ -621,18 +698,330 @@ function PublicHome() {
         </Link>
       </section>
 
-      {/* ───────────── Trust indicators ───────────── */}
-      <section className="px-5 pb-8 pt-7">
-        <div className="grid grid-cols-4 divide-x divide-black/5 rounded-2xl bg-white py-4 shadow-soft">
-          {TRUST_INDICATORS.map((item) => (
-            <div key={item.label} className="flex flex-col items-center gap-1.5 px-1 text-center">
-              <item.icon className="h-[18px] w-[18px] text-brand-ink" />
-              <span className="text-[9.5px] font-medium leading-tight text-muted-foreground">
-                {item.label}
-              </span>
-            </div>
-          ))}
+      {/* ───────────── Why PESAKI? ───────────── */}
+      <section className="px-5 pb-2 pt-8">
+        <h2 className="font-display text-lg font-bold tracking-tight text-brand-deep">
+          Why PESAKI?
+        </h2>
+        <span className="mt-2 block h-1 w-9 rounded-full bg-brand-gold" />
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+          PESAKI brings together practical digital services for work, business and financial access
+          in one platform.
+        </p>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          {SERVICES.map((service) => {
+            const Icon = SERVICE_ICONS[service.key];
+            return (
+              <Link
+                key={service.key}
+                to={service.to}
+                className="group flex flex-col rounded-2xl border border-black/5 bg-white p-4 shadow-soft transition-transform hover:-translate-y-0.5"
+              >
+                <span className="grid h-10 w-10 place-items-center rounded-full bg-brand-tint-green text-brand-ink">
+                  <Icon className="h-[18px] w-[18px]" />
+                </span>
+                <span className="mt-3 flex items-center gap-1 text-[13px] font-bold text-brand-deep">
+                  {service.name}
+                  <ChevronRight className="h-3.5 w-3.5 text-brand-ink/60 transition-transform group-hover:translate-x-0.5" />
+                </span>
+                <span className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                  {service.description}
+                </span>
+              </Link>
+            );
+          })}
         </div>
+      </section>
+
+      {/* ───────────── How PESAKI works ───────────── */}
+      <section className="px-5 pb-2 pt-8">
+        <h2 className="font-display text-lg font-bold tracking-tight text-brand-deep">
+          How PESAKI works
+        </h2>
+        <span className="mt-2 block h-1 w-9 rounded-full bg-brand-gold" />
+        <div className="mt-4 overflow-hidden rounded-2xl bg-white shadow-soft">
+          <ol>
+            {HOW_IT_WORKS.map((step, i) => (
+              <li
+                key={step.title}
+                className="flex items-start gap-3 border-b border-black/5 px-4 py-3.5 last:border-0"
+              >
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full gradient-brand text-[11px] font-bold text-white">
+                  {i + 1}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-semibold text-brand-deep">
+                    {step.title}
+                  </span>
+                  <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
+                    {step.body}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      {/* ───────────── Business Hub funding model ───────────── */}
+      <section className="px-5 pb-2 pt-8">
+        <h2 className="font-display text-lg font-bold tracking-tight text-brand-deep">
+          Business Hub: how funding works
+        </h2>
+        <span className="mt-2 block h-1 w-9 rounded-full bg-brand-gold" />
+        <Card className="mt-4 !p-4">
+          <div className="flex items-start gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand-tint-gold text-brand-gold-deep">
+              <Building2 className="h-[18px] w-[18px]" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[13px] font-bold text-brand-deep">Mentorship, then an agreement</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                Business Hub is designed to support small and emerging businesses. Eligible
+                entrepreneurs may receive approximately 3 hours of structured mentorship focused on
+                understanding and starting or growing an SME — covering business fundamentals, how
+                the business will operate, the responsibilities that come with funding, and how the
+                business will be monitored.
+              </p>
+            </div>
+          </div>
+          <ul className="mt-3 space-y-2">
+            {[
+              "The parties agree on the applicable terms.",
+              "The entrepreneur signs the relevant agreement.",
+              "Funding is provided according to the agreement.",
+              "PESAKI monitors the supported business and provides ongoing guidance.",
+              "The entrepreneur provides the agreed return according to the contract.",
+            ].map((item) => (
+              <li key={item} className="flex items-start gap-2 text-[11px] text-muted-foreground">
+                <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-ink" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-3 rounded-xl bg-brand-tint-gold p-3">
+            <p className="text-[11px] leading-relaxed text-brand-gold-deep">
+              The current intended model is{" "}
+              <span className="font-bold">an agreed 10% of monthly business profit</span> under the
+              signed agreement. This is a share of profit, not company ownership.
+            </p>
+          </div>
+          <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+            Funding is subject to eligibility, assessment and approval. Terms are disclosed and
+            agreed before funding is provided.
+          </p>
+          <Link
+            to="/business-funding"
+            className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand-ink hover:underline"
+          >
+            Read the full funding model <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
+        </Card>
+      </section>
+
+      {/* ───────────── Referrals ───────────── */}
+      <section className="px-5 pb-2 pt-8">
+        <h2 className="font-display text-lg font-bold tracking-tight text-brand-deep">
+          Earn through referrals
+        </h2>
+        <span className="mt-2 block h-1 w-9 rounded-full bg-brand-gold" />
+        <Card className="mt-4 !p-4">
+          <div className="flex items-start gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand-tint-green text-brand-ink">
+              <Users className="h-[18px] w-[18px]" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[13px] font-bold text-brand-deep">{REFERRAL.headline}</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                This is the current PESAKI referral programme. A referral reward is{" "}
+                {REFERRAL.creditWindow}.
+              </p>
+            </div>
+          </div>
+          <ol className="mt-3 space-y-1.5">
+            {[
+              "Register for PESAKI.",
+              "Log in to your account.",
+              "Open the Referral section in your profile.",
+              "Find your unique referral link or code.",
+              "Share it with people you know.",
+              "Eligible referral activity generates earnings according to the current referral programme.",
+              "Track referral activity and earnings from your account.",
+              "Withdraw or use earnings according to the currently supported withdrawal rules.",
+            ].map((item, i) => (
+              <li key={item} className="flex items-start gap-2 text-[11px] text-muted-foreground">
+                <span className="mt-px grid h-4 w-4 shrink-0 place-items-center rounded-full bg-brand-tint-green text-[9px] font-bold text-brand-ink">
+                  {i + 1}
+                </span>
+                <span>{item}</span>
+              </li>
+            ))}
+          </ol>
+          <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+            Earn according to the current PESAKI referral programme. Eligibility conditions:{" "}
+            {REFERRAL.conditions.join(" ")}
+          </p>
+          <Link
+            to="/auth"
+            search={{ mode: "signup" } as never}
+            className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand-ink hover:underline"
+          >
+            Create your account to get a referral code <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
+        </Card>
+      </section>
+
+      {/* ───────────── Account visibility ───────────── */}
+      <section className="px-5 pb-2 pt-8">
+        <h2 className="font-display text-lg font-bold tracking-tight text-brand-deep">
+          Your account &amp; transaction visibility
+        </h2>
+        <span className="mt-2 block h-1 w-9 rounded-full bg-brand-gold" />
+        <Card className="mt-4 !p-4">
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            Once you are logged in, the current application shows you:
+          </p>
+          <ul className="mt-3 grid grid-cols-1 gap-2">
+            {ACCOUNT_VISIBILITY.map((item) => (
+              <li key={item} className="flex items-start gap-2 text-[11px] text-muted-foreground">
+                <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-ink" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+            These are the account records PESAKI provides inside the app. If a figure does not look
+            right, contact the Help Center and we will look into it with you.
+          </p>
+          <Link
+            to="/terms"
+            className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand-ink hover:underline"
+          >
+            Review the Terms of Service <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
+        </Card>
+      </section>
+
+      {/* ───────────── Need clarification? ───────────── */}
+      <section className="px-5 pb-2 pt-8">
+        <h2 className="font-display text-lg font-bold tracking-tight text-brand-deep">
+          Need clarification?
+        </h2>
+        <span className="mt-2 block h-1 w-9 rounded-full bg-brand-gold" />
+        <Card className="mt-4 !p-4">
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            You don&apos;t have to rely on information from social media, search engines or third
+            parties to understand PESAKI. For questions about your account or any PESAKI service,
+            contact us directly or visit our offices.
+          </p>
+          <div className="mt-3 space-y-2">
+            {[
+              {
+                label: "WhatsApp / Help Center",
+                value: COMPANY.whatsapp,
+                href: `https://wa.me/${COMPANY.whatsappDial}`,
+              },
+              { label: "Email", value: COMPANY.email, href: `mailto:${COMPANY.email}` },
+              { label: "Official website", value: "pesaki.co.ke", href: COMPANY.website },
+            ].map((row) => (
+              <a
+                key={row.label}
+                href={row.href}
+                target={row.href.startsWith("http") ? "_blank" : undefined}
+                rel="noopener noreferrer"
+                className="flex items-center justify-between gap-3 rounded-xl bg-brand-tint-green px-3 py-2.5"
+              >
+                <span className="min-w-0">
+                  <span className="block text-[10px] uppercase tracking-wide text-brand-ink/70">
+                    {row.label}
+                  </span>
+                  <span className="block truncate text-[12px] font-semibold text-brand-deep">
+                    {row.value}
+                  </span>
+                </span>
+                <ChevronRight className="h-3.5 w-3.5 shrink-0 text-brand-ink/60" />
+              </a>
+            ))}
+          </div>
+          <div className="mt-3 space-y-2">
+            {OFFICES.map((office) => (
+              <div key={office.name} className="flex items-start gap-2.5">
+                <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-ink" />
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold text-foreground">
+                    {office.name} — {office.address}
+                  </p>
+                  <p className="mt-0.5 text-[10px] leading-relaxed text-muted-foreground">
+                    {office.note}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-[10px] leading-relaxed text-muted-foreground">
+            Users should review the applicable Terms of Service and service-specific agreements
+            before proceeding.
+          </p>
+          <Link
+            to="/contact"
+            className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand-ink hover:underline"
+          >
+            Contact PESAKI <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
+        </Card>
+      </section>
+
+      {/* ───────────── Why trust PESAKI? ───────────── */}
+      <section className="px-5 py-8">
+        <h2 className="font-display text-lg font-bold tracking-tight text-brand-deep">
+          Why trust PESAKI?
+        </h2>
+        <span className="mt-2 block h-1 w-9 rounded-full bg-brand-gold" />
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+          Not a promise — verifiable information. Anyone can check the following.
+        </p>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          {TRUST_ITEMS.map((item) => {
+            const content = (
+              <>
+                <span className="grid h-9 w-9 place-items-center rounded-full bg-brand-tint-green text-brand-ink">
+                  <item.icon className="h-4 w-4" />
+                </span>
+                <span className="mt-2 block text-[11px] font-bold text-brand-deep">
+                  {item.label}
+                </span>
+                <span className="mt-0.5 block text-[10px] leading-snug text-muted-foreground">
+                  {item.value}
+                </span>
+              </>
+            );
+            const className =
+              "flex flex-col rounded-2xl border border-black/5 bg-white p-3.5 shadow-soft";
+            return item.to ? (
+              <Link key={item.label} to={item.to} className={className}>
+                {content}
+              </Link>
+            ) : (
+              <div key={item.label} className={className}>
+                {content}
+              </div>
+            );
+          })}
+        </div>
+        <Card className="mt-3 !p-4">
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            {REGULATORY_STATEMENT} {REGISTRATION_STATEMENT}
+          </p>
+          <Link
+            to="/compliance"
+            className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand-ink hover:underline"
+          >
+            Open the Compliance &amp; Trust Center <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
+        </Card>
+        <p className="mt-6 text-center text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          {COMPANY.legalName} · {COMPANY.registrationNumber} · Nairobi, Kenya
+        </p>
       </section>
     </div>
   );
