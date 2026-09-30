@@ -544,7 +544,7 @@ function PublicHome() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd()) }}
       />
       {/* ───────────── Hero ───────────── */}
-      <section className="gradient-brand-deep relative overflow-hidden px-5 pb-9 pt-5 text-white">
+      <section className="gradient-primary relative min-h-[40vh] overflow-hidden px-5 pb-6 pt-4 text-white">
         <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-brand-gold/20 blur-3xl" />
         <div className="pointer-events-none absolute -left-24 top-32 h-56 w-56 rounded-full bg-brand-gold/10 blur-3xl" />
 
@@ -561,7 +561,7 @@ function PublicHome() {
               className="relative grid h-10 w-10 place-items-center rounded-full border border-white/25 bg-white/5 text-white/90 transition-colors hover:bg-white/10"
             >
               <Bell className="h-[18px] w-[18px]" />
-              <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-brand-gold ring-2 ring-brand-deep" />
+              <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-brand-gold ring-2 ring-white/25" />
             </Link>
             <Link
               to="/auth"
@@ -577,7 +577,7 @@ function PublicHome() {
         {/* Registered business pill */}
         <Link
           to="/about"
-          className="relative mt-5 flex items-center gap-2 rounded-full border border-white/15 bg-white/5 py-2 pl-3 pr-2.5 text-[11px] font-medium text-white transition-colors hover:bg-white/10"
+          className="relative mt-3 flex items-center gap-2 rounded-full border border-white/15 bg-white/5 py-2 pl-3 pr-2.5 text-[11px] font-medium text-white transition-colors hover:bg-white/10"
         >
           <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-brand-gold" />
           <span className="truncate">Kenyan Registered Business</span>
@@ -585,40 +585,37 @@ function PublicHome() {
         </Link>
 
         {/* Headline */}
-        <h1 className="relative mt-6 font-display text-[40px] font-bold leading-[1.05] tracking-tight">
+        <h1 className="relative mt-4 font-display text-[28px] font-extrabold leading-[1.15] tracking-tight">
           <span className="block text-white">One Platform.</span>
-          <span className="mt-1 block text-brand-gold">Work, Business &amp;</span>
+          <span className="block text-brand-gold">Work, Business &amp;</span>
           <span className="block text-brand-gold">Financial Services.</span>
         </h1>
 
-        <p className="relative mt-4 text-[14px] leading-relaxed text-white/85">
+        <p className="relative mt-3 text-[14px] leading-relaxed text-white/85">
           PESAKI brings together your wallet, jobs, business funding and banking in one powerful
           mobile app.
         </p>
 
         {/* CTAs */}
-        <div className="relative mt-7 flex items-stretch gap-2.5">
+        <div className="relative mt-5 flex gap-3">
           <Link
             to="/auth"
             search={{ mode: "signup" } as never}
-            className="flex flex-[1.15] items-center justify-between gap-2 rounded-full bg-brand-gold px-5 py-3.5 text-sm font-bold text-brand-deep shadow-lg shadow-black/25 transition-opacity hover:opacity-95"
+            className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-brand-gold text-sm font-bold text-brand-deep shadow-lg shadow-black/25 transition-opacity hover:opacity-95"
           >
-            <span className="flex items-center gap-2">
-              <UserPlus className="h-4 w-4" /> Get Started
-            </span>
-            <ArrowRight className="h-4 w-4" />
+            <UserPlus className="h-4 w-4" /> Get Started
           </Link>
           <Link
             to="/auth"
             search={{ mode: "signin" } as never}
-            className="flex flex-1 items-center justify-center gap-2 rounded-full border border-white/40 px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+            className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full border border-white/40 text-sm font-semibold text-white transition-colors hover:bg-white/10"
           >
             <LogIn className="h-4 w-4" /> Log in
           </Link>
         </div>
 
         {/* App availability */}
-        <div className="relative mt-6 flex items-center justify-center gap-3 text-white/75">
+        <div className="relative mt-5 flex items-center justify-center gap-3 text-white/75">
           <span className="flex items-center gap-1.5 text-[11px] font-medium tracking-wide">
             <Bot className="h-4 w-4 text-brand-gold" /> Available on Android
           </span>
@@ -660,7 +657,7 @@ function PublicHome() {
           <Link
             to="/auth"
             search={{ mode: "signup" } as never}
-            className="group flex flex-col justify-between rounded-2xl gradient-brand p-4 text-white shadow-soft"
+            className="group flex flex-col justify-between rounded-2xl gradient-primary p-4 text-white shadow-soft"
           >
             <span className="grid h-11 w-11 place-items-center rounded-full border border-white/30">
               <ArrowRight className="h-5 w-5" />
