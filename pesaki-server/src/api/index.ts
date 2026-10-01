@@ -7,6 +7,7 @@ import { fxRoutes } from "./routes/fx";
 import { healthRoutes } from "./routes/health";
 import { marketRoutes } from "./routes/market";
 import { nseRoutes } from "./routes/nse";
+import { forexRoutes } from "./routes/forex";
 
 export const registerRoutes = (fastify: FastifyInstance) => {
   fastify.register(healthRoutes); // /health is global
@@ -17,4 +18,7 @@ export const registerRoutes = (fastify: FastifyInstance) => {
   fastify.register(predictionRoutes, { prefix: "/games/prediction" });
   fastify.register(fxRoutes, { prefix: "/games/fx" });
   fastify.register(nseRoutes, { prefix: "/games/nse" });
+  // PESAKI Forex: own accounts/orders/positions/ledger and own data engine.
+  // Kept separate from the binary prediction game at /games/fx.
+  fastify.register(forexRoutes, { prefix: "/forex" });
 };

@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
@@ -52,7 +52,7 @@ const routeFor: Record<
 };
 
 function TradingPage() {
-  const [showForexGate, setShowForexGate] = useState(false);
+  const [showForexLiveNotice, setShowForexLiveNotice] = useState(false);
   const { ready, user } = useRequireAuth();
   const navigate = useNavigate();
 
@@ -85,7 +85,7 @@ function TradingPage() {
       </section>
 
       <section className="mt-6 space-y-3 px-5">
-        {/* Forex — advanced, gated */}
+        {/* Forex — live spot currency trading, demo available now */}
         <Card className="!p-4">
           <div className="flex items-start gap-3">
             <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl gradient-gold text-gold-foreground">
@@ -97,17 +97,18 @@ function TradingPage() {
                 <Badge tone="gold">Advanced</Badge>
               </div>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Trade major currency pairs with leverage. Requires prior experience.
+                Trade major currency pairs with real-time quotes and full position
+                management.
               </p>
               <div className="mt-3 flex gap-2">
                 <button
-                  onClick={() => setShowForexGate(true)}
+                  onClick={() => openGame("/trading/forex", "demo")}
                   className="inline-flex flex-1 items-center justify-center gap-1 rounded-full border border-border bg-background px-3 py-2 text-xs font-semibold"
                 >
                   <Play className="h-3 w-3" /> Demo
                 </button>
                 <button
-                  onClick={() => setShowForexGate(true)}
+                  onClick={() => setShowForexLiveNotice(true)}
                   className="inline-flex flex-1 items-center justify-center gap-1 rounded-full gradient-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
                 >
                   Real Mode
@@ -165,14 +166,17 @@ function TradingPage() {
         Trading involves risk. Trade responsibly.
       </p>
 
-      {showForexGate && (
+      {showForexLiveNotice && (
         <div className="fixed inset-0 z-50 grid place-items-end sm:place-items-center">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setShowForexGate(false)} />
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowForexLiveNotice(false)}
+          />
           <div className="relative z-10 w-full max-w-md rounded-t-3xl bg-card p-5 shadow-2xl sm:rounded-3xl">
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-base font-bold">Experience required</h3>
+              <h3 className="text-base font-bold">Live currency trading</h3>
               <button
-                onClick={() => setShowForexGate(false)}
+                onClick={() => setShowForexLiveNotice(false)}
                 className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground"
               >
                 <X className="h-4 w-4" />
@@ -182,27 +186,28 @@ function TradingPage() {
               <AlertTriangle className="h-7 w-7" />
             </div>
             <p className="mt-4 text-center text-sm font-semibold">
-              Sorry, before participating in forex trading you should have at least a 1 month
-              experience in binary trading.
+              Real Mode is not available yet.
             </p>
             <p className="mt-2 text-center text-xs text-muted-foreground">
-              Build up your skills on Binary FX first — it's the safest way to learn market
-              direction.
+              PESAKI Forex currently runs on demo accounts only. We are not yet routing real
+              currency orders to a licensed execution provider, so we are not accepting real money
+              on this product.
             </p>
 
-            <Link
-              to="/trading/fx"
-              search={{ mode: "demo" }}
-              onClick={() => setShowForexGate(false)}
+            <button
+              onClick={() => {
+                setShowForexLiveNotice(false);
+                openGame("/trading/forex", "demo");
+              }}
               className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-xl gradient-primary text-sm font-semibold text-primary-foreground"
             >
-              <BarChart3 className="h-4 w-4" /> Go to Binary FX <ChevronRight className="h-4 w-4" />
-            </Link>
+              <BarChart3 className="h-4 w-4" /> Trade on demo <ChevronRight className="h-4 w-4" />
+            </button>
             <button
-              onClick={() => setShowForexGate(false)}
+              onClick={() => setShowForexLiveNotice(false)}
               className="mt-2 h-11 w-full rounded-xl border border-border text-sm font-semibold"
             >
-              Maybe later
+              Close
             </button>
           </div>
         </div>

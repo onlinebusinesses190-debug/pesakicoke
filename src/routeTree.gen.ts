@@ -46,6 +46,7 @@ import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminWithdrawalsRouteImport } from './routes/admin.withdrawals'
 import { Route as TradingIndexRouteImport } from './routes/trading.index'
 import { Route as TradingAviatorRouteImport } from './routes/trading.aviator'
+import { Route as TradingForexRouteImport } from './routes/trading.forex'
 import { Route as TradingFxRouteImport } from './routes/trading.fx'
 import { Route as TradingInvestRouteImport } from './routes/trading.invest'
 import { Route as TradingSpinRouteImport } from './routes/trading.spin'
@@ -237,6 +238,11 @@ const TradingAviatorRoute = TradingAviatorRouteImport.update({
   path: '/aviator',
   getParentRoute: () => TradingRoute,
 } as any)
+const TradingForexRoute = TradingForexRouteImport.update({
+  id: '/forex',
+  path: '/forex',
+  getParentRoute: () => TradingRoute,
+} as any)
 const TradingFxRoute = TradingFxRouteImport.update({
   id: '/fx',
   path: '/fx',
@@ -299,6 +305,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AdminUsersRouteWithChildren
   '/admin/withdrawals': typeof AdminWithdrawalsRoute
   '/trading/aviator': typeof TradingAviatorRoute
+  '/trading/forex': typeof TradingForexRoute
   '/trading/fx': typeof TradingFxRoute
   '/trading/invest': typeof TradingInvestRoute
   '/trading/spin': typeof TradingSpinRoute
@@ -341,6 +348,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AdminUsersRouteWithChildren
   '/admin/withdrawals': typeof AdminWithdrawalsRoute
   '/trading/aviator': typeof TradingAviatorRoute
+  '/trading/forex': typeof TradingForexRoute
   '/trading/fx': typeof TradingFxRoute
   '/trading/invest': typeof TradingInvestRoute
   '/trading/spin': typeof TradingSpinRoute
@@ -386,6 +394,7 @@ export interface FileRoutesById {
   '/admin/users': typeof AdminUsersRouteWithChildren
   '/admin/withdrawals': typeof AdminWithdrawalsRoute
   '/trading/aviator': typeof TradingAviatorRoute
+  '/trading/forex': typeof TradingForexRoute
   '/trading/fx': typeof TradingFxRoute
   '/trading/invest': typeof TradingInvestRoute
   '/trading/spin': typeof TradingSpinRoute
@@ -432,6 +441,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/withdrawals'
     | '/trading/aviator'
+    | '/trading/forex'
     | '/trading/fx'
     | '/trading/invest'
     | '/trading/spin'
@@ -474,6 +484,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/withdrawals'
     | '/trading/aviator'
+    | '/trading/forex'
     | '/trading/fx'
     | '/trading/invest'
     | '/trading/spin'
@@ -518,6 +529,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/withdrawals'
     | '/trading/aviator'
+    | '/trading/forex'
     | '/trading/fx'
     | '/trading/invest'
     | '/trading/spin'
@@ -810,6 +822,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TradingAviatorRouteImport
       parentRoute: typeof TradingRoute
     }
+    '/trading/forex': {
+      id: '/trading/forex'
+      path: '/forex'
+      fullPath: '/trading/forex'
+      preLoaderRoute: typeof TradingForexRouteImport
+      parentRoute: typeof TradingRoute
+    }
     '/trading/fx': {
       id: '/trading/fx'
       path: '/fx'
@@ -902,6 +921,7 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface TradingRouteChildren {
   TradingAviatorRoute: typeof TradingAviatorRoute
+  TradingForexRoute: typeof TradingForexRoute
   TradingFxRoute: typeof TradingFxRoute
   TradingInvestRoute: typeof TradingInvestRoute
   TradingSpinRoute: typeof TradingSpinRoute
@@ -911,6 +931,7 @@ interface TradingRouteChildren {
 
 const TradingRouteChildren: TradingRouteChildren = {
   TradingAviatorRoute: TradingAviatorRoute,
+  TradingForexRoute: TradingForexRoute,
   TradingFxRoute: TradingFxRoute,
   TradingInvestRoute: TradingInvestRoute,
   TradingSpinRoute: TradingSpinRoute,
