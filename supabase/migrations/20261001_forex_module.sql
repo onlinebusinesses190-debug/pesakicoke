@@ -121,10 +121,14 @@ create table if not exists public.forex_positions (
   current_price       numeric(18,10),
   stop_loss           numeric(18,10),
   take_profit         numeric(18,10),
-  realized_pnl        numeric(18,4) not null default 0,
-  swap                numeric(18,4) not null default 0,
-  commission          numeric(18,4) not null default 0,
-  margin              numeric(18,4) not null default 0,
+realized_pnl         numeric(18,4) not null default 0,
+  swap                 numeric(18,4) not null default 0,
+  commission           numeric(18,4) not null default 0,
+  margin               numeric(18,4) not null default 0,
+  -- KES value of one unit of the quote currency when the position was opened.
+  -- Snapshotted per position because the rate moves, and unrealised P/L must be
+  -- converted with a rate, never added in raw quote currency.
+  quote_to_kes         numeric(18,8),
   provider_position_id text,
   opened_at           timestamptz not null default now(),
   updated_at          timestamptz not null default now(),
@@ -281,6 +285,34 @@ on conflict (symbol) do update
 -- an arbitrary amount to a balance.
 -- ===========================================================================
 
+-- Unrealised P/L across an account's open positions, in KES.
+--
+-- Every term is converted with that position's snapshotted quote_to_kes. Adding
+-- raw quote-currency moves together would be meaningless: a USD move and a JPY
+-- move are different currencies and neither is the KES the account is held in.
+create or replace function public.forex_account_upnl(p_account_id uuid)
+returns numeric
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(round(sum(
+           p.quantity * i.contract_size
+           * (case when p.side = 'buy'
+                   then coalesce(p.current_price, p.average_entry_price) - p.average_entry_price
+                   else p.average_entry_price - coalesce(p.current_price, p.average_entry_price) end)
+           * coalesce(p.quote_to_kes, 1)
+         ), 4), 0)
+    from public.forex_positions p
+    join public.forex_instruments i on i.id = p.instrument_id
+   where p.account_id = p_account_id
+     and p.closed_at is null;
+$$;
+
+revoke all on function public.forex_account_upnl(uuid) from public, anon, authenticated;
+grant execute on function public.forex_account_upnl(uuid) to service_role;
+
 create or replace function public.forex_open_market_position(
   p_user_id          uuid,
   p_account_id       uuid,
@@ -360,10 +392,12 @@ begin
   if not p_pending then
     insert into public.forex_positions (
       user_id, account_id, instrument_id, side, quantity,
-      average_entry_price, current_price, stop_loss, take_profit, margin
+      average_entry_price, current_price, stop_loss, take_profit, margin,
+      quote_to_kes
     ) values (
       p_user_id, p_account_id, p_instrument_id, p_side, p_quantity,
-      p_executed_price, p_executed_price, p_stop_loss, p_take_profit, v_margin
+      p_executed_price, p_executed_price, p_stop_loss, p_take_profit, v_margin,
+      p_quote_to_kes
     ) returning id into v_pos_id;
 
     insert into public.forex_fills (
@@ -380,7 +414,9 @@ begin
 
     update public.forex_accounts
        set used_margin = coalesce(used_margin, 0) + v_margin,
-           equity = coalesce(balance, 0),
+           -- Keep existing unrealised P/L: overwriting equity with the bare
+           -- balance would silently zero out every other open position.
+           equity = coalesce(balance, 0) + public.forex_account_upnl(p_account_id),
            updated_at = now()
      where id = p_account_id;
   end if;
@@ -467,7 +503,7 @@ begin
 
   update public.forex_accounts
      set balance = v_balance,
-         equity = v_balance,
+         equity = v_balance + public.forex_account_upnl(v_pos.account_id),
          used_margin = greatest(0, coalesce(used_margin, 0) - v_released),
          updated_at = now()
    where id = v_pos.account_id;
@@ -506,27 +542,19 @@ language plpgsql
 security definer
 set search_path = public
 as $$
-declare v_balance numeric(18,4); v_upnl numeric(18,4);
+declare v_balance numeric(18,4); v_equity numeric(18,4);
 begin
   select balance into v_balance from public.forex_accounts where id = p_account_id for update;
 
-  -- current_price is maintained by the server; entry price is the zero-P/L fallback.
-  select coalesce(sum(
-           p.quantity * i.contract_size
-           * (case when p.side = 'buy'
-                   then coalesce(p.current_price, p.average_entry_price) - p.average_entry_price
-                   else p.average_entry_price - coalesce(p.current_price, p.average_entry_price) end)
-         ), 0)
-    into v_upnl
-    from public.forex_positions p
-    join public.forex_instruments i on i.id = p.instrument_id
-   where p.account_id = p_account_id
-     and p.closed_at is null;
+  -- current_price is maintained by the server when it marks positions to market;
+  -- entry price is the zero-P/L fallback. Conversion to KES happens inside the
+  -- helper using each position's snapshotted rate.
+  v_equity := round(v_balance + public.forex_account_upnl(p_account_id), 4);
 
   update public.forex_accounts
-     set equity = round(v_balance + v_upnl, 4), updated_at = now()
+     set equity = v_equity, updated_at = now()
    where id = p_account_id;
-  return round(v_balance + v_upnl, 4);
+  return v_equity;
 end;
 $$;
 

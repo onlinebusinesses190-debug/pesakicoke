@@ -224,6 +224,8 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
       let unrealised = 0;
       let usedMargin = Number(account.used_margin ?? 0);
       const enriched = [];
+      // Positions we managed to price, so the mark-to-market can be persisted.
+      const marked: { id: string; price: number; q2k: number }[] = [];
       for (const p of positions ?? []) {
         const sym = await symbolForInstrument(p.instrument_id);
         const spec = sym ? getInstrument(sym) : undefined;
@@ -244,10 +246,34 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
             quoteToKes: q2k,
           });
           unrealised += pnl;
-          usedMargin = Number(p.margin ?? usedMargin);
+          // Accumulate across every open position. Assigning here reported only
+          // the margin of whichever position happened to be last in the list.
+          usedMargin += Number(p.margin ?? 0);
+          marked.push({ id: p.id, price: mid, q2k });
           enriched.push({ ...p, current_price: mid, unrealised_pnl: pnl });
         } catch {
           enriched.push({ ...p, unrealised_pnl: 0, priceStatus: "unavailable" });
+        }
+      }
+
+      // Persist the marks so database-side equity reflects live prices. Without
+      // this the stored current_price stays at entry forever and equity never
+      // moves between opens and closes.
+      if (marked.length > 0) {
+        await Promise.all(
+          marked.map((m) =>
+            supabase
+              .from("forex_positions")
+              .update({ current_price: m.price, quote_to_kes: m.q2k })
+              .eq("id", m.id)
+              .eq("user_id", request.user!.id),
+          ),
+        );
+        const { error: equityError } = await supabase.rpc("forex_recalculate_equity", {
+          p_account_id: account.id,
+        });
+        if (equityError) {
+          logger.warn({ err: equityError.message }, "Forex equity refresh failed");
         }
       }
 
