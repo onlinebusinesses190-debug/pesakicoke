@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   User,
   KeyRound,
@@ -23,15 +23,17 @@ import {
   Share2,
   Users,
   Calendar,
-  Trophy,
+  Award,
+  Clock,
+  TrendingUp,
   Link as LinkIcon,
   RefreshCw,
 } from "lucide-react";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Badge, SectionTitle, Stat } from "@/components/ui-bits";
 import { toast } from "sonner";
-import { apiRequest } from "@/utils/api";
 import { supabase } from "@/integrations/supabase/client";
+import { copyToClipboard } from "@/utils/clipboard";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({
@@ -48,6 +50,10 @@ export const Route = createFileRoute("/profile")({
 
 const WHATSAPP_URL = "https://wa.me/254140399389";
 
+const API_BASE = import.meta.env.VITE_PESAKI_API_URL || "https://pesaki-server.onrender.com";
+
+type ReferralStatus = "pending" | "qualified" | "completed" | "rejected";
+
 type ModalKey =
   | "personal"
   | "password"
@@ -63,10 +69,10 @@ type ModalKey =
   | null;
 
 type ReferredUser = {
-  id: string;
+  id?: string;
   name: string;
   joinedAt: string;
-  status: "pending" | "qualified" | "rejected";
+  status: ReferralStatus;
   earned: number;
 };
 
@@ -160,42 +166,55 @@ function ProfilePage() {
   const [earningsLog, setEarningsLog] = useState<EarningsEntry[]>([]);
   const [refLoading, setRefLoading] = useState(false);
   const [refError, setRefError] = useState<string | null>(null);
-  const [welcomeBonus, setWelcomeBonus] = useState(0);
+  const hasReferralFetched = useRef(false);
 
   const fetchReferralData = useCallback(async () => {
     setRefLoading(true);
     setRefError(null);
 
     try {
-      const [meResult, earningsResult] = await Promise.allSettled([
-        apiRequest("/referrals/me"),
-        apiRequest("/referrals/earnings"),
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      if (!token) {
+        setRefError("Referral data is temporarily unavailable. Please try again.");
+        return;
+      }
+
+      const headers = { Authorization: `Bearer ${token}` };
+
+      const [meRes, earningsRes] = await Promise.all([
+        fetch(`${API_BASE}/referrals/me`, { headers }),
+        fetch(`${API_BASE}/referrals/earnings`, { headers }),
       ]);
 
-      if (meResult.status === "fulfilled") {
-        const data = meResult.value as ReferralSummary;
-        setReferrals({
-          referralCode: data.referralCode || "",
-          referralLink: data.referralLink || "",
-          totalReferrals: Number(data.totalReferrals || 0),
-          qualifiedReferrals: Number(data.qualifiedReferrals || 0),
-          pendingReferrals: Number(data.pendingReferrals || 0),
-          totalEarnings: Number(data.totalEarnings || 0),
-          referrals: Array.isArray(data.referrals) ? data.referrals : [],
-        });
-      }
-
-      if (earningsResult.status === "fulfilled") {
-        const data = earningsResult.value as { earnings?: EarningsEntry[]; welcomeBonus?: number };
-        setEarningsLog(Array.isArray(data.earnings) ? data.earnings.slice(0, 20) : []);
-        setWelcomeBonus(Number(data.welcomeBonus || 0));
-      }
-
-      if (meResult.status === "rejected" || earningsResult.status === "rejected") {
+      if (!meRes.ok) {
         setRefError("Referral data is temporarily unavailable. Please try again.");
+        return;
+      }
+
+      const meJson = await meRes.json();
+      const data = meJson as ReferralSummary;
+      setReferrals({
+        referralCode: data.referralCode || "",
+        referralLink: data.referralLink || "",
+        totalReferrals: Number(data.totalReferrals || 0),
+        qualifiedReferrals: Number(data.qualifiedReferrals || 0),
+        pendingReferrals: Number(data.pendingReferrals || 0),
+        totalEarnings: Number(data.totalEarnings || 0),
+        referrals: Array.isArray(data.referrals) ? data.referrals : [],
+      });
+
+      if (earningsRes.ok) {
+        const earningsJson = await earningsRes.json();
+        const entries = Array.isArray(earningsJson?.earnings)
+          ? (earningsJson.earnings as EarningsEntry[])
+          : [];
+        setEarningsLog(entries.slice(0, 20));
+      } else {
+        setEarningsLog([]);
       }
     } catch (error: unknown) {
-      setRefError(error instanceof Error ? error.message : "Could not load referral data");
+      console.error("Failed to load referral data:", error);
+      setRefError("Referral data is temporarily unavailable. Please try again.");
     } finally {
       setRefLoading(false);
     }
@@ -222,29 +241,8 @@ function ProfilePage() {
           tier: tier,
           guest: false,
         });
-        setReferrals({
-          referralCode: "",
-          referralLink: "",
-          totalReferrals: 0,
-          qualifiedReferrals: 0,
-          pendingReferrals: 0,
-          totalEarnings: 0,
-          referrals: [],
-        });
-        setEarningsLog([]);
-        void fetchReferralData();
       } else {
         setProfile({ name: "", phone: "", email: "", tier: "Guest", guest: true });
-        setReferrals({
-          referralCode: "",
-          referralLink: "",
-          totalReferrals: 0,
-          qualifiedReferrals: 0,
-          pendingReferrals: 0,
-          totalEarnings: 0,
-          referrals: [],
-        });
-        setEarningsLog([]);
       }
     } catch (err) {
       console.error("Failed to load profile:", err);
@@ -252,11 +250,17 @@ function ProfilePage() {
     } finally {
       setLoading(false);
     }
-  }, [fetchReferralData]);
+  }, []);
 
   useEffect(() => {
     fetchProfileData();
   }, [fetchProfileData]);
+
+  useEffect(() => {
+    if (profile.guest || hasReferralFetched.current) return;
+    hasReferralFetched.current = true;
+    void fetchReferralData();
+  }, [profile.guest, fetchReferralData]);
 
   // ── Sign out ──────────────────────────────────────────────────────────────
   const signOut = async () => {
@@ -270,30 +274,6 @@ function ProfilePage() {
   };
 
   // ── Copy referral code ────────────────────────────────────────────────────
-  async function copyToClipboard(text: string): Promise<boolean> {
-    if (navigator.clipboard && window.isSecureContext) {
-      try {
-        await navigator.clipboard.writeText(text);
-        return true;
-      } catch {}
-    }
-    try {
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      ta.style.position = "fixed";
-      ta.style.top = "-9999px";
-      document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
-      const ok = document.execCommand("copy");
-      document.body.removeChild(ta);
-      return ok;
-    } catch {
-      return false;
-    }
-  }
-
-  // ── Copy referral code ────────────────────────────────────────────
   const copyRef = async () => {
     if (!referrals.referralCode) {
       toast.error("Referral code is not available yet");
@@ -322,24 +302,16 @@ function ProfilePage() {
   };
 
   // ── WhatsApp share ──────────────────────────────────────────
-  const shareWhatsApp = async () => {
+  const shareWhatsApp = () => {
     if (!referrals.referralCode) {
       toast.error("Referral code is not available yet");
       return;
     }
-
     const text = `Join PESAKI with my code: ${referrals.referralCode} — ${referrals.referralLink}`;
-    const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
-    window.open(waUrl, "_blank", "noopener,noreferrer");
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
   };
 
   // ── Referral helpers ──────────────────────────────────
-  const earnedFromUser = (referredUserId: string): number => {
-    return earningsLog
-      .filter((e) => e.referredUserId === referredUserId && e.source === "deposit_commission")
-      .reduce((sum, e) => sum + e.amount, 0);
-  };
-
   const formatSource = (source?: string): string => {
     if (!source) return "Referral reward";
     return source
@@ -348,16 +320,16 @@ function ProfilePage() {
       .join(" ");
   };
 
-  const statusLabel = (status: "pending" | "qualified" | "rejected"): string => {
+  const statusLabel = (status: ReferralStatus): string => {
     if (status === "qualified") return "Qualified";
+    if (status === "completed") return "Completed";
     if (status === "rejected") return "Rejected";
     return "Pending";
   };
 
-  const statusTone = (
-    status: "pending" | "qualified" | "rejected",
-  ): "warning" | "success" | "destructive" => {
+  const statusTone = (status: ReferralStatus): "warning" | "success" | "destructive" | "primary" => {
     if (status === "qualified") return "success";
+    if (status === "completed") return "primary";
     if (status === "rejected") return "destructive";
     return "warning";
   };
@@ -485,12 +457,11 @@ function ProfilePage() {
           </Link>
         )}
 
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
-          <Stat label="Total referrals" value={String(totalReferrals)} tone="primary" />
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Stat label="Total Referrals" value={String(totalReferrals)} tone="primary" />
           <Stat label="Qualified" value={String(qualifiedReferrals)} tone="success" />
           <Stat label="Pending" value={String(pendingReferrals)} tone="primary" />
-          <Stat label="Referral earnings" value={fmt(totalEarnings)} tone="gold" />
-          <Stat label="Welcome bonus" value={fmt(welcomeBonus)} tone="primary" />
+          <Stat label="Total Earnings (KES)" value={fmt(totalEarnings)} tone="gold" />
         </div>
 
         {refLoading && (
@@ -524,36 +495,44 @@ function ProfilePage() {
               </p>
             ) : (
               <ul className="divide-y divide-border">
-                {referredUsers.map((user) => (
+                {referredUsers.map((user, index) => {
+                  const earned = Number(user.earned || 0);
+                  return (
                   <li
-                    key={user.id}
+                    key={`${user.name || "user"}-${user.joinedAt || index}`}
                     className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 px-3 py-3"
                   >
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold">{user.name || "Unknown"}</p>
                       <p className="truncate text-[11px] text-muted-foreground">
-                        {new Date(user.joinedAt).toLocaleDateString("en-KE", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}
+                        {user.joinedAt
+                          ? new Date(user.joinedAt).toLocaleDateString("en-KE", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })
+                          : "—"}
                       </p>
                     </div>
                     <Badge tone={statusTone(user.status)}>{statusLabel(user.status)}</Badge>
                     <p
-                      className={`text-sm font-bold ${earnedFromUser(user.id) > 0 ? "text-success" : "text-muted-foreground"}`}
+                      className={`text-sm font-bold ${earned > 0 ? "text-success" : "text-muted-foreground"}`}
                     >
-                      {earnedFromUser(user.id) > 0 ? `+${fmt(earnedFromUser(user.id))}` : "—"}
+                      {earned > 0 ? `+${fmt(earned)}` : "—"}
                     </p>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
           </Card>
         </section>
 
         <section className="mt-5">
-          <SectionTitle title="Earnings log" />
+          <SectionTitle
+            title="Earnings log"
+            action={<Clock className="h-4 w-4 text-muted-foreground" />}
+          />
           <Card className="!p-2">
             {earningsLog.length === 0 ? (
               <p className="py-6 text-center text-sm text-muted-foreground">
@@ -611,7 +590,7 @@ function ProfilePage() {
                   step: "2",
                   title: "When they sign up and make a deposit",
                   desc: "You earn 10% of it",
-                  icon: Users,
+                  icon: TrendingUp,
                 },
                 {
                   step: "3",
@@ -623,15 +602,18 @@ function ProfilePage() {
                   step: "4",
                   title: "Rewards are credited automatically",
                   desc: "To your PESAKI wallet",
-                  icon: Trophy,
+                  icon: Award,
                 },
               ].map((item) => (
                 <div
                   key={item.step}
                   className="flex flex-col items-center rounded-xl bg-muted/40 p-3 text-center"
                 >
-                  <div className="grid h-9 w-9 place-items-center rounded-full gradient-primary text-primary-foreground text-xs font-bold">
-                    {item.step}
+                  <div className="relative grid h-9 w-9 place-items-center rounded-full gradient-primary text-primary-foreground text-xs font-bold">
+                    <item.icon className="h-4 w-4" />
+                    <span className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-gold text-[9px] font-bold text-gold-foreground">
+                      {item.step}
+                    </span>
                   </div>
                   <p className="mt-2 text-xs font-bold">{item.title}</p>
                   <p className="mt-0.5 text-[10px] text-muted-foreground">{item.desc}</p>
