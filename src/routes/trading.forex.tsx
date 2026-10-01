@@ -363,7 +363,7 @@ function ForexPage() {
         {/* Chart */}
         <div className="mt-4">
           {candles.length > 0 ? (
-            <TradingChart data={candles} markers={markers} />
+            <TradingChart data={candles} />
           ) : (
             <div className="grid h-56 place-items-center rounded-2xl border border-border bg-card">
               <div className="text-center">
