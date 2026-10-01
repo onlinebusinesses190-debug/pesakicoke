@@ -31,6 +31,14 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-gold: var(--gold);
   --color-gold-foreground: var(--gold-foreground);
+
+  --color-brand-deep: var(--brand-deep);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-paper: var(--brand-paper);
+  --color-brand-gold: var(--gold);
+  --color-brand-gold-deep: var(--brand-gold-deep);
+  --color-brand-tint-green: var(--brand-tint-green);
+  --color-brand-tint-gold: var(--brand-tint-gold);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
@@ -76,6 +84,14 @@
 
   --gold: #f5c842; /* PESAKI gold */
   --gold-foreground: oklch(0.22 0.04 90);
+
+  /* PESAKI brand greens backing the brand-* utilities */
+  --brand-deep: #024812;
+  --brand-ink: #0a2e1a;
+  --brand-paper: #f7faf8;
+  --brand-gold-deep: #8a6d12;
+  --brand-tint-green: #e6f4ec;
+  --brand-tint-gold: #fdf3d4;
 
   --success: oklch(0.65 0.16 155);
   --success-foreground: oklch(0.98 0.01 150);
