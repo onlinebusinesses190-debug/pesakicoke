@@ -137,7 +137,10 @@ async function getOrCreateAccount(userId: string, accountType: "demo" | "live") 
       // real funds. Seeding it with a demo-style balance would fabricate money.
       balance: accountType === "demo" ? DEMO_START_BALANCE : 0,
       equity: accountType === "demo" ? DEMO_START_BALANCE : 0,
-      leverage: 1,
+      // Leverage is a plain multiplier and must match what the order path sizes
+      // against, otherwise the server-side margin check would reserve a
+      // different amount of margin than the ticket promised the user.
+      leverage: configuredLeverage(),
       status: "active",
     })
     .select()

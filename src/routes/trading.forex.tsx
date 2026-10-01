@@ -146,7 +146,6 @@ function ForexPage() {
   // Position size (lots) is derived server-side from this and the platform
   // leverage, because a KSh 100 trade cannot be expressed in standard lots.
   const [tradeAmountInput, setTradeAmountInput] = useState("1000");
-  const [lots, setLots] = useState("0.10");
   const [orderType, setOrderType] = useState<"market" | "limit">("market");
   const [limitPrice, setLimitPrice] = useState("");
   const [stopLoss, setStopLoss] = useState("");
@@ -267,15 +266,6 @@ function ForexPage() {
 
   // Entry price for the ticket, derived from the live quote rather than typed.
   const entryPrice = side === "buy" ? quote?.ask : quote?.bid;
-
-  const requiredMargin = useMemo(() => {
-    if (!quote || !entryPrice) return null;
-    // Indicative only. The server recomputes and is the authority; this exists
-    // so the user sees a number before committing.
-    const notional = Number(lots) * 100_000 * entryPrice;
-    const q2k = quote.symbol.endsWith("JPY") ? 0.88 : 130;
-    return (notional * q2k) / 100;
-  }, [quote, entryPrice, lots]);
 
   // Trade Amount is the capital the user commits, in KSh. The margin held is
   // exactly this amount; the position size behind it is derived server-side
@@ -656,9 +646,19 @@ function ForexPage() {
                 <span className="font-semibold text-foreground">{entryPrice ?? "—"}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Required margin</span>
+                <span className="text-muted-foreground">Margin held</span>
                 <span className="font-semibold text-foreground">
-                  {requiredMargin != null ? ksh(requiredMargin) : "—"}
+                  {Number(tradeAmountInput) > 0 ? ksh(Number(tradeAmountInput)) : "—"}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Leverage</span>
+                <span className="font-semibold text-foreground">1:{leverage}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Position value</span>
+                <span className="font-semibold text-foreground">
+                  {exposure > 0 ? ksh(exposure) : "—"}
                 </span>
               </div>
               <div className="flex justify-between">
