@@ -10,6 +10,8 @@ import { startUpDownRounds } from './games/updown/engine';
 import { initCronJobs } from './cron';
 import { registerRoutes } from './api';
 import { setupRateLimit } from './middleware/rateLimit';
+import { getEngine } from './services/forex/marketEngine';
+import { startPositionMonitor } from './services/forex/positionMonitor';
 
 import walletRoutes from './routes/wallet';
 import kaziRoutes from './routes/kazi';
@@ -67,6 +69,20 @@ const startServer = async () => {
     startNewRound();
     startUpDownRounds();
     initCronJobs();
+
+    // PESAKI Forex: the market engine and the SL/TP monitor must run
+    // independently of the browser. Prices keep advancing and stops keep
+    // triggering while nobody has a tab open.
+    getEngine().start();
+    startPositionMonitor();
+
+    const shutdown = () => {
+      logger.info('Shutting down PESAKI Forex engine');
+      getEngine().stop();
+      process.exit(0);
+    };
+    process.on('SIGTERM', shutdown);
+    process.on('SIGINT', shutdown);
 
     await server.listen({ port: env.PORT, host: '0.0.0.0' });
     logger.info(`✨ Pesaki Server listening at http://localhost:${env.PORT}`);

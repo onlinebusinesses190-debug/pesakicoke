@@ -139,6 +139,10 @@ realized_pnl         numeric(18,4) not null default 0,
   -- Snapshotted per position because the rate moves, and unrealised P/L must be
   -- converted with a rate, never added in raw quote currency.
   quote_to_kes         numeric(18,8),
+  -- Why the position was closed. Set by the server-side monitor when a stop or
+  -- target fires, so history can distinguish a user close from a triggered one.
+  close_reason         text
+                        check (close_reason in ('manual','stop_loss','take_profit','liquidation','reset')),
   provider_position_id text,
   opened_at           timestamptz not null default now(),
   updated_at          timestamptz not null default now(),
@@ -149,11 +153,54 @@ create index if not exists forex_positions_open_idx
   on public.forex_positions (user_id) where closed_at is null;
 create index if not exists forex_positions_acct_idx on public.forex_positions (account_id);
 
--- REPAIR: quote_to_kes was added after the table first shipped, so databases
--- created from the earlier revision have the table but not the column. Without
--- this the unrealised P/L helper below fails to compile against the real table.
+-- REPAIR: columns added after the table first shipped. `create table if not
+-- exists` skips a table that already exists, so these never applied to a
+-- database created from an earlier revision.
 alter table public.forex_positions
   add column if not exists quote_to_kes numeric(18,8);
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+     where table_name = 'forex_positions' and column_name = 'close_reason'
+  ) then
+    alter table public.forex_positions
+      add column close_reason text
+        check (close_reason in ('manual','stop_loss','take_profit','liquidation','reset'));
+  end if;
+end $$;
+
+-- ─── Risk and exposure configuration ────────────────────────────────────────
+-- Because PESAKI runs its own market engine it carries the risk that its
+-- customers net out against it. These caps bound that exposure and are
+-- configuration, not hard-coded product rules.
+create table if not exists public.forex_market_config (
+  id                        serial primary key default 1,
+  state                     text not null default 'open'
+                              check (state in ('open','paused','unavailable')),
+  -- KES value of one unit of each quote currency used for P/L conversion.
+  kes_rates                 jsonb not null default '{"USD":130,"EUR":141,"GBP":168,"JPY":0.88,"CHF":152,"AUD":85,"CAD":95,"NZD":79}'::jsonb,
+  fee_per_lot               numeric(18,4) not null default 0,
+  -- Aggregate customer exposure the platform will carry, in KES notional.
+  max_total_exposure        numeric(18,2) not null default 50000000,
+  max_exposure_per_symbol   numeric(18,2) not null default 5000000,
+  max_exposure_per_account  numeric(18,2) not null default 100000,
+  -- Liquidation threshold as a percent of used margin.
+  liquidation_threshold_pct numeric(6,2) not null default 50,
+  updated_at                timestamptz not null default now(),
+  constraint forex_market_config_singleton check (id = 1)
+);
+
+insert into public.forex_market_config (id) values (1)
+on conflict (id) do nothing;
+
+-- Persisted engine state so a restart does not jump the price back to seed.
+create table if not exists public.forex_symbol_state (
+  symbol     text primary key,
+  mid        numeric(18,10) not null,
+  tick_count bigint not null default 0,
+  updated_at timestamptz not null default now()
+);
 
 -- Deferred so fills can reference positions regardless of creation order.
 alter table public.forex_fills

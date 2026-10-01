@@ -1,9 +1,9 @@
+﻿import { supabase } from "@/utils/supabase/client";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { Disc, Sparkles, Loader2, ArrowLeft, PlusCircle } from "lucide-react";
 import { apiRequest } from "@/utils/api";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
-import { createClient } from "@supabase/supabase-js";
 import { DepositSheet } from "@/components/DepositSheet";
 
 type AllocationOutcome = {
@@ -45,10 +45,6 @@ function MarketGrowthPage() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const supabase = createClient(
-          import.meta.env.VITE_SUPABASE_URL,
-          import.meta.env.VITE_SUPABASE_ANON_KEY,
-        );
         const {
           data: { session },
         } = await supabase.auth.getSession();

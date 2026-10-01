@@ -1,9 +1,9 @@
+﻿import { supabase } from "@/utils/supabase/client";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect, useRef, Component, ReactNode } from "react";
 import { Plane, Loader2, PlusCircle, ArrowLeft } from "lucide-react";
 import { io, Socket } from "socket.io-client";
 import { motion, AnimatePresence } from "framer-motion";
-import { createClient } from "@supabase/supabase-js";
 import { apiRequest } from "@/utils/api";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { AviatorCanvas } from "@/components/aviator/AviatorCanvas";
@@ -97,10 +97,6 @@ function AviatorPage() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const supabase = createClient(
-          import.meta.env.VITE_SUPABASE_URL,
-          import.meta.env.VITE_SUPABASE_ANON_KEY,
-        );
         const {
           data: { session },
         } = await supabase.auth.getSession();
@@ -295,10 +291,6 @@ function AviatorPage() {
 
   // ── WebSocket connection ──────────────────────────────────────────────────
   useEffect(() => {
-    const supabase = createClient(
-      import.meta.env.VITE_SUPABASE_URL,
-      import.meta.env.VITE_SUPABASE_ANON_KEY,
-    );
 
     const initGame = async () => {
       try {

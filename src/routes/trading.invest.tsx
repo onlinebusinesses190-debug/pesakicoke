@@ -1,3 +1,4 @@
+﻿import { supabase } from "@/utils/supabase/client";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect, useCallback } from "react";
 import {
@@ -19,7 +20,6 @@ import {
 } from "lucide-react";
 import { apiRequest } from "@/utils/api";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
-import { createClient } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { DepositSheet } from "@/components/DepositSheet";
 
@@ -174,10 +174,6 @@ function InvestmentPage() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const supabase = createClient(
-          import.meta.env.VITE_SUPABASE_URL,
-          import.meta.env.VITE_SUPABASE_ANON_KEY,
-        );
         const {
           data: { session },
         } = await supabase.auth.getSession();

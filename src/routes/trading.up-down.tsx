@@ -1,7 +1,7 @@
+﻿import { supabase } from "@/utils/supabase/client";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ArrowUp, ArrowDown, Loader2, TrendingUp, ArrowLeft, PlusCircle } from "lucide-react";
-import { createClient } from "@supabase/supabase-js";
 import { io, Socket } from "socket.io-client";
 import { apiRequest } from "@/utils/api";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
@@ -122,10 +122,6 @@ function UpDownGame() {
   // ── Auth check ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const checkAuth = async () => {
-      const supabase = createClient(
-        import.meta.env.VITE_SUPABASE_URL,
-        import.meta.env.VITE_SUPABASE_ANON_KEY,
-      );
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -163,10 +159,6 @@ function UpDownGame() {
     let socket: Socket;
 
     const connect = async () => {
-      const supabase = createClient(
-        import.meta.env.VITE_SUPABASE_URL,
-        import.meta.env.VITE_SUPABASE_ANON_KEY,
-      );
       const {
         data: { session },
       } = await supabase.auth.getSession();

@@ -1,3 +1,4 @@
+﻿import { supabase } from "@/utils/supabase/client";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ArrowDownToLine,
@@ -38,7 +39,6 @@ import { AppShell } from "@/components/AppShell";
 import { PesakiLogo, PesakiWordmark } from "@/components/PesakiLogo";
 import { Card, Stat, SectionTitle, Badge } from "@/components/ui-bits";
 import { apiRequest } from "../utils/api";
-import { createClient } from "@supabase/supabase-js";
 import { useAuth } from "@/hooks/useAuth";
 import {
   ACCOUNT_VISIBILITY,
@@ -118,10 +118,6 @@ function HomePage() {
     setLoading(true);
     const fetchAll = async () => {
       try {
-        const supabase = createClient(
-          import.meta.env.VITE_SUPABASE_URL,
-          import.meta.env.VITE_SUPABASE_ANON_KEY,
-        );
         const {
           data: { session },
         } = await supabase.auth.getSession();

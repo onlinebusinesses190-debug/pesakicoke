@@ -1,3 +1,4 @@
+﻿import { supabase } from "@/utils/supabase/client";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { TradingChart, type FxMarker } from "@/components/fx/TradingChart";
@@ -13,7 +14,6 @@ import {
 } from "lucide-react";
 import { apiRequest } from "@/utils/api";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
-import { createClient } from "@supabase/supabase-js";
 import { DepositSheet } from "@/components/DepositSheet";
 import { toast } from "sonner";
 
@@ -128,10 +128,6 @@ function TradingPage() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const supabase = createClient(
-        import.meta.env.VITE_SUPABASE_URL,
-        import.meta.env.VITE_SUPABASE_ANON_KEY,
-      );
       const {
         data: { session },
       } = await supabase.auth.getSession();

@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+﻿import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
@@ -10,7 +10,6 @@ import {
   RefreshCw,
   Play,
   DollarSign,
-  AlertTriangle,
   X,
   ChevronRight,
 } from "lucide-react";
@@ -52,7 +51,6 @@ const routeFor: Record<
 };
 
 function TradingPage() {
-  const [showForexLiveNotice, setShowForexLiveNotice] = useState(false);
   const { ready, user } = useRequireAuth();
   const navigate = useNavigate();
 
@@ -97,8 +95,7 @@ function TradingPage() {
                 <Badge tone="gold">Advanced</Badge>
               </div>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Trade major currency pairs with real-time quotes and full position
-                management.
+                Trade major currency pairs with real-time quotes and full position management.
               </p>
               <div className="mt-3 flex gap-2">
                 <button
@@ -108,7 +105,7 @@ function TradingPage() {
                   <Play className="h-3 w-3" /> Demo
                 </button>
                 <button
-                  onClick={() => setShowForexLiveNotice(true)}
+                  onClick={() => openGame("/trading/forex", "real")}
                   className="inline-flex flex-1 items-center justify-center gap-1 rounded-full gradient-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
                 >
                   Real Mode
@@ -165,53 +162,6 @@ function TradingPage() {
       <p className="mt-6 px-5 text-center text-[10px] text-muted-foreground">
         Trading involves risk. Trade responsibly.
       </p>
-
-      {showForexLiveNotice && (
-        <div className="fixed inset-0 z-50 grid place-items-end sm:place-items-center">
-          <div
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setShowForexLiveNotice(false)}
-          />
-          <div className="relative z-10 w-full max-w-md rounded-t-3xl bg-card p-5 shadow-2xl sm:rounded-3xl">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-base font-bold">Live currency trading</h3>
-              <button
-                onClick={() => setShowForexLiveNotice(false)}
-                className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-gold/15 text-gold-foreground">
-              <AlertTriangle className="h-7 w-7" />
-            </div>
-            <p className="mt-4 text-center text-sm font-semibold">
-              Real Mode is not available yet.
-            </p>
-            <p className="mt-2 text-center text-xs text-muted-foreground">
-              PESAKI Forex currently runs on demo accounts only. We are not yet routing real
-              currency orders to a licensed execution provider, so we are not accepting real money
-              on this product.
-            </p>
-
-            <button
-              onClick={() => {
-                setShowForexLiveNotice(false);
-                openGame("/trading/forex", "demo");
-              }}
-              className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-xl gradient-primary text-sm font-semibold text-primary-foreground"
-            >
-              <BarChart3 className="h-4 w-4" /> Trade on demo <ChevronRight className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setShowForexLiveNotice(false)}
-              className="mt-2 h-11 w-full rounded-xl border border-border text-sm font-semibold"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
     </AppShell>
   );
 }

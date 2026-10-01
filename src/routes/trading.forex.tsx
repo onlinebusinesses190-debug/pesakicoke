@@ -1,52 +1,62 @@
 /**
- * PESAKI Forex — public-facing trading screen.
+ * PESAKI Forex — trading screen.
  *
- * Separate from /trading/fx, which is the binary price-direction prediction
- * game. This is a spot FX market: real provider quotes, lots, margin,
- * positions and a server-validated order ticket.
+ * Separate from /trading/fx, which is the binary prediction game.
  *
- * Demo is the default and is clearly labelled. Live trading is only offered
- * when the backend reports it enabled, which currently requires a licensed
- * execution provider.
+ * Everything authoritative comes from the backend: prices, quotes, candles,
+ * balance, margin, position size and P/L. This file only renders what it is
+ * given and sends intents. It never computes a P/L or decides whether a trade
+ * is winning.
  *
- * Nothing on this screen invents a price. When market data is unavailable the
- * UI says so instead of rendering a fabricated chart.
+ * DEMO and REAL are separate accounts on the server. The mode in the URL is a
+ * display preference only — it grants nothing. If the backend has real trading
+ * switched off, selecting REAL surfaces the server's reason instead of quietly
+ * bouncing the user back to demo.
  */
 
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import {
+  AlertTriangle,
+  ArrowLeft,
   ArrowDownRight,
   ArrowUpRight,
-  BarChart3,
-  Calculator,
   Loader2,
   RefreshCw,
+  Wallet,
   WifiOff,
 } from "lucide-react";
-import { AppShell, PageHeader } from "@/components/AppShell";
+import { AppShell } from "@/components/AppShell";
 import { Card, SectionTitle } from "@/components/ui-bits";
-import { TradingChart } from "@/components/fx/TradingChart";
+import { ForexChart, type ForexCandle, type ForexInterval } from "@/components/forex/ForexChart";
 import { apiRequest } from "@/utils/api";
 import { toast } from "sonner";
 
-const API_BASE = import.meta.env.VITE_PESAKI_API_URL || "https://pesaki-server.onrender.com";
-
+type Mode = "demo" | "live";
 type Side = "buy" | "sell";
+
+const API_BASE = import.meta.env.VITE_PESAKI_API_URL || "https://pesaki-server.onrender.com";
 
 interface Quote {
   symbol: string;
   bid: number;
   ask: number;
-  spreadPips: number;
   mid: number;
-  timestamp: string;
+  spreadPips: number;
   provider: string;
-  status: string;
+  state: string;
+}
+
+interface WatchRow {
+  pips: number;
+  percent: number;
+  high: number | null;
+  low: number | null;
 }
 
 interface Candle {
-  time: string;
+  time: number;
   open: number;
   high: number;
   low: number;
@@ -55,6 +65,8 @@ interface Candle {
 
 interface Position {
   id: string;
+  instrument_id: number;
+  symbol?: string;
   side: Side;
   quantity: number;
   average_entry_price: number;
@@ -63,9 +75,8 @@ interface Position {
   take_profit: number | null;
   realized_pnl: number;
   unrealised_pnl?: number;
-  instrument_id: number;
+  margin?: number;
   opened_at: string;
-  symbol?: string;
 }
 
 interface AccountState {
@@ -76,30 +87,18 @@ interface AccountState {
   marginLevelPercent: number | null;
 }
 
-interface RiskPreview {
-  lots: number;
-  units: number;
-  riskAmount: number;
-  stopDistancePips: number;
-  marginRequired: number;
-  entrySpreadPips: number;
-  riskRewardRatio: number;
-  potentialLoss: number;
-  potentialProfit: number;
+interface HistoryRow {
+  id: string;
+  kind: string;
+  symbol?: string;
+  side: Side;
+  quantity: number;
+  entry: number | null;
+  pnl: number;
+  status: string;
+  closeReason?: string;
+  closedAt: string;
 }
-
-const SYMBOLS = [
-  "EUR/USD",
-  "GBP/USD",
-  "USD/JPY",
-  "USD/CHF",
-  "AUD/USD",
-  "USD/CAD",
-  "NZD/USD",
-  "EUR/GBP",
-  "EUR/JPY",
-  "GBP/JPY",
-];
 
 const ksh = (n: number) =>
   `KSh ${Number(n || 0).toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -107,11 +106,10 @@ const ksh = (n: number) =>
 export const Route = createFileRoute("/trading/forex")({
   head: () => ({
     meta: [
-      { title: "PESAKI Forex — Spot Currency Trading" },
+      { title: "PESAKI Forex — Currency Trading" },
       {
         name: "description",
-        content:
-          "Trade major currency pairs on PESAKI Forex. View live quotes, charts and your open positions.",
+        content: "Trade currency pairs on the PESAKI market engine. Demo and real accounts.",
       },
     ],
   }),
@@ -119,24 +117,36 @@ export const Route = createFileRoute("/trading/forex")({
 });
 
 function ForexPage() {
+  const navigate = useNavigate();
+  const search = Route.useSearch?.() as { mode?: string } | undefined;
+
+  const [mode, setMode] = useState<Mode>(search?.mode === "live" ? "live" : "demo");
   const [symbol, setSymbol] = useState("EUR/USD");
+  const [interval, setInterval_] = useState<ForexInterval>("5m");
+
   const [quotes, setQuotes] = useState<Record<string, Quote>>({});
+  const [watch, setWatch] = useState<Record<string, WatchRow>>({});
+  const [marketState, setMarketState] = useState("open");
   const [candles, setCandles] = useState<Candle[]>([]);
-  const [connection, setConnection] = useState<"connecting" | "live" | "unavailable">("connecting");
+
   const [account, setAccount] = useState<AccountState | null>(null);
   const [positions, setPositions] = useState<Position[]>([]);
-  const [liveTradingEnabled, setLiveTradingEnabled] = useState(false);
+  const [history, setHistory] = useState<HistoryRow[]>([]);
+  const [realEnabled, setRealEnabled] = useState(true);
+  const [realBlocked, setRealBlocked] = useState<string | null>(null);
 
-  // order ticket
   const [side, setSide] = useState<Side>("buy");
   const [lots, setLots] = useState("0.10");
+  const [orderType, setOrderType] = useState<"market" | "limit">("market");
+  const [limitPrice, setLimitPrice] = useState("");
   const [stopLoss, setStopLoss] = useState("");
   const [takeProfit, setTakeProfit] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [preview, setPreview] = useState<RiskPreview | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [loadingAccount, setLoadingAccount] = useState(true);
 
   const idemRef = useRef<string>(crypto.randomUUID());
 
+  // ── Market data ───────────────────────────────────────────────────────────
   const loadQuotes = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE}/forex/quotes`);
@@ -145,90 +155,123 @@ function ForexPage() {
       const map: Record<string, Quote> = {};
       for (const q of body.quotes as Quote[]) map[q.symbol] = q;
       setQuotes(map);
-      setConnection("live");
+      setWatch(body.watch ?? {});
+      setMarketState(body.state ?? "open");
     } catch {
-      setConnection("unavailable");
+      setMarketState("unavailable");
     }
   }, []);
 
-  const loadCandles = useCallback(async (sym: string) => {
-    try {
-      const res = await fetch(`${API_BASE}/forex/candles/${sym}?count=60`);
-      const body = await res.json();
-      if (res.ok && body.success) setCandles(body.candles);
-      else setCandles([]);
-    } catch {
-      setCandles([]);
-    }
-  }, []);
-
-  const loadAccount = useCallback(async () => {
-    try {
-      const res = await apiRequest("/forex/account?account_type=demo");
-      if (res?.success) {
-        setAccount(res.account);
-        setPositions(res.positions ?? []);
-        setLiveTradingEnabled(Boolean(res.liveTradingEnabled));
+  const loadCandles = useCallback(
+    async (sym: string, iv: ForexInterval) => {
+      try {
+        const res = await fetch(
+          `${API_BASE}/forex/candles?symbol=${encodeURIComponent(sym)}&interval=${iv}&count=180`,
+        );
+        const body = await res.json();
+        if (res.ok && body.success) setCandles(body.candles);
+        else setCandles([]);
+      } catch {
+        setCandles([]);
       }
+    },
+    [],
+  );
+
+  // ── Account ───────────────────────────────────────────────────────────────
+  const loadAccount = useCallback(
+    async (m: Mode) => {
+      setLoadingAccount(true);
+      try {
+        const res = await apiRequest(`/forex/account?account_type=${m}`);
+        if (res?.success) {
+          setAccount(res.account);
+          setPositions(res.positions ?? []);
+          setRealEnabled(Boolean(res.realTradingEnabled));
+          setRealBlocked(null);
+        }
+      } catch (err) {
+        // A disabled real account is a legitimate server answer, not a crash.
+        const message = err instanceof Error ? err.message : "Could not load the account";
+        if (m === "live") {
+          setRealBlocked(message);
+          setRealEnabled(false);
+        } else {
+          setAccount(null);
+        }
+      } finally {
+        setLoadingAccount(false);
+      }
+    },
+    [],
+  );
+
+  const loadHistory = useCallback(async (m: Mode) => {
+    try {
+      const res = await apiRequest(`/forex/history?mode=${m}&limit=50`);
+      if (res?.success) setHistory(res.history ?? []);
     } catch {
-      /* account loads after sign-in; the market view still works without it */
+      setHistory([]);
     }
   }, []);
 
   useEffect(() => {
     void loadQuotes();
-    void loadAccount();
-    const t = setInterval(() => void loadQuotes(), 30_000);
+    const t = setInterval(() => void loadQuotes(), 5_000);
     return () => clearInterval(t);
-  }, [loadQuotes, loadAccount]);
+  }, [loadQuotes]);
 
   useEffect(() => {
-    void loadCandles(symbol);
-  }, [symbol, loadCandles]);
+    void loadCandles(symbol, interval);
+    const t = setInterval(() => void loadCandles(symbol, interval), 5_000);
+    return () => clearInterval(t);
+  }, [symbol, interval, loadCandles]);
+
+  useEffect(() => {
+    void loadAccount(mode);
+    void loadHistory(mode);
+    const t = setInterval(() => void loadAccount(mode), 5_000);
+    return () => clearInterval(t);
+  }, [mode, loadAccount, loadHistory]);
 
   const quote = quotes[symbol];
+  const digits = symbol.endsWith("JPY") ? 3 : 5;
 
-  // Risk preview, debounced so typing a stop loss does not spam the API.
-  useEffect(() => {
-    const sl = Number(stopLoss);
-    const entry = side === "buy" ? quote?.ask : quote?.bid;
-    if (!quote || !entry || !Number.isFinite(sl) || sl <= 0 || !account) {
-      setPreview(null);
-      return;
-    }
-    const t = setTimeout(async () => {
-      try {
-        const res = await fetch(`${API_BASE}/forex/risk/preview`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            symbol,
-            side,
-            balance: account.balance,
-            risk_percent: 1,
-            entry_price: entry,
-            stop_loss: sl,
-          }),
-        });
-        const body = await res.json();
-        if (body.success) setPreview(body.preview);
-        else setPreview(null);
-      } catch {
-        setPreview(null);
-      }
-    }, 350);
-    return () => clearTimeout(t);
-  }, [symbol, side, stopLoss, quote, account]);
+  const openPositionsForSymbol = useMemo(
+    () => positions.filter((p) => p.symbol === symbol),
+    [positions, symbol],
+  );
+
+  const priceLines = useMemo(() => {
+    const first = openPositionsForSymbol[0];
+    if (!first) return {};
+    return {
+      entry: Number(first.average_entry_price),
+      stopLoss: first.stop_loss != null ? Number(first.stop_loss) : undefined,
+      takeProfit: first.take_profit != null ? Number(first.take_profit) : undefined,
+    };
+  }, [openPositionsForSymbol]);
+
+  // Entry price for the ticket, derived from the live quote rather than typed.
+  const entryPrice = side === "buy" ? quote?.ask : quote?.bid;
+
+  const requiredMargin = useMemo(() => {
+    if (!quote || !entryPrice) return null;
+    // Indicative only. The server recomputes and is the authority; this exists
+    // so the user sees a number before committing.
+    const notional = Number(lots) * 100_000 * entryPrice;
+    const q2k = quote.symbol.endsWith("JPY") ? 0.88 : 130;
+    return (notional * q2k) / 100;
+  }, [quote, entryPrice, lots]);
 
   const placeOrder = async () => {
-    const entry = side === "buy" ? quote?.ask : quote?.bid;
+    if (!quote) return;
     const amount = Number(lots);
-    if (!quote || !entry) return;
     if (!Number.isFinite(amount) || amount <= 0) {
       toast.error("Enter a valid position size");
       return;
     }
-    setSubmitting(true);
+    setBusy(true);
     try {
       const res = await apiRequest("/forex/orders", {
         method: "POST",
@@ -236,24 +279,26 @@ function ForexPage() {
           symbol,
           side,
           lots: amount,
-          order_type: "market",
+          order_type: orderType,
+          limit_price: orderType === "limit" ? Number(limitPrice) : null,
           stop_loss: stopLoss ? Number(stopLoss) : null,
           take_profit: takeProfit ? Number(takeProfit) : null,
-          account_type: "demo",
+          account_type: mode,
           idempotency_key: idemRef.current,
         }),
       });
       if (res?.success) {
         toast.success(`${side === "buy" ? "Bought" : "Sold"} ${amount} lots of ${symbol}`);
         idemRef.current = crypto.randomUUID();
-        await loadAccount();
+        await loadAccount(mode);
+        await loadHistory(mode);
       } else {
-        toast.error(res?.error ?? "Order rejected");
+        toast.error(res?.error ?? "The order was rejected");
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not reach the trading server");
     } finally {
-      setSubmitting(false);
+      setBusy(false);
     }
   };
 
@@ -261,145 +306,232 @@ function ForexPage() {
     try {
       const res = await apiRequest(`/forex/positions/${id}/close`, { method: "POST" });
       if (res?.success) {
-        toast.success(`Closed for ${res.realizedPnl >= 0 ? "+" : ""}${ksh(res.realizedPnl)}`);
-        await loadAccount();
+        const pnl = Number(res.realizedPnl ?? 0);
+        toast.success(`Closed for ${pnl >= 0 ? "+" : ""}${ksh(pnl)}`);
+        await loadAccount(mode);
+        await loadHistory(mode);
       }
-    } catch {
-      toast.error("Could not close the position");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not close the position");
     }
   };
 
-  const connectionBanner =
-    connection === "unavailable" ? (
-      <div className="mx-5 mt-4 flex items-start gap-2.5 rounded-2xl border border-border bg-muted/40 p-3.5">
-        <WifiOff className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-        <div className="min-w-0">
-          <p className="text-[13px] font-semibold text-foreground">
-            Market data is currently unavailable
-          </p>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
-            We could not reach the rate provider, so prices are not shown. No orders can be placed
-            until live pricing returns. Your existing positions are unaffected.
-          </p>
-          <button
-            onClick={() => void loadQuotes()}
-            className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand-ink"
-          >
-            <RefreshCw className="h-3 w-3" /> Try again
-          </button>
-        </div>
-      </div>
-    ) : null;
+  const resetDemo = async () => {
+    if (!window.confirm("Reset your demo account to KSh 100,000 and close all demo positions?")) {
+      return;
+    }
+    try {
+      const res = await apiRequest("/forex/account/reset-demo", { method: "POST" });
+      if (res?.success) {
+        toast.success("Demo account reset");
+        await loadAccount("demo");
+        await loadHistory("demo");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not reset the demo account");
+    }
+  };
+
+  const marketBadge =
+    marketState === "open" ? "MARKET OPEN" : marketState === "paused" ? "MARKET PAUSED" : "MARKET UNAVAILABLE";
 
   return (
     <AppShell>
-      <PageHeader
-        title="Forex"
-        subtitle="Spot currency trading"
-        right={
-          <span
-            className={[
-              "rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide",
-              connection === "live"
-                ? "bg-brand-tint-green text-brand-ink"
-                : "bg-muted text-muted-foreground",
-            ].join(" ")}
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <header className="sticky top-0 z-30 border-b border-border bg-background/95 px-4 py-3 backdrop-blur-xl">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate({ to: "/trading" })}
+            aria-label="Back to trading"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-muted text-foreground"
           >
-            {connection === "live"
-              ? "Live"
-              : connection === "connecting"
-                ? "Connecting"
-                : "Offline"}
-          </span>
-        }
-      />
+            <ArrowLeft className="h-4 w-4" />
+          </button>
 
-      <div className="px-5 pb-6">
-        <div className="mt-4 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="font-display text-xl font-bold text-brand-deep">{symbol}</h2>
-            {quote ? (
-              <p className="mt-1 font-mono text-2xl font-semibold text-foreground">
-                {quote.mid.toFixed(symbol.endsWith("JPY") ? 3 : 5)}
-              </p>
-            ) : (
-              <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading {symbol}…
-              </p>
-            )}
-            {quote && (
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                Bid {quote.bid} · Ask {quote.ask} · {quote.spreadPips} pips
-              </p>
-            )}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-bold text-brand-deep">Forex</p>
+            <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {marketBadge}
+            </p>
           </div>
+
           <div className="shrink-0 text-right">
-            <span className="rounded-full bg-brand-gold px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-brand-deep">
-              Demo
-            </span>
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              Available balance
+            </p>
+            <p className="font-display text-sm font-bold text-brand-deep">
+              {loadingAccount && !account ? "—" : ksh(account?.balance ?? 0)}
+            </p>
           </div>
         </div>
 
-        {connectionBanner}
-
-        {/* Symbol picker */}
-        <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-          {SYMBOLS.map((s) => (
+        {/* Mode switch. DEMO/REAL only — never "LIVE", which used to sit on a
+            demo account and misrepresent it. */}
+        <div className="mt-3 flex gap-2">
+          {(["demo", "live"] as Mode[]).map((m) => (
             <button
-              key={s}
-              onClick={() => setSymbol(s)}
+              key={m}
+              onClick={() => setMode(m)}
               className={[
-                "shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors",
-                s === symbol
-                  ? "bg-brand-deep text-white"
-                  : "bg-muted text-muted-foreground hover:text-foreground",
+                "flex-1 rounded-full py-1.5 text-[11px] font-bold uppercase tracking-wide transition-colors",
+                m === mode
+                  ? m === "live"
+                    ? "bg-brand-deep text-white"
+                    : "bg-brand-gold text-brand-deep"
+                  : "bg-muted text-muted-foreground",
               ].join(" ")}
             >
-              {s}
+              {m === "demo" ? "Demo" : "Real"}
             </button>
           ))}
         </div>
+      </header>
 
-        {/* Chart */}
-        <div className="mt-4">
-          {candles.length > 0 ? (
-            <TradingChart data={candles} />
+      <div className="space-y-4 px-4 pb-8 pt-4">
+        {/* Real trading disabled: explain, do not pretend, do not force demo. */}
+        {mode === "live" && !realEnabled && (
+          <div className="flex items-start gap-2.5 rounded-2xl border border-border bg-muted/40 p-3.5">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+            <div>
+              <p className="text-[13px] font-semibold text-foreground">
+                Real trading is not enabled on this deployment
+              </p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+                {realBlocked ??
+                  "The server has not switched real-money forex trading on. Your demo account is unaffected."}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Deposit / reset */}
+        <div className="flex gap-2">
+          {mode === "live" ? (
+            <button
+              onClick={() => navigate({ to: "/wallet" })}
+              className="flex flex-1 items-center justify-center gap-2 rounded-full bg-brand-gold py-2.5 text-[12px] font-bold text-brand-deep"
+            >
+              <Wallet className="h-4 w-4" /> Deposit
+            </button>
           ) : (
-            <div className="grid h-56 place-items-center rounded-2xl border border-border bg-card">
-              <div className="text-center">
-                <BarChart3 className="mx-auto h-5 w-5 text-muted-foreground" />
-                <p className="mt-2 text-[12px] font-semibold text-foreground">
-                  Chart data unavailable
+            <button
+              onClick={resetDemo}
+              className="flex flex-1 items-center justify-center gap-2 rounded-full border border-border py-2.5 text-[12px] font-semibold text-foreground"
+            >
+              <RefreshCw className="h-4 w-4" /> Reset demo
+            </button>
+          )}
+        </div>
+
+        {/* ── Market watch ────────────────────────────────────────────── */}
+        <div>
+          <SectionTitle title="Market watch" />
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {Object.values(quotes).map((q) => {
+              const w = watch[q.symbol];
+              const up = (w?.pips ?? 0) >= 0;
+              const active = q.symbol === symbol;
+              return (
+                <button
+                  key={q.symbol}
+                  onClick={() => setSymbol(q.symbol)}
+                  className={[
+                    "rounded-xl border p-2.5 text-left transition-colors",
+                    active ? "border-brand-ink bg-brand-tint-green" : "border-border bg-card",
+                  ].join(" ")}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[12px] font-bold text-brand-deep">{q.symbol}</span>
+                    {w && (
+                      <span
+                        className={[
+                          "flex items-center text-[10px] font-bold",
+                          up ? "text-brand-ink" : "text-destructive",
+                        ].join(" ")}
+                      >
+                        {up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                        {w.percent}%
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-1 font-mono text-[11px] text-foreground">
+                    {q.bid} / {q.ask}
+                  </div>
+                  <div className="mt-0.5 text-[9px] text-muted-foreground">
+                    {q.spreadPips} pips
+                    {w?.high != null && w?.low != null ? ` · ${w.low}–${w.high}` : ""}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Chart ───────────────────────────────────────────────────── */}
+        <div>
+          <div className="mb-2 flex items-end justify-between">
+            <div>
+              <h2 className="font-display text-lg font-bold text-brand-deep">{symbol}</h2>
+              {quote ? (
+                <p className="text-[11px] text-muted-foreground">
+                  Bid {quote.bid} · Ask {quote.ask} · {quote.spreadPips} pips
                 </p>
+              ) : (
+                <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Loading
+                </p>
+              )}
+            </div>
+          </div>
+
+          {marketState === "unavailable" ? (
+            <div className="grid h-64 place-items-center rounded-2xl border border-border bg-card">
+              <div className="text-center">
+                <WifiOff className="mx-auto h-5 w-5 text-muted-foreground" />
+                <p className="mt-2 text-[12px] font-semibold text-foreground">Market unavailable</p>
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  No historical rates for {symbol} right now.
+                  The PESAKI market engine is not reachable right now.
                 </p>
               </div>
+            </div>
+          ) : candles.length > 0 ? (
+            <ForexChart
+              data={candles}
+              interval={interval}
+              onIntervalChange={setInterval_}
+              lines={priceLines}
+              digits={digits}
+            />
+          ) : (
+            <div className="grid h-64 place-items-center rounded-2xl border border-border bg-card">
+              <p className="text-[12px] text-muted-foreground">Loading {symbol} candles…</p>
             </div>
           )}
         </div>
 
-        {/* Account summary */}
+        {/* ── Account metrics ─────────────────────────────────────────── */}
         {account && (
-          <div className="mt-5 grid grid-cols-2 gap-3">
-            {[
-              ["Balance", ksh(account.balance)],
-              ["Equity", ksh(account.equity)],
-              ["Free margin", ksh(account.freeMargin)],
-              ["Margin level", account.marginLevelPercent ? `${account.marginLevelPercent}%` : "—"],
-            ].map(([label, value]) => (
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                ["Equity", ksh(account.equity)],
+                ["Used margin", ksh(account.usedMargin)],
+                ["Free margin", ksh(account.freeMargin)],
+                ["Margin level", account.marginLevelPercent ? `${account.marginLevelPercent}%` : "—"],
+              ] as const
+            ).map(([label, value]) => (
               <Card key={label} className="!p-3">
                 <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
-                <p className="mt-1 text-sm font-bold text-brand-deep">{value}</p>
+                <p className="mt-0.5 text-[13px] font-bold text-brand-deep">{value}</p>
               </Card>
             ))}
           </div>
         )}
 
-        {/* Order ticket */}
-        <div className="mt-6">
+        {/* ── Order ticket ────────────────────────────────────────────── */}
+        <div>
           <SectionTitle title="Order ticket" />
-          <Card className="mt-3 !p-4">
+          <Card className="mt-2 !p-4">
             <div className="grid grid-cols-2 gap-2">
               {(["buy", "sell"] as Side[]).map((s) => (
                 <button
@@ -414,24 +546,46 @@ function ForexPage() {
                       : "bg-muted text-muted-foreground",
                   ].join(" ")}
                 >
-                  {s === "buy" ? (
-                    <ArrowUpRight className="h-4 w-4" />
-                  ) : (
-                    <ArrowDownRight className="h-4 w-4" />
-                  )}
-                  {s === "buy" ? "BUY" : "SELL"}
+                  {s === "buy" ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
+                  {s.toUpperCase()}
                 </button>
               ))}
             </div>
 
-            <label className="mt-4 block text-[11px] font-semibold text-foreground">
-              Position size (lots)
-            </label>
+            <div className="mt-3 flex gap-2">
+              {(["market", "limit"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setOrderType(t)}
+                  className={[
+                    "flex-1 rounded-lg py-1.5 text-[11px] font-semibold capitalize transition-colors",
+                    t === orderType ? "bg-brand-deep text-white" : "bg-muted text-muted-foreground",
+                  ].join(" ")}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+
+            {orderType === "limit" && (
+              <div className="mt-3">
+                <label className="block text-[11px] font-semibold text-foreground">Limit price</label>
+                <input
+                  value={limitPrice}
+                  onChange={(e) => setLimitPrice(e.target.value)}
+                  inputMode="decimal"
+                  placeholder={entryPrice ? String(entryPrice) : "0.00000"}
+                  className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-brand-ink"
+                />
+              </div>
+            )}
+
+            <label className="mt-3 block text-[11px] font-semibold text-foreground">Position size (lots)</label>
             <input
               value={lots}
               onChange={(e) => setLots(e.target.value)}
               inputMode="decimal"
-              className="mt-1 h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-brand-ink"
+              className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-brand-ink"
             />
 
             <div className="mt-3 grid grid-cols-2 gap-3">
@@ -441,124 +595,147 @@ function ForexPage() {
                   value={stopLoss}
                   onChange={(e) => setStopLoss(e.target.value)}
                   inputMode="decimal"
-                  placeholder="optional"
-                  className="mt-1 h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-brand-ink"
+                  placeholder="none"
+                  className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-brand-ink"
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-foreground">
-                  Take profit
-                </label>
+                <label className="block text-[11px] font-semibold text-foreground">Take profit</label>
                 <input
                   value={takeProfit}
                   onChange={(e) => setTakeProfit(e.target.value)}
                   inputMode="decimal"
-                  placeholder="optional"
-                  className="mt-1 h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-brand-ink"
+                  placeholder="none"
+                  className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-brand-ink"
                 />
               </div>
             </div>
 
-            {preview && (
-              <div className="mt-4 rounded-xl bg-brand-tint-green p-3">
-                <p className="flex items-center gap-1.5 text-[11px] font-bold text-brand-deep">
-                  <Calculator className="h-3.5 w-3.5" /> Risk preview (1% of balance)
-                </p>
-                <dl className="mt-2 space-y-1 text-[11px]">
-                  {[
-                    [
-                      "Suggested size",
-                      `${preview.lots} lots (${preview.units.toLocaleString()} units)`,
-                    ],
-                    ["Stop distance", `${preview.stopDistancePips} pips`],
-                    ["Maximum planned loss", ksh(preview.potentialLoss)],
-                    ["Potential profit at 2R", ksh(preview.potentialProfit)],
-                    ["Risk / reward", `1 : ${preview.riskRewardRatio}`],
-                    ["Required margin", ksh(preview.marginRequired)],
-                    ["Spread", `${preview.entrySpreadPips} pips`],
-                  ].map(([k, v]) => (
-                    <div key={k} className="flex justify-between gap-3">
-                      <dt className="text-muted-foreground">{k}</dt>
-                      <dd className="font-semibold text-foreground">{v}</dd>
-                    </div>
-                  ))}
-                </dl>
+            <div className="mt-3 space-y-1 rounded-xl bg-muted/50 p-3 text-[11px]">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Entry (estimated)</span>
+                <span className="font-semibold text-foreground">{entryPrice ?? "—"}</span>
               </div>
-            )}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Required margin</span>
+                <span className="font-semibold text-foreground">
+                  {requiredMargin != null ? ksh(requiredMargin) : "—"}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Spread cost</span>
+                <span className="font-semibold text-foreground">
+                  {quote ? `${quote.spreadPips} pips` : "—"}
+                </span>
+              </div>
+            </div>
 
             <button
               onClick={placeOrder}
-              disabled={submitting || connection !== "live" || !quote}
+              disabled={busy || !quote || marketState !== "open"}
               className={[
-                "mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-full text-sm font-bold transition-opacity disabled:opacity-50",
-                side === "buy" ? "bg-brand-deep text-white" : "bg-destructive text-white",
+                "mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-full text-sm font-bold text-white disabled:opacity-50",
+                side === "buy" ? "bg-brand-deep" : "bg-destructive",
               ].join(" ")}
             >
-              {submitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Calculator className="h-4 w-4" />
-              )}
-              {submitting ? "Submitting…" : `Confirm ${side === "buy" ? "buy" : "sell"}`}
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {busy ? "Submitting…" : `${side === "buy" ? "Buy" : "Sell"} ${symbol}`}
             </button>
 
             <p className="mt-2 text-center text-[10px] leading-relaxed text-muted-foreground">
-              Forex trading involves risk and can result in the loss of your demo balance. This is a
-              simulated account.
+              Prices come from the PESAKI market engine and are generated, not interbank rates.
+              {mode === "demo"
+                ? " Demo funds are virtual and never touch your wallet."
+                : " Trading real funds can lose you money."}
             </p>
-
-            {!liveTradingEnabled && (
-              <p className="mt-2 rounded-lg bg-muted/50 p-2 text-center text-[10px] text-muted-foreground">
-                Live currency trading is not yet available on PESAKI.
-              </p>
-            )}
           </Card>
         </div>
 
-        {/* Positions */}
-        <div className="mt-6">
+        {/* ── Positions ───────────────────────────────────────────────── */}
+        <div>
           <SectionTitle title="Open positions" />
           {positions.length === 0 ? (
-            <Card className="mt-3 !p-4">
+            <Card className="mt-2 !p-4">
               <p className="text-[12px] font-semibold text-foreground">No open positions</p>
               <p className="mt-1 text-[11px] text-muted-foreground">
                 Place a trade above and it will appear here.
               </p>
             </Card>
           ) : (
-            <div className="mt-3 space-y-2">
-              {positions.map((p) => (
-                <Card key={p.id} className="!p-3.5">
+            <div className="mt-2 space-y-2">
+              {positions.map((p) => {
+                const pnl = Number(p.unrealised_pnl ?? 0);
+                return (
+                  <Card key={p.id} className="!p-3.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-bold text-brand-deep">
+                          {p.symbol ?? "—"} · {p.side.toUpperCase()}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          {p.quantity} lots @ {p.average_entry_price}
+                          {p.current_price != null ? ` → ${p.current_price}` : ""}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {p.stop_loss != null ? `SL ${p.stop_loss} · ` : ""}
+                          {p.take_profit != null ? `TP ${p.take_profit}` : ""}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p
+                          className={[
+                            "text-[13px] font-bold",
+                            pnl >= 0 ? "text-brand-ink" : "text-destructive",
+                          ].join(" ")}
+                        >
+                          {pnl >= 0 ? "+" : ""}
+                          {ksh(pnl)}
+                        </p>
+                        <button
+                          onClick={() => void closePosition(p.id)}
+                          className="mt-1 text-[10px] font-semibold text-muted-foreground underline"
+                        >
+                          Close
+                        </button>
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ── History ─────────────────────────────────────────────────── */}
+        <div>
+          <SectionTitle title={`Trade history · ${mode === "demo" ? "Demo" : "Real"}`} />
+          {history.length === 0 ? (
+            <Card className="mt-2 !p-4">
+              <p className="text-[12px] font-semibold text-foreground">No closed trades yet</p>
+            </Card>
+          ) : (
+            <div className="mt-2 space-y-2">
+              {history.map((h) => (
+                <Card key={h.id} className="!p-3">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-[13px] font-bold text-brand-deep">
-                        {p.symbol ?? "Position"} · {p.side.toUpperCase()}
+                      <p className="text-[12px] font-bold text-brand-deep">
+                        {h.symbol ?? "—"} · {h.side?.toUpperCase() ?? "—"} · {h.quantity} lots
                       </p>
-                      <p className="mt-0.5 text-[11px] text-muted-foreground">
-                        {p.quantity} lots @ {p.average_entry_price}
-                        {p.stop_loss ? ` · SL ${p.stop_loss}` : ""}
-                        {p.take_profit ? ` · TP ${p.take_profit}` : ""}
+                      <p className="mt-0.5 text-[10px] text-muted-foreground">
+                        {h.entry != null ? `Entry ${h.entry} · ` : ""}
+                        {h.status}
+                        {h.closeReason && h.closeReason !== "manual" ? ` · ${h.closeReason}` : ""}
                       </p>
                     </div>
-                    <div className="shrink-0 text-right">
-                      <p
-                        className={[
-                          "text-[13px] font-bold",
-                          Number(p.unrealised_pnl ?? 0) >= 0
-                            ? "text-brand-ink"
-                            : "text-destructive",
-                        ].join(" ")}
-                      >
-                        {Number(p.unrealised_pnl ?? 0) >= 0 ? "+" : ""}
-                        {ksh(p.unrealised_pnl ?? 0)}
-                      </p>
-                      <button
-                        onClick={() => void closePosition(p.id)}
-                        className="mt-1 text-[10px] font-semibold text-muted-foreground underline"
-                      >
-                        Close
-                      </button>
-                    </div>
+                    <p
+                      className={[
+                        "shrink-0 text-[12px] font-bold",
+                        h.pnl > 0 ? "text-brand-ink" : h.pnl < 0 ? "text-destructive" : "text-muted-foreground",
+                      ].join(" ")}
+                    >
+                      {h.kind === "position" ? `${h.pnl >= 0 ? "+" : ""}${ksh(h.pnl)}` : h.status}
+                    </p>
                   </div>
                 </Card>
               ))}
