@@ -1,8 +1,21 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { hasActiveSession } from "@/lib/require-session";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
 import {
-  Target, PiggyBank, Plus, ArrowDownToLine, ArrowUpFromLine,
-  TrendingUp, HandCoins, Lock, Info, CheckCircle2, ShieldCheck, Calendar, X, ArrowLeft,
+  Target,
+  PiggyBank,
+  Plus,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  TrendingUp,
+  HandCoins,
+  Lock,
+  Info,
+  CheckCircle2,
+  ShieldCheck,
+  Calendar,
+  X,
+  ArrowLeft,
 } from "lucide-react";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Stat, SectionTitle, Progress, Badge } from "@/components/ui-bits";
@@ -11,10 +24,18 @@ import { createClient } from "@supabase/supabase-js";
 import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/banking")({
+  beforeLoad: async () => {
+    if (!(await hasActiveSession())) {
+      throw redirect({ to: "/auth", search: { mode: "signup" } });
+    }
+  },
   head: () => ({
     meta: [
       { title: "Banking Hub — PESAKI" },
-      { name: "description", content: "Deposit, withdraw, invest and borrow – your PESAKI bank in one place." },
+      {
+        name: "description",
+        content: "Deposit, withdraw, invest and borrow – your PESAKI bank in one place.",
+      },
     ],
   }),
   component: BankingPage,
@@ -23,15 +44,19 @@ export const Route = createFileRoute("/banking")({
 type ActionKey = "deposit" | "withdraw" | "invest" | "loan";
 
 const actions: { key: ActionKey; label: string; icon: any; tone: string }[] = [
-  { key: "deposit",  label: "Deposit",  icon: ArrowDownToLine, tone: "bg-success/15 text-success" },
+  { key: "deposit", label: "Deposit", icon: ArrowDownToLine, tone: "bg-success/15 text-success" },
   { key: "withdraw", label: "Withdraw", icon: ArrowUpFromLine, tone: "bg-primary/10 text-primary" },
-  { key: "invest",   label: "Invest",   icon: TrendingUp,      tone: "bg-gold/15 text-gold-foreground" },
-  { key: "loan",     label: "Loan",     icon: HandCoins,       tone: "bg-muted text-foreground" },
+  { key: "invest", label: "Invest", icon: TrendingUp, tone: "bg-gold/15 text-gold-foreground" },
+  { key: "loan", label: "Loan", icon: HandCoins, tone: "bg-muted text-foreground" },
 ];
 
 // Helper: format currency
 const fmt = (amount: number) => {
-  return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', minimumFractionDigits: 0 }).format(amount);
+  return new Intl.NumberFormat("en-KE", {
+    style: "currency",
+    currency: "KES",
+    minimumFractionDigits: 0,
+  }).format(amount);
 };
 
 function BankingPage() {
@@ -43,7 +68,7 @@ function BankingPage() {
   // ─── Supabase client ──────────────────────────────────────────────────────
   const supabase = createClient(
     import.meta.env.VITE_SUPABASE_URL!,
-    import.meta.env.VITE_SUPABASE_ANON_KEY!
+    import.meta.env.VITE_SUPABASE_ANON_KEY!,
   );
 
   // ─── Data state ──────────────────────────────────────────────────────────
@@ -84,9 +109,9 @@ function BankingPage() {
       try {
         // Try fetching with 'locked' column first
         const { data, error } = await supabase
-          .from('wallets')
-          .select('balance, locked')
-          .eq('user_id', user.id)
+          .from("wallets")
+          .select("balance, locked")
+          .eq("user_id", user.id)
           .single();
 
         if (!error) {
@@ -94,9 +119,9 @@ function BankingPage() {
         } else {
           // If 'locked' column doesn't exist, fetch just balance
           const { data: balanceOnly, error: balanceErr } = await supabase
-            .from('wallets')
-            .select('balance')
-            .eq('user_id', user.id)
+            .from("wallets")
+            .select("balance")
+            .eq("user_id", user.id)
             .single();
 
           if (balanceErr) throw balanceErr;
@@ -108,19 +133,19 @@ function BankingPage() {
 
       // 2. Fetch completed deposits from mpesa_deposits
       const { data: depositData, error: depositErr } = await supabase
-        .from('mpesa_deposits')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('status', 'completed')
-        .order('created_at', { ascending: false });
+        .from("mpesa_deposits")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("status", "completed")
+        .order("created_at", { ascending: false });
 
       if (depositErr) throw depositErr;
 
       // 3. Fetch savings goals (if any)
       const { data: goalsData, error: goalsErr } = await supabase
-        .from('savings_goals')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .from("savings_goals")
+        .select("*")
+        .order("created_at", { ascending: false });
 
       if (goalsErr) throw goalsErr;
 
@@ -139,10 +164,9 @@ function BankingPage() {
 
       setDeposits(depositData || []);
       setSavingsGoals(goalsData || []);
-
     } catch (err) {
-      console.error('🔴 Failed to load banking data:', err);
-      toast.error('Could not load banking data');
+      console.error("🔴 Failed to load banking data:", err);
+      toast.error("Could not load banking data");
     } finally {
       console.log("🟣 Banking: Setting loading false");
       setLoading(false);
@@ -164,12 +188,21 @@ function BankingPage() {
     fetchBankingData();
   };
 
-  const { totalSavings, interestEarned, projectedAnnual, lockedTotal, availableBalance, avgApy } = summary;
+  const { totalSavings, interestEarned, projectedAnnual, lockedTotal, availableBalance, avgApy } =
+    summary;
 
   if (loading) {
     return (
       <AppShell>
-        <PageHeader title="Banking Hub" subtitle="Your PESAKI bank" right={<Badge tone="success"><ShieldCheck className="h-2.5 w-2.5" /> Insured</Badge>} />
+        <PageHeader
+          title="Banking Hub"
+          subtitle="Your PESAKI bank"
+          right={
+            <Badge tone="success">
+              <ShieldCheck className="h-2.5 w-2.5" /> Insured
+            </Badge>
+          }
+        />
         <div className="flex items-center justify-center h-64">
           <p className="text-muted-foreground">Loading banking data...</p>
         </div>
@@ -179,7 +212,15 @@ function BankingPage() {
 
   return (
     <AppShell>
-      <PageHeader title="Banking Hub" subtitle="Your PESAKI bank" right={<Badge tone="success"><ShieldCheck className="h-2.5 w-2.5" /> Insured</Badge>} />
+      <PageHeader
+        title="Banking Hub"
+        subtitle="Your PESAKI bank"
+        right={
+          <Badge tone="success">
+            <ShieldCheck className="h-2.5 w-2.5" /> Insured
+          </Badge>
+        }
+      />
 
       {/* Balance card */}
       <section className="px-5 pt-5">
@@ -244,7 +285,7 @@ function BankingPage() {
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-bold text-success">+{fmt(d.amount)}</p>
-                  <Badge tone={d.status === 'completed' ? 'success' : 'warning'}>{d.status}</Badge>
+                  <Badge tone={d.status === "completed" ? "success" : "warning"}>{d.status}</Badge>
                 </div>
               </div>
             </Card>
@@ -264,7 +305,9 @@ function BankingPage() {
         />
         <div className="space-y-2.5">
           {savingsGoals.length === 0 && (
-            <Card className="!p-4 text-center text-xs text-muted-foreground">No savings goals yet.</Card>
+            <Card className="!p-4 text-center text-xs text-muted-foreground">
+              No savings goals yet.
+            </Card>
           )}
           {savingsGoals.map((g) => {
             const pct = Math.round((g.saved / g.target) * 100);
@@ -276,12 +319,16 @@ function BankingPage() {
                   </span>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold">{g.name}</p>
-                    <p className="text-[11px] text-muted-foreground">{fmt(g.saved)} of {fmt(g.target)}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {fmt(g.saved)} of {fmt(g.target)}
+                    </p>
                   </div>
                   <Badge tone="gold">{g.apy}</Badge>
                 </div>
                 <div className="mt-3 flex items-center gap-3">
-                  <div className="flex-1"><Progress value={pct} /></div>
+                  <div className="flex-1">
+                    <Progress value={pct} />
+                  </div>
                   <span className="text-xs font-bold text-primary">{pct}%</span>
                 </div>
               </Card>
@@ -292,7 +339,14 @@ function BankingPage() {
 
       {/* Loan preview */}
       <section className="mt-6 px-5">
-        <SectionTitle title="Instant loans" action={<button onClick={() => setModal("loan")} className="text-xs font-semibold text-primary">Apply</button>} />
+        <SectionTitle
+          title="Instant loans"
+          action={
+            <button onClick={() => setModal("loan")} className="text-xs font-semibold text-primary">
+              Apply
+            </button>
+          }
+        />
         <Card className="!p-4">
           <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
             <span className="grid h-11 w-11 place-items-center rounded-xl bg-gold/15 text-gold-foreground">
@@ -303,7 +357,10 @@ function BankingPage() {
               <p className="text-lg font-bold text-primary">{fmt(150000)}</p>
               <p className="text-[11px] text-muted-foreground">20% p.a. · Repay in 3–24 months</p>
             </div>
-            <button onClick={() => setModal("loan")} className="rounded-full gradient-primary px-3 py-1.5 text-[11px] font-semibold text-primary-foreground">
+            <button
+              onClick={() => setModal("loan")}
+              className="rounded-full gradient-primary px-3 py-1.5 text-[11px] font-semibold text-primary-foreground"
+            >
               Get loan
             </button>
           </div>
@@ -314,24 +371,34 @@ function BankingPage() {
         Funds insured · Secured by PESAKI
       </p>
 
-      {modal && <ActionSheet action={modal} onClose={() => setModal(null)} onSuccess={refreshBanking} />}
+      {modal && (
+        <ActionSheet action={modal} onClose={() => setModal(null)} onSuccess={refreshBanking} />
+      )}
     </AppShell>
   );
 }
 
 // ─── ActionSheet ──────────────────────────────────────────────────────────
-function ActionSheet({ action, onClose, onSuccess }: { action: ActionKey; onClose: () => void; onSuccess: () => void }) {
+function ActionSheet({
+  action,
+  onClose,
+  onSuccess,
+}: {
+  action: ActionKey;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
   const { user } = useAuth();
   const config = {
-    deposit:  { title: "Deposit funds",  cta: "Deposit",  hint: "Top up via M-Pesa, bank or card." },
+    deposit: { title: "Deposit funds", cta: "Deposit", hint: "Top up via M-Pesa, bank or card." },
     withdraw: { title: "Withdraw funds", cta: "Withdraw", hint: "Instant to M-Pesa or bank." },
-    invest:   { title: "New investment", cta: "Invest",   hint: "Grow with our curated portfolios." },
-    loan:     { title: "Apply for loan", cta: "Apply",    hint: "Get pre-approved in minutes." },
+    invest: { title: "New investment", cta: "Invest", hint: "Grow with our curated portfolios." },
+    loan: { title: "Apply for loan", cta: "Apply", hint: "Get pre-approved in minutes." },
   }[action];
 
   const supabase = createClient(
     import.meta.env.VITE_SUPABASE_URL!,
-    import.meta.env.VITE_SUPABASE_ANON_KEY!
+    import.meta.env.VITE_SUPABASE_ANON_KEY!,
   );
 
   const [amount, setAmount] = useState<number>(action === "loan" ? 20000 : 5000);
@@ -340,25 +407,24 @@ function ActionSheet({ action, onClose, onSuccess }: { action: ActionKey; onClos
   const [submitting, setSubmitting] = useState(false);
 
   const handleAction = async () => {
-    if (!user) return toast.error('Please log in');
-    if (amount < 100) return toast.error('Minimum amount is KES 100');
+    if (!user) return toast.error("Please log in");
+    if (amount < 100) return toast.error("Minimum amount is KES 100");
     setSubmitting(true);
     try {
       // Map action to table – adjust as needed
       const tableMap = {
-        deposit: 'transactions',
-        withdraw: 'transactions',
-        invest: 'investments',
-        loan: 'loan_applications',
+        deposit: "transactions",
+        withdraw: "transactions",
+        invest: "investments",
+        loan: "loan_applications",
       };
 
-      const payload = action === 'loan'
-        ? { user_id: user.id, amount, months, status: 'pending' }
-        : { user_id: user.id, amount, type: action, status: 'pending' };
+      const payload =
+        action === "loan"
+          ? { user_id: user.id, amount, months, status: "pending" }
+          : { user_id: user.id, amount, type: action, status: "pending" };
 
-      const { error } = await supabase
-        .from(tableMap[action])
-        .insert([payload]);
+      const { error } = await supabase.from(tableMap[action]).insert([payload]);
 
       if (error) throw error;
       toast.success(`${config.cta} of ${fmt(amount)} submitted successfully`);
@@ -403,7 +469,10 @@ function ActionSheet({ action, onClose, onSuccess }: { action: ActionKey; onClos
       <div className="relative z-10 w-full max-w-md rounded-t-3xl bg-card p-5 shadow-2xl sm:rounded-3xl">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-bold">{config.title}</h3>
-          <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground">
+          <button
+            onClick={onClose}
+            className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -425,14 +494,18 @@ function ActionSheet({ action, onClose, onSuccess }: { action: ActionKey; onClos
 
         {action === "loan" && (
           <>
-            <p className="mt-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Repayment period</p>
+            <p className="mt-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Repayment period
+            </p>
             <div className="mt-1 grid grid-cols-4 gap-2">
               {[3, 6, 12, 24].map((m) => (
                 <button
                   key={m}
                   onClick={() => setMonths(m)}
                   className={`rounded-lg border py-2 text-xs font-semibold ${
-                    months === m ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground"
+                    months === m
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border text-muted-foreground"
                   }`}
                 >
                   {m}m
@@ -440,17 +513,35 @@ function ActionSheet({ action, onClose, onSuccess }: { action: ActionKey; onClos
               ))}
             </div>
             <div className="mt-3 rounded-lg bg-muted/60 p-3 text-xs">
-              <div className="flex justify-between"><span className="text-muted-foreground">Interest rate</span><span className="font-bold">20% p.a.</span></div>
-              <div className="mt-1 flex justify-between"><span className="text-muted-foreground">Monthly repayment</span><span className="font-bold">{fmt(Math.round((amount * (1 + 0.20 * (months / 12))) / months))}</span></div>
-              <div className="mt-1 flex justify-between"><span className="text-muted-foreground">Total to repay</span><span className="font-bold text-primary">{fmt(Math.round(amount * (1 + 0.20 * (months / 12))))}</span></div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Interest rate</span>
+                <span className="font-bold">20% p.a.</span>
+              </div>
+              <div className="mt-1 flex justify-between">
+                <span className="text-muted-foreground">Monthly repayment</span>
+                <span className="font-bold">
+                  {fmt(Math.round((amount * (1 + 0.2 * (months / 12))) / months))}
+                </span>
+              </div>
+              <div className="mt-1 flex justify-between">
+                <span className="text-muted-foreground">Total to repay</span>
+                <span className="font-bold text-primary">
+                  {fmt(Math.round(amount * (1 + 0.2 * (months / 12))))}
+                </span>
+              </div>
             </div>
           </>
         )}
 
         {action === "invest" && (
           <div className="mt-3 rounded-lg bg-gold/10 p-3 text-xs">
-            <div className="flex justify-between"><span className="text-muted-foreground">Est. annual return</span><span className="font-bold text-success">Up to 15% p.a.</span></div>
-            <p className="mt-1 text-[10px] text-muted-foreground">Returns are not guaranteed. Past performance does not predict future results.</p>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Est. annual return</span>
+              <span className="font-bold text-success">Up to 15% p.a.</span>
+            </div>
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Returns are not guaranteed. Past performance does not predict future results.
+            </p>
           </div>
         )}
 
@@ -459,7 +550,7 @@ function ActionSheet({ action, onClose, onSuccess }: { action: ActionKey; onClos
           disabled={submitting || amount < 100}
           className="mt-5 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50"
         >
-          {submitting ? 'Processing...' : `${config.cta} ${fmt(amount)}`}
+          {submitting ? "Processing..." : `${config.cta} ${fmt(amount)}`}
         </button>
       </div>
     </div>

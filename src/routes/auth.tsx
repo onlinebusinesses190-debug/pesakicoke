@@ -20,11 +20,18 @@ function formatPhoneNumber(raw: string): string {
 }
 
 export const Route = createFileRoute("/auth")({
+  validateSearch: (search: Record<string, unknown>): { mode?: "signin" | "signup" } => {
+    const mode = search?.mode;
+    return { mode: mode === "signup" ? "signup" : mode === "signin" ? "signin" : undefined };
+  },
   component: AuthPage,
 });
 
 function AuthPage() {
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  // Honour ?mode=signup so guests redirected from a gated route land on sign-up,
+  // not the sign-in tab.
+  const { mode: initialMode } = Route.useSearch();
+  const [mode, setMode] = useState<"signin" | "signup">(initialMode ?? "signin");
   const [loginMethod, setLoginMethod] = useState<"email" | "phone">("phone");
   const [name, setName] = useState("");
   const [dob, setDob] = useState("");

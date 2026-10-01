@@ -1,8 +1,20 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { hasActiveSession } from "@/lib/require-session";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useEffect, useState, useRef } from "react";
 import {
-  Building2, FileText, TrendingUp, Award, BookOpen, ChevronRight, X, ArrowLeft,
-  Rocket, Store, Calendar, CheckCircle2, Clock,
+  Building2,
+  FileText,
+  TrendingUp,
+  Award,
+  BookOpen,
+  ChevronRight,
+  X,
+  ArrowLeft,
+  Rocket,
+  Store,
+  Calendar,
+  CheckCircle2,
+  Clock,
 } from "lucide-react";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Stat, SectionTitle, Badge } from "@/components/ui-bits";
@@ -13,10 +25,19 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/business")({
+  beforeLoad: async () => {
+    if (!(await hasActiveSession())) {
+      throw redirect({ to: "/auth", search: { mode: "signup" } });
+    }
+  },
   head: () => ({
     meta: [
       { title: "Business Hub — PESAKI" },
-      { name: "description", content: "Apply for funding, manage applications, and grow your business through PESAKI Business Hub." },
+      {
+        name: "description",
+        content:
+          "Apply for funding, manage applications, and grow your business through PESAKI Business Hub.",
+      },
     ],
   }),
   component: BusinessPage,
@@ -24,11 +45,11 @@ export const Route = createFileRoute("/business")({
 
 type ActionKey = "apply" | "apps" | "invest" | "stories" | "guide";
 const sections: { label: string; icon: any; tone: string; key: ActionKey }[] = [
-  { label: "Apply for Funding",  icon: FileText,    tone: "primary", key: "apply" },
-  { label: "My Applications",    icon: Building2,   tone: "gold",    key: "apps" },
-  { label: "My Investments",     icon: TrendingUp,  tone: "success", key: "invest" },
-  { label: "Success Stories",    icon: Award,       tone: "gold",    key: "stories" },
-  { label: "Funding Guidelines", icon: BookOpen,    tone: "primary", key: "guide" },
+  { label: "Apply for Funding", icon: FileText, tone: "primary", key: "apply" },
+  { label: "My Applications", icon: Building2, tone: "gold", key: "apps" },
+  { label: "My Investments", icon: TrendingUp, tone: "success", key: "invest" },
+  { label: "Success Stories", icon: Award, tone: "gold", key: "stories" },
+  { label: "Funding Guidelines", icon: BookOpen, tone: "primary", key: "guide" },
 ];
 
 interface BusinessApplication {
@@ -75,7 +96,7 @@ function BusinessPage() {
 
   const supabase = createClient(
     import.meta.env.VITE_SUPABASE_URL!,
-    import.meta.env.VITE_SUPABASE_ANON_KEY!
+    import.meta.env.VITE_SUPABASE_ANON_KEY!,
   );
 
   const fetchData = async () => {
@@ -98,44 +119,44 @@ function BusinessPage() {
     try {
       console.log("🟢 Fetching applications...");
       const { data: appsData, error: appsErr } = await supabase
-        .from('business_applications')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .from("business_applications")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
 
       if (appsErr) throw appsErr;
       setApplications(appsData || []);
 
       console.log("🟢 Fetching investments...");
       const { data: invData, error: invErr } = await supabase
-        .from('business_investments')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .from("business_investments")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
 
       if (invErr) throw invErr;
       setInvestments(invData || []);
 
       console.log("🟢 Fetching success stories...");
       const { data: storyData, error: storyErr } = await supabase
-        .from('success_stories')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .from("success_stories")
+        .select("*")
+        .order("created_at", { ascending: false });
 
       if (storyErr) throw storyErr;
       setStories(storyData || []);
 
       const total = appsData?.reduce((sum, a) => sum + (a.amount_requested || 0), 0) || 0;
-      const open = appsData?.filter(a => a.status === 'Pending').length || 0;
-      const approved = appsData?.filter(a => a.status === 'Approved' || a.status === 'Disbursed').length || 0;
+      const open = appsData?.filter((a) => a.status === "Pending").length || 0;
+      const approved =
+        appsData?.filter((a) => a.status === "Approved" || a.status === "Disbursed").length || 0;
 
       setTotalFunding(total);
       setOpenApps(open);
       setApprovedApps(approved);
-
     } catch (err) {
       console.error("🔴 Error fetching business data:", err);
-      toast.error('Could not load Business Hub data');
+      toast.error("Could not load Business Hub data");
     } finally {
       console.log("🟣 Setting loading false");
       setLoading(false);
@@ -156,8 +177,14 @@ function BusinessPage() {
 
   const onAction = (k: ActionKey) => {
     if (k === "apply") return setMode("picker");
-    if (k === "apps") return document.getElementById("apps-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    if (k === "stories") return document.getElementById("stories-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (k === "apps")
+      return document
+        .getElementById("apps-section")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (k === "stories")
+      return document
+        .getElementById("stories-section")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
     if (k === "invest") return setInfo("invest");
     if (k === "guide") return setInfo("guide");
   };
@@ -212,11 +239,15 @@ function BusinessPage() {
                   onClick={() => onAction(s.key)}
                   className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-2 py-3 text-left"
                 >
-                  <span className={`grid h-9 w-9 place-items-center rounded-xl ${
-                    s.tone === "gold" ? "bg-gold/15 text-gold-foreground"
-                    : s.tone === "success" ? "bg-success/15 text-success"
-                    : "bg-primary/10 text-primary"
-                  }`}>
+                  <span
+                    className={`grid h-9 w-9 place-items-center rounded-xl ${
+                      s.tone === "gold"
+                        ? "bg-gold/15 text-gold-foreground"
+                        : s.tone === "success"
+                          ? "bg-success/15 text-success"
+                          : "bg-primary/10 text-primary"
+                    }`}
+                  >
                     <s.icon className="h-4 w-4" />
                   </span>
                   <span className="truncate text-sm font-semibold">{s.label}</span>
@@ -241,9 +272,19 @@ function BusinessPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold">{a.business_name}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">Requested {fmt(a.amount_requested)}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Requested {fmt(a.amount_requested)}
+                    </p>
                   </div>
-                  <Badge tone={a.status === "Approved" ? "success" : a.status === "Disbursed" ? "primary" : "warning"}>
+                  <Badge
+                    tone={
+                      a.status === "Approved"
+                        ? "success"
+                        : a.status === "Disbursed"
+                          ? "primary"
+                          : "warning"
+                    }
+                  >
                     {a.status}
                   </Badge>
                 </div>
@@ -291,17 +332,33 @@ function BusinessPage() {
 
 // ─── Sheet Components ────────────────────────────────────────────────
 
-function SheetShell({ title, onBack, onClose, children }: { title: string; onBack?: () => void; onClose: () => void; children: React.ReactNode }) {
+function SheetShell({
+  title,
+  onBack,
+  onClose,
+  children,
+}: {
+  title: string;
+  onBack?: () => void;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-end sm:place-items-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative z-10 max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-card p-5 shadow-2xl sm:rounded-3xl">
         <div className="mb-4 flex items-center justify-between">
-          <button onClick={onBack ?? onClose} className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground">
+          <button
+            onClick={onBack ?? onClose}
+            className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground"
+          >
             <ArrowLeft className="h-4 w-4" />
           </button>
           <h3 className="text-base font-bold">{title}</h3>
-          <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground">
+          <button
+            onClick={onClose}
+            className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -312,14 +369,21 @@ function SheetShell({ title, onBack, onClose, children }: { title: string; onBac
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{children}</label>;
+  return (
+    <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+      {children}
+    </label>
+  );
 }
-const inputCls = "mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring";
+const inputCls =
+  "mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring";
 
 function SectionHeader({ n, title }: { n: number; title: string }) {
   return (
     <div className="mt-5 flex items-center gap-2 border-b border-border pb-2">
-      <span className="grid h-6 w-6 place-items-center rounded-full gradient-primary text-[11px] font-bold text-primary-foreground">{n}</span>
+      <span className="grid h-6 w-6 place-items-center rounded-full gradient-primary text-[11px] font-bold text-primary-foreground">
+        {n}
+      </span>
       <h4 className="text-sm font-bold">{title}</h4>
     </div>
   );
@@ -329,24 +393,40 @@ function FundingSheet({ mode, setMode, onClose, user, onSuccess }: any) {
   if (mode === "picker") {
     return (
       <SheetShell title="Apply for funding" onClose={onClose}>
-        <p className="text-xs text-muted-foreground">Choose the type of business you're funding. Each flow is tailored to your stage.</p>
+        <p className="text-xs text-muted-foreground">
+          Choose the type of business you're funding. Each flow is tailored to your stage.
+        </p>
         <div className="mt-4 space-y-3">
-          <button onClick={() => setMode("startup")} className="w-full rounded-2xl border border-border p-4 text-left transition-colors hover:border-primary/40">
+          <button
+            onClick={() => setMode("startup")}
+            className="w-full rounded-2xl border border-border p-4 text-left transition-colors hover:border-primary/40"
+          >
             <div className="flex items-center gap-3">
-              <span className="grid h-11 w-11 place-items-center rounded-xl gradient-primary text-primary-foreground"><Rocket className="h-5 w-5" /></span>
+              <span className="grid h-11 w-11 place-items-center rounded-xl gradient-primary text-primary-foreground">
+                <Rocket className="h-5 w-5" />
+              </span>
               <div className="min-w-0">
                 <p className="text-sm font-bold">Startup</p>
-                <p className="text-[11px] text-muted-foreground">New idea or business under 1 year</p>
+                <p className="text-[11px] text-muted-foreground">
+                  New idea or business under 1 year
+                </p>
               </div>
               <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
             </div>
           </button>
-          <button onClick={() => setMode("existing")} className="w-full rounded-2xl border border-border p-4 text-left transition-colors hover:border-primary/40">
+          <button
+            onClick={() => setMode("existing")}
+            className="w-full rounded-2xl border border-border p-4 text-left transition-colors hover:border-primary/40"
+          >
             <div className="flex items-center gap-3">
-              <span className="grid h-11 w-11 place-items-center rounded-xl gradient-gold text-gold-foreground"><Store className="h-5 w-5" /></span>
+              <span className="grid h-11 w-11 place-items-center rounded-xl gradient-gold text-gold-foreground">
+                <Store className="h-5 w-5" />
+              </span>
               <div className="min-w-0">
                 <p className="text-sm font-bold">Existing Business</p>
-                <p className="text-[11px] text-muted-foreground">Operating with revenue & records</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Operating with revenue & records
+                </p>
               </div>
               <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
             </div>
@@ -355,8 +435,23 @@ function FundingSheet({ mode, setMode, onClose, user, onSuccess }: any) {
       </SheetShell>
     );
   }
-  if (mode === "startup") return <StartupForm onBack={() => setMode("picker")} onClose={onClose} user={user} onSuccess={onSuccess} />;
-  return <ExistingForm onBack={() => setMode("picker")} onClose={onClose} user={user} onSuccess={onSuccess} />;
+  if (mode === "startup")
+    return (
+      <StartupForm
+        onBack={() => setMode("picker")}
+        onClose={onClose}
+        user={user}
+        onSuccess={onSuccess}
+      />
+    );
+  return (
+    <ExistingForm
+      onBack={() => setMode("picker")}
+      onClose={onClose}
+      user={user}
+      onSuccess={onSuccess}
+    />
+  );
 }
 
 function StartupForm({ onBack, onClose, user, onSuccess }: any) {
@@ -368,7 +463,7 @@ function StartupForm({ onBack, onClose, user, onSuccess }: any) {
   const [loading, setLoading] = useState(false);
   const supabase = createClient(
     import.meta.env.VITE_SUPABASE_URL!,
-    import.meta.env.VITE_SUPABASE_ANON_KEY!
+    import.meta.env.VITE_SUPABASE_ANON_KEY!,
   );
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -378,93 +473,214 @@ function StartupForm({ onBack, onClose, user, onSuccess }: any) {
     setLoading(true);
     const formData = new FormData(e.currentTarget);
     try {
-      const { error } = await supabase.from('business_applications').insert([{
-        user_id: user?.id,
-        business_name: formData.get('business_name'),
-        business_type: 'startup',
-        amount_requested: parseInt(formData.get('amount') as string),
-        status: 'Pending',
-        details: {
-          type: formData.get('type'),
-          years: formData.get('years'),
-          location: formData.get('location'),
-          founder_name: formData.get('founder_name'),
-          phone: formData.get('phone'),
-          email: formData.get('email'),
-          id_number: formData.get('id_number'),
-          problem: formData.get('problem'),
-          purpose: formData.get('purpose'),
-          expected_profit: formData.get('expected_profit'),
-          training_date: date,
-          training_slot: slot,
-          consent_financial_data: consentFinancial,
-        }
-      }]);
+      const { error } = await supabase.from("business_applications").insert([
+        {
+          user_id: user?.id,
+          business_name: formData.get("business_name"),
+          business_type: "startup",
+          amount_requested: parseInt(formData.get("amount") as string),
+          status: "Pending",
+          details: {
+            type: formData.get("type"),
+            years: formData.get("years"),
+            location: formData.get("location"),
+            founder_name: formData.get("founder_name"),
+            phone: formData.get("phone"),
+            email: formData.get("email"),
+            id_number: formData.get("id_number"),
+            problem: formData.get("problem"),
+            purpose: formData.get("purpose"),
+            expected_profit: formData.get("expected_profit"),
+            training_date: date,
+            training_slot: slot,
+            consent_financial_data: consentFinancial,
+          },
+        },
+      ]);
       if (error) throw error;
-      toast.success('Application submitted!');
+      toast.success("Application submitted!");
       setDone(true);
       if (onSuccess) onSuccess();
     } catch (err) {
-      toast.error('Failed to submit');
+      toast.error("Failed to submit");
       console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  if (done) return (
-    <SheetShell title="Startup funding" onClose={onClose}>
-      <SuccessBlock message="Your startup application has been submitted. We'll review and get back to you shortly." onClose={onClose} />
-    </SheetShell>
-  );
+  if (done)
+    return (
+      <SheetShell title="Startup funding" onClose={onClose}>
+        <SuccessBlock
+          message="Your startup application has been submitted. We'll review and get back to you shortly."
+          onClose={onClose}
+        />
+      </SheetShell>
+    );
 
   return (
     <SheetShell title="Startup funding" onBack={onBack} onClose={onClose}>
       <div className="rounded-xl bg-primary/5 p-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">Startup track</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">Fill in each section — a training session is required after review.</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">
+          Startup track
+        </p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Fill in each section — a training session is required after review.
+        </p>
       </div>
       <form onSubmit={handleSubmit}>
         <SectionHeader n={1} title="Business details" />
         <div className="mt-3 space-y-3">
-          <div><FieldLabel>Business name</FieldLabel><input required name="business_name" className={inputCls} /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><FieldLabel>Business type</FieldLabel><select required name="type" className={inputCls}><option value="Startup">Startup</option></select></div>
-            <div><FieldLabel>Years in operation</FieldLabel><select required name="years" className={inputCls}><option value="">Select</option><option>Less than 1</option><option>1-2</option><option>2+</option></select></div>
+          <div>
+            <FieldLabel>Business name</FieldLabel>
+            <input required name="business_name" className={inputCls} />
           </div>
-          <div><FieldLabel>Location</FieldLabel><input required name="location" className={inputCls} placeholder="e.g. Nairobi CBD" /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <FieldLabel>Business type</FieldLabel>
+              <select required name="type" className={inputCls}>
+                <option value="Startup">Startup</option>
+              </select>
+            </div>
+            <div>
+              <FieldLabel>Years in operation</FieldLabel>
+              <select required name="years" className={inputCls}>
+                <option value="">Select</option>
+                <option>Less than 1</option>
+                <option>1-2</option>
+                <option>2+</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <FieldLabel>Location</FieldLabel>
+            <input required name="location" className={inputCls} placeholder="e.g. Nairobi CBD" />
+          </div>
         </div>
         <SectionHeader n={2} title="Founder details" />
         <div className="mt-3 space-y-3">
-          <div><FieldLabel>Full name</FieldLabel><input required name="founder_name" className={inputCls} /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><FieldLabel>Phone</FieldLabel><input required name="phone" className={inputCls} /></div>
-            <div><FieldLabel>Email</FieldLabel><input required name="email" type="email" className={inputCls} /></div>
+          <div>
+            <FieldLabel>Full name</FieldLabel>
+            <input required name="founder_name" className={inputCls} />
           </div>
-          <div><FieldLabel>ID / Passport number</FieldLabel><input required name="id_number" className={inputCls} /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <FieldLabel>Phone</FieldLabel>
+              <input required name="phone" className={inputCls} />
+            </div>
+            <div>
+              <FieldLabel>Email</FieldLabel>
+              <input required name="email" type="email" className={inputCls} />
+            </div>
+          </div>
+          <div>
+            <FieldLabel>ID / Passport number</FieldLabel>
+            <input required name="id_number" className={inputCls} />
+          </div>
           <FileField label="Founder photo" required accept="image/*" />
         </div>
         <SectionHeader n={3} title="Pitch" />
         <div className="mt-3 space-y-3">
-          <div><FieldLabel>Tell us about your business idea</FieldLabel><textarea required name="idea" rows={3} className={inputCls} /></div>
-          <div><FieldLabel>What problem does it solve?</FieldLabel><textarea required name="problem" rows={3} className={inputCls} /></div>
+          <div>
+            <FieldLabel>Tell us about your business idea</FieldLabel>
+            <textarea required name="idea" rows={3} className={inputCls} />
+          </div>
+          <div>
+            <FieldLabel>What problem does it solve?</FieldLabel>
+            <textarea required name="problem" rows={3} className={inputCls} />
+          </div>
         </div>
         <SectionHeader n={4} title="Funding" />
         <div className="mt-3 space-y-3">
-          <div><FieldLabel>Amount requested (KES)</FieldLabel><input required name="amount" type="number" min={1000} className={inputCls} /></div>
-          <div><FieldLabel>Purpose</FieldLabel><select required name="purpose" className={inputCls}><option value="">Select</option><option>Equipment</option><option>Inventory</option><option>Marketing</option><option>Expansion</option><option>Other</option></select></div>
-          <div><FieldLabel>Expected monthly profit (KES)</FieldLabel><input required name="expected_profit" type="number" className={inputCls} /></div>
+          <div>
+            <FieldLabel>Amount requested (KES)</FieldLabel>
+            <input required name="amount" type="number" min={1000} className={inputCls} />
+          </div>
+          <div>
+            <FieldLabel>Purpose</FieldLabel>
+            <select required name="purpose" className={inputCls}>
+              <option value="">Select</option>
+              <option>Equipment</option>
+              <option>Inventory</option>
+              <option>Marketing</option>
+              <option>Expansion</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div>
+            <FieldLabel>Expected monthly profit (KES)</FieldLabel>
+            <input required name="expected_profit" type="number" className={inputCls} />
+          </div>
         </div>
         <SectionHeader n={5} title="Training (after review)" />
-        <div className="mt-3 rounded-xl bg-gold/10 p-3 text-xs"><p className="font-semibold text-gold-foreground">You must attend a free one-time physical training to get funds for startup.</p></div>
+        <div className="mt-3 rounded-xl bg-gold/10 p-3 text-xs">
+          <p className="font-semibold text-gold-foreground">
+            You must attend a free one-time physical training to get funds for startup.
+          </p>
+        </div>
         <div className="mt-3 space-y-3">
-          <div><FieldLabel>Preferred training date</FieldLabel><div className="relative"><Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><input required type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls + " pl-9"} /></div></div>
-          <div><FieldLabel>Preferred time</FieldLabel><div className="mt-1 grid grid-cols-2 gap-2">{([{key:"morning",label:"8:00 AM – 11:00 AM"},{key:"afternoon",label:"2:00 PM – 5:00 PM"}]).map(s => <button type="button" key={s.key} onClick={() => setSlot(s.key)} className={`flex items-center justify-center gap-1.5 rounded-xl border py-2.5 text-xs font-semibold ${slot === s.key ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"}`}><Clock className="h-3.5 w-3.5" /> {s.label}</button>)}</div></div>
+          <div>
+            <FieldLabel>Preferred training date</FieldLabel>
+            <div className="relative">
+              <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                required
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className={inputCls + " pl-9"}
+              />
+            </div>
+          </div>
+          <div>
+            <FieldLabel>Preferred time</FieldLabel>
+            <div className="mt-1 grid grid-cols-2 gap-2">
+              {[
+                { key: "morning", label: "8:00 AM – 11:00 AM" },
+                { key: "afternoon", label: "2:00 PM – 5:00 PM" },
+              ].map((s) => (
+                <button
+                  type="button"
+                  key={s.key}
+                  onClick={() => setSlot(s.key)}
+                  className={`flex items-center justify-center gap-1.5 rounded-xl border py-2.5 text-xs font-semibold ${slot === s.key ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"}`}
+                >
+                  <Clock className="h-3.5 w-3.5" /> {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
         <SectionHeader n={6} title="Terms" />
-        <label className="mt-3 flex items-start gap-2 rounded-xl border border-border p-3 text-xs"><input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" /><span>I agree to return a percentage of my monthly profit to PESAKI until the full amount is repaid.</span></label>
-        <label className="mt-3 flex items-start gap-2 rounded-xl border border-border p-3 text-xs"><input type="checkbox" checked={consentFinancial} onChange={(e) => setConsentFinancial(e.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" /><span>I consent to my financial data being processed for funding review.</span></label>
-        <button type="submit" disabled={!agree || !consentFinancial || loading} className="mt-5 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50">{loading ? "Submitting..." : "Submit Application"}</button>
+        <label className="mt-3 flex items-start gap-2 rounded-xl border border-border p-3 text-xs">
+          <input
+            type="checkbox"
+            checked={agree}
+            onChange={(e) => setAgree(e.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-primary"
+          />
+          <span>
+            I agree to return a percentage of my monthly profit to PESAKI until the full amount is
+            repaid.
+          </span>
+        </label>
+        <label className="mt-3 flex items-start gap-2 rounded-xl border border-border p-3 text-xs">
+          <input
+            type="checkbox"
+            checked={consentFinancial}
+            onChange={(e) => setConsentFinancial(e.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-primary"
+          />
+          <span>I consent to my financial data being processed for funding review.</span>
+        </label>
+        <button
+          type="submit"
+          disabled={!agree || !consentFinancial || loading}
+          className="mt-5 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50"
+        >
+          {loading ? "Submitting..." : "Submit Application"}
+        </button>
       </form>
     </SheetShell>
   );
@@ -477,7 +693,7 @@ function ExistingForm({ onBack, onClose, user, onSuccess }: any) {
   const [loading, setLoading] = useState(false);
   const supabase = createClient(
     import.meta.env.VITE_SUPABASE_URL!,
-    import.meta.env.VITE_SUPABASE_ANON_KEY!
+    import.meta.env.VITE_SUPABASE_ANON_KEY!,
   );
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -487,31 +703,33 @@ function ExistingForm({ onBack, onClose, user, onSuccess }: any) {
     setLoading(true);
     const formData = new FormData(e.currentTarget);
     try {
-      const { error } = await supabase.from('business_applications').insert([{
-        user_id: user?.id,
-        business_name: formData.get('business_name'),
-        business_type: 'existing',
-        amount_requested: parseInt(formData.get('amount') as string),
-        status: 'Pending',
-        details: {
-          registration: formData.get('registration'),
-          type: formData.get('type'),
-          location: formData.get('location'),
-          years: formData.get('years'),
-          monthly_revenue: formData.get('monthly_revenue'),
-          monthly_profit: formData.get('monthly_profit'),
-          reason: formData.get('reason'),
-          repayment_plan: formData.get('repayment_plan'),
-          purpose: formData.get('purpose'),
-          consent_financial_data: consentFinancial,
-        }
-      }]);
+      const { error } = await supabase.from("business_applications").insert([
+        {
+          user_id: user?.id,
+          business_name: formData.get("business_name"),
+          business_type: "existing",
+          amount_requested: parseInt(formData.get("amount") as string),
+          status: "Pending",
+          details: {
+            registration: formData.get("registration"),
+            type: formData.get("type"),
+            location: formData.get("location"),
+            years: formData.get("years"),
+            monthly_revenue: formData.get("monthly_revenue"),
+            monthly_profit: formData.get("monthly_profit"),
+            reason: formData.get("reason"),
+            repayment_plan: formData.get("repayment_plan"),
+            purpose: formData.get("purpose"),
+            consent_financial_data: consentFinancial,
+          },
+        },
+      ]);
       if (error) throw error;
-      toast.success('Application submitted!');
+      toast.success("Application submitted!");
       setSubmitted(true);
       if (onSuccess) onSuccess();
     } catch (err) {
-      toast.error('Failed to submit');
+      toast.error("Failed to submit");
       console.error(err);
     } finally {
       setLoading(false);
@@ -521,28 +739,65 @@ function ExistingForm({ onBack, onClose, user, onSuccess }: any) {
   return (
     <SheetShell title="Existing business funding" onBack={onBack} onClose={onClose}>
       <div className="rounded-xl bg-gold/10 p-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-gold-foreground">Established track</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">Documented businesses with revenue history.</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-gold-foreground">
+          Established track
+        </p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Documented businesses with revenue history.
+        </p>
       </div>
       {submitted ? (
         <div className="mt-5 rounded-2xl border border-border bg-primary/5 p-5 text-center">
-          <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-primary/15 text-primary"><CheckCircle2 className="h-6 w-6" /></div>
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-primary/15 text-primary">
+            <CheckCircle2 className="h-6 w-6" />
+          </div>
           <p className="mt-3 text-base font-bold">Your application is under review</p>
-          <p className="mt-1 text-xs text-muted-foreground">Our team will assess your documents and financials. Expect a decision within 3–5 business days.</p>
-          <button onClick={onClose} className="mt-4 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground">Done</button>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Our team will assess your documents and financials. Expect a decision within 3–5
+            business days.
+          </p>
+          <button
+            onClick={onClose}
+            className="mt-4 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground"
+          >
+            Done
+          </button>
         </div>
       ) : (
         <form onSubmit={handleSubmit}>
           <SectionHeader n={1} title="Business details" />
           <div className="mt-3 space-y-3">
-            <div><FieldLabel>Business name</FieldLabel><input required name="business_name" className={inputCls} /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><FieldLabel>Registration number</FieldLabel><input required name="registration" className={inputCls} /></div>
-              <div><FieldLabel>Business type</FieldLabel><select required name="type" className={inputCls}><option>Existing</option></select></div>
+            <div>
+              <FieldLabel>Business name</FieldLabel>
+              <input required name="business_name" className={inputCls} />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div><FieldLabel>Location</FieldLabel><input required name="location" className={inputCls} /></div>
-              <div><FieldLabel>Years in operation</FieldLabel><select required name="years" className={inputCls}><option value="">Select</option><option>1-2</option><option>3-5</option><option>5-10</option><option>10+</option></select></div>
+              <div>
+                <FieldLabel>Registration number</FieldLabel>
+                <input required name="registration" className={inputCls} />
+              </div>
+              <div>
+                <FieldLabel>Business type</FieldLabel>
+                <select required name="type" className={inputCls}>
+                  <option>Existing</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <FieldLabel>Location</FieldLabel>
+                <input required name="location" className={inputCls} />
+              </div>
+              <div>
+                <FieldLabel>Years in operation</FieldLabel>
+                <select required name="years" className={inputCls}>
+                  <option value="">Select</option>
+                  <option>1-2</option>
+                  <option>3-5</option>
+                  <option>5-10</option>
+                  <option>10+</option>
+                </select>
+              </div>
             </div>
           </div>
           <SectionHeader n={2} title="Documents" />
@@ -555,21 +810,71 @@ function ExistingForm({ onBack, onClose, user, onSuccess }: any) {
           <SectionHeader n={3} title="Financials" />
           <div className="mt-3 space-y-3">
             <div className="grid grid-cols-2 gap-3">
-              <div><FieldLabel>Monthly revenue (KES)</FieldLabel><input required name="monthly_revenue" type="number" className={inputCls} /></div>
-              <div><FieldLabel>Monthly profit (KES)</FieldLabel><input required name="monthly_profit" type="number" className={inputCls} /></div>
+              <div>
+                <FieldLabel>Monthly revenue (KES)</FieldLabel>
+                <input required name="monthly_revenue" type="number" className={inputCls} />
+              </div>
+              <div>
+                <FieldLabel>Monthly profit (KES)</FieldLabel>
+                <input required name="monthly_profit" type="number" className={inputCls} />
+              </div>
             </div>
-            <div><FieldLabel>Reason for funding</FieldLabel><textarea required name="reason" rows={3} className={inputCls} /></div>
-            <div><FieldLabel>Repayment plan</FieldLabel><textarea required name="repayment_plan" rows={3} className={inputCls} /></div>
+            <div>
+              <FieldLabel>Reason for funding</FieldLabel>
+              <textarea required name="reason" rows={3} className={inputCls} />
+            </div>
+            <div>
+              <FieldLabel>Repayment plan</FieldLabel>
+              <textarea required name="repayment_plan" rows={3} className={inputCls} />
+            </div>
           </div>
           <SectionHeader n={4} title="Funding" />
           <div className="mt-3 space-y-3">
-            <div><FieldLabel>Amount requested (KES)</FieldLabel><input required name="amount" type="number" className={inputCls} /></div>
-            <div><FieldLabel>Purpose</FieldLabel><select required name="purpose" className={inputCls}><option value="">Select</option><option>Equipment</option><option>Inventory</option><option>Marketing</option><option>Expansion</option><option>Other</option></select></div>
+            <div>
+              <FieldLabel>Amount requested (KES)</FieldLabel>
+              <input required name="amount" type="number" className={inputCls} />
+            </div>
+            <div>
+              <FieldLabel>Purpose</FieldLabel>
+              <select required name="purpose" className={inputCls}>
+                <option value="">Select</option>
+                <option>Equipment</option>
+                <option>Inventory</option>
+                <option>Marketing</option>
+                <option>Expansion</option>
+                <option>Other</option>
+              </select>
+            </div>
           </div>
           <SectionHeader n={5} title="Terms" />
-          <label className="mt-3 flex items-start gap-2 rounded-xl border border-border p-3 text-xs"><input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" /><span>I agree to return a percentage of my monthly profit to PESAKI until the full amount is repaid.</span></label>
-          <label className="mt-3 flex items-start gap-2 rounded-xl border border-border p-3 text-xs"><input type="checkbox" checked={consentFinancial} onChange={(e) => setConsentFinancial(e.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" /><span>I consent to my financial data being processed for funding review.</span></label>
-          <button type="submit" disabled={!agree || !consentFinancial || loading} className="mt-5 h-11 w-full rounded-xl gradient-gold text-sm font-semibold text-gold-foreground disabled:opacity-50">{loading ? "Submitting..." : "Submit Application"}</button>
+          <label className="mt-3 flex items-start gap-2 rounded-xl border border-border p-3 text-xs">
+            <input
+              type="checkbox"
+              checked={agree}
+              onChange={(e) => setAgree(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-primary"
+            />
+            <span>
+              I agree to return a percentage of my monthly profit to PESAKI until the full amount is
+              repaid.
+            </span>
+          </label>
+          <label className="mt-3 flex items-start gap-2 rounded-xl border border-border p-3 text-xs">
+            <input
+              type="checkbox"
+              checked={consentFinancial}
+              onChange={(e) => setConsentFinancial(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-primary"
+            />
+            <span>I consent to my financial data being processed for funding review.</span>
+          </label>
+          <button
+            type="submit"
+            disabled={!agree || !consentFinancial || loading}
+            className="mt-5 h-11 w-full rounded-xl gradient-gold text-sm font-semibold text-gold-foreground disabled:opacity-50"
+          >
+            {loading ? "Submitting..." : "Submit Application"}
+          </button>
         </form>
       )}
     </SheetShell>
@@ -582,7 +887,9 @@ function InfoSheet({ which, onClose }: { which: "invest" | "guide"; onClose: () 
     <SheetShell title={title} onClose={onClose}>
       {which === "invest" ? (
         <div className="space-y-3 text-sm">
-          <p className="text-xs text-muted-foreground">Track businesses you've co-funded through PESAKI and your projected returns.</p>
+          <p className="text-xs text-muted-foreground">
+            Track businesses you've co-funded through PESAKI and your projected returns.
+          </p>
           <div className="rounded-2xl gradient-primary p-4 text-primary-foreground">
             <p className="text-[11px] uppercase tracking-widest opacity-80">Total invested</p>
             <p className="mt-1 text-2xl font-bold">KES 0</p>
@@ -604,19 +911,30 @@ function InfoSheet({ which, onClose }: { which: "invest" | "guide"; onClose: () 
           </div>
           <div className="rounded-xl border border-border p-3">
             <p className="text-sm font-bold text-foreground">Funding range</p>
-            <p className="mt-1">Startup: KES 20,000 – 250,000 · Existing: KES 50,000 – 2,000,000.</p>
+            <p className="mt-1">
+              Startup: KES 20,000 – 250,000 · Existing: KES 50,000 – 2,000,000.
+            </p>
           </div>
           <div className="rounded-xl border border-border p-3">
             <p className="text-sm font-bold text-foreground">Repayment</p>
-            <p className="mt-1">A negotiated share of monthly profit until the funded amount is fully repaid — no compounding interest.</p>
+            <p className="mt-1">
+              A negotiated share of monthly profit until the funded amount is fully repaid — no
+              compounding interest.
+            </p>
           </div>
           <div className="rounded-xl border border-border p-3">
             <p className="text-sm font-bold text-foreground">Timeline</p>
-            <p className="mt-1">Startup: 7–10 business days including training. Existing: 3–5 business days after documents are verified.</p>
+            <p className="mt-1">
+              Startup: 7–10 business days including training. Existing: 3–5 business days after
+              documents are verified.
+            </p>
           </div>
           <div className="rounded-xl border border-border p-3">
             <p className="text-sm font-bold text-foreground">Required documents</p>
-            <p className="mt-1">National ID, KRA PIN, business registration (if any), 6 months of bank/M-Pesa statements, and a short business plan.</p>
+            <p className="mt-1">
+              National ID, KRA PIN, business registration (if any), 6 months of bank/M-Pesa
+              statements, and a short business plan.
+            </p>
           </div>
         </div>
       )}
