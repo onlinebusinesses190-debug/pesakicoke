@@ -109,7 +109,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { name: "geo.region", content: "KE-Nairobi" },
       { name: "geo.country", content: "Kenya" },
-      { title: "PESAKI — One Platform. Work, Business & Financial Services." },
+      { title: "PESAKI — Africa's Digital Wealth Ecosystem" },
       {
         name: "description",
         content:
@@ -117,7 +117,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       {
         property: "og:title",
-        content: "PESAKI — One Platform. Work, Business & Financial Services.",
+        content: "PESAKI — Africa's Digital Wealth Ecosystem",
       },
       {
         property: "og:description",
@@ -134,12 +134,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:image:height", content: "512" },
       {
         property: "og:image:alt",
-        content: "PESAKI — One Platform. Work, Business & Financial Services.",
+        content: "PESAKI — Africa's Digital Wealth Ecosystem",
       },
       { name: "twitter:card", content: "summary_large_image" },
       {
         name: "twitter:title",
-        content: "PESAKI — One Platform. Work, Business & Financial Services.",
+        content: "PESAKI — Africa's Digital Wealth Ecosystem",
       },
       {
         name: "twitter:description",
@@ -149,7 +149,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:image", content: "https://pesaki.co.ke/icons/icon-512.png" },
       {
         name: "twitter:image:alt",
-        content: "PESAKI — One Platform. Work, Business & Financial Services.",
+        content: "PESAKI — Africa's Digital Wealth Ecosystem",
       },
     ],
     links: [
