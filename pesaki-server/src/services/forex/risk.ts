@@ -126,6 +126,101 @@ export function marginForLots(
   return Number((notionalKes * (marginPercent / 100)).toFixed(2));
 }
 
+// ===========================================================================
+// TRADE AMOUNT SIZING
+// ===========================================================================
+// PESAKI's product surface is "Trade Amount (KSh)": how much of the user's
+// capital they commit to a trade. That is NOT the same thing as position size,
+// and expressing a small KES allocation in standard lots is impossible: one
+// 0.01 lot of EUR/USD is roughly KSh 14,700 of notional at current rates, so
+// the product's KSh 100 minimum could never be expressed.
+//
+// Worse, sizing in lots made every order fail the margin check: the margin a
+// 0.10 lot trade demands (~KSh 1.47M) is far larger than a realistic balance,
+// so the endpoint rejected 100% of orders as "insufficient free margin".
+//
+// Position size is therefore tracked in base-currency UNITS and derived from
+// the committed amount and server-configured leverage. Lots stay available for
+// the risk calculator and for display, but they are not the unit of account.
+
+/** Minimum committed trade amount, in KSh. Server-side configuration. */
+export function minTradeAmount(): number {
+  const raw = Number(process.env.PESAKI_FX_MIN_TRADE_AMOUNT);
+  return Number.isFinite(raw) && raw > 0 ? raw : 100;
+}
+
+/**
+ * Leverage the product offers.
+ *
+ * Server-side configuration only. The frontend may display it, but the client
+ * can never choose it: the order endpoint ignores any client-supplied leverage
+ * and sizes the position with this value.
+ */
+export function configuredLeverage(): number {
+  const raw = Number(process.env.PESAKI_FX_LEVERAGE);
+  return Number.isFinite(raw) && raw > 0 ? raw : 10;
+}
+
+export interface TradeAmountInput {
+  /** Capital the user commits, in KSh. */
+  tradeAmount: number;
+  entryPrice: number;
+  instrument: InstrumentSpec;
+  quoteToKes: number;
+  leverage: number;
+}
+
+export interface TradeAmountSizing {
+  tradeAmount: number;
+  exposure: number;
+  units: number;
+  margin: number;
+  /** Derived for display and reporting only. */
+  lots: number;
+  notionalPerLot: number;
+}
+
+/**
+ * Convert a committed KES amount into an exposure and a position size.
+ *
+ * exposure = tradeAmount * leverage
+ * units    = exposure / (entryPrice * quoteToKes)
+ *
+ * Margin reserved is exactly the trade amount, because that is precisely what
+ * the user committed; everything else follows from it.
+ */
+export function sizeFromTradeAmount(input: TradeAmountInput): TradeAmountSizing {
+  const { tradeAmount, entryPrice, instrument, quoteToKes, leverage } = input;
+  const exposure = tradeAmount * leverage;
+  const units = exposure / (entryPrice * quoteToKes);
+  const notionalPerLot = instrument.contractSize * entryPrice * quoteToKes;
+  return {
+    tradeAmount,
+    exposure,
+    units,
+    margin: tradeAmount,
+    lots: units / instrument.contractSize,
+    notionalPerLot,
+  };
+}
+
+/**
+ * Unrealised or realised P/L for a position measured in units.
+ *
+ * `units` already represents the full notional, so there is no contract size to
+ * multiply in. This is why computePnl (lot-based) must not be reused here.
+ */
+export function computePnlFromUnits(
+  side: "buy" | "sell",
+  units: number,
+  entryPrice: number,
+  exitPrice: number,
+  quoteToKes: number,
+): number {
+  const delta = side === "buy" ? exitPrice - entryPrice : entryPrice - exitPrice;
+  return Number((units * delta * quoteToKes).toFixed(2));
+}
+
 export interface PnlInput {
   side: "buy" | "sell";
   lots: number;
@@ -215,6 +310,43 @@ export function validateLots(lots: number, instrument: InstrumentSpec): Validati
   const steps = lots / instrument.lotStep;
   if (Math.abs(steps - Math.round(steps)) > 1e-9) {
     return { ok: false, error: `Position size must be a multiple of ${instrument.lotStep} lots` };
+  }
+  return { ok: true };
+}
+
+/**
+ * Validate a committed trade amount against the product minimum and the
+ * exposure cap for the account.
+ *
+ * The exposure cap exists so a trade can never put more of the account at risk
+ * than the platform is configured to allow, independent of free margin.
+ */
+export function validateTradeAmount(
+  tradeAmount: number,
+  freeMargin: number,
+  maxExposurePerTrade?: number | null,
+): ValidationResult {
+  if (!Number.isFinite(tradeAmount)) return { ok: false, error: "Trade amount is not valid" };
+  if (tradeAmount <= 0) return { ok: false, error: "Trade amount must be greater than zero" };
+
+  const min = minTradeAmount();
+  if (tradeAmount < min) {
+    return { ok: false, error: `Minimum trade amount is KSh ${min.toFixed(2)}` };
+  }
+  if (tradeAmount > freeMargin) {
+    return {
+      ok: false,
+      error: `Order rejected: insufficient free margin. You have KSh ${freeMargin.toFixed(2)} available.`,
+    };
+  }
+  if (maxExposurePerTrade != null && Number.isFinite(maxExposurePerTrade)) {
+    const maxAmount = maxExposurePerTrade / configuredLeverage();
+    if (tradeAmount > maxAmount) {
+      return {
+        ok: false,
+        error: `Order rejected: exposure limit exceeded. Maximum trade amount is KSh ${maxAmount.toFixed(2)}.`,
+      };
+    }
   }
   return { ok: true };
 }

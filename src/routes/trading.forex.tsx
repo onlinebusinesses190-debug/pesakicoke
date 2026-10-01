@@ -28,6 +28,8 @@ import {
   WifiOff,
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { DepositSheet } from "@/components/DepositSheet";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { Card, SectionTitle } from "@/components/ui-bits";
 import { ForexChart, type ForexCandle, type ForexInterval } from "@/components/forex/ForexChart";
 import { apiRequest } from "@/utils/api";
@@ -85,6 +87,8 @@ interface AccountState {
   usedMargin: number;
   freeMargin: number;
   marginLevelPercent: number | null;
+  /** Platform leverage as a plain multiplier, e.g. 10 for 10:1. */
+  leverage?: number;
 }
 
 interface HistoryRow {
@@ -118,7 +122,9 @@ export const Route = createFileRoute("/trading/forex")({
 
 function ForexPage() {
   const navigate = useNavigate();
+  const { user, ready } = useRequireAuth();
   const search = Route.useSearch?.() as { mode?: string } | undefined;
+  const [showDeposit, setShowDeposit] = useState(false);
 
   const [mode, setMode] = useState<Mode>(search?.mode === "live" ? "live" : "demo");
   const [symbol, setSymbol] = useState("EUR/USD");
@@ -136,6 +142,10 @@ function ForexPage() {
   const [realBlocked, setRealBlocked] = useState<string | null>(null);
 
   const [side, setSide] = useState<Side>("buy");
+  // Trade Amount is the user's input: KSh of capital committed to the trade.
+  // Position size (lots) is derived server-side from this and the platform
+  // leverage, because a KSh 100 trade cannot be expressed in standard lots.
+  const [tradeAmountInput, setTradeAmountInput] = useState("1000");
   const [lots, setLots] = useState("0.10");
   const [orderType, setOrderType] = useState<"market" | "limit">("market");
   const [limitPrice, setLimitPrice] = useState("");
@@ -196,9 +206,12 @@ function ForexPage() {
         if (m === "live") {
           setRealBlocked(message);
           setRealEnabled(false);
-        } else {
-          setAccount(null);
         }
+        // Clear the account on any failure. Leaving the previous mode's numbers
+        // on screen is how the KSh 100,000 demo balance ended up displayed in the
+        // REAL view, which misrepresents real funds as demo money.
+        setAccount(null);
+        setPositions([]);
       } finally {
         setLoadingAccount(false);
       }
@@ -264,11 +277,27 @@ function ForexPage() {
     return (notional * q2k) / 100;
   }, [quote, entryPrice, lots]);
 
+  // Trade Amount is the capital the user commits, in KSh. The margin held is
+  // exactly this amount; the position size behind it is derived server-side
+  // using the platform's leverage, which the client never sets.
+  const leverage = account?.leverage ?? 10;
+  const minTradeAmount = 100;
+  const freeMargin = account?.freeMargin ?? null;
+  const exposure = Number(tradeAmountInput) > 0 ? Number(tradeAmountInput) * leverage : 0;
+
   const placeOrder = async () => {
     if (!quote) return;
-    const amount = Number(lots);
+    const amount = Number(tradeAmountInput);
     if (!Number.isFinite(amount) || amount <= 0) {
-      toast.error("Enter a valid position size");
+      toast.error("Enter a valid trade amount");
+      return;
+    }
+    if (amount < minTradeAmount) {
+      toast.error(`Minimum trade amount is KSh ${minTradeAmount}`);
+      return;
+    }
+    if (freeMargin != null && amount > freeMargin) {
+      toast.error(`Insufficient free margin. You have KSh ${freeMargin.toFixed(2)} available.`);
       return;
     }
     setBusy(true);
@@ -278,7 +307,7 @@ function ForexPage() {
         body: JSON.stringify({
           symbol,
           side,
-          lots: amount,
+          trade_amount: amount,
           order_type: orderType,
           limit_price: orderType === "limit" ? Number(limitPrice) : null,
           stop_loss: stopLoss ? Number(stopLoss) : null,
@@ -288,7 +317,9 @@ function ForexPage() {
         }),
       });
       if (res?.success) {
-        toast.success(`${side === "buy" ? "Bought" : "Sold"} ${amount} lots of ${symbol}`);
+        toast.success(
+          `${side === "buy" ? "Bought" : "Sold"} ${symbol} · KSh ${amount.toLocaleString()} committed`,
+        );
         idemRef.current = crypto.randomUUID();
         await loadAccount(mode);
         await loadHistory(mode);
@@ -408,7 +439,7 @@ function ForexPage() {
         <div className="flex gap-2">
           {mode === "live" ? (
             <button
-              onClick={() => navigate({ to: "/wallet" })}
+              onClick={() => setShowDeposit(true)}
               className="flex flex-1 items-center justify-center gap-2 rounded-full bg-brand-gold py-2.5 text-[12px] font-bold text-brand-deep"
             >
               <Wallet className="h-4 w-4" /> Deposit
@@ -580,13 +611,21 @@ function ForexPage() {
               </div>
             )}
 
-            <label className="mt-3 block text-[11px] font-semibold text-foreground">Position size (lots)</label>
+            <label className="mt-3 block text-[11px] font-semibold text-foreground">
+              Trade Amount (KSh)
+            </label>
             <input
-              value={lots}
-              onChange={(e) => setLots(e.target.value)}
+              value={tradeAmountInput}
+              onChange={(e) => setTradeAmountInput(e.target.value.replace(/[^0-9.]/g, ""))}
               inputMode="decimal"
+              placeholder="1000"
+              aria-label="Trade Amount in Kenyan Shillings"
               className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-brand-ink"
             />
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Minimum KSh {minTradeAmount}. This amount is held as margin
+              {exposure > 0 ? ` and controls a KSh ${exposure.toLocaleString()} position.` : "."}
+            </p>
 
             <div className="mt-3 grid grid-cols-2 gap-3">
               <div>
@@ -743,6 +782,15 @@ function ForexPage() {
           )}
         </div>
       </div>
+
+      {showDeposit && user && (
+        <DepositSheet
+          onClose={() => setShowDeposit(false)}
+          user={user}
+          onSuccess={() => void loadAccount(mode)}
+          onDepositComplete={() => void loadAccount(mode)}
+        />
+      )}
     </AppShell>
   );
 }

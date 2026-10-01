@@ -13,12 +13,17 @@ import { getInstrument } from "./instruments";
 import {
   calculatePositionSize,
   computePnl,
+  computePnlFromUnits,
+  configuredLeverage,
   marginForLots,
   marginState,
+  minTradeAmount,
   pipValuePerLot,
+  sizeFromTradeAmount,
   validateLots,
   validateStopLoss,
   validateTakeProfit,
+  validateTradeAmount,
 } from "./risk";
 
 const EURUSD = getInstrument("EUR/USD")!;
@@ -216,6 +221,133 @@ describe("computePnl", () => {
         quoteToKes: USD_KES,
       }),
     ).toBe(0);
+  });
+});
+
+describe("sizeFromTradeAmount", () => {
+  const base = {
+    tradeAmount: 1_000,
+    entryPrice: 1.1,
+    instrument: EURUSD,
+    quoteToKes: USD_KES,
+    leverage: 10,
+  };
+
+  it("commits exactly the requested amount as margin", () => {
+    // Margin is the capital the user committed. Nothing else is charged, and
+    // leverage must not inflate the figure.
+    expect(sizeFromTradeAmount(base).margin).toBe(1_000);
+  });
+
+  it("derives exposure as the amount times leverage", () => {
+    expect(sizeFromTradeAmount(base).exposure).toBe(10_000);
+  });
+
+  it("converts exposure into units at the entry price", () => {
+    // 10,000 KES of exposure at 1.1000 and KES 130/USD is 10,000 / 143 = 69.93 USD.
+    const out = sizeFromTradeAmount(base);
+    expect(out.units).toBeCloseTo(10_000 / (1.1 * USD_KES), 6);
+  });
+
+  it("never consumes more margin than the account has free", () => {
+    // The production failure: at leverage 1 the old path demanded KSh 1,468,623
+    // for a 0.10 lot trade against a KSh 100,000 balance, so every order was
+    // rejected. Sizing from the committed amount keeps margin == amount.
+    const out = sizeFromTradeAmount({ ...base, leverage: 1, tradeAmount: 1_000 });
+    expect(out.margin).toBeLessThanOrEqual(100_000);
+  });
+
+  it("can express the product minimum of KSh 100 as a real position", () => {
+    // A 0.01 lot is ~KSh 14,700 of notional, so the KSh 100 minimum is
+    // impossible to express in lots. In units it is a legitimate small trade.
+    const out = sizeFromTradeAmount({ ...base, tradeAmount: 100 });
+    expect(out.units).toBeGreaterThan(0);
+    expect(out.margin).toBe(100);
+  });
+
+  it("keeps the derived lots consistent with the derived units", () => {
+    const out = sizeFromTradeAmount(base);
+    expect(out.lots).toBeCloseTo(out.units / EURUSD.contractSize, 10);
+  });
+
+  it("scales linearly with the committed amount", () => {
+    const one = sizeFromTradeAmount({ ...base, tradeAmount: 500 });
+    const two = sizeFromTradeAmount({ ...base, tradeAmount: 1_000 });
+    expect(two.units).toBeCloseTo(one.units * 2, 10);
+  });
+});
+
+describe("computePnlFromUnits", () => {
+  it("pays a buy when price rises", () => {
+    // units already represent notional, so contract size must not reappear.
+    // 1,000 units * 0.0050 * KES 130 = KES 650.
+    expect(computePnlFromUnits("buy", 1_000, 1.1, 1.105, USD_KES)).toBeCloseTo(650, 2);
+  });
+
+  it("charges a sell when price rises", () => {
+    expect(computePnlFromUnits("sell", 1_000, 1.1, 1.105, USD_KES)).toBeCloseTo(-650, 2);
+  });
+
+  it("agrees with the lot-based P/L for the same notional", () => {
+    // 1 lot EUR/USD is 100,000 units. Both paths must price identically, which
+    // is what keeps stored lot quantities and unit maths consistent.
+    const lotPnl = computePnl({
+      side: "buy",
+      lots: 1,
+      entryPrice: 1.1,
+      exitPrice: 1.105,
+      instrument: EURUSD,
+      quoteToKes: USD_KES,
+    });
+    expect(computePnlFromUnits("buy", EURUSD.contractSize, 1.1, 1.105, USD_KES)).toBeCloseTo(
+      lotPnl,
+      2,
+    );
+  });
+
+  it("returns zero at the entry price", () => {
+    expect(computePnlFromUnits("buy", 1_000, 1.1, 1.1, USD_KES)).toBe(0);
+  });
+});
+
+describe("validateTradeAmount", () => {
+  it("accepts the minimum and above", () => {
+    expect(validateTradeAmount(100, 100_000).ok).toBe(true);
+    expect(validateTradeAmount(5_000, 100_000).ok).toBe(true);
+  });
+
+  it("rejects amounts below the configured minimum", () => {
+    const check = validateTradeAmount(50, 100_000);
+    expect(check.ok).toBe(false);
+    expect(check.error).toContain(String(minTradeAmount()));
+  });
+
+  it("rejects an amount larger than free margin", () => {
+    const check = validateTradeAmount(500_000, 100_000);
+    expect(check.ok).toBe(false);
+    expect(check.error).toContain("insufficient free margin");
+  });
+
+  it("rejects non-positive and non-finite amounts instead of throwing", () => {
+    expect(validateTradeAmount(0, 100_000).ok).toBe(false);
+    expect(validateTradeAmount(-100, 100_000).ok).toBe(false);
+    expect(validateTradeAmount(Number.NaN, 100_000).ok).toBe(false);
+  });
+
+  it("enforces a per-trade exposure cap when one is configured", () => {
+    // The cap is in KES notional, so the allowed amount is cap / leverage.
+    const cap = 100_000;
+    const allowed = cap / configuredLeverage();
+    expect(validateTradeAmount(allowed, 10_000_000, cap).ok).toBe(true);
+    expect(validateTradeAmount(allowed * 2, 10_000_000, cap).ok).toBe(false);
+  });
+});
+
+describe("configuredLeverage", () => {
+  it("falls back to a positive multiplier when unset", () => {
+    const lev = configuredLeverage();
+    expect(lev).toBeGreaterThan(0);
+    expect(Number.isFinite(lev)).toBe(true);
   });
 });
 

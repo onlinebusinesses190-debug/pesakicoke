@@ -32,11 +32,15 @@ import { kesPerUnit } from "../../services/forex/kesRates";
 import {
   calculatePositionSize,
   computePnl,
+  configuredLeverage,
   marginForLots,
   marginState,
+  minTradeAmount,
+  sizeFromTradeAmount,
   validateLots,
   validateStopLoss,
   validateTakeProfit,
+  validateTradeAmount,
 } from "../../services/forex/risk";
 
 const DEMO_START_BALANCE = 100_000;
@@ -145,7 +149,13 @@ async function getOrCreateAccount(userId: string, accountType: "demo" | "live") 
 const orderSchema = z.object({
   symbol: z.enum(SYMBOLS as [string, ...string[]]),
   side: z.enum(["buy", "sell"]),
-  lots: z.number().positive(),
+  // Trade amount is the committed KES capital and the only user-supplied size
+  // input. Lots are derived server-side from it and the configured leverage, so
+  // the client can never size its own position or state its own leverage.
+  trade_amount: z.number().positive().optional(),
+  // Retained so existing clients and the risk calculator keep working. When
+  // trade_amount is absent the request is treated as a lot-sized order.
+  lots: z.number().positive().optional(),
     order_type: z.enum(["market", "limit", "stop", "stop_limit"]).default("market"),
   limit_price: z.number().positive().nullable().optional(),
   trigger_price: z.number().positive().nullable().optional(),
@@ -364,16 +374,36 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
 
       return {
         success: true,
-        account: { ...account, ...state },
+        account: {
+          // Normalised to camelCase to match the computed state, and carrying
+          // the leverage the server actually sized the position with. `state`
+          // supplies the authoritative balance/equity/margin figures.
+          id: account.id,
+          account_type: account.account_type,
+          leverage: Number(account.leverage ?? 1),
+          status: account.status,
+          ...state,
+        },
         positions: enriched,
         recentTransactions: ledger ?? [],
         realTradingEnabled: REAL_TRADING_ENABLED,
       };
     } catch (err) {
+      // A ForexError carries a deliberate status (403 for a gated live account).
+      // Anything else is a genuine fault: log it in full and report it honestly
+      // rather than flattening every failure to an opaque 500.
       const status = (err as { statusCode?: number }).statusCode ?? 500;
+      if (status === 500) {
+        logger.error({ err }, "Forex account load failed");
+        return reply.code(500).send({
+          success: false,
+          error: "Could not load your Forex account.",
+          code: "ACCOUNT_LOAD_FAILED",
+        });
+      }
       return reply.code(status).send({
         success: false,
-        error: status === 403 ? "Live trading is currently unavailable." : "Could not load account.",
+        error: status === 403 ? "Live trading is currently unavailable." : (err as Error).message,
       });
     }
   });
@@ -432,10 +462,8 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     if (!parsed.success) return bad(reply, "Invalid order details");
     const body = parsed.data;
     const userId = request.user!.id;
-    const spec = getInstrument(body.symbol)!;
-
-    const lotsCheck = validateLots(body.lots, spec);
-    if (!lotsCheck.ok) return bad(reply, lotsCheck.error!);
+    const spec = getInstrument(body.symbol);
+    if (!spec) return bad(reply, "This instrument is not available");
 
     if (body.account_type === "live" && !REAL_TRADING_ENABLED) {
       return bad(reply, "Live trading is currently unavailable. Use Demo trading.", 403);
@@ -495,14 +523,114 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     if (!tpCheck.ok) return bad(reply, tpCheck.error!);
 
     const q2k = quoteToKes(spec);
-    const margin = marginForLots(body.lots, entry, spec, q2k, Number(account.leverage ?? 1) * 100);
+    const leverage = configuredLeverage();
+    const isPending = ["limit", "stop", "stop_limit"].includes(body.order_type);
+
+    // Size the position. When the client commits a KES trade amount the server
+    // derives the lots; otherwise a lot-sized request is validated as such.
+    const sizing = (() => {
+      if (body.trade_amount != null) {
+        return sizeFromTradeAmount({
+          tradeAmount: body.trade_amount,
+          entryPrice: entry,
+          instrument: spec,
+          quoteToKes: q2k,
+          leverage,
+        });
+      }
+      const lots = body.lots!;
+      return {
+        tradeAmount: 0,
+        exposure: lots * spec.contractSize * entry * q2k,
+        units: lots * spec.contractSize,
+        margin: marginForLots(lots, entry, spec, q2k, 100 / leverage),
+        lots,
+        notionalPerLot: spec.contractSize * entry * q2k,
+      };
+    })();
+
     const freeMargin = Number(account.equity ?? account.balance ?? 0) - Number(account.used_margin ?? 0);
-    if (margin > freeMargin) {
-      return bad(reply, `Order rejected: insufficient free margin. You need KSh ${margin.toFixed(2)}.`);
+
+    if (body.trade_amount != null) {
+      const amountCheck = validateTradeAmount(body.trade_amount, freeMargin);
+      if (!amountCheck.ok) return bad(reply, amountCheck.error!);
+    } else {
+      const lotsCheck = validateLots(body.lots!, spec);
+      if (!lotsCheck.ok) return bad(reply, lotsCheck.error!);
+      if (sizing.margin > freeMargin) {
+        return bad(
+          reply,
+          `Order rejected: insufficient free margin. You need KSh ${sizing.margin.toFixed(2)}.`,
+        );
+      }
     }
 
-    const pendingTypes = ["limit", "stop", "stop_limit"];
-    const isPending = pendingTypes.includes(body.order_type);
+    // Exposure caps bound the platform's net risk. Because PESAKI runs its own
+    // market engine it carries the risk that customers net out against it, so
+    // the order is measured against caps before it is allowed to consume margin.
+    if (isPending) {
+      // A pending order reserves no margin, so it is not exposure yet.
+    } else {
+      const { data: config } = await supabase
+        .from("forex_market_config")
+        .select("max_exposure_per_account, max_exposure_per_symbol, max_total_exposure")
+        .eq("id", 1)
+        .maybeSingle();
+
+      const { data: openPositions } = await supabase
+        .from("forex_positions")
+        .select("instrument_id, quantity, average_entry_price, quote_to_kes")
+        .eq("account_id", account.id)
+        .eq("status", "open");
+
+      let accountExposure = 0;
+      let symbolExposure = 0;
+      for (const p of openPositions ?? []) {
+        const notional =
+          Number(p.quantity) *
+          spec.contractSize *
+          Number(p.average_entry_price) *
+          Number(p.quote_to_kes ?? q2k);
+        accountExposure += notional;
+        if (p.instrument_id === instrumentRow.id) symbolExposure += notional;
+      }
+
+      const proposed = accountExposure + sizing.exposure;
+      const perAccount = Number(config?.max_exposure_per_account ?? 0);
+      const perSymbol = Number(config?.max_exposure_per_symbol ?? 0);
+      const total = Number(config?.max_total_exposure ?? 0);
+
+      if (perAccount > 0 && proposed > perAccount) {
+        return bad(
+          reply,
+          `Order rejected: this would raise your exposure to KSh ${proposed.toFixed(2)}, above the per-account limit of KSh ${perAccount.toFixed(2)}.`,
+        );
+      }
+      if (perSymbol > 0 && symbolExposure + sizing.exposure > perSymbol) {
+        return bad(
+          reply,
+          `Order rejected: this would exceed the exposure limit for ${spec.symbol}.`,
+        );
+      }
+      if (total > 0) {
+        const { data: allOpen } = await supabase
+          .from("forex_positions")
+          .select("quantity, average_entry_price, quote_to_kes")
+          .eq("status", "open");
+        let platformExposure = 0;
+        for (const p of allOpen ?? []) {
+          platformExposure +=
+            Number(p.quantity) *
+            spec.contractSize *
+            Number(p.average_entry_price) *
+            Number(p.quote_to_kes ?? q2k);
+        }
+        if (platformExposure + sizing.exposure > total) {
+          return bad(reply, "Order rejected: platform exposure limit reached. Please try again later.");
+        }
+      }
+    }
+
     const executedPrice = body.side === "buy" ? quote.ask : quote.bid;
     const slippage = Number((executedPrice - quote.mid).toFixed(spec.digits));
 
@@ -516,7 +644,7 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
       p_instrument_id: instrumentRow.id,
       p_order_type: body.order_type,
       p_side: body.side,
-      p_quantity: body.lots,
+      p_quantity: sizing.lots,
       p_requested_price: quote.mid,
       p_executed_price: executedPrice,
       p_slippage: slippage,
@@ -767,7 +895,14 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     ]);
 
     if (posErr || ordErr) {
-      logger.error({ userId, mode: accountType }, "Forex history query failed");
+      // A PostgREST error here almost always means the database is missing a
+      // column the query selects, i.e. a migration was not applied. Log the
+      // database's own message so the cause is identifiable from the logs
+      // instead of a bare 500.
+      logger.error(
+        { userId, mode: accountType, posErr: posErr?.message, ordErr: ordErr?.message },
+        "Forex history query failed",
+      );
       return reply.code(FX_ERRORS.INTERNAL).send({
         success: false,
         error: "Trade history is temporarily unavailable.",
@@ -832,6 +967,80 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     realTradingEnabled: REAL_TRADING_ENABLED,
     symbols: SYMBOLS.length,
   }));
+
+  /**
+   * Schema and function diagnostics.
+   *
+   * The Forex RPCs and the sizing columns ship in SQL migrations that must be
+   * applied out of band, so a partially-migrated database produced 400s and 500s
+   * that were impossible to explain from the client. This reports what is
+   * actually present so the failure can be identified without guessing. Read-only,
+   * service-role, and it never returns credentials or user data.
+   */
+  fastify.get("/diagnostics", { preHandler: [verifyAuth] }, async (request, reply) => {
+    const userId = request.user!.id;
+    const required = [
+      "forex_accounts",
+      "forex_instruments",
+      "forex_orders",
+      "forex_positions",
+      "forex_fills",
+      "forex_transactions",
+      "forex_market_config",
+      "forex_symbol_state",
+    ];
+    const requiredFns = [
+      "forex_open_market_position",
+      "forex_close_position",
+      "forex_recalculate_equity",
+      "forex_account_upnl",
+    ];
+
+    const problems: string[] = [];
+    const { data: tables, error: tableErr } = await supabase
+      .from("information_schema.tables")
+      .select("table_name")
+      .eq("table_schema", "public")
+      .in("table_name", required);
+    if (tableErr) {
+      return reply.code(500).send({ success: false, error: tableErr.message, code: "DIAGNOSTICS_FAILED" });
+    }
+    const present = new Set((tables ?? []).map((t: { table_name: string }) => t.table_name));
+    const missingTables = required.filter((t) => !present.has(t));
+    if (missingTables.length) problems.push(`Missing tables: ${missingTables.join(", ")}`);
+
+    const { data: routines } = await supabase
+      .from("information_schema.routines")
+      .select("routine_name")
+      .eq("routine_schema", "public")
+      .in("routine_name", requiredFns);
+    const presentFns = new Set((routines ?? []).map((r: { routine_name: string }) => r.routine_name));
+    const missingFns = requiredFns.filter((f) => !presentFns.has(f));
+    if (missingFns.length) {
+      problems.push(
+        `Missing database functions: ${missingFns.join(", ")}. Apply the Forex migrations in supabase/migrations.`,
+      );
+    }
+
+    // Report the account the caller can actually see, which is the one whose
+    // creation and equity paths the 500s came from.
+    const { data: accounts, error: acctErr } = await supabase
+      .from("forex_accounts")
+      .select("id, account_type, balance, equity, used_margin, leverage, status")
+      .eq("user_id", userId);
+    if (acctErr) problems.push(`forex_accounts unreadable: ${acctErr.message}`);
+
+    return reply.code(200).send({
+      success: true,
+      requiredFunctions: requiredFns,
+      missingTables,
+      problems,
+      accounts: accounts ?? [],
+      leverageDefault: configuredLeverage(),
+      minTradeAmount: minTradeAmount(),
+      realTradingEnabled: REAL_TRADING_ENABLED,
+    });
+  });
 };
 
 async function closePosition(  request: FastifyRequest,
