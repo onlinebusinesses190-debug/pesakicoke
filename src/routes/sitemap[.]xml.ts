@@ -1,12 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-export const Route = createFileRoute("/sitemap.xml")({
-  headers: {
-    "Content-Type": "application/xml; charset=utf-8",
-  },
-  component: SitemapPage,
-});
-
 const BASE_URL = "https://pesaki.co.ke";
 
 // Member-only routes (/kazi, /business, /banking, /wallet, /profile) are
@@ -25,22 +18,33 @@ const PAGES = [
   { path: "/auth", priority: 0.4, changefreq: "monthly" },
 ];
 
-function SitemapPage() {
+function buildSitemap(): string {
   const today = new Date().toISOString().slice(0, 10);
-  const urls = PAGES.map((p) => {
-    const loc = `${BASE_URL}${p.path}`;
-    return `  <url>
-    <loc>${loc}</loc>
+  const urls = PAGES.map(
+    (p) => `  <url>
+    <loc>${BASE_URL}${p.path}</loc>
     <lastmod>${today}</lastmod>
     <changefreq>${p.changefreq}</changefreq>
     <priority>${p.priority.toFixed(1)}</priority>
-  </url>`;
-  }).join("\n");
+  </url>`,
+  ).join("\n");
 
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+  return `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${urls}
 </urlset>`;
-
-  return <pre style={{ fontFamily: "monospace", whiteSpace: "pre-wrap" }}>{xml}</pre>;
 }
+
+export const Route = createFileRoute("/sitemap.xml")({
+  server: {
+    handlers: {
+      GET: () =>
+        new Response(buildSitemap(), {
+          headers: {
+            "Content-Type": "application/xml; charset=utf-8",
+            "Cache-Control": "public, max-age=3600",
+          },
+        }),
+    },
+  },
+});
