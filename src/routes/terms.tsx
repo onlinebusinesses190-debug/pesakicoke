@@ -14,7 +14,7 @@ export const Route = createFileRoute("/terms")({
 
 function TermsPage() {
   return (
-    <AppShell>
+    <AppShell variant="public">
       <PageHeader title="Terms of Service" subtitle="The rules of the road" />
 
       <div className="px-5 pt-5">

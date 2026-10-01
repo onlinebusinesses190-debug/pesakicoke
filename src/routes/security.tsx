@@ -19,7 +19,7 @@ export const Route = createFileRoute("/security")({
 
 function SecurityPage() {
   return (
-    <AppShell>
+    <AppShell variant="public">
       <PageHeader title="Security" subtitle="Your safety is our priority" />
 
       <div className="px-5 pt-5">

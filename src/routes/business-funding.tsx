@@ -47,7 +47,7 @@ export const Route = createFileRoute("/business-funding")({
 
 function BusinessFundingPage() {
   return (
-    <AppShell>
+    <AppShell variant="public">
       <PageHeader title="Business Hub Funding" subtitle="How the funding model works" />
 
       <div className="px-5 pt-5">

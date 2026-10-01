@@ -14,7 +14,7 @@ export const Route = createFileRoute("/cookies")({
 
 function CookiesPage() {
   return (
-    <AppShell>
+    <AppShell variant="public">
       <PageHeader title="Cookie Policy" subtitle="How we use cookies" />
 
       <div className="px-5 pt-5">

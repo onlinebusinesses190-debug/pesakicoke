@@ -14,7 +14,7 @@ export const Route = createFileRoute("/refund")({
 
 function RefundPage() {
   return (
-    <AppShell>
+    <AppShell variant="public">
       <PageHeader title="Refund Policy" subtitle="What can be refunded" />
 
       <div className="px-5 pt-5">

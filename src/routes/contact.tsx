@@ -44,7 +44,7 @@ function ContactPage() {
   }
 
   return (
-    <AppShell>
+    <AppShell variant="public">
       <PageHeader title="Contact Us" subtitle="Ask PESAKI directly" />
 
       <div className="px-5 pt-5">

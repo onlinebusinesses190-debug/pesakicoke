@@ -63,7 +63,7 @@ const fmt = (amount: number) => {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "PESAKI — Africa's Digital Wealth Ecosystem" },
+      { title: "PESAKI — One Platform. Work, Business & Financial Services." },
       {
         name: "description",
         content:
@@ -201,7 +201,7 @@ function HomePage() {
 
   if (!isLoggedIn && !loading) {
     return (
-      <AppShell>
+      <AppShell variant="public">
         <PublicHome />
       </AppShell>
     );
@@ -588,8 +588,9 @@ function PublicHome() {
 
         {/* Headline */}
         <h1 className="relative mt-4 font-display text-[28px] font-extrabold leading-[1.15] tracking-tight">
-          <span className="block text-white">Africa&apos;s Digital</span>
-          <span className="block text-brand-gold">Wealth Ecosystem.</span>
+          <span className="block text-white">One Platform.</span>
+          <span className="block text-brand-gold">Work, Business &amp;</span>
+          <span className="block text-brand-gold">Financial Services.</span>
         </h1>
 
         <p className="relative mt-3 text-[14px] leading-relaxed text-white/85">

@@ -29,7 +29,7 @@ export const Route = createFileRoute("/about")({
 
 function AboutPage() {
   return (
-    <AppShell>
+    <AppShell variant="public">
       <PageHeader title="About PESAKI" subtitle="Africa's Digital Wealth Ecosystem" />
 
       <div className="px-5 pt-5">

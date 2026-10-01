@@ -63,7 +63,7 @@ function Row({ label, value }: { label: string; value: ReactNode }) {
 
 function CompliancePage() {
   return (
-    <AppShell>
+    <AppShell variant="public">
       <PageHeader
         title="PESAKI Compliance & Trust Center"
         subtitle="Transparency, security and responsible digital services."

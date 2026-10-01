@@ -17,7 +17,7 @@ export const Route = createFileRoute("/privacy")({
 
 function PrivacyPage() {
   return (
-    <AppShell>
+    <AppShell variant="public">
       <PageHeader title="Privacy Policy" subtitle="How we protect your data" />
 
       <div className="px-5 pt-5">
