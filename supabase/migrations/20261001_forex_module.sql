@@ -33,6 +33,16 @@ create table if not exists public.forex_accounts (
 
 comment on column public.forex_accounts.account_type is
   'demo uses simulated execution; live requires licensed execution provider';
+comment on column public.forex_accounts.leverage is
+  '1 means unlevered 1:1, which is what the demo accounts are created with';
+
+-- REPAIR: an earlier revision of this migration created balance with
+-- `check (balance >= 0)`. Because `create table if not exists` skips a table
+-- that already exists, that constraint survives on any database created from
+-- it -- and would then reject the balance update on every losing close, making
+-- the position impossible to close. Drop it explicitly.
+alter table public.forex_accounts
+  drop constraint if exists forex_accounts_balance_check;
 
 -- ─── Instruments ─────────────────────────────────────────────────────────────
 create table if not exists public.forex_instruments (
@@ -138,6 +148,12 @@ realized_pnl         numeric(18,4) not null default 0,
 create index if not exists forex_positions_open_idx
   on public.forex_positions (user_id) where closed_at is null;
 create index if not exists forex_positions_acct_idx on public.forex_positions (account_id);
+
+-- REPAIR: quote_to_kes was added after the table first shipped, so databases
+-- created from the earlier revision have the table but not the column. Without
+-- this the unrealised P/L helper below fails to compile against the real table.
+alter table public.forex_positions
+  add column if not exists quote_to_kes numeric(18,8);
 
 -- Deferred so fills can reference positions regardless of creation order.
 alter table public.forex_fills
