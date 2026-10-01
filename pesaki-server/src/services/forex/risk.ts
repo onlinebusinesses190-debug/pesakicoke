@@ -221,6 +221,53 @@ export function computePnlFromUnits(
   return Number((units * delta * quoteToKes).toFixed(2));
 }
 
+/**
+ * Wallet movements caused by closing a real position.
+ *
+ * Split out as a pure function because this is where real money changes hands and
+ * the two legs must be exactly right: the margin lock is returned to the user's
+ * balance, and the realised P/L is then applied on top of it. Getting the sign
+ * or the ordering wrong would either strand collateral or pay a loss twice.
+ */
+export interface SettlementLegs {
+  /** Margin to return from the wallet lock back to the balance. */
+  marginRelease: number;
+  /** Profit to credit, or 0 when the position lost. */
+  profit: number;
+  /** Loss to debit, or 0 when the position won. */
+  loss: number;
+}
+
+/**
+ * Derive the wallet legs for a closed position.
+ *
+ * The P/L is not accepted from a caller: it is recomputed here from the stored
+ * entry price, the exit price, direction and size, so a client cannot influence
+ * settlement.
+ */
+export function settlementLegs(params: {
+  side: "buy" | "sell";
+  units: number;
+  entryPrice: number;
+  exitPrice: number;
+  quoteToKes: number;
+  margin: number;
+}): SettlementLegs {
+  const pnl = computePnlFromUnits(
+    params.side,
+    params.units,
+    params.entryPrice,
+    params.exitPrice,
+    params.quoteToKes,
+  );
+
+  return {
+    marginRelease: Math.max(0, Number(params.margin.toFixed(2))),
+    profit: pnl > 0 ? pnl : 0,
+    loss: pnl < 0 ? Math.abs(pnl) : 0,
+  };
+}
+
 export interface PnlInput {
   side: "buy" | "sell";
   lots: number;

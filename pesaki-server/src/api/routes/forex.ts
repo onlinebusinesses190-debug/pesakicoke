@@ -37,11 +37,14 @@ import {
   marginState,
   minTradeAmount,
   sizeFromTradeAmount,
+  settlementLegs,
   validateLots,
   validateStopLoss,
   validateTakeProfit,
   validateTradeAmount,
 } from "../../services/forex/risk";
+import { reserveMargin, settleReal } from "../../services/forex/walletBridge";
+import { releaseLockedFunds } from "../../wallet/service";
 
 const DEMO_START_BALANCE = 100_000;
 
@@ -72,6 +75,16 @@ export const FX_ERRORS = {
 export type FxErrorCode = keyof typeof FX_ERRORS;
 
 class ForexError extends Error {
+  /**
+   * HTTP status derived from the structured code.
+   *
+   * This is what makes a predictable business condition such as a gated REAL
+   * account surface as a 403 with a readable message instead of collapsing into
+   * a 500. Previously the error carried only `code`, so every catch block that
+   * read `err.statusCode` fell through to 500 and hid the real cause.
+   */
+  readonly statusCode: number;
+
   constructor(
     readonly code: FxErrorCode,
     message: string,
@@ -79,6 +92,7 @@ class ForexError extends Error {
   ) {
     super(message);
     this.name = "ForexError";
+    this.statusCode = FX_ERRORS[code] ?? 500;
   }
 }
 
@@ -147,6 +161,27 @@ async function getOrCreateAccount(userId: string, accountType: "demo" | "live") 
     .single();
   if (insertError) throw insertError;
   return created;
+}
+
+/**
+ * Return a margin reservation to the PESAKI wallet.
+ *
+ * Used when an order does not end up opening. DEMO has no wallet to touch, so
+ * this is a no-op there.
+ */
+async function releaseReservation(
+  userId: string,
+  mode: "demo" | "live",
+  margin: number,
+  reason: string,
+): Promise<void> {
+  if (mode !== "live" || margin <= 0) return;
+  try {
+    await releaseLockedFunds(userId, margin, true);
+  } catch (err) {
+    // Surfaced loudly: the user is owed funds back and this needs reconciling.
+    logger.error({ err, userId, margin, reason }, "Forex margin release failed — needs reconciliation");
+  }
 }
 
 const orderSchema = z.object({
@@ -312,7 +347,6 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
         .is("closed_at", null);
 
       let unrealised = 0;
-      let usedMargin = Number(account.used_margin ?? 0);
       const enriched = [];
       // Positions we managed to price, so the mark-to-market can be persisted.
       const marked: { id: string; price: number; q2k: number }[] = [];
@@ -336,9 +370,6 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
             quoteToKes: q2k,
           });
           unrealised += pnl;
-          // Accumulate across every open position. Assigning here reported only
-          // the margin of whichever position happened to be last in the list.
-          usedMargin += Number(p.margin ?? 0);
           marked.push({ id: p.id, price: mid, q2k });
           enriched.push({ ...p, current_price: mid, unrealised_pnl: pnl });
         } catch {
@@ -367,7 +398,55 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
         }
       }
 
-      const state = marginState(Number(account.balance), unrealised, usedMargin);
+      // ── Balance source of truth ────────────────────────────────────────────
+      //
+      // DEMO: the forex_accounts row is the only ledger, so its balance is the
+      // virtual balance.
+      //
+      // REAL: the PESAKI wallet owns the user's actual funds. `wallets.balance`
+      // is the authoritative figure and `wallets.locked` is what other
+      // subsystems (withdrawals, other products, and Forex margin) already have
+      // reserved. Reading the forex row here would show a number that had
+      // drifted from the money the user really owns, which is exactly how a
+      // demo balance ends up displayed as a real one.
+      const isLive = accountType === "live";
+      let balance: number;
+      let walletLocked = 0;
+      let walletBalance = 0;
+
+      if (isLive) {
+        const { data: wallet, error: walletError } = await supabase
+          .from("wallets")
+          .select("balance, locked")
+          .eq("user_id", request.user!.id)
+          .maybeSingle();
+        if (walletError) {
+          logger.error({ err: walletError.message }, "Forex account: wallet read failed");
+          return reply.code(500).send({
+            success: false,
+            error: "Could not read your PESAKI wallet balance.",
+            code: "WALLET_UNAVAILABLE",
+          });
+        }
+        walletBalance = Number(wallet?.balance ?? 0);
+        walletLocked = Number(wallet?.locked ?? 0);
+        balance = walletBalance;
+      } else {
+        balance = Number(account.balance ?? 0);
+      }
+
+      // Used margin is Forex's own reservation. For REAL it is also held inside
+      // wallets.locked, so the account row is the single figure to report and it
+      // must not be summed with per-position margins on top of it.
+      const effectiveUsedMargin = Number(account.used_margin ?? 0);
+
+      const state = marginState(balance, unrealised, effectiveUsedMargin);
+
+      // Funds genuinely free to open a new position.
+      const availableBalance = isLive
+        ? Math.max(0, walletBalance - walletLocked)
+        : Math.max(0, state.equity - effectiveUsedMargin);
+
       const { data: ledger } = await supabase
         .from("forex_transactions")
         .select("*")
@@ -378,13 +457,18 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
       return {
         success: true,
         account: {
-          // Normalised to camelCase to match the computed state, and carrying
-          // the leverage the server actually sized the position with. `state`
-          // supplies the authoritative balance/equity/margin figures.
           id: account.id,
           account_type: account.account_type,
           leverage: Number(account.leverage ?? 1),
           status: account.status,
+          // Where the balance came from, so the frontend never has to guess and
+          // a REAL view can never be sourced from demo funds.
+          balanceSource: isLive ? "pesaki_wallet" : "forex_demo_account",
+          walletBalance,
+          walletLocked,
+          unrealized_pnl: unrealised,
+          availableBalance,
+          minTradeAmount: minTradeAmount(),
           ...state,
         },
         positions: enriched,
@@ -392,21 +476,25 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
         realTradingEnabled: REAL_TRADING_ENABLED,
       };
     } catch (err) {
-      // A ForexError carries a deliberate status (403 for a gated live account).
+      // A ForexError carries a deliberate status (403 for a gated REAL account).
       // Anything else is a genuine fault: log it in full and report it honestly
       // rather than flattening every failure to an opaque 500.
-      const status = (err as { statusCode?: number }).statusCode ?? 500;
-      if (status === 500) {
-        logger.error({ err }, "Forex account load failed");
-        return reply.code(500).send({
+      if (err instanceof ForexError) {
+        if (err.statusCode >= 500) {
+          logger.error({ err: err.message, code: err.code }, "Forex account load failed");
+        }
+        return reply.code(err.statusCode).send({
           success: false,
-          error: "Could not load your Forex account.",
-          code: "ACCOUNT_LOAD_FAILED",
+          error: err.message,
+          code: err.code,
         });
       }
-      return reply.code(status).send({
+
+      logger.error({ err }, "Forex account load failed");
+      return reply.code(500).send({
         success: false,
-        error: status === 403 ? "Live trading is currently unavailable." : (err as Error).message,
+        error: "Could not load your Forex account.",
+        code: "INTERNAL",
       });
     }
   });
@@ -584,7 +672,7 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
         .from("forex_positions")
         .select("instrument_id, quantity, average_entry_price, quote_to_kes")
         .eq("account_id", account.id)
-        .eq("status", "open");
+        .is("closed_at", null);
 
       let accountExposure = 0;
       let symbolExposure = 0;
@@ -619,7 +707,7 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
         const { data: allOpen } = await supabase
           .from("forex_positions")
           .select("quantity, average_entry_price, quote_to_kes")
-          .eq("status", "open");
+          .is("closed_at", null);
         let platformExposure = 0;
         for (const p of allOpen ?? []) {
           platformExposure +=
@@ -636,6 +724,32 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
 
     const executedPrice = body.side === "buy" ? quote.ask : quote.bid;
     const slippage = Number((executedPrice - quote.mid).toFixed(spec.digits));
+
+    // ── REAL: reserve margin in the PESAKI wallet before opening ────────────
+    //
+    // A REAL position is backed by the user's actual funds, so the wallet must be
+    // debited (locked) before the position exists. DEMO is virtual money and is
+    // a no-op here; it must never touch the real wallet.
+    //
+    // The lock is released again if execution fails, so a rejected order can
+    // never leave a user's funds stranded.
+    let reserved = false;
+    if (!isPending) {
+      const reservation = await reserveMargin(
+        userId,
+        body.account_type,
+        sizing.margin,
+        `${spec.symbol}:${body.side}:${body.idempotency_key ?? Date.now()}`,
+      );
+      if (!reservation.ok) {
+        return reply.code(FX_ERRORS.INSUFFICIENT_BALANCE).send({
+          success: false,
+          error: reservation.reason ?? "Insufficient funds to open this position.",
+          code: "INSUFFICIENT_FUNDS",
+        });
+      }
+      reserved = true;
+    }
 
     // Execution runs entirely inside one database transaction: the order, the
     // position, the fill and the margin reservation either all land or none do.
@@ -662,6 +776,14 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
 
     if (execError) {
       const reason = execError.message ?? "";
+
+      // The position did not open, so the wallet reservation must go back.
+      // Without this a rejected order would strand the user's funds.
+      if (reserved) {
+        await releaseReservation(userId, body.account_type, sizing.margin, "open failed");
+        reserved = false;
+      }
+
       if (reason.includes("INSUFFICIENT_MARGIN")) {
         const needed = Number(reason.split(":")[1] ?? 0);
         return bad(reply, `Order rejected: insufficient free margin. You need KSh ${needed.toFixed(2)}.`);
@@ -677,6 +799,11 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     }
 
     if (result?.idempotent) {
+      // This order already exists, so the reservation taken above is a duplicate
+      // of one that was already held. Give it back.
+      if (reserved) {
+        await releaseReservation(userId, body.account_type, sizing.margin, "idempotent replay");
+      }
       const { data: existing } = await supabase
         .from("forex_orders")
         .select("*")
@@ -717,10 +844,24 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
   });
 
   fastify.get("/positions", { preHandler: [verifyAuth] }, async (request) => {
+    // Scoped to the account for the requested mode, so DEMO positions can never
+    // be returned to a REAL view.
+    const { mode } = request.query as { mode?: string };
+    const accountType = mode === "live" ? "live" : "demo";
+
+    const { data: account } = await supabase
+      .from("forex_accounts")
+      .select("id")
+      .eq("user_id", request.user!.id)
+      .eq("account_type", accountType)
+      .maybeSingle();
+
+    if (!account) return { success: true, positions: [] };
+
     const { data } = await supabase
       .from("forex_positions")
       .select("*")
-      .eq("user_id", request.user!.id)
+      .eq("account_id", account.id)
       .is("closed_at", null)
       .order("opened_at", { ascending: false });
     return { success: true, positions: data ?? [] };
@@ -877,21 +1018,42 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
 
     const n = Math.min(Math.max(Number(limit) || 100, 1), 500);
 
+    // Scope strictly to this user's account FOR THIS MODE. Filtering on user_id
+    // alone would return the same trades in both views, so DEMO trades would
+    // appear as REAL trades and vice versa. Isolation is enforced here on the
+    // server, not trusted to the client.
+    let accountId: string | null = null;
+    {
+      const { data: acct } = await supabase
+        .from("forex_accounts")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("account_type", accountType)
+        .maybeSingle();
+      accountId = acct?.id ?? null;
+    }
+
+    // No account for this mode means no trades exist for it. That is a normal
+    // empty result, not a server error.
+    if (!accountId) {
+      return { success: true, history: [], account_type: accountType };
+    }
+
     // Orders that never became a position (pending, cancelled, rejected) still
     // belong in history, so the two sources are merged rather than the client
     // being shown only closed trades.
     const [{ data: positions, error: posErr }, { data: orders, error: ordErr }] = await Promise.all([
       supabase
         .from("forex_positions")
-        .select("id,instrument_id,side,quantity,average_entry_price,closed_at,opened_at,realized_pnl,close_reason,status")
-        .eq("user_id", userId)
+        .select("id,instrument_id,side,quantity,average_entry_price,closed_at,opened_at,realized_pnl,close_reason")
+        .eq("account_id", accountId)
         .not("closed_at", "is", null)
         .order("closed_at", { ascending: false })
         .limit(n),
       supabase
         .from("forex_orders")
         .select("id,instrument_id,side,quantity,order_type,status,reject_reason,created_at")
-        .eq("user_id", userId)
+        .eq("account_id", accountId)
         .in("status", ["pending", "cancelled", "rejected", "expired"])
         .order("created_at", { ascending: false })
         .limit(n),
@@ -1126,6 +1288,61 @@ async function closePosition(  request: FastifyRequest,
     .select("*")
     .eq("id", positionId)
     .maybeSingle();
+
+  // ── REAL: settle the closed P/L against the PESAKI wallet ───────────────
+  //
+  // The position is already closed in the database, so the user's funds must be
+  // reconciled now: release the margin lock and apply the realised P/L that the
+  // database computed. DEMO settles entirely inside forex_* and never touches
+  // the real wallet.
+  const { data: accountRow } = await supabase
+    .from("forex_accounts")
+    .select("account_type")
+    .eq("id", position.account_id)
+    .maybeSingle();
+
+  const positionMode = (accountRow?.account_type === "live" ? "live" : "demo") as
+    | "live"
+    | "demo";
+
+  if (positionMode === "live") {
+    // Only the closed portion's margin is released, so a partial close keeps the
+    // rest of the collateral held against the position that is still open.
+    const closedFraction = remaining > 0 ? closeLots / remaining : 1;
+    const releasedMargin = Number((Number(position.margin ?? 0) * closedFraction).toFixed(4));
+    // Recomputed server-side from the stored entry price and size rather than
+    // trusted from the request, using the same helper the tests cover.
+    const legs = settlementLegs({
+      side: position.side,
+      units: closeLots * spec.contractSize,
+      entryPrice: Number(position.average_entry_price),
+      exitPrice,
+      quoteToKes: q2k,
+      margin: releasedMargin,
+    });
+
+    const settlement = await settleReal(
+      userId,
+      legs.marginRelease,
+      legs.profit - legs.loss,
+      `close:${positionId}`,
+    );
+    if (!settlement.ok) {
+      // The position is closed but the money has not moved. Say so rather than
+      // reporting a clean success the wallet does not agree with.
+      logger.error(
+        { userId, positionId, releasedMargin, reason: settlement.reason },
+        "Forex settlement failed after close — needs reconciliation",
+      );
+      return reply.code(502).send({
+        success: false,
+        error:
+          "The position was closed but the wallet settlement did not complete. Support has been notified.",
+        code: "SETTLEMENT_PENDING",
+        position: updated,
+      });
+    }
+  }
 
   return {
     success: true,

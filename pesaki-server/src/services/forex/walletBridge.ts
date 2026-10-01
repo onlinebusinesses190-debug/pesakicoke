@@ -36,6 +36,44 @@ export interface WalletView {
  * anything already locked by other subsystems so a Forex margin reservation can
  * never overcommit funds that a withdrawal or another product is holding.
  */
+/**
+ * Record a wallet movement caused by forex.
+ *
+ * Written even when the movement fails, because a failed settlement is real money
+ * the platform still owes the user and must be reconcilable. The idempotency key
+ * means a retried settlement is recognised rather than applied twice.
+ */
+async function recordSettlement(params: {
+  userId: string;
+  kind: "margin_reserve" | "margin_release" | "pnl_credit" | "pnl_debit";
+  amount: number;
+  direction: "credit" | "debit";
+  completed: boolean;
+  failureReason?: string;
+  idempotencyKey: string;
+  positionId?: string;
+  accountId?: string;
+  metadata?: Record<string, unknown>;
+}): Promise<void> {
+  try {
+    await supabase.from("forex_wallet_settlements").insert({
+      user_id: params.userId,
+      position_id: params.positionId ?? null,
+      account_id: params.accountId ?? null,
+      kind: params.kind,
+      amount: Math.abs(Number(params.amount.toFixed(2))),
+      direction: params.direction,
+      completed: params.completed,
+      failure_reason: params.failureReason ?? null,
+      idempotency_key: params.idempotencyKey,
+      metadata: params.metadata ?? {},
+    });
+  } catch (err) {
+    // Never let the audit write break a trade. It is logged so the gap is visible.
+    logger.error({ err, userId: params.userId }, "Could not record forex settlement audit row");
+  }
+}
+
 export async function getAvailable(userId: string, mode: AccountMode): Promise<WalletView> {
   if (mode === "demo") {
     const { data } = await supabase
@@ -100,8 +138,26 @@ export async function reserveMargin(
   const result = await reserveLockedFunds(userId, margin);
   if (!result.success) {
     logger.error({ userId, margin, reference, err: result.error }, "Forex margin reservation failed");
+    await recordSettlement({
+      userId,
+      kind: "margin_reserve",
+      amount: margin,
+      direction: "debit",
+      completed: false,
+      failureReason: result.error ?? "Could not reserve margin",
+      idempotencyKey: `reserve:${reference}`,
+    });
     return { ok: false, reason: result.error ?? "Could not reserve margin" };
   }
+
+  await recordSettlement({
+    userId,
+    kind: "margin_reserve",
+    amount: margin,
+    direction: "debit",
+    completed: true,
+    idempotencyKey: `reserve:${reference}`,
+  });
 
   logger.info({ userId, margin, reference }, "Forex margin reserved from wallet");
   return { ok: true };
@@ -123,13 +179,39 @@ export async function settleReal(
   try {
     if (margin > 0) {
       await releaseLockedFunds(userId, margin, true);
+      await recordSettlement({
+        userId,
+        kind: "margin_release",
+        amount: margin,
+        direction: "credit",
+        completed: true,
+        idempotencyKey: `release:${reference}`,
+      });
     }
 
     if (pnl > 0) {
       const r = await credit(userId, pnl, "real", `Forex profit ${reference}`);
+      await recordSettlement({
+        userId,
+        kind: "pnl_credit",
+        amount: pnl,
+        direction: "credit",
+        completed: r.success,
+        failureReason: r.success ? undefined : (r.error ?? "Could not credit profit"),
+        idempotencyKey: `pnl_credit:${reference}`,
+      });
       if (!r.success) return { ok: false, reason: r.error ?? "Could not credit profit" };
     } else if (pnl < 0) {
       const r = await debit(userId, Math.abs(pnl), "real", `Forex loss ${reference}`);
+      await recordSettlement({
+        userId,
+        kind: "pnl_debit",
+        amount: Math.abs(pnl),
+        direction: "debit",
+        completed: r.success,
+        failureReason: r.success ? undefined : (r.error ?? "Could not debit loss"),
+        idempotencyKey: `pnl_debit:${reference}`,
+      });
       // A debit failure here is serious: the loss is real even if the wallet
       // cannot take it. Surface it so it can be reconciled rather than
       // pretending the position settled cleanly.

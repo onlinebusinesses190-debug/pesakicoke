@@ -82,6 +82,7 @@ interface Position {
 }
 
 interface AccountState {
+  account_type?: "demo" | "live";
   balance: number;
   equity: number;
   usedMargin: number;
@@ -89,6 +90,19 @@ interface AccountState {
   marginLevelPercent: number | null;
   /** Platform leverage as a plain multiplier, e.g. 10 for 10:1. */
   leverage?: number;
+  /**
+   * Where balance came from. "pesaki_wallet" for REAL, "forex_demo_account" for
+   * DEMO. Used to guarantee the REAL view can never be rendered from demo funds.
+   */
+  balanceSource?: "pesaki_wallet" | "forex_demo_account";
+  /** Real PESAKI wallet figures, present only for REAL. */
+  walletBalance?: number;
+  walletLocked?: number;
+  unrealized_pnl?: number;
+  /** Funds genuinely free to open a new position. */
+  availableBalance?: number;
+  /** Server-computed minimum Trade Amount, so the UI never hard-codes it. */
+  minTradeAmount?: number;
 }
 
 interface HistoryRow {
@@ -108,6 +122,13 @@ const ksh = (n: number) =>
   `KSh ${Number(n || 0).toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export const Route = createFileRoute("/trading/forex")({
+  // Declared so the selected mode survives a reload and can be linked to. It
+  // validates to demo/live only, so the URL cannot select any other mode.
+  validateSearch: (search: Record<string, unknown>): { mode?: Mode } => {
+    const mode = search.mode;
+    if (mode === "live" || mode === "demo") return { mode };
+    return {};
+  },
   head: () => ({
     meta: [
       { title: "PESAKI Forex — Currency Trading" },
@@ -127,6 +148,18 @@ function ForexPage() {
   const [showDeposit, setShowDeposit] = useState(false);
 
   const [mode, setMode] = useState<Mode>(search?.mode === "live" ? "live" : "demo");
+
+  // Reflect the selected mode in the URL so a reload, refresh or shared link
+  // returns to the same mode instead of silently reverting to DEMO.
+  useEffect(() => {
+    const current = search?.mode === "live" ? "live" : "demo";
+    if (current !== mode) {
+      navigate({ to: "/trading/forex", search: { mode }, replace: true });
+    }
+    // `search` is intentionally omitted: this reacts to a mode change, not to
+    // the URL being rewritten by this effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, navigate]);
   const [symbol, setSymbol] = useState("EUR/USD");
   const [interval, setInterval_] = useState<ForexInterval>("5m");
 
@@ -140,6 +173,7 @@ function ForexPage() {
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [realEnabled, setRealEnabled] = useState(true);
   const [realBlocked, setRealBlocked] = useState<string | null>(null);
+  const [accountError, setAccountError] = useState<string | null>(null);
 
   const [side, setSide] = useState<Side>("buy");
   // Trade Amount is the user's input: KSh of capital committed to the trade.
@@ -194,17 +228,21 @@ function ForexPage() {
         setPositions(res.positions ?? []);
         setRealEnabled(Boolean(res.realTradingEnabled));
         setRealBlocked(null);
+        setAccountError(null);
       }
     } catch (err) {
-      // A disabled real account is a legitimate server answer, not a crash.
+      // A gated or failed REAL account is a legitimate server answer, not a
+      // crash. Report it as an error state rather than silently showing a number
+      // that came from the other mode.
       const message = err instanceof Error ? err.message : "Could not load the account";
       if (m === "live") {
         setRealBlocked(message);
         setRealEnabled(false);
       }
-      // Clear the account on any failure. Leaving the previous mode's numbers
-      // on screen is how the KSh 100,000 demo balance ended up displayed in the
-      // REAL view, which misrepresents real funds as demo money.
+      setAccountError(message);
+      // Clear on any failure. Keeping the previous mode's figures on screen is
+      // exactly how the KSh 100,000 demo balance ended up displayed in the REAL
+      // view, which misrepresents virtual money as real funds.
       setAccount(null);
       setPositions([]);
     } finally {
@@ -215,7 +253,9 @@ function ForexPage() {
   const loadHistory = useCallback(async (m: Mode) => {
     try {
       const res = await apiRequest(`/forex/history?mode=${m}&limit=50`);
+      // An empty history is a valid result and must render as an empty list.
       if (res?.success) setHistory(res.history ?? []);
+      else setHistory([]);
     } catch {
       setHistory([]);
     }
@@ -234,6 +274,15 @@ function ForexPage() {
   }, [symbol, interval, loadCandles]);
 
   useEffect(() => {
+    // Clear the previous mode's figures before fetching the new ones. Switching
+    // modes must never show DEMO numbers while REAL is still loading, or REAL
+    // numbers while DEMO loads.
+    setAccount(null);
+    setPositions([]);
+    setHistory([]);
+    setAccountError(null);
+    setLoadingAccount(true);
+
     void loadAccount(mode);
     void loadHistory(mode);
     const t = setInterval(() => void loadAccount(mode), 5_000);
@@ -279,8 +328,38 @@ function ForexPage() {
   // exactly this amount; the position size behind it is derived server-side
   // using the platform's leverage, which the client never sets.
   const leverage = account?.leverage ?? 10;
-  const minTradeAmount = 100;
+  // Server-computed, so the product minimum can change without a frontend edit.
+  const minTradeAmount = account?.minTradeAmount ?? 100;
   const freeMargin = account?.freeMargin ?? null;
+
+  /**
+   * Available Balance.
+   *
+   * REAL: the actual PESAKI wallet figure the server read, so it always matches
+   * the money the user owns. DEMO: the forex demo account.
+   */
+  const availableBalance = useMemo(() => {
+    if (!account) return null;
+    if (account.balanceSource === "pesaki_wallet") {
+      const wallet = Number(account.walletBalance ?? account.balance ?? 0);
+      const locked = Number(account.walletLocked ?? 0);
+      return Math.max(0, wallet - locked);
+    }
+    return Number(account.availableBalance ?? account.freeMargin ?? account.balance ?? 0);
+  }, [account]);
+
+  /**
+   * Largest Trade Amount the server will accept.
+   *
+   * Bounded by what is actually free (never more than the user has) and by
+   * exposure at the configured leverage, so the ticket can never offer a size
+   * the order path would reject.
+   */
+  const maxTradeAmount = useMemo(() => {
+    if (freeMargin == null || !Number.isFinite(freeMargin) || freeMargin <= 0) return null;
+    return Math.floor(freeMargin * 100) / 100;
+  }, [freeMargin]);
+
   const exposure = Number(tradeAmountInput) > 0 ? Number(tradeAmountInput) * leverage : 0;
 
   // Pairs offered in the fullscreen selector, taken from the same live watchlist
@@ -296,6 +375,10 @@ function ForexPage() {
     }
     if (amount < minTradeAmount) {
       toast.error(`Minimum trade amount is KSh ${minTradeAmount}`);
+      return;
+    }
+    if (maxTradeAmount != null && amount > maxTradeAmount) {
+      toast.error(`Maximum trade amount is KSh ${maxTradeAmount.toLocaleString("en-KE")}`);
       return;
     }
     if (freeMargin != null && amount > freeMargin) {
@@ -437,6 +520,10 @@ function ForexPage() {
                 {realBlocked ??
                   "The server has not switched real-money forex trading on. Your demo account is unaffected."}
               </p>
+              <p className="mt-1.5 text-[10px] leading-relaxed text-muted-foreground">
+                This is a deployment setting (<code>PESAKI_FX_REAL_ENABLED</code>) on the PESAKI
+                server. It cannot be enabled from the browser. Demo trading works normally.
+              </p>
             </div>
           </div>
         )}
@@ -555,17 +642,25 @@ function ForexPage() {
         </div>
 
         {/* ── Account metrics ─────────────────────────────────────────── */}
-        {account && (
+        {loadingAccount ? (
+          <div className="grid grid-cols-2 gap-2">
+            {["Available balance", "Equity", "Used margin", "Free margin"].map((label) => (
+              <Card key={label} className="!p-3">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+                <p className="mt-0.5 text-[13px] font-bold text-muted-foreground">Loading…</p>
+              </Card>
+            ))}
+          </div>
+        ) : account ? (
           <div className="grid grid-cols-2 gap-2">
             {(
               [
+                // REAL reads the PESAKI wallet; DEMO reads the demo account. The
+                // value shown is always the one the server computed for this mode.
+                ["Available balance", availableBalance != null ? ksh(availableBalance) : "—"],
                 ["Equity", ksh(account.equity)],
                 ["Used margin", ksh(account.usedMargin)],
                 ["Free margin", ksh(account.freeMargin)],
-                [
-                  "Margin level",
-                  account.marginLevelPercent ? `${account.marginLevelPercent}%` : "—",
-                ],
               ] as const
             ).map(([label, value]) => (
               <Card key={label} className="!p-3">
@@ -574,7 +669,14 @@ function ForexPage() {
               </Card>
             ))}
           </div>
-        )}
+        ) : accountError ? (
+          <Card className="!p-3">
+            <p className="text-[12px] font-semibold text-destructive">
+              {mode === "live" ? "Real account unavailable" : "Demo account unavailable"}
+            </p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">{accountError}</p>
+          </Card>
+        ) : null}
 
         {/* ── Order ticket ────────────────────────────────────────────── */}
         <div>
@@ -646,8 +748,14 @@ function ForexPage() {
               className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-brand-ink"
             />
             <p className="mt-1 text-[10px] text-muted-foreground">
-              Minimum KSh {minTradeAmount}. This amount is held as margin
-              {exposure > 0 ? ` and controls a KSh ${exposure.toLocaleString()} position.` : "."}
+              {mode === "live"
+                ? "Allocated from your PESAKI wallet balance. "
+                : "Allocated from your demo balance. "}
+              Minimum KSh {minTradeAmount}
+              {maxTradeAmount != null
+                ? ` · Maximum KSh ${maxTradeAmount.toLocaleString("en-KE")}`
+                : ""}
+              .{exposure > 0 ? ` Controls a KSh ${exposure.toLocaleString("en-KE")} position.` : ""}
             </p>
 
             <div className="mt-3 grid grid-cols-2 gap-3">

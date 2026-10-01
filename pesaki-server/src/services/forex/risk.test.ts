@@ -19,6 +19,7 @@ import {
   marginState,
   minTradeAmount,
   pipValuePerLot,
+  settlementLegs,
   sizeFromTradeAmount,
   validateLots,
   validateStopLoss,
@@ -348,6 +349,54 @@ describe("configuredLeverage", () => {
     const lev = configuredLeverage();
     expect(lev).toBeGreaterThan(0);
     expect(Number.isFinite(lev)).toBe(true);
+  });
+});
+
+describe("settlementLegs", () => {
+  const base = {
+    side: "buy" as const,
+    units: 1_000,
+    entryPrice: 1.1,
+    exitPrice: 1.105,
+    quoteToKes: USD_KES,
+    margin: 1_000,
+  };
+
+  it("returns the full margin lock to the user", () => {
+    // Collateral must come back whether the trade won or lost; the user is never
+    // left holding margin for a position that no longer exists.
+    expect(settlementLegs(base).marginRelease).toBe(1_000);
+    expect(settlementLegs({ ...base, exitPrice: 1.09 }).marginRelease).toBe(1_000);
+  });
+
+  it("credits a winning position and debits nothing", () => {
+    const legs = settlementLegs(base);
+    expect(legs.profit).toBeCloseTo(650, 2);
+    expect(legs.loss).toBe(0);
+  });
+
+  it("debits a losing position and credits nothing", () => {
+    const legs = settlementLegs({ ...base, exitPrice: 1.095 });
+    expect(legs.loss).toBeCloseTo(650, 2);
+    expect(legs.profit).toBe(0);
+  });
+
+  it("settles both legs at zero for a scratch trade", () => {
+    const legs = settlementLegs({ ...base, exitPrice: base.entryPrice });
+    expect(legs.profit).toBe(0);
+    expect(legs.loss).toBe(0);
+    expect(legs.marginRelease).toBe(1_000);
+  });
+
+  it("never returns a negative margin release", () => {
+    // A negative would debit the user for releasing their own collateral.
+    expect(settlementLegs({ ...base, margin: -50 }).marginRelease).toBe(0);
+  });
+
+  it("handles a short position losing", () => {
+    const legs = settlementLegs({ ...base, side: "sell", exitPrice: 1.105 });
+    expect(legs.loss).toBeCloseTo(650, 2);
+    expect(legs.profit).toBe(0);
   });
 });
 
