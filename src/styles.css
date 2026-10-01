@@ -62,7 +62,7 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.18 0.03 165);
 
-  --primary: oklch(0.36 0.09 165);          /* deep emerald */
+  --primary: oklch(0.36 0.09 165); /* deep emerald */
   --primary-foreground: oklch(0.98 0.02 90);
 
   --secondary: oklch(0.95 0.02 160);
@@ -74,7 +74,7 @@
   --accent: oklch(0.93 0.05 160);
   --accent-foreground: oklch(0.25 0.06 165);
 
-  --gold: oklch(0.78 0.13 85);              /* premium gold */
+  --gold: #f5c842; /* PESAKI gold */
   --gold-foreground: oklch(0.22 0.04 90);
 
   --success: oklch(0.65 0.16 155);
@@ -121,7 +121,7 @@
   --accent: oklch(0.3 0.05 160);
   --accent-foreground: oklch(0.97 0.01 150);
 
-  --gold: oklch(0.82 0.14 85);
+  --gold: #f5c842;
   --gold-foreground: oklch(0.18 0.04 90);
 
   --success: oklch(0.72 0.16 155);
@@ -140,20 +140,30 @@
   * {
     border-color: var(--color-border);
   }
-  html, body {
+  html,
+  body {
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
-  h1, h2, h3, h4, h5 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5 {
     font-family: var(--font-display);
     letter-spacing: -0.02em;
   }
 }
 
 @utility gradient-primary {
-  background-image: linear-gradient(135deg, oklch(0.32 0.09 165) 0%, oklch(0.45 0.11 160) 60%, oklch(0.55 0.12 155) 100%);
+  background-image: linear-gradient(
+    135deg,
+    oklch(0.32 0.09 165) 0%,
+    oklch(0.45 0.11 160) 60%,
+    oklch(0.55 0.12 155) 100%
+  );
 }
 @utility gradient-gold {
   background-image: linear-gradient(135deg, oklch(0.82 0.14 88) 0%, oklch(0.7 0.14 75) 100%);

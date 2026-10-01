@@ -629,19 +629,19 @@ function PublicHome() {
       </section>
 
       {/* ───────────── Everything in one app ───────────── */}
-      <section className="px-5 pb-2 pt-7">
+      <section className="px-[38px] pb-2 pt-7">
         <h2 className="font-display text-lg font-bold tracking-tight text-brand-deep">
           Everything in one app
         </h2>
-        <span className="mt-2 block h-1 w-9 rounded-full bg-brand-gold" />
+        <span className="mt-2.5 block h-[5px] w-[68px] rounded-full bg-brand-gold" />
 
-        <div className="mt-4 grid grid-cols-2 gap-3">
+        <div className="mt-5 grid grid-cols-2 gap-4">
           {HUB_CARDS.map((hub) => (
             <Link
               key={hub.to}
               to="/auth"
               search={{ mode: "signup" } as never}
-              className="group flex flex-col rounded-2xl border border-black/5 bg-white p-4 shadow-soft transition-transform hover:-translate-y-0.5"
+              className="group flex flex-col rounded-[30px] border border-black/5 bg-white p-5 shadow-soft transition-transform hover:-translate-y-0.5"
             >
               <span className={`grid h-11 w-11 place-items-center rounded-full ${hub.circle}`}>
                 <hub.icon className="h-5 w-5" />
@@ -660,7 +660,7 @@ function PublicHome() {
           <Link
             to="/auth"
             search={{ mode: "signup" } as never}
-            className="group flex flex-col justify-between rounded-2xl gradient-primary p-4 text-white shadow-soft"
+            className="group flex flex-col justify-between rounded-[30px] gradient-primary p-5 text-white shadow-soft"
           >
             <span className="grid h-11 w-11 place-items-center rounded-full border border-white/30">
               <ArrowRight className="h-5 w-5" />

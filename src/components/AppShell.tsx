@@ -54,8 +54,9 @@ export function AppShell({
   const { user, ready } = useAuth();
 
   const nav = variant === "public" ? publicNav : appNav;
-  // 8 public items need a tighter grid than the 7-item app nav.
-  const columns = variant === "public" ? "grid-cols-4" : "grid-cols-7";
+  const isPublic = variant === "public";
+  // All 8 public links must fit on ONE row; the 7-item app nav is unaffected.
+  const columns = isPublic ? "grid-cols-8" : "grid-cols-7";
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background">
@@ -84,21 +85,37 @@ export function AppShell({
                     }
                   }}
                   className={[
-                    "flex w-full flex-col items-center gap-0.5 rounded-xl px-0.5 py-1.5 text-[10px] font-medium transition-colors",
-                    active ? "text-primary" : "text-muted-foreground hover:text-foreground",
+                    isPublic
+                      ? "relative flex w-full flex-col items-center gap-0.5 rounded-lg px-0.5 py-1.5 text-[8.5px] font-medium leading-tight transition-colors"
+                      : "flex w-full flex-col items-center gap-0.5 rounded-xl px-0.5 py-1.5 text-[10px] font-medium transition-colors",
+                    isPublic
+                      ? active
+                        ? "text-brand-deep"
+                        : "text-muted-foreground hover:text-foreground"
+                      : active
+                        ? "text-primary"
+                        : "text-muted-foreground hover:text-foreground",
                   ].join(" ")}
                 >
+                  {isPublic && active && (
+                    <span className="absolute -top-[0.3rem] left-1/2 h-[3px] w-5 -translate-x-1/2 rounded-full bg-brand-gold" />
+                  )}
                   <span
                     className={[
-                      "grid h-8 w-8 place-items-center rounded-lg transition-all",
-                      active ? "bg-primary/10" : "",
+                      isPublic
+                        ? "grid h-7 w-7 place-items-center rounded-lg transition-all"
+                        : "grid h-8 w-8 place-items-center rounded-lg transition-all",
+                      !isPublic && active ? "bg-primary/10" : "",
                     ].join(" ")}
                   >
-                    <Icon className="h-4 w-4" strokeWidth={active ? 2.5 : 2} />
+                    <Icon
+                      className={isPublic ? "h-[15px] w-[15px]" : "h-4 w-4"}
+                      strokeWidth={active ? 2.5 : 2}
+                    />
                   </span>
                   <span className="flex flex-col items-center leading-tight">
                     <span className="truncate">{item.label}</span>
-                    {item.sub && <span className="truncate text-[9px] opacity-80">{item.sub}</span>}
+                    {item.sub && <span className="truncate text-[8px] opacity-80">{item.sub}</span>}
                   </span>
                 </Link>
               </li>
