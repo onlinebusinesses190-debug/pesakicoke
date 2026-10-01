@@ -1,0 +1,8 @@
+# https://www.robotstxt.org/robotstxt.html
+# Allows crawlers and points to the sitemap
+# Trading content is behind authentication and not indexed
+
+User-agent: *
+Disallow:
+
+Sitemap: https://pesaki.co.ke/sitemap.xml

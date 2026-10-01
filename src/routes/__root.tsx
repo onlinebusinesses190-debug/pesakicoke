@@ -13,9 +13,25 @@ import { toast } from "sonner";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { CookieBanner } from "../components/CookieBanner";
 import { useAuth } from "@/hooks/useAuth";
 
-const PUBLIC_PATHS = ["/", "/auth"];
+// Routes reachable without a session. The landing page and the auth screens are
+// public; everything else is guarded in RootComponent via AuthRouteGuard.
+const PUBLIC_PATHS = [
+  "/",
+  "/auth",
+  "/about",
+  "/compliance",
+  "/security",
+  "/contact",
+  "/business-funding",
+  "/terms",
+  "/privacy",
+  "/refund",
+  "/cookies",
+  "/sitemap.xml",
+];
 
 function NotFoundComponent() {
   return (
@@ -82,39 +98,63 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { name: "theme-color", content: "#0a3b2e" },
-      { title: "PESAKI — Dashboard" },
+      { name: "theme-color", content: "#024812" },
+      { name: "robots", content: "index, follow" },
+      { name: "googlebot", content: "index, follow" },
+      { name: "author", content: "PESAKI" },
+      {
+        name: "keywords",
+        content:
+          "PESAKI, Nairobi, Kenya, mobile money, M-Pesa, jobs, kazi, business funding, savings, wallet, digital banking, fintech, Africa",
+      },
+      { name: "geo.region", content: "KE-Nairobi" },
+      { name: "geo.country", content: "Kenya" },
+      { title: "PESAKI — One Platform. Work, Business & Financial Services." },
       {
         name: "description",
-        content: "Your PESAKI dashboard: wallet, earnings, trades, jobs, and opportunities.",
+        content:
+          "PESAKI brings together your wallet, jobs, business funding and banking in one powerful mobile app. PESAKI MARKETING, BN-6ASR2E26, registered in Kenya.",
       },
-      { property: "og:title", content: "PESAKI — Dashboard" },
+      {
+        property: "og:title",
+        content: "PESAKI — One Platform. Work, Business & Financial Services.",
+      },
       {
         property: "og:description",
-        content: "Your PESAKI dashboard: wallet, earnings, trades, jobs, and opportunities.",
+        content:
+          "PESAKI brings together your wallet, jobs, business funding and banking in one powerful mobile app. PESAKI MARKETING, BN-6ASR2E26, registered in Kenya.",
       },
       { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://pesaki.co.ke/" },
+      { property: "og:site_name", content: "PESAKI" },
+      { property: "og:locale", content: "en_KE" },
+      { property: "og:image", content: "https://pesaki.co.ke/icons/icon-512.png" },
+      { property: "og:image:type", content: "image/png" },
+      { property: "og:image:width", content: "512" },
+      { property: "og:image:height", content: "512" },
+      {
+        property: "og:image:alt",
+        content: "PESAKI — One Platform. Work, Business & Financial Services.",
+      },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "PESAKI — Dashboard" },
+      {
+        name: "twitter:title",
+        content: "PESAKI — One Platform. Work, Business & Financial Services.",
+      },
       {
         name: "twitter:description",
-        content: "Your PESAKI dashboard: wallet, earnings, trades, jobs, and opportunities.",
-      },
-      {
-        property: "og:image",
         content:
-          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/fdeb1878-8ad9-4c0d-8b3b-d767051054a3/id-preview-76e24141--66b9a5aa-fbc6-43c7-a488-530b18a42bd2.lovable.app-1783818751962.png",
+          "PESAKI brings together your wallet, jobs, business funding and banking in one powerful mobile app. PESAKI MARKETING, BN-6ASR2E26, registered in Kenya.",
       },
+      { name: "twitter:image", content: "https://pesaki.co.ke/icons/icon-512.png" },
       {
-        name: "twitter:image",
-        content:
-          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/fdeb1878-8ad9-4c0d-8b3b-d767051054a3/id-preview-76e24141--66b9a5aa-fbc6-43c7-a488-530b18a42bd2.lovable.app-1783818751962.png",
+        name: "twitter:image:alt",
+        content: "PESAKI — One Platform. Work, Business & Financial Services.",
       },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "manifest", href: "/manifest.json" },
-      { rel: "apple-touch-icon", href: "/icons/apple-touch-icon-180.png" },
+      { rel: "canonical", href: "https://pesaki.co.ke/" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
@@ -122,7 +162,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap",
       },
     ],
-    scripts: [{ src: "/registerSW.js", defer: true }],
   }),
   shellComponent: RootShell,
   component: RootComponent,
@@ -153,6 +192,7 @@ function RootComponent() {
       <AuthRouteGuard>
         <Outlet />
       </AuthRouteGuard>
+      <CookieBanner />
     </QueryClientProvider>
   );
 }
