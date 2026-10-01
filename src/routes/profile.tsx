@@ -13,6 +13,8 @@ import {
   Lock,
   Info,
   LogOut,
+  Trash2,
+  TriangleAlert,
   LogIn,
   Copy,
   ChevronRight,
@@ -146,6 +148,11 @@ function ProfilePage() {
   const [modal, setModal] = useState<ModalKey>(null);
   const [loading, setLoading] = useState(true);
 
+  // ── Danger Zone: delete account (type-to-confirm) ─────────────────────────
+  const [showDelete, setShowDelete] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
   // ── Data state ──────────────────────────────────────────────────────────────
   const [profile, setProfile] = useState({
     name: "",
@@ -273,6 +280,40 @@ function ProfilePage() {
     }
   };
 
+  // ── Delete account ─────────────────────────────────────────────────────────
+  // Calls the existing DELETE /user/delete-account endpoint, which verifies the
+  // Supabase session, anonymises the user's data and bans the auth account.
+  const deleteAccount = async () => {
+    if (deleteConfirm.trim().toUpperCase() !== "DELETE") {
+      toast.error("Type DELETE to confirm");
+      return;
+    }
+    setDeleting(true);
+    try {
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      if (!token) {
+        toast.error("Session expired. Please sign in again.");
+        return;
+      }
+      const res = await fetch(`${API_BASE}/user/delete-account`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        toast.error(body?.error || "Account deletion failed");
+        return;
+      }
+      toast.success("Your account has been deleted");
+      await supabase.auth.signOut();
+      navigate({ to: "/auth" });
+    } catch (err) {
+      toast.error("Account deletion failed. Please contact support.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   // ── Copy referral code ────────────────────────────────────────────────────
   const copyRef = async () => {
     if (!referrals.referralCode) {
@@ -327,7 +368,9 @@ function ProfilePage() {
     return "Pending";
   };
 
-  const statusTone = (status: ReferralStatus): "warning" | "success" | "destructive" | "primary" => {
+  const statusTone = (
+    status: ReferralStatus,
+  ): "warning" | "success" | "destructive" | "primary" => {
     if (status === "qualified") return "success";
     if (status === "completed") return "primary";
     if (status === "rejected") return "destructive";
@@ -498,29 +541,29 @@ function ProfilePage() {
                 {referredUsers.map((user, index) => {
                   const earned = Number(user.earned || 0);
                   return (
-                  <li
-                    key={`${user.name || "user"}-${user.joinedAt || index}`}
-                    className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 px-3 py-3"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold">{user.name || "Unknown"}</p>
-                      <p className="truncate text-[11px] text-muted-foreground">
-                        {user.joinedAt
-                          ? new Date(user.joinedAt).toLocaleDateString("en-KE", {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            })
-                          : "—"}
-                      </p>
-                    </div>
-                    <Badge tone={statusTone(user.status)}>{statusLabel(user.status)}</Badge>
-                    <p
-                      className={`text-sm font-bold ${earned > 0 ? "text-success" : "text-muted-foreground"}`}
+                    <li
+                      key={`${user.name || "user"}-${user.joinedAt || index}`}
+                      className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 px-3 py-3"
                     >
-                      {earned > 0 ? `+${fmt(earned)}` : "—"}
-                    </p>
-                  </li>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">{user.name || "Unknown"}</p>
+                        <p className="truncate text-[11px] text-muted-foreground">
+                          {user.joinedAt
+                            ? new Date(user.joinedAt).toLocaleDateString("en-KE", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              })
+                            : "—"}
+                        </p>
+                      </div>
+                      <Badge tone={statusTone(user.status)}>{statusLabel(user.status)}</Badge>
+                      <p
+                        className={`text-sm font-bold ${earned > 0 ? "text-success" : "text-muted-foreground"}`}
+                      >
+                        {earned > 0 ? `+${fmt(earned)}` : "—"}
+                      </p>
+                    </li>
                   );
                 })}
               </ul>
@@ -656,6 +699,71 @@ function ProfilePage() {
           >
             <LogOut className="h-4 w-4" /> Sign out
           </button>
+        </section>
+      )}
+
+      {/* ── Danger Zone ── Delete account lives here only, never as a primary
+          profile item, on the homepage, or in any navigation. */}
+      {!guest && (
+        <section className="mt-6 px-5">
+          <Card className="!border-destructive/30 !bg-destructive/[0.04] !p-4">
+            <div className="flex items-start gap-2.5">
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+              <div className="min-w-0">
+                <h3 className="text-sm font-bold text-destructive">Danger Zone</h3>
+                <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                  Deleting your account permanently removes your profile, wallet and transaction
+                  history. Under the Kenya Data Protection Act 2019 you may request erasure of your
+                  personal data. This cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            {!showDelete ? (
+              <button
+                onClick={() => setShowDelete(true)}
+                className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-destructive/40 bg-transparent text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10"
+              >
+                <Trash2 className="h-4 w-4" /> Delete Account
+              </button>
+            ) : (
+              <div className="mt-3">
+                <label className="block text-[11px] font-semibold text-destructive">
+                  Type <span className="font-bold">DELETE</span> to confirm
+                </label>
+                <input
+                  value={deleteConfirm}
+                  onChange={(e) => setDeleteConfirm(e.target.value)}
+                  placeholder="DELETE"
+                  autoComplete="off"
+                  className="mt-1.5 h-11 w-full rounded-xl border border-destructive/40 bg-background px-3 text-sm outline-none focus:border-destructive"
+                />
+                <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
+                  Prefer to keep your account? Contact the Help Center on 0140399389 and we will
+                  assist with erasure.
+                </p>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={deleteAccount}
+                    disabled={deleting}
+                    className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-destructive text-sm font-bold text-destructive-foreground disabled:opacity-60"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    {deleting ? "Deleting…" : "Permanently delete"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowDelete(false);
+                      setDeleteConfirm("");
+                    }}
+                    className="h-11 flex-1 rounded-xl border border-border text-sm font-semibold text-foreground"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </Card>
         </section>
       )}
 

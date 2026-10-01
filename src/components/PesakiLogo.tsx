@@ -59,12 +59,22 @@ export function PesakiWordmark({
 
   const taglineSize = size === "lg" ? "text-[9px]" : "text-[8px]";
 
+  // The wordmark is real text (the logo mark itself is an image and must not be
+  // recoloured), so the "S" can be accented independently.
+  const wordColor = tone === "light" ? "text-white" : "text-brand-deep";
+  const letters = ["P", "E", "S", "A", "K", "I"];
+
   return (
     <span className={`flex min-w-0 flex-col ${className}`}>
       <span
-        className={`font-display font-bold tracking-[0.06em] ${titleSize} ${tone === "light" ? "text-white" : "text-brand-deep"}`}
+        className={`font-display font-bold tracking-[0.06em] ${titleSize} ${wordColor}`}
+        aria-label="PESAKI"
       >
-        PESAKI
+        {letters.map((letter, i) => (
+          <span key={i} className={i === 2 ? "text-brand-gold" : undefined}>
+            {letter}
+          </span>
+        ))}
       </span>
       {tagline && (
         <span

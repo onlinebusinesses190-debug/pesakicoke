@@ -560,7 +560,7 @@ function PublicHome() {
             <Link
               to="/profile"
               aria-label="Notifications"
-              className="relative grid h-10 w-10 place-items-center rounded-full border border-white/25 bg-white/5 text-white/90 transition-colors hover:bg-white/10"
+              className="relative grid h-10 w-10 place-items-center rounded-full border border-white/25 bg-white/5 text-brand-gold transition-colors hover:bg-white/10"
             >
               <Bell className="h-[18px] w-[18px]" />
               <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-brand-gold ring-2 ring-white/25" />
@@ -665,7 +665,7 @@ function PublicHome() {
             <span className="grid h-11 w-11 place-items-center rounded-full border border-white/30">
               <ArrowRight className="h-5 w-5" />
             </span>
-            <span className="mt-4 flex items-center gap-1 text-[13px] font-bold">
+            <span className="mt-4 flex items-center gap-1 text-[13px] font-bold text-brand-gold">
               Get Started
               <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
             </span>
