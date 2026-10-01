@@ -171,52 +171,46 @@ function ForexPage() {
     }
   }, []);
 
-  const loadCandles = useCallback(
-    async (sym: string, iv: ForexInterval) => {
-      try {
-        const res = await fetch(
-          `${API_BASE}/forex/candles?symbol=${encodeURIComponent(sym)}&interval=${iv}&count=180`,
-        );
-        const body = await res.json();
-        if (res.ok && body.success) setCandles(body.candles);
-        else setCandles([]);
-      } catch {
-        setCandles([]);
-      }
-    },
-    [],
-  );
+  const loadCandles = useCallback(async (sym: string, iv: ForexInterval) => {
+    try {
+      const res = await fetch(
+        `${API_BASE}/forex/candles?symbol=${encodeURIComponent(sym)}&interval=${iv}&count=180`,
+      );
+      const body = await res.json();
+      if (res.ok && body.success) setCandles(body.candles);
+      else setCandles([]);
+    } catch {
+      setCandles([]);
+    }
+  }, []);
 
   // ── Account ───────────────────────────────────────────────────────────────
-  const loadAccount = useCallback(
-    async (m: Mode) => {
-      setLoadingAccount(true);
-      try {
-        const res = await apiRequest(`/forex/account?account_type=${m}`);
-        if (res?.success) {
-          setAccount(res.account);
-          setPositions(res.positions ?? []);
-          setRealEnabled(Boolean(res.realTradingEnabled));
-          setRealBlocked(null);
-        }
-      } catch (err) {
-        // A disabled real account is a legitimate server answer, not a crash.
-        const message = err instanceof Error ? err.message : "Could not load the account";
-        if (m === "live") {
-          setRealBlocked(message);
-          setRealEnabled(false);
-        }
-        // Clear the account on any failure. Leaving the previous mode's numbers
-        // on screen is how the KSh 100,000 demo balance ended up displayed in the
-        // REAL view, which misrepresents real funds as demo money.
-        setAccount(null);
-        setPositions([]);
-      } finally {
-        setLoadingAccount(false);
+  const loadAccount = useCallback(async (m: Mode) => {
+    setLoadingAccount(true);
+    try {
+      const res = await apiRequest(`/forex/account?account_type=${m}`);
+      if (res?.success) {
+        setAccount(res.account);
+        setPositions(res.positions ?? []);
+        setRealEnabled(Boolean(res.realTradingEnabled));
+        setRealBlocked(null);
       }
-    },
-    [],
-  );
+    } catch (err) {
+      // A disabled real account is a legitimate server answer, not a crash.
+      const message = err instanceof Error ? err.message : "Could not load the account";
+      if (m === "live") {
+        setRealBlocked(message);
+        setRealEnabled(false);
+      }
+      // Clear the account on any failure. Leaving the previous mode's numbers
+      // on screen is how the KSh 100,000 demo balance ended up displayed in the
+      // REAL view, which misrepresents real funds as demo money.
+      setAccount(null);
+      setPositions([]);
+    } finally {
+      setLoadingAccount(false);
+    }
+  }, []);
 
   const loadHistory = useCallback(async (m: Mode) => {
     try {
@@ -264,6 +258,20 @@ function ForexPage() {
     };
   }, [openPositionsForSymbol]);
 
+  // Context shown in the fullscreen bar so a position remains readable without
+  // scrolling back to the ticket. Read-only: fullscreen must never act on it.
+  const fullscreenContext = useMemo(() => {
+    const first = openPositionsForSymbol[0];
+    return {
+      priceLabel: quote ? `Bid ${quote.bid} · Ask ${quote.ask}` : undefined,
+      positionLabel: first
+        ? `${first.side.toUpperCase()} ${first.quantity} lots @ ${first.average_entry_price}`
+        : undefined,
+      pnlLabel: first?.unrealised_pnl != null ? ksh(first.unrealised_pnl) : undefined,
+      pnlPositive: (first?.unrealised_pnl ?? 0) >= 0,
+    };
+  }, [openPositionsForSymbol, quote]);
+
   // Entry price for the ticket, derived from the live quote rather than typed.
   const entryPrice = side === "buy" ? quote?.ask : quote?.bid;
 
@@ -274,6 +282,10 @@ function ForexPage() {
   const minTradeAmount = 100;
   const freeMargin = account?.freeMargin ?? null;
   const exposure = Number(tradeAmountInput) > 0 ? Number(tradeAmountInput) * leverage : 0;
+
+  // Pairs offered in the fullscreen selector, taken from the same live watchlist
+  // the normal view uses so the two can never disagree.
+  const symbolOptions = useMemo(() => Object.values(quotes).map((q) => q.symbol), [quotes]);
 
   const placeOrder = async () => {
     if (!quote) return;
@@ -354,7 +366,11 @@ function ForexPage() {
   };
 
   const marketBadge =
-    marketState === "open" ? "MARKET OPEN" : marketState === "paused" ? "MARKET PAUSED" : "MARKET UNAVAILABLE";
+    marketState === "open"
+      ? "MARKET OPEN"
+      : marketState === "paused"
+        ? "MARKET PAUSED"
+        : "MARKET UNAVAILABLE";
 
   return (
     <AppShell>
@@ -470,7 +486,11 @@ function ForexPage() {
                           up ? "text-brand-ink" : "text-destructive",
                         ].join(" ")}
                       >
-                        {up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                        {up ? (
+                          <ArrowUpRight className="h-3 w-3" />
+                        ) : (
+                          <ArrowDownRight className="h-3 w-3" />
+                        )}
                         {w.percent}%
                       </span>
                     )}
@@ -522,6 +542,10 @@ function ForexPage() {
               onIntervalChange={setInterval_}
               lines={priceLines}
               digits={digits}
+              symbol={symbol}
+              symbols={symbolOptions}
+              onSymbolChange={setSymbol}
+              {...fullscreenContext}
             />
           ) : (
             <div className="grid h-64 place-items-center rounded-2xl border border-border bg-card">
@@ -538,7 +562,10 @@ function ForexPage() {
                 ["Equity", ksh(account.equity)],
                 ["Used margin", ksh(account.usedMargin)],
                 ["Free margin", ksh(account.freeMargin)],
-                ["Margin level", account.marginLevelPercent ? `${account.marginLevelPercent}%` : "—"],
+                [
+                  "Margin level",
+                  account.marginLevelPercent ? `${account.marginLevelPercent}%` : "—",
+                ],
               ] as const
             ).map(([label, value]) => (
               <Card key={label} className="!p-3">
@@ -567,7 +594,11 @@ function ForexPage() {
                       : "bg-muted text-muted-foreground",
                   ].join(" ")}
                 >
-                  {s === "buy" ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
+                  {s === "buy" ? (
+                    <ArrowUpRight className="h-4 w-4" />
+                  ) : (
+                    <ArrowDownRight className="h-4 w-4" />
+                  )}
                   {s.toUpperCase()}
                 </button>
               ))}
@@ -590,7 +621,9 @@ function ForexPage() {
 
             {orderType === "limit" && (
               <div className="mt-3">
-                <label className="block text-[11px] font-semibold text-foreground">Limit price</label>
+                <label className="block text-[11px] font-semibold text-foreground">
+                  Limit price
+                </label>
                 <input
                   value={limitPrice}
                   onChange={(e) => setLimitPrice(e.target.value)}
@@ -629,7 +662,9 @@ function ForexPage() {
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-foreground">Take profit</label>
+                <label className="block text-[11px] font-semibold text-foreground">
+                  Take profit
+                </label>
                 <input
                   value={takeProfit}
                   onChange={(e) => setTakeProfit(e.target.value)}
@@ -770,7 +805,11 @@ function ForexPage() {
                     <p
                       className={[
                         "shrink-0 text-[12px] font-bold",
-                        h.pnl > 0 ? "text-brand-ink" : h.pnl < 0 ? "text-destructive" : "text-muted-foreground",
+                        h.pnl > 0
+                          ? "text-brand-ink"
+                          : h.pnl < 0
+                            ? "text-destructive"
+                            : "text-muted-foreground",
                       ].join(" ")}
                     >
                       {h.kind === "position" ? `${h.pnl >= 0 ? "+" : ""}${ksh(h.pnl)}` : h.status}
