@@ -100,6 +100,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { name: "theme-color", content: "#024812" },
+      // Lets iOS treat an added home-screen icon as a standalone app.
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+      { name: "apple-mobile-web-app-title", content: "PESAKI" },
       { name: "robots", content: "index, follow" },
       { name: "googlebot", content: "index, follow" },
       { name: "author", content: "PESAKI" },
@@ -156,6 +161,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "canonical", href: "https://pesaki.co.ke/" },
+      // Required for PWA installability. Without this the browser never parses
+      // the manifest and `beforeinstallprompt` never fires.
+      { rel: "manifest", href: "/manifest.json" },
+      { rel: "icon", href: "/favicon.ico", sizes: "any" },
+      { rel: "icon", href: "/icons/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { rel: "icon", href: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { rel: "icon", href: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+      // iOS ignores the manifest for the home-screen icon and uses this instead.
+      { rel: "apple-touch-icon", href: "/icons/apple-touch-icon-180.png", sizes: "180x180" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
@@ -187,6 +201,8 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
+  usePwaServiceWorker();
+
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
@@ -196,6 +212,52 @@ function RootComponent() {
       <CookieBanner />
     </QueryClientProvider>
   );
+}
+
+/**
+ * Registers the service worker that vite-plugin-pwa generates at /sw.js.
+ *
+ * A registered service worker with a fetch handler is a precondition for
+ * `beforeinstallprompt`, so without this PESAKI can never be installed. Failures
+ * are swallowed deliberately: an unavailable or blocked service worker must never
+ * break the app, it only means installation is unavailable.
+ */
+function usePwaServiceWorker() {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!("serviceWorker" in navigator)) return;
+
+    // A stale worker from a previous deploy can serve an old shell. Reloading
+    // once on controller change makes the new build take effect immediately.
+    let reloading = false;
+    const onControllerChange = () => {
+      if (reloading) return;
+      reloading = true;
+      window.location.reload();
+    };
+    navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+
+    const register = async () => {
+      try {
+        await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+      } catch (err) {
+        // Expected in private browsing or on insecure origins. Not actionable for
+        // the user, and must not surface as an application error.
+        console.debug("PESAKI service worker not registered:", err);
+      }
+    };
+
+    if (document.readyState === "complete") {
+      void register();
+    } else {
+      window.addEventListener("load", register, { once: true });
+    }
+
+    return () => {
+      navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+      window.removeEventListener("load", register);
+    };
+  }, []);
 }
 
 function AuthRouteGuard({ children }: { children: ReactNode }) {

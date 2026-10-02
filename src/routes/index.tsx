@@ -37,6 +37,7 @@ import {
 import { useState, useEffect, useRef } from "react";
 import { AppShell } from "@/components/AppShell";
 import { PesakiLogo, PesakiWordmark } from "@/components/PesakiLogo";
+import { InstallPESAKI } from "@/components/InstallPESAKI";
 import { Card, Stat, SectionTitle, Badge } from "@/components/ui-bits";
 import { apiRequest } from "../utils/api";
 import { useAuth } from "@/hooks/useAuth";
@@ -553,6 +554,7 @@ function PublicHome() {
             <PesakiWordmark size="lg" tone="light" />
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            <InstallPESAKI autoPrompt={false} />
             <Link
               to="/profile"
               aria-label="Notifications"
@@ -1016,6 +1018,10 @@ function PublicHome() {
           {COMPANY.legalName} · {COMPANY.registrationNumber} · Nairobi, Kenya
         </p>
       </section>
+
+      {/* Branded install offer. Renders nothing unless the browser reports PESAKI
+          is installable (or iOS, where manual steps are shown instead). */}
+      <InstallPESAKI autoPrompt />
     </div>
   );
 }
