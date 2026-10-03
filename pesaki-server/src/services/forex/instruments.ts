@@ -146,6 +146,21 @@ export const INSTRUMENTS: Record<string, InstrumentSpec> = {
     lotStep: 0.01,
     typicalSpreadPips: 1.8,
   },
+  // KES/USD — Kenyan Shilling vs US Dollar. The quote currency is USD so the
+  // spread is sub-unit; pipSize is a single fractional digit (0.00001) to give
+  // a meaningful pip at this price level, matching the forex_instruments row.
+  "KES/USD": {
+    symbol: "KES/USD",
+    base: "KES",
+    quote: "USD",
+    digits: 5,
+    pipSize: 0.00001,
+    contractSize: 100000,
+    minLot: 0.01,
+    maxLot: 100,
+    lotStep: 0.01,
+    typicalSpreadPips: 1.5,
+  },
 };
 
 export const SYMBOLS = Object.keys(INSTRUMENTS);

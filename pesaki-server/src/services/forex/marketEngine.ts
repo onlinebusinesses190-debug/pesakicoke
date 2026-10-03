@@ -69,6 +69,8 @@ const DEFAULT_INITIAL_PRICES: Record<string, number> = {
   "EUR/GBP": 0.8777,
   "EUR/JPY": 171.06,
   "GBP/JPY": 194.88,
+  // KES/USD: 1 / (KES per USD). Default USD rate is 130, so ≈ 0.00769.
+  "KES/USD": 0.00769,
 };
 
 const num = (key: string, fallback: number) => {
@@ -159,6 +161,21 @@ export interface Quote {
   timestamp: string;
 }
 
+/**
+ * Optional persistence adapter. The engine is deterministic, but a restart that
+ * loses the last mid price and tick counter jumps the walk back to seed. This
+ * adapter lets the engine load and save that state so a restart continues the
+ * same series instead of restarting it.
+ *
+ * It is injected rather than imported so the engine stays pure and testable
+ * without a database.
+ */
+export interface EnginePersistence {
+  loadSymbolState(): Promise<Record<string, { mid: number; tickCount: number }>>;
+  loadCandles(symbol: string, interval: string, count: number): Promise<Candle[]>;
+}
+
+
 export class MarketEngine {
   private config: EngineConfig;
   /** Per-symbol walk state. */
@@ -169,6 +186,14 @@ export class MarketEngine {
   private startedAt: number;
   private timer: NodeJS.Timeout | null = null;
   private _state: MarketState;
+  /**
+   * Fired with a completed candle (symbol + interval) the moment a new bucket
+   * starts. Used by the persistence layer to archive candles without the engine
+   * knowing where they are written.
+   */
+  onCandleComplete?: (symbol: string, interval: Interval, candle: Candle) => void;
+  /** Guards against seedHistory overwriting hydrated state on start(). */
+  private _historySeeded = false;
 
   constructor(config: EngineConfig, now = Date.now()) {
     this.config = config;
@@ -290,6 +315,11 @@ export class MarketEngine {
       const series = ((this.candles[symbol] ??= {})[interval] ??= []);
       const last = series[series.length - 1];
       if (!last || last.timestamp !== start) {
+        // The previous candle is now complete: a new bucket is starting. Notify
+        // any persistence hook so it can be archived without a separate sweep.
+        if (last && this.onCandleComplete) {
+          this.onCandleComplete(symbol, interval, last);
+        }
         series.push({ timestamp: start, open: price, high: price, low: price, close: price, tickVolume: 1 });
       } else {
         last.high = Math.max(last.high, price);
@@ -408,7 +438,13 @@ export class MarketEngine {
   start() {
     if (this.timer) return;
     const symbols = Object.keys(INSTRUMENTS);
-    this.seedHistory(symbols);
+    // Don't overwrite hydrated state. hydrate() loads persisted prices and
+    // candles so the walk continues from where it stopped; regenerating from
+    // seed would discard that and jump the price back to its starting value.
+    if (!this._historySeeded) {
+      this.seedHistory(symbols);
+      this._historySeeded = true;
+    }
     this.timer = setInterval(() => {
       if (this._state !== "open") return;
       const at = Date.now();
@@ -437,6 +473,90 @@ export class MarketEngine {
     const spec = getInstrumentSpec(symbol);
     if (!spec || !Number.isFinite(price)) return;
     this.mid[symbol.toUpperCase()] = roundToDigits(price, spec.digits);
+  }
+
+  /**
+   * Restore a tick counter so the deterministic walk continues from the same
+   * position it was at before a restart, instead of regenerating the same first
+   * ticks and re-trading a price move.
+   */
+  hydrateCounter(symbol: string, count: number) {
+    const key = symbol.toUpperCase();
+    if (this.counter[key] !== undefined && Number.isFinite(count) && count >= 0) {
+      this.counter[key] = Math.floor(count);
+    }
+  }
+
+  /**
+   * Replace an interval's in-memory candles with a persisted series. Used at
+   * startup so a chart is never empty after a restart.
+   */
+  hydrateCandles(symbol: string, interval: Interval, candles: Candle[]) {
+    const key = symbol.toUpperCase();
+    if (!this.candles[key]) this.candles[key] = {};
+    this.candles[key][interval] = candles;
+  }
+
+  /**
+   * Load persisted symbol state and candles before the engine starts ticking.
+   *
+   * State (mid + counter) is the critical piece: it keeps the price walk and the
+   * PRNG counter continuous across restarts. Candles are a secondary benefit —
+   * the walk is deterministic so seedHistory regenerates a consistent series,
+   * but loading saved candles avoids a brief empty-chart flash.
+   *
+   * On any persistence failure the engine falls back to seedHistory, so a
+   * database outage never prevents the market from opening.
+   */
+  async hydrate(persistence: EnginePersistence): Promise<void> {
+    if (this._historySeeded) return;
+    const symbols = Object.keys(INSTRUMENTS);
+
+    try {
+      const state = await persistence.loadSymbolState();
+      let hydratedAny = false;
+      for (const [symbol, s] of Object.entries(state)) {
+        this.hydrateMid(symbol, s.mid);
+        this.hydrateCounter(symbol, s.tickCount);
+        if (INSTRUMENTS[symbol.toUpperCase()]) hydratedAny = true;
+      }
+
+      let candlesLoaded = 0;
+      for (const symbol of symbols) {
+        for (const [interval] of Object.entries(INTERVALS) as [Interval, number][]) {
+          const loaded = await persistence.loadCandles(symbol, interval, 500);
+          if (loaded.length > 0) {
+            this.hydrateCandles(symbol, interval, loaded);
+            candlesLoaded += loaded.length;
+          }
+        }
+      }
+
+      if (hydratedAny || candlesLoaded > 0) {
+        this._historySeeded = true;
+      }
+      logger.info({ stateRows: Object.keys(state).length, candlesLoaded }, "Forex engine hydrated from persistence");
+    } catch (err) {
+      logger.warn({ err: (err as Error).message }, "Forex persistence load failed — falling back to seed");
+    }
+
+    // Fallback: if nothing was loaded, seed as normal so the market still opens.
+    if (!this._historySeeded) {
+      this.seedHistory(symbols);
+      this._historySeeded = true;
+    }
+  }
+
+  /** Point-in-time snapshot of every symbol's walk state, for flushing. */
+  snapshot(): Record<string, { mid: number; tickCount: number }> {
+    const out: Record<string, { mid: number; tickCount: number }> = {};
+    for (const symbol of Object.keys(INSTRUMENTS)) {
+      out[symbol] = {
+        mid: this.mid[symbol] ?? DEFAULT_INITIAL_PRICES[symbol] ?? 0,
+        tickCount: this.counter[symbol] ?? 0,
+      };
+    }
+    return out;
   }
 }
 

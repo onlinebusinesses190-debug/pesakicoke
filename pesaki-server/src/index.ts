@@ -11,6 +11,7 @@ import { initCronJobs } from './cron';
 import { registerRoutes } from './api';
 import { setupRateLimit } from './middleware/rateLimit';
 import { getEngine } from './services/forex/marketEngine';
+import { hydrateAndAttach } from './services/forex/persistence';
 import { startPositionMonitor } from './services/forex/positionMonitor';
 
 import walletRoutes from './routes/wallet';
@@ -73,12 +74,18 @@ const startServer = async () => {
     // PESAKI Forex: the market engine and the SL/TP monitor must run
     // independently of the browser. Prices keep advancing and stops keep
     // triggering while nobody has a tab open.
+    //
+    // Hydrate from persistence first so the price walk and candle history
+    // continue from where they left off, then attach the persistence hooks
+    // before starting so the first live tick already gets archived.
+    const stopPersistence = await hydrateAndAttach(getEngine());
     getEngine().start();
     startPositionMonitor();
 
     const shutdown = () => {
       logger.info('Shutting down PESAKI Forex engine');
       getEngine().stop();
+      if (stopPersistence) stopPersistence();
       process.exit(0);
     };
     process.on('SIGTERM', shutdown);

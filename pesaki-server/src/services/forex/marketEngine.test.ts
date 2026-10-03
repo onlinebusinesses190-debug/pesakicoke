@@ -13,9 +13,28 @@ import {
   MarketEngine,
   aggregate,
   loadConfig,
+  type Candle,
   type EngineConfig,
+  type EnginePersistence,
 } from "./marketEngine";
 import { INSTRUMENTS } from "./instruments";
+
+/** In-memory EnginePersistence for testing hydration and callbacks. */
+class MockPersistence implements EnginePersistence {
+  public state: Record<string, { mid: number; tickCount: number }> = {};
+  public candles: Record<string, Candle[]> = {};
+  public shouldFail = false;
+
+  async loadSymbolState(): Promise<Record<string, { mid: number; tickCount: number }>> {
+    if (this.shouldFail) throw new Error("DB unavailable");
+    return this.state;
+  }
+
+  async loadCandles(symbol: string, interval: string, _count: number): Promise<Candle[]> {
+    if (this.shouldFail) throw new Error("DB unavailable");
+    return this.candles[`${symbol}:${interval}`] ?? [];
+  }
+}
 
 const baseConfig = (over: Partial<EngineConfig> = {}): EngineConfig => ({
   seed: 42,
@@ -240,5 +259,127 @@ describe("no hidden house edge", () => {
     // negative by exactly one spread. This is the disclosed cost of trading.
     const roundTrip = (q.bid - q.ask) / 0.0001;
     expect(roundTrip).toBeCloseTo(-1, 3);
+  });
+});
+
+describe("KES/USD instrument", () => {
+  it("is registered so the engine can quote it", () => {
+    const e = new MarketEngine(baseConfig(), NOW);
+    expect(INSTRUMENTS["KES/USD"]).toBeDefined();
+    expect(e.quote("KES/USD")).toBeTypeOf("object");
+  });
+
+  it("quotes with ask above bid around a positive mid", () => {
+    const e = new MarketEngine(baseConfig(), NOW);
+    const q = e.advance("KES/USD", NOW);
+    expect(q.ask).toBeGreaterThan(q.bid);
+    expect(q.mid).toBeGreaterThan(0);
+    expect(q.provider).toBe("pesaki-engine");
+  });
+
+  it("uses a sub-unit pip size at this price level", () => {
+    expect(INSTRUMENTS["KES/USD"].pipSize).toBe(0.00001);
+    expect(INSTRUMENTS["KES/USD"].base).toBe("KES");
+    expect(INSTRUMENTS["KES/USD"].quote).toBe("USD");
+  });
+
+  it("seeds from a sensible initial price", () => {
+    const e = new MarketEngine(baseConfig(), NOW);
+    // 1 / 130 KES/USD ≈ 0.00769
+    expect(e.quote("KES/USD").mid).toBeCloseTo(1 / 130, 5);
+  });
+});
+
+describe("state persistence", () => {
+  it("resumes the walk from a hydrated counter and mid", () => {
+    const cfg = baseConfig({ seed: 99 });
+    const a = new MarketEngine(cfg, NOW);
+    for (let i = 0; i < 10; i++) a.advance("EUR/USD", NOW + i * 1000);
+    const snap = a.snapshot()["EUR/USD"];
+
+    // Fresh engine with the same seed, restored to the saved state.
+    const b = new MarketEngine(cfg, NOW);
+    b.hydrateMid("EUR/USD", snap.mid);
+    b.hydrateCounter("EUR/USD", snap.tickCount);
+
+    // After restoring 10 ticks, the 11th must match because the PRNG is keyed
+    // by the counter — the walk is continuous, not restarted.
+    const nextA = a.advance("EUR/USD", NOW + 10_000);
+    const nextB = b.advance("EUR/USD", NOW + 10_000);
+    expect(nextB.mid).toBe(nextA.mid);
+  });
+
+  it("snapshot returns every registered symbol", () => {
+    const e = new MarketEngine(baseConfig(), NOW);
+    e.advance("EUR/USD", NOW);
+    const snap = e.snapshot();
+    for (const symbol of Object.keys(INSTRUMENTS)) {
+      expect(snap[symbol]).toBeDefined();
+      expect(snap[symbol].tickCount).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it("hydrate loads persisted state and skips seedHistory", async () => {
+    const mock = new MockPersistence();
+    mock.state = { "EUR/USD": { mid: 1.2, tickCount: 50 } };
+    const e = new MarketEngine(baseConfig(), NOW);
+    await e.hydrate(mock);
+
+    expect(e.quote("EUR/USD").mid).toBe(1.2);
+    // Counter was restored.
+    expect(e.snapshot()["EUR/USD"].tickCount).toBe(50);
+  });
+
+  it("hydrate loads persisted candles into the chart", async () => {
+    const mock = new MockPersistence();
+    mock.candles["EUR/USD:1m"] = [
+      { timestamp: NOW - 120_000, open: 1.19, high: 1.2, low: 1.18, close: 1.195, tickVolume: 5 },
+    ];
+    const e = new MarketEngine(baseConfig(), NOW);
+    await e.hydrate(mock);
+
+    const candles = e.getCandles("EUR/USD", "1m", 10, NOW);
+    expect(candles[0].open).toBe(1.19);
+    expect(candles[0].high).toBe(1.2);
+  });
+
+  it("hydrate falls back to seedHistory when persistence is empty", async () => {
+    const mock = new MockPersistence(); // no state, no candles
+    const e = new MarketEngine(baseConfig(), NOW);
+    await e.hydrate(mock);
+
+    expect(e.getCandles("EUR/USD", "1m", 5, NOW).length).toBeGreaterThan(0);
+  });
+
+  it("hydrate falls back to seedHistory when persistence throws", async () => {
+    const mock = new MockPersistence();
+    mock.shouldFail = true;
+    const e = new MarketEngine(baseConfig(), NOW);
+    await e.hydrate(mock);
+
+    expect(e.getCandles("EUR/USD", "1m", 5, NOW).length).toBeGreaterThan(0);
+  });
+
+  it("fires onCandleComplete when a candle bucket closes", () => {
+    const e = new MarketEngine(baseConfig(), NOW);
+    e.seedHistory(["EUR/USD"], NOW);
+    const completed: string[] = [];
+    e.onCandleComplete = (_symbol, interval) => completed.push(interval);
+
+    // Advance past a 1m boundary so the previous candle is closed.
+    e.advance("EUR/USD", NOW + 120_000);
+    expect(completed.length).toBeGreaterThan(0);
+    expect(completed).toContain("1m");
+  });
+
+  it("start() does not reseed after hydrate", async () => {
+    const mock = new MockPersistence();
+    mock.state = { "EUR/USD": { mid: 1.15, tickCount: 30 } };
+    const e = new MarketEngine(baseConfig(), NOW);
+    await e.hydrate(mock);
+    // start() must preserve the hydrated mid, not overwrite with seed.
+    e.start();
+    e.stop();
+    expect(e.quote("EUR/USD").mid).toBe(1.15);
   });
 });
