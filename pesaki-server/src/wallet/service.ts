@@ -4,7 +4,7 @@ import { logger } from '../utils/logger';
 
 const balanceFieldForMode = (mode: WalletMode) => mode === 'real' ? 'balance' : 'demo_balance';
 
-const ensureWalletExists = async (userId: string) => {
+export const ensureWalletExists = async (userId: string) => {
   const { data, error } = await supabase
     .from('wallets')
     .select('user_id, balance, demo_balance, locked')

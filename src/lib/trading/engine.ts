@@ -8,6 +8,27 @@ export type Side = "buy" | "sell";
 export type OrderType = "buy" | "sell" | "buy_limit" | "sell_limit" | "buy_stop" | "sell_stop";
 export type CloseReason = "manual" | "sl" | "tp" | "stopout";
 
+// KES value of one unit of each quote currency. Mirrors the server's
+// kesRates so a client deposit is converted the same way the server settles
+// P/L, and so the demo terminal's balance stays comparable to a real one.
+const KES_PER_QUOTE: Record<string, number> = {
+  USD: 130,
+  EUR: 141,
+  GBP: 168,
+  JPY: 0.88,
+  CHF: 152,
+  AUD: 85,
+  CAD: 95,
+  NZD: 79,
+};
+
+/** KES value of one unit of a quote currency (1 for KES itself). */
+export function kesPerQuote(currency: string): number {
+  const code = currency.toUpperCase();
+  if (code === "KES") return 1;
+  return KES_PER_QUOTE[code] ?? 1;
+}
+
 export interface SymbolSpec {
   name: string;
   desc: string;
@@ -145,6 +166,10 @@ export class Engine {
   balance = START_BALANCE;
   leverage = 100;
   currency = "USD";
+  // Demo by default. Switching to live routes deposits and orders through the
+  // backend (the client engine is a demo simulator and must never touch real
+  // funds), so the UI can show the mode without trusting the client.
+  mode: "demo" | "live" = "demo";
   positions: Position[] = [];
   orders: PendingOrder[] = [];
   history: Deal[] = [];
@@ -457,9 +482,12 @@ export class Engine {
     return { ok: true };
   }
 
-  deposit(amount: number): Result {
-    if (!(amount > 0 && amount <= 1e7)) return this.fail("Invalid deposit amount");
-    this.balance = round(this.balance + amount, 2);
+  deposit(amountKes: number): Result {
+    if (!(amountKes > 0 && amountKes <= 1e7)) return this.fail("Invalid deposit amount");
+    // The engine holds balance in USD; the terminal accepts KES, so convert
+    // using the same rate the server uses for P/L settlement.
+    const usd = amountKes / kesPerQuote("USD");
+    this.balance = round(this.balance + usd, 2);
     this.history.unshift({
       ticket: this.nextTicket++,
       symbol: "",
@@ -469,13 +497,22 @@ export class Engine {
       closePrice: 0,
       openTime: Date.now(),
       closeTime: Date.now(),
-      profit: amount,
+      profit: usd,
       reason: "deposit",
     });
-    this.log(`balance deposit ${amount.toFixed(2)} USD`);
+    this.log(`balance deposit ${usd.toFixed(2)} USD (KSh ${amountKes.toFixed(2)})`);
     this.save();
     this.emit();
     return { ok: true };
+  }
+
+  /** Switch the terminal between demo and live. Live mode routes deposits
+   * and orders through the backend; the client engine keeps simulating. */
+  setMode(mode: "demo" | "live") {
+    this.mode = mode;
+    this.log(mode === "live" ? "Live trading enabled (real funds via backend)" : "Demo trading");
+    this.save();
+    this.emit();
   }
 
   resetAccount() {

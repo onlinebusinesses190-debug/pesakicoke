@@ -44,7 +44,7 @@ import {
   validateTradeAmount,
 } from "../../services/forex/risk";
 import { reserveMargin, settleReal } from "../../services/forex/walletBridge";
-import { releaseLockedFunds } from "../../wallet/service";
+import { ensureWalletExists, releaseLockedFunds } from "../../wallet/service";
 
 const DEMO_START_BALANCE = 100_000;
 
@@ -497,6 +497,97 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
         code: "INTERNAL",
       });
     }
+  });
+
+  // ─── Deposit funds ───────────────────────────────────────────────────────────
+  //
+  // Funds the Forex account. DEMO credits the virtual `forex_accounts.balance`;
+  // REAL credits the PESAKI wallet's real `balance` (the source of truth for
+  // real money). Both enforce the same KSh 100-10,000 band so a deposit can
+  // never be too small or too large, and the band is the single source of
+  // truth rather than a client-side guess.
+  fastify.post("/deposit", { preHandler: [verifyAuth] }, async (request, reply) => {
+    const MIN_DEPOSIT = 100;
+    const MAX_DEPOSIT = 10_000;
+
+    const parsed = z
+      .object({
+        amount: z.number().positive(),
+        account_type: z.enum(["demo", "live"]).default("demo"),
+      })
+      .safeParse(request.body);
+
+    if (!parsed.success) return bad(reply, "Invalid deposit details");
+    const { amount, account_type } = parsed.data;
+    const userId = request.user!.id;
+
+    if (amount < MIN_DEPOSIT) {
+      return bad(reply, `Minimum deposit is KSh ${MIN_DEPOSIT}`, 400);
+    }
+    if (amount > MAX_DEPOSIT) {
+      return bad(reply, `Maximum deposit is KSh ${MAX_DEPOSIT}`, 400);
+    }
+
+    if (account_type === "live" && !REAL_TRADING_ENABLED) {
+      return bad(reply, "Real-money trading is not enabled on this deployment.", 403);
+    }
+
+    if (account_type === "demo") {
+      const account = await getOrCreateAccount(userId, "demo");
+      const balance = Number((Number(account.balance ?? 0) + amount).toFixed(4));
+      const { error: updateError } = await supabase
+        .from("forex_accounts")
+        .update({ balance, equity: balance, updated_at: new Date().toISOString() })
+        .eq("id", account.id)
+        .eq("user_id", userId);
+      if (updateError) {
+        logger.error({ err: updateError.message, userId, amount }, "Forex demo deposit failed");
+        return reply.code(500).send({ success: false, error: "Could not deposit funds.", code: "INTERNAL" });
+      }
+
+      await supabase.from("forex_transactions").insert({
+        user_id: userId,
+        account_id: account.id,
+        type: "deposit",
+        amount,
+        balance_after: balance,
+        status: "completed",
+        reference: `demo-deposit:${userId}:${amount}`,
+        note: `Demo deposit KSh ${amount}`,
+      });
+
+      return { success: true, mode: "demo", amount, balance };
+    }
+
+    // REAL: the PESAKI wallet is the source of truth. Credit it and mirror the
+    // figure into the forex row so the account view stays consistent.
+    const wallet = await ensureWalletExists(userId);
+    const newBalance = Number(wallet.balance ?? 0) + amount;
+    const { error: creditError } = await supabase
+      .from("wallets")
+      .update({ balance: newBalance })
+      .eq("user_id", userId);
+    if (creditError) {
+      logger.error({ err: creditError.message, userId, amount }, "Forex real deposit failed");
+      return reply.code(500).send({ success: false, error: "Could not deposit funds.", code: "INTERNAL" });
+    }
+
+    await supabase.from("wallet_ledger").insert({
+      user_id: userId,
+      amount,
+      type: "deposit",
+      mode: "credit",
+      description: `Forex deposit KSh ${amount}`,
+    });
+
+    let account = await getOrCreateAccount(userId, "live");
+    await supabase
+      .from("forex_accounts")
+      .update({ balance: newBalance, equity: newBalance, updated_at: new Date().toISOString() })
+      .eq("id", account.id)
+      .eq("user_id", userId);
+
+    return { success: true, mode: "live", amount, balance: newBalance };
   });
 
   // ─── Risk calculator ───────────────────────────────────────────────────────

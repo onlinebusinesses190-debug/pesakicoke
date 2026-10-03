@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { TIMEFRAMES, type TF } from "@/lib/trading/engine";
 import { money, useEngine } from "@/lib/trading/use-engine";
+import { apiRequest } from "@/utils/api";
 import { MarketWatch } from "./MarketWatch";
 import { PriceChart } from "./PriceChart";
 import { Toolbox } from "./Toolbox";
@@ -18,6 +19,10 @@ export function Terminal() {
   const [depositOpen, setDepositOpen] = useState(false);
   const [depositAmount, setDepositAmount] = useState("");
   const [depositErr, setDepositErr] = useState("");
+  const [depositLoading, setDepositLoading] = useState(false);
+  // REAL balance is held in the PESAKI wallet and kept in sync via the backend;
+  // DEMO balance lives in the client engine, so only the live figure is remote.
+  const [realBalance, setRealBalance] = useState<number | null>(null);
   const open = (d: DialogState) => {
     setDlgKey((k) => k + 1);
     setDialog(d);
@@ -27,6 +32,20 @@ export function Terminal() {
     setDepositOpen(true);
     setDepositErr("");
     setDepositAmount("");
+  };
+  const fetchRealBalance = async () => {
+    try {
+      const res = await apiRequest<{ success: boolean; balance: number }>(
+        "/forex/account?account_type=live",
+      );
+      setRealBalance(res.balance ?? 0);
+    } catch (err) {
+      setRealBalance(null);
+    }
+  };
+  const toggleMode = () => {
+    e.setMode(e.mode === "live" ? "demo" : "live");
+    if (e.mode !== "live") void fetchRealBalance();
   };
   const reset = () => {
     if (window.confirm("Reset the demo account? All positions and history will be removed."))
@@ -57,6 +76,13 @@ export function Terminal() {
         </button>
         <button className="px-2 hover:bg-accent" onClick={reset}>
           Reset Account
+        </button>
+        <button
+          className={`px-2 hover:bg-accent ${e.mode === "live" ? "text-buy" : "text-sell"}`}
+          onClick={toggleMode}
+          title={e.mode === "live" ? "Switch to demo" : "Switch to live"}
+        >
+          {e.mode === "live" ? "● LIVE" : "Demo"}
         </button>
         <button
           className="px-2 hover:bg-accent"
@@ -126,7 +152,13 @@ export function Terminal() {
         <span className={`truncate ${e.notice?.error ? "text-destructive" : ""}`}>
           {e.notice?.msg ?? "Ready"}
         </span>
-        <span className="ml-auto">Equity {money(e.equity)}</span>
+        {e.mode === "live" ? (
+          <span className="ml-auto">
+            Wallet KSh {realBalance != null ? realBalance.toLocaleString() : "—"}
+          </span>
+        ) : (
+          <span className="ml-auto">Equity {money(e.equity)}</span>
+        )}
         <span className="text-up">● Connected</span>
       </div>
 
@@ -136,13 +168,17 @@ export function Terminal() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 p-2">
           <div className="w-full max-w-sm border border-border bg-background p-3 shadow-xl">
             <div className="mb-2 flex items-center justify-between">
-              <span className="font-bold text-primary">Deposit demo funds</span>
+              <span className="font-bold text-primary">
+                {e.mode === "live" ? "Deposit real funds" : "Deposit demo funds"}
+              </span>
               <button onClick={() => setDepositOpen(false)} aria-label="Close" className="px-2">
                 ✕
               </button>
             </div>
             <p className="mb-2 text-xs text-muted-foreground">
-              Add virtual money to your demo account. Minimum KSh 100, maximum KSh 10,000.
+              {e.mode === "live"
+                ? "Add real money to your trading wallet. Minimum KSh 100, maximum KSh 10,000."
+                : "Add virtual money to your demo account. Minimum KSh 100, maximum KSh 10,000."}
             </p>
             <input
               className="mt-input w-full"
@@ -161,17 +197,42 @@ export function Terminal() {
                 Cancel
               </button>
               <button
-                className="flex-1 bg-primary py-1.5 text-primary-foreground"
-                onClick={() => {
+                className="flex-1 bg-primary py-1.5 text-primary-foreground disabled:opacity-50"
+                disabled={depositLoading}
+                onClick={async () => {
                   const n = Number(depositAmount);
                   if (!Number.isFinite(n)) return setDepositErr("Enter an amount");
                   if (n < 100) return setDepositErr("Minimum deposit is KSh 100");
                   if (n > 10000) return setDepositErr("Maximum deposit is KSh 10,000");
-                  e.deposit(n);
-                  setDepositOpen(false);
+                  setDepositErr("");
+                  setDepositLoading(true);
+                  try {
+                    if (e.mode === "live") {
+                      // Real money: the PESAKI wallet is the source of truth.
+                      const res = await apiRequest<{
+                        success: boolean;
+                        balance: number;
+                        error?: string;
+                      }>("/forex/deposit", {
+                        method: "POST",
+                        body: JSON.stringify({ amount: n, account_type: "live" }),
+                      });
+                      if (!res.success) return setDepositErr(res.error ?? "Deposit failed");
+                      setRealBalance(res.balance);
+                    } else {
+                      // Demo: keep the client-side balance in sync with the sheet.
+                      e.deposit(n);
+                    }
+                    setDepositAmount("");
+                    setDepositOpen(false);
+                  } catch (err) {
+                    setDepositErr(err instanceof Error ? err.message : "Deposit failed");
+                  } finally {
+                    setDepositLoading(false);
+                  }
                 }}
               >
-                Deposit
+                {depositLoading ? "Depositing…" : "Deposit"}
               </button>
             </div>
           </div>
