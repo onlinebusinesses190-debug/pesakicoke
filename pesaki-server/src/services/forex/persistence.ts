@@ -74,11 +74,7 @@ export class ForexPersistence implements EnginePersistence {
     }));
   }
 
-  async saveSymbolState(
-    symbol: string,
-    mid: number,
-    tickCount: number,
-  ): Promise<void> {
+  async saveSymbolState(symbol: string, mid: number, tickCount: number): Promise<void> {
     const { error } = await supabase.from("forex_symbol_state").upsert({
       symbol,
       mid,
@@ -87,10 +83,7 @@ export class ForexPersistence implements EnginePersistence {
     });
 
     if (error) {
-      logger.warn(
-        { symbol, error: error.message },
-        "Forex: could not persist symbol state",
-      );
+      logger.warn({ symbol, error: error.message }, "Forex: could not persist symbol state");
     }
   }
 
@@ -157,9 +150,7 @@ export function attachPersistence(
 }
 
 /** Convenience: hydrate then attach, in the order the server needs them. */
-export async function hydrateAndAttach(
-  engine: MarketEngine,
-): Promise<(() => void) | null> {
+export async function hydrateAndAttach(engine: MarketEngine): Promise<(() => void) | null> {
   const persistence = new ForexPersistence();
   await engine.hydrate(persistence);
   return attachPersistence(engine, persistence);

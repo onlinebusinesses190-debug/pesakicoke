@@ -81,7 +81,7 @@ const num = (key: string, fallback: number) => {
 };
 
 export function loadConfig(): EngineConfig {
-  let initialPrices: Record<string, number> = { ...DEFAULT_INITIAL_PRICES };
+  const initialPrices: Record<string, number> = { ...DEFAULT_INITIAL_PRICES };
   const raw = process.env.PESAKI_FX_INITIAL_PRICES;
   if (raw) {
     try {
@@ -136,7 +136,7 @@ function tickSeed(master: number, symbol: string, counter: number): number {
   for (let i = 0; i < symbol.length; i++) {
     h = (Math.imul(h, 31) + symbol.charCodeAt(i)) >>> 0;
   }
-  return (Math.imul(h ^ counter, 2654435761) >>> 0);
+  return Math.imul(h ^ counter, 2654435761) >>> 0;
 }
 
 export interface Candle {
@@ -174,7 +174,6 @@ export interface EnginePersistence {
   loadSymbolState(): Promise<Record<string, { mid: number; tickCount: number }>>;
   loadCandles(symbol: string, interval: string, count: number): Promise<Candle[]>;
 }
-
 
 export class MarketEngine {
   private config: EngineConfig;
@@ -254,18 +253,12 @@ export class MarketEngine {
     const current = this.mid[key];
     const shock = (rng() - 0.5) * 2 * this.config.volatility;
     const pull = (DEFAULT_INITIAL_PRICES[key] - current) / DEFAULT_INITIAL_PRICES[key];
-    const next = roundToDigits(
-      current * (1 + shock + pull * 0.02),
-      spec.digits,
-    );
+    const next = roundToDigits(current * (1 + shock + pull * 0.02), spec.digits);
     this.mid[key] = next;
 
     // Spread drawn per tick within the configured band. Applied to every fill.
     const pipRange = this.config.spreadPipsMax - this.config.spreadPipsMin;
-    const spreadPips = roundToDigits(
-      this.config.spreadPipsMin + rng() * pipRange,
-      2,
-    );
+    const spreadPips = roundToDigits(this.config.spreadPipsMin + rng() * pipRange, 2);
     const halfSpread = (spreadPips * spec.pipSize) / 2;
 
     this.recordTick(key, next, atMs);
@@ -320,7 +313,14 @@ export class MarketEngine {
         if (last && this.onCandleComplete) {
           this.onCandleComplete(symbol, interval, last);
         }
-        series.push({ timestamp: start, open: price, high: price, low: price, close: price, tickVolume: 1 });
+        series.push({
+          timestamp: start,
+          open: price,
+          high: price,
+          low: price,
+          close: price,
+          tickVolume: 1,
+        });
       } else {
         last.high = Math.max(last.high, price);
         last.low = Math.min(last.low, price);
@@ -362,7 +362,14 @@ export class MarketEngine {
         const bucket = Math.floor(at / bucketMs) * bucketMs;
         const last = series[series.length - 1];
         if (!last || last.timestamp !== bucket) {
-          series.push({ timestamp: bucket, open: price, high: price, low: price, close: price, tickVolume: 1 });
+          series.push({
+            timestamp: bucket,
+            open: price,
+            high: price,
+            low: price,
+            close: price,
+            tickVolume: 1,
+          });
         } else {
           last.high = Math.max(last.high, price);
           last.low = Math.min(last.low, price);
@@ -422,7 +429,8 @@ export class MarketEngine {
   dailyChange(symbol: string) {
     const key = symbol.toUpperCase();
     const spec = getInstrumentSpec(key);
-    if (!spec) return { pips: 0, percent: 0, high: null as number | null, low: null as number | null };
+    if (!spec)
+      return { pips: 0, percent: 0, high: null as number | null, low: null as number | null };
     const day = this.candles[key]["1D"] ?? [];
     const first = day[0]?.open ?? this.mid[key];
     const last = this.mid[key];
@@ -535,9 +543,15 @@ export class MarketEngine {
       if (hydratedAny || candlesLoaded > 0) {
         this._historySeeded = true;
       }
-      logger.info({ stateRows: Object.keys(state).length, candlesLoaded }, "Forex engine hydrated from persistence");
+      logger.info(
+        { stateRows: Object.keys(state).length, candlesLoaded },
+        "Forex engine hydrated from persistence",
+      );
     } catch (err) {
-      logger.warn({ err: (err as Error).message }, "Forex persistence load failed — falling back to seed");
+      logger.warn(
+        { err: (err as Error).message },
+        "Forex persistence load failed — falling back to seed",
+      );
     }
 
     // Fallback: if nothing was loaded, seed as normal so the market still opens.
@@ -568,7 +582,14 @@ export function aggregate(series: Candle[], seconds: number): Candle[] {
     const bucket = Math.floor(c.timestamp / bucketMs) * bucketMs;
     const last = out[out.length - 1];
     if (!last || last.timestamp !== bucket) {
-      out.push({ timestamp: bucket, open: c.open, high: c.high, low: c.low, close: c.close, tickVolume: c.tickVolume });
+      out.push({
+        timestamp: bucket,
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+        tickVolume: c.tickVolume,
+      });
     } else {
       last.high = Math.max(last.high, c.high);
       last.low = Math.min(last.low, c.low);

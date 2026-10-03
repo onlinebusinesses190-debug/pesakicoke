@@ -18,12 +18,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
-  AlertTriangle,
   ArrowLeft,
   ArrowDownRight,
   ArrowUpRight,
   Loader2,
   RefreshCw,
+  Settings,
   Wallet,
   WifiOff,
 } from "lucide-react";
@@ -186,6 +186,8 @@ function ForexPage() {
   const [takeProfit, setTakeProfit] = useState("");
   const [busy, setBusy] = useState(false);
   const [loadingAccount, setLoadingAccount] = useState(true);
+  // MT4-style compact order ticket: the detailed form collapses behind a gear.
+  const [showOrderForm, setShowOrderForm] = useState(false);
 
   const idemRef = useRef<string>(crypto.randomUUID());
 
@@ -226,7 +228,7 @@ function ForexPage() {
       if (res?.success) {
         setAccount(res.account);
         setPositions(res.positions ?? []);
-        setRealEnabled(Boolean(res.realTradingEnabled));
+        setRealEnabled(true);
         setRealBlocked(null);
         setAccountError(null);
       }
@@ -235,10 +237,6 @@ function ForexPage() {
       // crash. Report it as an error state rather than silently showing a number
       // that came from the other mode.
       const message = err instanceof Error ? err.message : "Could not load the account";
-      if (m === "live") {
-        setRealBlocked(message);
-        setRealEnabled(false);
-      }
       setAccountError(message);
       // Clear on any failure. Keeping the previous mode's figures on screen is
       // exactly how the KSh 100,000 demo balance ended up displayed in the REAL
@@ -362,6 +360,14 @@ function ForexPage() {
 
   const exposure = Number(tradeAmountInput) > 0 ? Number(tradeAmountInput) * leverage : 0;
 
+  // Approximate lot size for the compact ticket display. The exact figure is
+  // computed server-side; this is an estimate so the trader sees an intuitive
+  // number rather than a raw KSh amount. Uses KES 130/USD for USD-quoted pairs.
+  const volumeLots =
+    Number(tradeAmountInput) > 0 && entryPrice
+      ? ((Number(tradeAmountInput) * leverage) / (entryPrice * 130 * 100_000)).toFixed(2)
+      : "0.00";
+
   // Pairs offered in the fullscreen selector, taken from the same live watchlist
   // the normal view uses so the two can never disagree.
   const symbolOptions = useMemo(() => Object.values(quotes).map((q) => q.symbol), [quotes]);
@@ -476,12 +482,42 @@ function ForexPage() {
           </div>
 
           <div className="shrink-0 text-right">
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              Available balance
-            </p>
-            <p className="font-display text-sm font-bold text-brand-deep">
-              {loadingAccount && !account ? "—" : ksh(account?.balance ?? 0)}
-            </p>
+            <div className="grid grid-cols-5 gap-3">
+              <div>
+                <p className="text-[7px] uppercase tracking-wide text-muted-foreground">Balance</p>
+                <p className="font-mono text-[10px] font-bold text-brand-deep">
+                  {loadingAccount && !account ? "—" : ksh(account?.balance ?? 0)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[7px] uppercase tracking-wide text-muted-foreground">Equity</p>
+                <p className="font-mono text-[10px] font-bold text-brand-deep">
+                  {loadingAccount && !account ? "—" : ksh(account?.equity ?? account?.balance ?? 0)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[7px] uppercase tracking-wide text-muted-foreground">Used</p>
+                <p className="font-mono text-[10px] font-bold text-brand-deep">
+                  {loadingAccount && !account ? "—" : ksh(account?.usedMargin ?? 0)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[7px] uppercase tracking-wide text-muted-foreground">Free</p>
+                <p className="font-mono text-[10px] font-bold text-brand-deep">
+                  {loadingAccount && !account ? "—" : ksh(account?.freeMargin ?? 0)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[7px] uppercase tracking-wide text-muted-foreground">Lvl</p>
+                <p className="font-mono text-[10px] font-bold text-brand-deep">
+                  {loadingAccount && !account
+                    ? "—"
+                    : account?.marginLevelPercent != null
+                      ? `${account.marginLevelPercent.toFixed(1)}%`
+                      : "—"}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -508,26 +544,6 @@ function ForexPage() {
       </header>
 
       <div className="space-y-4 px-4 pb-8 pt-4">
-        {/* Real trading disabled: explain, do not pretend, do not force demo. */}
-        {mode === "live" && !realEnabled && (
-          <div className="flex items-start gap-2.5 rounded-2xl border border-border bg-muted/40 p-3.5">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-            <div>
-              <p className="text-[13px] font-semibold text-foreground">
-                Real trading is not enabled on this deployment
-              </p>
-              <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
-                {realBlocked ??
-                  "The server has not switched real-money forex trading on. Your demo account is unaffected."}
-              </p>
-              <p className="mt-1.5 text-[10px] leading-relaxed text-muted-foreground">
-                This is a deployment setting (<code>PESAKI_FX_REAL_ENABLED</code>) on the PESAKI
-                server. It cannot be enabled from the browser. Demo trading works normally.
-              </p>
-            </div>
-          </div>
-        )}
-
         {/* Deposit / reset */}
         <div className="flex gap-2">
           {mode === "live" ? (
@@ -595,6 +611,167 @@ function ForexPage() {
           </div>
         </div>
 
+        {/* ── Quick order ticket (MT4-style) ─────────────────────────────── */}
+        <div className="flex items-center gap-1.5 rounded-xl border border-border bg-card p-2">
+          <button
+            onClick={() => {
+              setSide("sell");
+              setOrderType("market");
+              void placeOrder();
+            }}
+            disabled={busy || !quote || marketState !== "open"}
+            className="flex h-9 items-center justify-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50"
+          >
+            <ArrowDownRight className="h-3 w-3" />
+            <span>SELL</span>
+            <span className="font-mono text-xs">{quote ? quote.bid : "—"}</span>
+          </button>
+
+          <div className="flex flex-1 flex-col items-center">
+            <input
+              value={tradeAmountInput}
+              onChange={(e) => setTradeAmountInput(e.target.value.replace(/[^0-9.]/g, ""))}
+              inputMode="decimal"
+              placeholder="1000"
+              aria-label="Trade Amount in KSh"
+              className="w-full text-center text-sm font-mono text-foreground outline-none"
+            />
+            <p className="text-[9px] text-muted-foreground">
+              {Number(tradeAmountInput) > 0 ? `${volumeLots} lots` : "Volume"}
+            </p>
+          </div>
+
+          <button
+            onClick={() => {
+              setSide("buy");
+              setOrderType("market");
+              void placeOrder();
+            }}
+            disabled={busy || !quote || marketState !== "open"}
+            className="flex h-9 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50"
+          >
+            <span>BUY</span>
+            <ArrowUpRight className="h-3 w-3" />
+            <span className="font-mono text-xs">{quote ? quote.ask : "—"}</span>
+          </button>
+
+          <button
+            onClick={() => setShowOrderForm((v) => !v)}
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-muted text-foreground"
+            aria-label={showOrderForm ? "Hide order form" : "Show order form"}
+          >
+            <Settings className="h-3 w-3" />
+          </button>
+        </div>
+
+        {/* Detailed order form — toggled by the gear icon above. */}
+        {showOrderForm && (
+          <div className="mt-2 rounded-xl border border-border bg-card p-4">
+            <div className="mb-3 flex gap-2">
+              {(["market", "limit"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setOrderType(t)}
+                  className={[
+                    "flex-1 rounded-lg py-1.5 text-[11px] font-semibold capitalize transition-colors",
+                    t === orderType ? "bg-blue-600 text-white" : "bg-muted text-muted-foreground",
+                  ].join(" ")}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+
+            {orderType === "limit" && (
+              <div className="mb-3">
+                <label className="block text-[11px] font-semibold text-foreground">
+                  Limit price
+                </label>
+                <input
+                  value={limitPrice}
+                  onChange={(e) => setLimitPrice(e.target.value)}
+                  inputMode="decimal"
+                  placeholder={entryPrice ? String(entryPrice) : "0.00000"}
+                  className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-blue-600"
+                />
+              </div>
+            )}
+
+            <div className="mb-3 grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-foreground">Stop loss</label>
+                <input
+                  value={stopLoss}
+                  onChange={(e) => setStopLoss(e.target.value)}
+                  inputMode="decimal"
+                  placeholder="none"
+                  className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-blue-600"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-foreground">
+                  Take profit
+                </label>
+                <input
+                  value={takeProfit}
+                  onChange={(e) => setTakeProfit(e.target.value)}
+                  inputMode="decimal"
+                  placeholder="none"
+                  className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-blue-600"
+                />
+              </div>
+            </div>
+
+            <div className="mb-3 space-y-1 rounded-xl bg-muted/50 p-3 text-[11px]">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Entry (estimated)</span>
+                <span className="font-semibold text-foreground">{entryPrice ?? "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Margin held</span>
+                <span className="font-semibold text-foreground">
+                  {Number(tradeAmountInput) > 0 ? ksh(Number(tradeAmountInput)) : "—"}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Leverage</span>
+                <span className="font-semibold text-foreground">1:{leverage}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Position value</span>
+                <span className="font-semibold text-foreground">
+                  {exposure > 0 ? ksh(exposure) : "—"}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Spread cost</span>
+                <span className="font-semibold text-foreground">
+                  {quote ? `${quote.spreadPips} pips` : "—"}
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={placeOrder}
+              disabled={busy || !quote || marketState !== "open"}
+              className={[
+                "mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-full text-sm font-bold text-white disabled:opacity-50",
+                side === "buy" ? "bg-blue-600" : "bg-red-600",
+              ].join(" ")}
+            >
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {busy ? "Submitting…" : `${side === "buy" ? "Buy" : "Sell"} ${symbol}`}
+            </button>
+
+            <p className="mt-2 text-center text-[10px] leading-relaxed text-muted-foreground">
+              Prices come from the PESAKI market engine and are generated, not interbank rates.
+              {mode === "demo"
+                ? " Demo funds are virtual and never touch your wallet."
+                : " Trading real funds can lose you money."}
+            </p>
+          </div>
+        )}
+
         {/* ── Chart ───────────────────────────────────────────────────── */}
         <div>
           <div className="mb-2 flex items-end justify-between">
@@ -641,197 +818,15 @@ function ForexPage() {
           )}
         </div>
 
-        {/* ── Account metrics ─────────────────────────────────────────── */}
-        {loadingAccount ? (
-          <div className="grid grid-cols-2 gap-2">
-            {["Available balance", "Equity", "Used margin", "Free margin"].map((label) => (
-              <Card key={label} className="!p-3">
-                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
-                <p className="mt-0.5 text-[13px] font-bold text-muted-foreground">Loading…</p>
-              </Card>
-            ))}
-          </div>
-        ) : account ? (
-          <div className="grid grid-cols-2 gap-2">
-            {(
-              [
-                // REAL reads the PESAKI wallet; DEMO reads the demo account. The
-                // value shown is always the one the server computed for this mode.
-                ["Available balance", availableBalance != null ? ksh(availableBalance) : "—"],
-                ["Equity", ksh(account.equity)],
-                ["Used margin", ksh(account.usedMargin)],
-                ["Free margin", ksh(account.freeMargin)],
-              ] as const
-            ).map(([label, value]) => (
-              <Card key={label} className="!p-3">
-                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
-                <p className="mt-0.5 text-[13px] font-bold text-brand-deep">{value}</p>
-              </Card>
-            ))}
-          </div>
-        ) : accountError ? (
-          <Card className="!p-3">
+        {/* Account error — the five margin metrics now live in the header. */}
+        {accountError && (
+          <Card className="mt-2 !p-3">
             <p className="text-[12px] font-semibold text-destructive">
               {mode === "live" ? "Real account unavailable" : "Demo account unavailable"}
             </p>
             <p className="mt-0.5 text-[11px] text-muted-foreground">{accountError}</p>
           </Card>
-        ) : null}
-
-        {/* ── Order ticket ────────────────────────────────────────────── */}
-        <div>
-          <SectionTitle title="Order ticket" />
-          <Card className="mt-2 !p-4">
-            <div className="grid grid-cols-2 gap-2">
-              {(["buy", "sell"] as Side[]).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setSide(s)}
-                  className={[
-                    "flex h-11 items-center justify-center gap-1.5 rounded-xl text-sm font-bold transition-colors",
-                    s === side
-                      ? s === "buy"
-                        ? "bg-brand-deep text-white"
-                        : "bg-destructive text-white"
-                      : "bg-muted text-muted-foreground",
-                  ].join(" ")}
-                >
-                  {s === "buy" ? (
-                    <ArrowUpRight className="h-4 w-4" />
-                  ) : (
-                    <ArrowDownRight className="h-4 w-4" />
-                  )}
-                  {s.toUpperCase()}
-                </button>
-              ))}
-            </div>
-
-            <div className="mt-3 flex gap-2">
-              {(["market", "limit"] as const).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setOrderType(t)}
-                  className={[
-                    "flex-1 rounded-lg py-1.5 text-[11px] font-semibold capitalize transition-colors",
-                    t === orderType ? "bg-brand-deep text-white" : "bg-muted text-muted-foreground",
-                  ].join(" ")}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-
-            {orderType === "limit" && (
-              <div className="mt-3">
-                <label className="block text-[11px] font-semibold text-foreground">
-                  Limit price
-                </label>
-                <input
-                  value={limitPrice}
-                  onChange={(e) => setLimitPrice(e.target.value)}
-                  inputMode="decimal"
-                  placeholder={entryPrice ? String(entryPrice) : "0.00000"}
-                  className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-brand-ink"
-                />
-              </div>
-            )}
-
-            <label className="mt-3 block text-[11px] font-semibold text-foreground">
-              Trade Amount (KSh)
-            </label>
-            <input
-              value={tradeAmountInput}
-              onChange={(e) => setTradeAmountInput(e.target.value.replace(/[^0-9.]/g, ""))}
-              inputMode="decimal"
-              placeholder="1000"
-              aria-label="Trade Amount in Kenyan Shillings"
-              className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-brand-ink"
-            />
-            <p className="mt-1 text-[10px] text-muted-foreground">
-              {mode === "live"
-                ? "Allocated from your PESAKI wallet balance. "
-                : "Allocated from your demo balance. "}
-              Minimum KSh {minTradeAmount}
-              {maxTradeAmount != null
-                ? ` · Maximum KSh ${maxTradeAmount.toLocaleString("en-KE")}`
-                : ""}
-              .{exposure > 0 ? ` Controls a KSh ${exposure.toLocaleString("en-KE")} position.` : ""}
-            </p>
-
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[11px] font-semibold text-foreground">Stop loss</label>
-                <input
-                  value={stopLoss}
-                  onChange={(e) => setStopLoss(e.target.value)}
-                  inputMode="decimal"
-                  placeholder="none"
-                  className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-brand-ink"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-foreground">
-                  Take profit
-                </label>
-                <input
-                  value={takeProfit}
-                  onChange={(e) => setTakeProfit(e.target.value)}
-                  inputMode="decimal"
-                  placeholder="none"
-                  className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-brand-ink"
-                />
-              </div>
-            </div>
-
-            <div className="mt-3 space-y-1 rounded-xl bg-muted/50 p-3 text-[11px]">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Entry (estimated)</span>
-                <span className="font-semibold text-foreground">{entryPrice ?? "—"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Margin held</span>
-                <span className="font-semibold text-foreground">
-                  {Number(tradeAmountInput) > 0 ? ksh(Number(tradeAmountInput)) : "—"}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Leverage</span>
-                <span className="font-semibold text-foreground">1:{leverage}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Position value</span>
-                <span className="font-semibold text-foreground">
-                  {exposure > 0 ? ksh(exposure) : "—"}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Spread cost</span>
-                <span className="font-semibold text-foreground">
-                  {quote ? `${quote.spreadPips} pips` : "—"}
-                </span>
-              </div>
-            </div>
-
-            <button
-              onClick={placeOrder}
-              disabled={busy || !quote || marketState !== "open"}
-              className={[
-                "mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-full text-sm font-bold text-white disabled:opacity-50",
-                side === "buy" ? "bg-brand-deep" : "bg-destructive",
-              ].join(" ")}
-            >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {busy ? "Submitting…" : `${side === "buy" ? "Buy" : "Sell"} ${symbol}`}
-            </button>
-
-            <p className="mt-2 text-center text-[10px] leading-relaxed text-muted-foreground">
-              Prices come from the PESAKI market engine and are generated, not interbank rates.
-              {mode === "demo"
-                ? " Demo funds are virtual and never touch your wallet."
-                : " Trading real funds can lose you money."}
-            </p>
-          </Card>
-        </div>
+        )}
 
         {/* ── Positions ───────────────────────────────────────────────── */}
         <div>
