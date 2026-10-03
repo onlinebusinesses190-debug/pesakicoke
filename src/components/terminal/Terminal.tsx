@@ -13,14 +13,20 @@ export function Terminal() {
   const [zoom, setZoom] = useState(1);
   const [dialog, setDialog] = useState<DialogState>(null);
   const [dlgKey, setDlgKey] = useState(0);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [chartLight, setChartLight] = useState(false);
+  const [depositOpen, setDepositOpen] = useState(false);
+  const [depositAmount, setDepositAmount] = useState("");
+  const [depositErr, setDepositErr] = useState("");
   const open = (d: DialogState) => {
     setDlgKey((k) => k + 1);
     setDialog(d);
   };
 
   const deposit = () => {
-    const v = window.prompt("Deposit amount (USD)", "1000");
-    if (v) e.deposit(parseFloat(v));
+    setDepositOpen(true);
+    setDepositErr("");
+    setDepositAmount("");
   };
   const reset = () => {
     if (window.confirm("Reset the demo account? All positions and history will be removed."))
@@ -30,8 +36,11 @@ export function Terminal() {
   return (
     // The terminal is an MT4-style dark interface. Force dark mode on the
     // subtree so the chrome/chart palette is right regardless of the global
-    // theme (the root shell does not apply a dark class).
-    <div className="dark flex min-h-screen flex-col bg-background md:h-screen">
+    // theme (the root shell does not apply a dark class). The chart itself
+    // is toggled separately via the chart-light class so it can be light too.
+    <div
+      className={`dark flex min-h-screen flex-col bg-background md:h-screen ${fullscreen ? "fixed inset-0 z-50" : ""} ${chartLight ? "chart-light" : ""}`}
+    >
       <div className="flex flex-wrap items-center gap-1 border-b border-border bg-chrome px-1 py-0.5">
         <span className="px-2 font-bold text-primary">MetaTrader Web</span>
         <button className="px-2 hover:bg-accent" onClick={() => open({ mode: "new", symbol })}>
@@ -48,6 +57,20 @@ export function Terminal() {
         </button>
         <button className="px-2 hover:bg-accent" onClick={reset}>
           Reset Account
+        </button>
+        <button
+          className="px-2 hover:bg-accent"
+          onClick={() => setChartLight((l) => !l)}
+          title={chartLight ? "Dark chart" : "Light chart"}
+        >
+          ☀/🌙
+        </button>
+        <button
+          className="px-2 hover:bg-accent"
+          onClick={() => setFullscreen((f) => !f)}
+          title={fullscreen ? "Exit fullscreen" : "Fullscreen"}
+        >
+          ⤢
         </button>
         <span className="ml-auto px-2 text-muted-foreground">Demo · 1:{e.leverage} · USD</span>
       </div>
@@ -108,6 +131,52 @@ export function Terminal() {
       </div>
 
       {dialog && <OrderDialog key={dlgKey} state={dialog} onClose={() => setDialog(null)} />}
+
+      {depositOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 p-2">
+          <div className="w-full max-w-sm border border-border bg-background p-3 shadow-xl">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="font-bold text-primary">Deposit demo funds</span>
+              <button onClick={() => setDepositOpen(false)} aria-label="Close" className="px-2">
+                ✕
+              </button>
+            </div>
+            <p className="mb-2 text-xs text-muted-foreground">
+              Add virtual money to your demo account. Minimum KSh 100, maximum KSh 10,000.
+            </p>
+            <input
+              className="mt-input w-full"
+              type="number"
+              min={100}
+              max={10000}
+              step={1}
+              inputMode="numeric"
+              placeholder="Amount in KSh"
+              value={depositAmount}
+              onChange={(v) => setDepositAmount(v.target.value)}
+            />
+            {depositErr && <p className="mt-1 text-xs text-destructive">{depositErr}</p>}
+            <div className="mt-3 flex gap-2">
+              <button className="mt-btn flex-1" onClick={() => setDepositOpen(false)}>
+                Cancel
+              </button>
+              <button
+                className="flex-1 bg-primary py-1.5 text-primary-foreground"
+                onClick={() => {
+                  const n = Number(depositAmount);
+                  if (!Number.isFinite(n)) return setDepositErr("Enter an amount");
+                  if (n < 100) return setDepositErr("Minimum deposit is KSh 100");
+                  if (n > 10000) return setDepositErr("Maximum deposit is KSh 10,000");
+                  e.deposit(n);
+                  setDepositOpen(false);
+                }}
+              >
+                Deposit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

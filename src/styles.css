@@ -266,6 +266,23 @@
   background: var(--chrome);
 }
 
+// Light chart palette. Toggled from the toolbar so the candlestick chart
+// can be viewed on a light background without leaving the dark terminal.
+.chart-light {
+  --chart-bg: oklch(0.96 0.01 150);
+  --chart-grid: oklch(0.82 0.03 150);
+  --chart-text: oklch(0.2 0.04 165);
+  --chart-bull: oklch(0.35 0.16 155);
+  --chart-bear: oklch(0.62 0.22 27);
+  --chart-bid: oklch(0.2 0.04 165);
+  --chart-ask: oklch(0.62 0.22 27);
+  --chart-sl: oklch(0.62 0.22 27);
+  --chart-tp: oklch(0.35 0.16 155);
+  --chart-entry-buy: oklch(0.3 0.16 250);
+  --chart-entry-sell: oklch(0.6 0.2 40);
+  --chart-cross: oklch(0.4 0.04 165);
+}
+
 :root {
   --text-buy: var(--buy);
   --text-sell: var(--sell);

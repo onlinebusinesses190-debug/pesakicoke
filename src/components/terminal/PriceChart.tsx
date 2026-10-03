@@ -39,7 +39,7 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
     cv.height = size.h * dpr;
     const ctx = cv.getContext("2d")!;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const css = getComputedStyle(document.documentElement);
+    const css = getComputedStyle(wrapRef.current!);
     const col = (n: string) => css.getPropertyValue(n).trim();
     const W = size.w,
       H = size.h,
