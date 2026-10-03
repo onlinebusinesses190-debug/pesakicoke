@@ -44,6 +44,12 @@ export interface PriceLines {
   takeProfit?: number;
 }
 
+/** A buy/sell order-block marker drawn as a horizontal bar on the price axis. */
+export interface OrderBlock {
+  price: number;
+  side: "buy" | "sell";
+}
+
 const INTERVALS = ["1m", "5m", "15m", "30m", "1H", "4H", "1D"] as const;
 export type ForexInterval = (typeof INTERVALS)[number];
 
@@ -65,6 +71,7 @@ export function ForexChart({
   positionLabel,
   pnlLabel,
   pnlPositive,
+  orderBlocks,
 }: {
   data: ForexCandle[];
   interval: ForexInterval;
@@ -83,6 +90,8 @@ export function ForexChart({
   positionLabel?: string;
   pnlLabel?: string;
   pnlPositive?: boolean;
+  /** Left-axis order-block bars (recent buy/sell pressure). */
+  orderBlocks?: OrderBlock[];
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
@@ -230,6 +239,51 @@ export function ForexChart({
       }
     };
   }, [lines?.entry, lines?.stopLoss, lines?.takeProfit]);
+
+  // Order-block / volume histogram on the price axis: short horizontal bars per
+  // recent tick, green for buying pressure, red for selling pressure.
+  useEffect(() => {
+    const series = seriesRef.current;
+    if (!series) return;
+
+    const applied: unknown[] = [];
+    for (const ob of orderBlocks ?? []) {
+      const options: PriceLineOptions = {
+        price: ob.price,
+        color: ob.side === "buy" ? GREEN : RED,
+        lineWidth: 2,
+        lineStyle: LineStyle.Dashed,
+        lineVisible: true,
+        axisLabelVisible: false,
+        title: ob.side === "buy" ? "BUY" : "SELL",
+      };
+      applied.push(series.createPriceLine(options));
+    }
+
+    return () => {
+      for (const line of applied) {
+        try {
+          series.removePriceLine(line as never);
+        } catch {
+          // Line may already be gone if the series was torn down.
+        }
+      }
+    };
+  }, [orderBlocks]);
+
+  /** Y coordinate of the entry price, to anchor the on-chart position badge. */
+  const [entryBadgeY, setEntryBadgeY] = useState<number | null>(null);
+  useEffect(() => {
+    const series = seriesRef.current;
+    if (!series || !lines?.entry || full) {
+      setEntryBadgeY(null);
+      return;
+    }
+    const y = (
+      series as unknown as { priceToCoordinate: (p: number) => number | null }
+    ).priceToCoordinate(lines.entry);
+    setEntryBadgeY(y == null ? null : y);
+  }, [lines?.entry, full]);
 
   // ── Fullscreen ─────────────────────────────────────────────────────────────
 
@@ -486,6 +540,23 @@ export function ForexChart({
         className={full ? "min-h-0 w-full flex-1" : "w-full"}
         style={full ? undefined : { height }}
       />
+
+      {/* On-chart position badge anchored to the entry price line. */}
+      {!full && positionLabel && entryBadgeY != null && (
+        <div
+          className="pointer-events-none absolute left-2 z-10 flex items-center"
+          style={{ top: Math.max(0, entryBadgeY - 8) }}
+        >
+          <span
+            className={[
+              "rounded px-1.5 py-0.5 text-[10px] font-bold text-white",
+              pnlPositive ? "bg-blue-600" : "bg-red-600",
+            ].join(" ")}
+          >
+            {positionLabel}
+          </span>
+        </div>
+      )}
 
       {full && (
         <p className="shrink-0 px-3 pb-2 pt-1 text-center text-[10px] text-muted-foreground">
