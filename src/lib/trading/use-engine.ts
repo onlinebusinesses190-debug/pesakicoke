@@ -8,7 +8,9 @@ export function useEngine() {
 }
 
 export const money = (v: number) =>
-  v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/,/g, " ");
+  v
+    .toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    .replace(/,/g, " ");
 
 export const dt = (ms: number) => {
   const d = new Date(ms);

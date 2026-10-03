@@ -27,21 +27,50 @@ export interface Quote {
   dir: -1 | 0 | 1;
   time: number;
 }
-export interface Candle { t: number; o: number; h: number; l: number; c: number }
+export interface Candle {
+  t: number;
+  o: number;
+  h: number;
+  l: number;
+  c: number;
+}
 export interface Position {
-  ticket: number; symbol: string; side: Side; lots: number;
-  openPrice: number; openTime: number; sl: number; tp: number;
+  ticket: number;
+  symbol: string;
+  side: Side;
+  lots: number;
+  openPrice: number;
+  openTime: number;
+  sl: number;
+  tp: number;
 }
 export interface PendingOrder {
-  ticket: number; symbol: string; type: Exclude<OrderType, "buy" | "sell">; lots: number;
-  price: number; sl: number; tp: number; time: number;
+  ticket: number;
+  symbol: string;
+  type: Exclude<OrderType, "buy" | "sell">;
+  lots: number;
+  price: number;
+  sl: number;
+  tp: number;
+  time: number;
 }
 export interface Deal {
-  ticket: number; symbol: string; side: Side; lots: number;
-  openPrice: number; closePrice: number; openTime: number; closeTime: number;
-  profit: number; reason: CloseReason | "deposit" | "cancel";
+  ticket: number;
+  symbol: string;
+  side: Side;
+  lots: number;
+  openPrice: number;
+  closePrice: number;
+  openTime: number;
+  closeTime: number;
+  profit: number;
+  reason: CloseReason | "deposit" | "cancel";
 }
-export interface JournalEntry { time: number; msg: string; error?: boolean }
+export interface JournalEntry {
+  time: number;
+  msg: string;
+  error?: boolean;
+}
 export type Result = { ok: true; ticket?: number } | { ok: false; error: string };
 
 const RAW: [string, string, number, number, number, number][] = [
@@ -58,7 +87,14 @@ const RAW: [string, string, number, number, number, number][] = [
 ];
 
 export const SYMBOLS: SymbolSpec[] = RAW.map(([name, desc, digits, spread, contract, start]) => ({
-  name, desc, digits, point: Math.pow(10, -digits), spread, contract, start, vol: start * 1.6e-5,
+  name,
+  desc,
+  digits,
+  point: Math.pow(10, -digits),
+  spread,
+  contract,
+  start,
+  vol: start * 1.6e-5,
 }));
 
 const STORAGE_KEY = "mt-terminal-v1";
@@ -68,7 +104,8 @@ const MARGIN_CALL = 100;
 
 export const round = (v: number, d: number) => Math.round(v * Math.pow(10, d)) / Math.pow(10, d);
 const gauss = () => {
-  let u = 0, v = 0;
+  let u = 0,
+    v = 0;
   while (u === 0) u = Math.random();
   while (v === 0) v = Math.random();
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
@@ -82,14 +119,23 @@ function genCandles(s: SymbolSpec, tfSec: number, nowSec: number, n = 400): Cand
   const subSigma = s.vol * Math.sqrt((tfSec * 2) / 6);
   const last = Math.floor(nowSec / tfSec) * tfSec;
   for (let i = 0; i < n; i++) {
-    const o = p; let h = p, l = p;
-    for (let k = 0; k < 6; k++) { p += gauss() * subSigma; h = Math.max(h, p); l = Math.min(l, p); }
+    const o = p;
+    let h = p,
+      l = p;
+    for (let k = 0; k < 6; k++) {
+      p += gauss() * subSigma;
+      h = Math.max(h, p);
+      l = Math.min(l, p);
+    }
     out.push({ t: last - (n - 1 - i) * tfSec, o, h, l, c: p });
   }
   const shift = s.start - p;
   return out.map((c) => ({
-    t: c.t, o: round(c.o + shift, s.digits), h: round(c.h + shift, s.digits),
-    l: round(c.l + shift, s.digits), c: round(c.c + shift, s.digits),
+    t: c.t,
+    o: round(c.o + shift, s.digits),
+    h: round(c.h + shift, s.digits),
+    l: round(c.l + shift, s.digits),
+    c: round(c.c + shift, s.digits),
   }));
 }
 
@@ -113,13 +159,19 @@ export class Engine {
     const now = Date.now() / 1000;
     for (const s of SYMBOLS) {
       const tfs = {} as Record<TF, Candle[]>;
-      (Object.keys(TIMEFRAMES) as TF[]).forEach((tf) => (tfs[tf] = genCandles(s, TIMEFRAMES[tf], now)));
+      (Object.keys(TIMEFRAMES) as TF[]).forEach(
+        (tf) => (tfs[tf] = genCandles(s, TIMEFRAMES[tf], now)),
+      );
       this.candles[s.name] = tfs;
       const day = tfs.H1.slice(-24);
       this.quotes[s.name] = {
-        bid: s.start, ask: round(s.start + s.spread * s.point, s.digits),
-        high: Math.max(...day.map((c) => c.h)), low: Math.min(...day.map((c) => c.l)),
-        open: day[0].o, dir: 0, time: Date.now(),
+        bid: s.start,
+        ask: round(s.start + s.spread * s.point, s.digits),
+        high: Math.max(...day.map((c) => c.h)),
+        low: Math.min(...day.map((c) => c.l)),
+        open: day[0].o,
+        dir: 0,
+        time: Date.now(),
       };
     }
     this.load();
@@ -127,16 +179,33 @@ export class Engine {
     setInterval(() => this.tick(), 500);
   }
 
-  subscribe = (fn: () => void) => { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; };
+  subscribe = (fn: () => void) => {
+    this.listeners.add(fn);
+    return () => {
+      this.listeners.delete(fn);
+    };
+  };
   getVersion = () => this.version;
-  private emit() { this.version++; this.listeners.forEach((l) => l()); }
+  private emit() {
+    this.version++;
+    this.listeners.forEach((l) => l());
+  }
   private save() {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        balance: this.balance, positions: this.positions, orders: this.orders,
-        history: this.history.slice(0, 500), journal: this.journal.slice(0, 300), nextTicket: this.nextTicket,
-      }));
-    } catch { /* storage full or unavailable */ }
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          balance: this.balance,
+          positions: this.positions,
+          orders: this.orders,
+          history: this.history.slice(0, 500),
+          journal: this.journal.slice(0, 300),
+          nextTicket: this.nextTicket,
+        }),
+      );
+    } catch {
+      /* storage full or unavailable */
+    }
   }
   private load() {
     try {
@@ -149,7 +218,9 @@ export class Engine {
       this.history = d.history ?? [];
       this.journal = d.journal ?? [];
       this.nextTicket = d.nextTicket ?? this.nextTicket;
-    } catch { /* ignore corrupt storage */ }
+    } catch {
+      /* ignore corrupt storage */
+    }
   }
   private log(msg: string, error = false) {
     const e = { time: Date.now(), msg, error };
@@ -158,8 +229,12 @@ export class Engine {
     this.notice = e;
   }
 
-  spec(name: string) { return SYMBOLS.find((s) => s.name === name)!; }
-  fmt(name: string, v: number) { return v.toFixed(this.spec(name).digits); }
+  spec(name: string) {
+    return SYMBOLS.find((s) => s.name === name)!;
+  }
+  fmt(name: string, v: number) {
+    return v.toFixed(this.spec(name).digits);
+  }
 
   toUSD(symbol: string, amount: number) {
     const q = symbol.slice(3, 6);
@@ -172,8 +247,11 @@ export class Engine {
     const base = symbol.slice(0, 3);
     const units = lots * s.contract;
     if (base === "USD") return units / this.leverage;
+    // JPY pairs quote the inverse way round: USDJPY is USD per JPY, so the
+    // margin in USD is units / price, not units * price. Quote is USD per
+    // unit-of-base, so divide for all non-USD-base pairs.
     const conv = this.quotes[base + "USD"];
-    return (units * (conv ? conv.bid : 1)) / this.leverage;
+    return units / (conv ? conv.bid : 1) / this.leverage;
   }
   closePriceOf(p: { symbol: string; side: Side }) {
     const q = this.quotes[p.symbol];
@@ -184,13 +262,32 @@ export class Engine {
     const diff = (this.closePriceOf(p) - p.openPrice) * (p.side === "buy" ? 1 : -1);
     return round(this.toUSD(p.symbol, diff * lots * s.contract), 2);
   }
-  get floating() { return this.positions.reduce((a, p) => a + this.profitOf(p), 0); }
-  get equity() { return round(this.balance + this.floating, 2); }
-  get margin() { return round(this.positions.reduce((a, p) => a + this.marginFor(p.symbol, p.lots), 0), 2); }
-  get freeMargin() { return round(this.equity - this.margin, 2); }
-  get marginLevel() { return this.margin > 0 ? (this.equity / this.margin) * 100 : 0; }
+  get floating() {
+    return this.positions.reduce((a, p) => a + this.profitOf(p), 0);
+  }
+  get equity() {
+    return round(this.balance + this.floating, 2);
+  }
+  get margin() {
+    return round(
+      this.positions.reduce((a, p) => a + this.marginFor(p.symbol, p.lots), 0),
+      2,
+    );
+  }
+  get freeMargin() {
+    return round(this.equity - this.margin, 2);
+  }
+  get marginLevel() {
+    return this.margin > 0 ? (this.equity / this.margin) * 100 : 0;
+  }
 
-  private checkStops(side: Side, ref: number, sl: number, tp: number, symbol: string): string | null {
+  private checkStops(
+    side: Side,
+    ref: number,
+    sl: number,
+    tp: number,
+    symbol: string,
+  ): string | null {
     const minDist = this.spec(symbol).point * 10;
     if (sl < 0 || tp < 0) return "Invalid stops";
     if (side === "buy") {
@@ -202,19 +299,33 @@ export class Engine {
     }
     return null;
   }
-  private fail(msg: string): Result { this.log(msg, true); this.emit(); return { ok: false, error: msg }; }
+  private fail(msg: string): Result {
+    this.log(msg, true);
+    this.emit();
+    return { ok: false, error: msg };
+  }
 
-  placeOrder(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number }): Result {
+  placeOrder(req: {
+    symbol: string;
+    type: OrderType;
+    lots: number;
+    price?: number;
+    sl?: number;
+    tp?: number;
+  }): Result {
     const s = this.spec(req.symbol);
     if (!s) return this.fail("Unknown symbol");
     const q = this.quotes[req.symbol];
     const lots = round(req.lots, 2);
     if (!(lots >= 0.01 && lots <= 100)) return this.fail("Invalid volume (0.01 - 100 lots)");
-    const sl = round(req.sl || 0, s.digits), tp = round(req.tp || 0, s.digits);
+    const sl = round(req.sl || 0, s.digits),
+      tp = round(req.tp || 0, s.digits);
     const side: Side = isBuyType(req.type) ? "buy" : "sell";
 
     if (req.type === "buy" || req.type === "sell") {
-      const err = this.checkStops(side, side === "buy" ? q.bid : q.ask, sl, tp, req.symbol);
+      // Reference is the fill price (ask for buy, bid for sell) so SL/TP
+      // validation matches where the position actually opens.
+      const err = this.checkStops(side, side === "buy" ? q.ask : q.bid, sl, tp, req.symbol);
       if (err) return this.fail(err);
       return this.openPosition(req.symbol, side, lots, sl, tp);
     }
@@ -229,22 +340,54 @@ export class Engine {
     const err = this.checkStops(side, price, sl, tp, req.symbol);
     if (err) return this.fail(err);
     const ticket = this.nextTicket++;
-    this.orders.push({ ticket, symbol: req.symbol, type: t, lots, price, sl, tp, time: Date.now() });
-    this.log(`order #${ticket} ${typeLabel(t)} ${lots.toFixed(2)} ${req.symbol} at ${price.toFixed(s.digits)} placed`);
-    this.save(); this.emit();
+    this.orders.push({
+      ticket,
+      symbol: req.symbol,
+      type: t,
+      lots,
+      price,
+      sl,
+      tp,
+      time: Date.now(),
+    });
+    this.log(
+      `order #${ticket} ${typeLabel(t)} ${lots.toFixed(2)} ${req.symbol} at ${price.toFixed(s.digits)} placed`,
+    );
+    this.save();
+    this.emit();
     return { ok: true, ticket };
   }
 
-  private openPosition(symbol: string, side: Side, lots: number, sl: number, tp: number, fromOrder?: number): Result {
+  private openPosition(
+    symbol: string,
+    side: Side,
+    lots: number,
+    sl: number,
+    tp: number,
+    fromOrder?: number,
+  ): Result {
     const s = this.spec(symbol);
     const need = this.marginFor(symbol, lots);
-    if (this.freeMargin < need) return this.fail(`Not enough money: required margin ${need.toFixed(2)} USD`);
+    if (this.freeMargin < need)
+      return this.fail(`Not enough money: required margin ${need.toFixed(2)} USD`);
     const q = this.quotes[symbol];
     const price = side === "buy" ? q.ask : q.bid;
     const ticket = fromOrder ?? this.nextTicket++;
-    this.positions.push({ ticket, symbol, side, lots, openPrice: price, openTime: Date.now(), sl, tp });
-    this.log(`deal #${ticket} ${side} ${lots.toFixed(2)} ${symbol} at ${price.toFixed(s.digits)} done`);
-    this.save(); this.emit();
+    this.positions.push({
+      ticket,
+      symbol,
+      side,
+      lots,
+      openPrice: price,
+      openTime: Date.now(),
+      sl,
+      tp,
+    });
+    this.log(
+      `deal #${ticket} ${side} ${lots.toFixed(2)} ${symbol} at ${price.toFixed(s.digits)} done`,
+    );
+    this.save();
+    this.emit();
     return { ok: true, ticket };
   }
 
@@ -257,21 +400,34 @@ export class Engine {
     const price = this.closePriceOf(p);
     this.balance = round(this.balance + profit, 2);
     this.history.unshift({
-      ticket: p.ticket, symbol: p.symbol, side: p.side, lots: closeLots, openPrice: p.openPrice,
-      closePrice: price, openTime: p.openTime, closeTime: Date.now(), profit, reason,
+      ticket: p.ticket,
+      symbol: p.symbol,
+      side: p.side,
+      lots: closeLots,
+      openPrice: p.openPrice,
+      closePrice: price,
+      openTime: p.openTime,
+      closeTime: Date.now(),
+      profit,
+      reason,
     });
     if (closeLots >= p.lots - 1e-9) this.positions = this.positions.filter((x) => x !== p);
     else p.lots = round(p.lots - closeLots, 2);
     const tag = reason === "manual" ? "" : ` [${reason === "stopout" ? "stop out" : reason}]`;
-    this.log(`position #${ticket} closed ${closeLots.toFixed(2)} ${p.symbol} at ${this.fmt(p.symbol, price)}, profit ${profit.toFixed(2)}${tag}`, reason === "stopout");
-    this.save(); this.emit();
+    this.log(
+      `position #${ticket} closed ${closeLots.toFixed(2)} ${p.symbol} at ${this.fmt(p.symbol, price)}, profit ${profit.toFixed(2)}${tag}`,
+      reason === "stopout",
+    );
+    this.save();
+    this.emit();
     return { ok: true };
   }
 
   closeAll(filter?: "profit" | "loss") {
     [...this.positions].forEach((p) => {
       const pr = this.profitOf(p);
-      if (!filter || (filter === "profit" && pr > 0) || (filter === "loss" && pr < 0)) this.closePosition(p.ticket);
+      if (!filter || (filter === "profit" && pr > 0) || (filter === "loss" && pr < 0))
+        this.closePosition(p.ticket);
     });
   }
 
@@ -279,12 +435,15 @@ export class Engine {
     const p = this.positions.find((x) => x.ticket === ticket);
     if (!p) return this.fail(`Position #${ticket} not found`);
     const d = this.spec(p.symbol).digits;
-    sl = round(sl || 0, d); tp = round(tp || 0, d);
+    sl = round(sl || 0, d);
+    tp = round(tp || 0, d);
     const err = this.checkStops(p.side, this.closePriceOf(p), sl, tp, p.symbol);
     if (err) return this.fail(err);
-    p.sl = sl; p.tp = tp;
+    p.sl = sl;
+    p.tp = tp;
     this.log(`position #${ticket} modified: sl ${sl || "-"}, tp ${tp || "-"}`);
-    this.save(); this.emit();
+    this.save();
+    this.emit();
     return { ok: true };
   }
 
@@ -293,7 +452,8 @@ export class Engine {
     if (!o) return this.fail(`Order #${ticket} not found`);
     this.orders = this.orders.filter((x) => x !== o);
     this.log(`order #${ticket} ${typeLabel(o.type)} ${o.lots.toFixed(2)} ${o.symbol} canceled`);
-    this.save(); this.emit();
+    this.save();
+    this.emit();
     return { ok: true };
   }
 
@@ -301,18 +461,32 @@ export class Engine {
     if (!(amount > 0 && amount <= 1e7)) return this.fail("Invalid deposit amount");
     this.balance = round(this.balance + amount, 2);
     this.history.unshift({
-      ticket: this.nextTicket++, symbol: "", side: "buy", lots: 0, openPrice: 0, closePrice: 0,
-      openTime: Date.now(), closeTime: Date.now(), profit: amount, reason: "deposit",
+      ticket: this.nextTicket++,
+      symbol: "",
+      side: "buy",
+      lots: 0,
+      openPrice: 0,
+      closePrice: 0,
+      openTime: Date.now(),
+      closeTime: Date.now(),
+      profit: amount,
+      reason: "deposit",
     });
     this.log(`balance deposit ${amount.toFixed(2)} USD`);
-    this.save(); this.emit();
+    this.save();
+    this.emit();
     return { ok: true };
   }
 
   resetAccount() {
-    this.balance = START_BALANCE; this.positions = []; this.orders = []; this.history = []; this.journal = [];
+    this.balance = START_BALANCE;
+    this.positions = [];
+    this.orders = [];
+    this.history = [];
+    this.journal = [];
     this.log(`Demo account reset to ${START_BALANCE.toFixed(2)} USD`);
-    this.save(); this.emit();
+    this.save();
+    this.emit();
   }
 
   private tick() {
@@ -327,13 +501,27 @@ export class Engine {
       q.bid = bid;
       q.ask = round(bid + spreadPts * s.point, s.digits);
       q.dir = bid > prev ? 1 : bid < prev ? -1 : q.dir;
-      q.high = Math.max(q.high, bid); q.low = Math.min(q.low, bid); q.time = now;
+      q.high = Math.max(q.high, bid);
+      q.low = Math.min(q.low, bid);
+      q.time = now;
       for (const tf of Object.keys(TIMEFRAMES) as TF[]) {
         const arr = this.candles[s.name][tf];
         const bucket = Math.floor(nowSec / TIMEFRAMES[tf]) * TIMEFRAMES[tf];
         const last = arr[arr.length - 1];
-        if (last.t === bucket) { last.h = Math.max(last.h, bid); last.l = Math.min(last.l, bid); last.c = bid; }
-        else { arr.push({ t: bucket, o: last.c, h: Math.max(last.c, bid), l: Math.min(last.c, bid), c: bid }); if (arr.length > 1500) arr.shift(); }
+        if (last.t === bucket) {
+          last.h = Math.max(last.h, bid);
+          last.l = Math.min(last.l, bid);
+          last.c = bid;
+        } else {
+          arr.push({
+            t: bucket,
+            o: last.c,
+            h: Math.max(last.c, bid),
+            l: Math.min(last.c, bid),
+            c: bid,
+          });
+          if (arr.length > 1500) arr.shift();
+        }
       }
     }
     this.processTriggers();
@@ -344,12 +532,21 @@ export class Engine {
     for (const o of [...this.orders]) {
       const q = this.quotes[o.symbol];
       const hit =
-        (o.type === "buy_limit" && q.ask <= o.price) || (o.type === "sell_limit" && q.bid >= o.price) ||
-        (o.type === "buy_stop" && q.ask >= o.price) || (o.type === "sell_stop" && q.bid <= o.price);
+        (o.type === "buy_limit" && q.ask <= o.price) ||
+        (o.type === "sell_limit" && q.bid >= o.price) ||
+        (o.type === "buy_stop" && q.ask >= o.price) ||
+        (o.type === "sell_stop" && q.bid <= o.price);
       if (!hit) continue;
       this.orders = this.orders.filter((x) => x !== o);
       this.log(`order #${o.ticket} ${typeLabel(o.type)} triggered`);
-      const r = this.openPosition(o.symbol, isBuyType(o.type) ? "buy" : "sell", o.lots, o.sl, o.tp, o.ticket);
+      const r = this.openPosition(
+        o.symbol,
+        isBuyType(o.type) ? "buy" : "sell",
+        o.lots,
+        o.sl,
+        o.tp,
+        o.ticket,
+      );
       if (!r.ok) this.log(`order #${o.ticket} canceled: ${r.error}`, true);
     }
     for (const p of [...this.positions]) {
@@ -364,7 +561,10 @@ export class Engine {
     }
     if (this.positions.length) {
       const ml = this.marginLevel;
-      if (ml < MARGIN_CALL && !this.marginCallWarned) { this.marginCallWarned = true; this.log(`Margin call: margin level ${ml.toFixed(2)}%`, true); }
+      if (ml < MARGIN_CALL && !this.marginCallWarned) {
+        this.marginCallWarned = true;
+        this.log(`Margin call: margin level ${ml.toFixed(2)}%`, true);
+      }
       if (ml >= MARGIN_CALL) this.marginCallWarned = false;
       let guard = 0;
       while (this.positions.length && this.marginLevel < STOP_OUT && guard++ < 50) {
