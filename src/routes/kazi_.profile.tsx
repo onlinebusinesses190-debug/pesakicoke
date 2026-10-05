@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Badge, Card, Progress, SectionTitle } from "@/components/ui-bits";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
@@ -398,7 +399,7 @@ export function KaziProfileEditor() {
         setSaveStatus("failed");
       }
     }, 800);
-  }, [form, user]);
+  }, [form, user, supabase]);
 
   // Wrapper that updates local state AND triggers auto-save
   const setAndSave = <K extends keyof KaziProfileBasic>(key: K, value: KaziProfileBasic[K]) => {
