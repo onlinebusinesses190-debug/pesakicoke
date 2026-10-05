@@ -123,12 +123,45 @@ export const KAZI_PROFICIENCIES: { value: KaziProficiency; label: string }[] = [
 ];
 
 export const KAZI_AVAILABILITY = [
-  "Available now",
-  "Available this week",
-  "Available next week",
-  "Available in 2 weeks",
-  "Not available",
-];
+  "Available",
+  "Busy",
+  "Unavailable",
+] as const;
+
+export type KaziAvailability = (typeof KAZI_AVAILABILITY)[number];
+
+/** Older rows may hold the longer free-text values; normalise for the badge. */
+export function availabilityTone(value?: string | null): {
+  label: string;
+  tone: "success" | "warning" | "neutral";
+} {
+  const raw = (value || "").trim();
+  const v = raw.toLowerCase();
+  if (!v) return { label: "Not set", tone: "neutral" };
+  if (v.includes("unavailable") || v.includes("not available")) {
+    return { label: "Unavailable", tone: "neutral" };
+  }
+  if (v.includes("busy")) return { label: "Busy", tone: "warning" };
+  if (v.includes("available")) return { label: "Available", tone: "success" };
+  return { label: raw, tone: "neutral" };
+}
+
+export type KaziSearchResult = {
+  userId: string;
+  name: string;
+  headline: string | null;
+  category: string | null;
+  location: string | null;
+  photoUrl: string | null;
+  profileType: KaziProfileType;
+  serviceName: string | null;
+  availability: string | null;
+  ratingAverage: number | null;
+  ratingCount: number;
+  jobsCompleted: number;
+  verified: boolean;
+  matchedBySkill: boolean;
+};
 
 export const KAZI_CATEGORIES = [
   "House Help",
@@ -138,14 +171,9 @@ export const KAZI_CATEGORIES = [
   "Driver",
   "Plumber",
   "Electrician",
-  "Security",
+  "Security Guard",
   "Event Worker",
   "Cook",
-  "Caregiver",
-  "Mason",
-  "Painter",
-  "Tailor",
-  "Photographer",
   "Other",
 ];
 

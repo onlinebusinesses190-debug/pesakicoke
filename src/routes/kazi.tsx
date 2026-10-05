@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, useRef } from "react";
 import {
   Search, Star, MapPin, ShieldCheck, Plus, X, ArrowLeft, Upload, CheckCircle2,
@@ -8,6 +8,7 @@ import {
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Badge, SectionTitle } from "@/components/ui-bits";
 import { KaziProfileTab, MyProfileShortcut } from "@/components/kazi/KaziProfileTab";
+import { ProfileSearchSheet } from "@/components/kazi/ProfileSearchSheet";
 import { useAuth } from "@/hooks/useAuth";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { toast } from "sonner";
@@ -15,6 +16,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { fmt } from "@/lib/mock";
 
 export const Route = createFileRoute("/kazi")({
+  // /kazi?hireFor=Amina opens the post-a-job sheet pre-addressed to that person,
+  // which is how the public profile's Hire button hands off.
+  validateSearch: (search: Record<string, unknown>) => ({
+    hireFor: typeof search.hireFor === "string" && search.hireFor ? search.hireFor : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "KAZI Link — PESAKI" },
@@ -100,13 +106,18 @@ interface ChatMessage {
 function KaziPage() {
   const { user } = useAuth();
   const { requireAuth } = useRequireAuth();
+  const { hireFor } = Route.useSearch();
   const [tab, setTab] = useState<Tab>("find");
   const [q, setQ] = useState("");
   const [applyJob, setApplyJob] = useState<Job | null>(null);
   const [postJob, setPostJob] = useState(false);
+  // Set once so the Hire handoff opens the sheet exactly one time, even if the
+  // effect re-runs while the user dismisses it.
+  const handledHireFor = useRef<string | null>(null);
   const [hireApp, setHireApp] = useState<Application | null>(null);
   const [chatApp, setChatApp] = useState<{ application: Application; job: Job } | null>(null);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [profileSearchOpen, setProfileSearchOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [showApplicants, setShowApplicants] = useState(false);
@@ -119,6 +130,17 @@ function KaziPage() {
     const { data } = await supabase.auth.getSession();
     return data.session?.access_token;
   };
+
+  // ─── Public profile "Hire" handoff ─────────────────────────────────────────
+  useEffect(() => {
+    if (!hireFor) return;
+    if (handledHireFor.current === hireFor) return;
+    // Wait for the session: the sheet posts a job, so it needs an auth token.
+    if (!user) return;
+    handledHireFor.current = hireFor;
+    setTab("hire");
+    setPostJob(true);
+  }, [hireFor, user]);
 
   // ─── Data state ────────────────────────────────────────────────────────────
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -249,18 +271,29 @@ function KaziPage() {
         title="KAZI Link"
         subtitle="Connecting workers and employers"
         right={
-          <button
-            onClick={() => setNotifOpen(true)}
-            className="relative grid h-9 w-9 place-items-center rounded-full bg-muted text-foreground"
-            aria-label="Notifications"
-          >
-            <Bell className="h-4 w-4" />
-            {unread > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
-                {unread}
-              </span>
-            )}
-          </button>
+          // Wrapped in a flex row: PageHeader's slot is a single grid cell, so
+          // two sibling buttons would otherwise spill into an implicit row.
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setProfileSearchOpen(true)}
+              className="grid h-9 w-9 place-items-center rounded-full bg-muted text-foreground"
+              aria-label="Search profiles"
+            >
+              <Search className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setNotifOpen(true)}
+              className="relative grid h-9 w-9 place-items-center rounded-full bg-muted text-foreground"
+              aria-label="Notifications"
+            >
+              <Bell className="h-4 w-4" />
+              {unread > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
+                  {unread}
+                </span>
+              )}
+            </button>
+          </div>
         }
       />
 
@@ -378,7 +411,19 @@ function KaziPage() {
       {tab === "profile" && <KaziProfileTab />}
 
       {applyJob && <ApplyJobSheet job={applyJob} onClose={() => setApplyJob(null)} onSuccess={refreshData} user={user} />}
-      {postJob && <PostJobSheet onClose={() => setPostJob(false)} onSuccess={refreshData} user={user} />}
+      {postJob && (
+        <PostJobSheet
+          onClose={() => {
+            setPostJob(false);
+            // Drop ?hireFor= so reopening the sheet later isn't pre-addressed.
+            if (hireFor) navigate({ to: "/kazi", search: {} as never });
+          }}
+          initialDescription={hireFor ? `Hiring ${hireFor}…` : undefined}
+          onSuccess={refreshData}
+          user={user}
+        />
+      )}
+      {profileSearchOpen && <ProfileSearchSheet onClose={() => setProfileSearchOpen(false)} />}
       {hireApp && <HireSheet app={hireApp} onClose={() => setHireApp(null)} onHireSuccess={refreshData} user={user} />}
       {chatApp && (
         <ChatSheet
@@ -1444,7 +1489,7 @@ function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
 }
 
 // ─── PostJobSheet ───────────────────────────────────────────────────────────
-function PostJobSheet({ onClose, onSuccess, user }: any) {
+function PostJobSheet({ onClose, onSuccess, user, initialDescription }: any) {
   const { requireAuth } = useRequireAuth();
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -1452,7 +1497,10 @@ function PostJobSheet({ onClose, onSuccess, user }: any) {
   const [checked, setChecked] = useState<string[]>([]);
   const requirements = ["Experience required", "ID Required", "References", "Background check", "Own tools"];
   const [form, setForm] = useState({
-    title: "", category: "", location: "", pay: "", payAmount: 0, duration: "", description: "",
+    title: "", category: "", location: "", pay: "", payAmount: 0, duration: "",
+    // Pre-seeded from ?hireFor=Name so the employer starts with context instead
+    // of an empty box. Still fully editable.
+    description: initialDescription || "",
   });
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const v = k === "payAmount" ? Number((e.target as HTMLInputElement).value) : e.target.value;

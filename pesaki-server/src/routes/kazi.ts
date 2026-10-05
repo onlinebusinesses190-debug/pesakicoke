@@ -1627,15 +1627,17 @@ server.get('/kazi/escrow/:jobId', async (request: FastifyRequest, reply: Fastify
     try {
       const body = (request.body as any) || {};
 
-      const profileType = body.profile_type ?? 'worker';
-      if (!['worker', 'service_provider', 'business'].includes(profileType)) {
+      // Only touched when actually sent. Defaulting it would silently demote a
+      // service_provider or business to worker on any partial update.
+      if ('profile_type' in body && !['worker', 'service_provider', 'business'].includes(body.profile_type)) {
         return profileFail(reply, 400, 'profile_type must be worker, service_provider or business');
       }
 
       const patch: Record<string, any> = {
-        profile_type: profileType,
         updated_at: new Date().toISOString(),
       };
+
+      if ('profile_type' in body) patch.profile_type = body.profile_type;
 
       if ('full_name' in body) patch.full_name = trimOrNull(body.full_name);
       if ('headline' in body) patch.headline = trimOrNull(body.headline);
@@ -2138,6 +2140,183 @@ server.get('/kazi/escrow/:jobId', async (request: FastifyRequest, reply: Fastify
       return reply.send({ success: true, data: { reviews: enriched, rating, reviewCount: ratings.length } });
     } catch (err: any) {
       return profileDbError(reply, err, 'Could not load the reviews');
+    }
+  });
+
+  // GET /kazi/search-profiles — people / skills / category search
+  //
+  // kazi_profiles.user_id has no foreign key to public.profiles, so the names
+  // are looked up in a second query rather than a PostgREST embed (an unresolvable
+  // embed fails the whole request with a schema-cache error).
+  //
+  // rating_average / rating_count / jobs_completed are not stored columns on
+  // kazi_profiles, so they are derived from kazi_reviews and job_contracts and
+  // used for ordering. No table is modified to provide them.
+  server.get('/kazi/search-profiles', async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const query = (request.query as any) || {};
+      const term = String(query.q || '').trim();
+      const type = String(query.type || 'all').trim().toLowerCase();
+      const limit = Math.min(Math.max(Number(query.limit) || 20, 1), 50);
+      const offset = Math.max(Number(query.offset) || 0, 0);
+
+      if (!['all', 'worker', 'service_provider', 'business'].includes(type)) {
+        return profileFail(reply, 400, "type must be all, worker, service_provider or business");
+      }
+
+      // Escaped so a user typing % or _ does not turn into a wildcard.
+      const like = `%${term.replace(/[%_]/g, (c) => `\\${c}`)}%`;
+
+      let queryBuilder = supabase
+        .from('kazi_profiles')
+        .select('user_id, full_name, headline, category, location, photo_url, profile_type, service_name, availability, is_verified, completeness, created_at')
+        .limit(200);
+
+      if (type !== 'all') queryBuilder = queryBuilder.eq('profile_type', type);
+
+      if (term) {
+        queryBuilder = queryBuilder.or(
+          [
+            `full_name.ilike.${like}`,
+            `headline.ilike.${like}`,
+            `category.ilike.${like}`,
+            `location.ilike.${like}`,
+            `service_name.ilike.${like}`,
+          ].join(',')
+        );
+      }
+
+      const { data: direct, error: directError } = await queryBuilder;
+      if (directError) throw directError;
+
+      const byUser = new Map<string, any>();
+      for (const row of direct || []) byUser.set(row.user_id, row);
+
+      // Second pass: profiles whose skills match, merged into the same map.
+      let matchedSkills: string[] = [];
+      if (term) {
+        const { data: skillRows, error: skillError } = await supabase
+          .from('kazi_skills')
+          .select('user_id, skill_name')
+          .ilike('skill_name', like)
+          .limit(200);
+        if (skillError) throw skillError;
+
+        const extra = Array.from(
+          new Set((skillRows || []).map((s: any) => s.user_id).filter((id: string) => !byUser.has(id)))
+        ) as string[];
+
+        if (extra.length > 0) {
+          let skillQuery = supabase
+            .from('kazi_profiles')
+            .select('user_id, full_name, headline, category, location, photo_url, profile_type, service_name, availability, is_verified, completeness, created_at')
+            .in('user_id', extra)
+            .limit(200);
+          if (type !== 'all') skillQuery = skillQuery.eq('profile_type', type);
+
+          const { data: skillProfiles, error: skillProfilesError } = await skillQuery;
+          if (skillProfilesError) throw skillProfilesError;
+
+          for (const row of skillProfiles || []) {
+            byUser.set(row.user_id, { ...row, matchedBySkill: true });
+          }
+          matchedSkills = (skillRows || [])
+            .map((s: any) => s.user_id)
+            .filter((id: string) => byUser.get(id)?.matchedBySkill);
+        }
+      }
+
+      let rows = Array.from(byUser.values());
+      if (rows.length === 0) {
+        return reply.send({
+          success: true,
+          data: { results: [], total: 0, limit, offset },
+        });
+      }
+
+      const userIds = rows.map((r: any) => r.user_id);
+
+      // Names from public.profiles, falling back to kazi_profiles.full_name.
+      const { data: profileRows } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', userIds);
+      const names: Record<string, string> = {};
+      for (const p of profileRows || []) {
+        if (p.full_name) names[p.id] = p.full_name;
+      }
+
+      // Rating average / count derived from reviews.
+      const { data: reviewRows } = await supabase
+        .from('kazi_reviews')
+        .select('reviewee_id, rating')
+        .in('reviewee_id', userIds);
+      const ratingSum: Record<string, number> = {};
+      const ratingCount: Record<string, number> = {};
+      for (const r of reviewRows || []) {
+        const n = Number(r.rating);
+        if (!Number.isFinite(n)) continue;
+        ratingSum[r.reviewee_id] = (ratingSum[r.reviewee_id] || 0) + n;
+        ratingCount[r.reviewee_id] = (ratingCount[r.reviewee_id] || 0) + 1;
+      }
+
+      // Completed contracts per worker.
+      const { data: contractRows } = await supabase
+        .from('job_contracts')
+        .select('worker_id, status')
+        .in('worker_id', userIds);
+      const jobsCompleted: Record<string, number> = {};
+      for (const c of contractRows || []) {
+        if (c.status === 'completed') {
+          jobsCompleted[c.worker_id] = (jobsCompleted[c.worker_id] || 0) + 1;
+        }
+      }
+
+      const skillUserIds = new Set(matchedSkills);
+
+      const results = rows.map((r: any) => {
+        const count = ratingCount[r.user_id] || 0;
+        const average = count
+          ? Math.round((ratingSum[r.user_id] / count) * 10) / 10
+          : null;
+        return {
+          userId: r.user_id,
+          name: names[r.user_id] || r.full_name || 'KAZI member',
+          headline: r.headline || null,
+          category: r.category || null,
+          location: r.location || null,
+          photoUrl: r.photo_url || null,
+          profileType: r.profile_type || 'worker',
+          serviceName: r.service_name || null,
+          availability: r.availability || null,
+          ratingAverage: average,
+          ratingCount: count,
+          jobsCompleted: jobsCompleted[r.user_id] || 0,
+          verified: Boolean(r.is_verified),
+          matchedBySkill: skillUserIds.has(r.user_id),
+        };
+      });
+
+      // rating_average DESC, jobs_completed DESC, created_at DESC
+      results.sort((a, b) => {
+        if (b.ratingAverage !== a.ratingAverage) {
+          return (b.ratingAverage ?? -1) - (a.ratingAverage ?? -1);
+        }
+        if (b.jobsCompleted !== a.jobsCompleted) return b.jobsCompleted - a.jobsCompleted;
+        return 0;
+      });
+
+      return reply.send({
+        success: true,
+        data: {
+          results: results.slice(offset, offset + limit),
+          total: results.length,
+          limit,
+          offset,
+        },
+      });
+    } catch (err: any) {
+      return profileDbError(reply, err, 'Could not search profiles');
     }
   });
 }

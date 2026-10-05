@@ -2,18 +2,20 @@ import type { ReactNode } from "react";
 import {
   BadgeCheck,
   Briefcase,
+  Clock,
+  FileText,
   GraduationCap,
   Images,
   MapPin,
   MessageSquare,
   Sparkles,
   Star,
-  Clock,
 } from "lucide-react";
 import { Badge, Card, SectionTitle } from "@/components/ui-bits";
 import {
   formatKaziDate,
   formatKaziDateRange,
+  availabilityTone,
   profileTypeLabel,
   type KaziProfileBundle,
   type KaziReview,
@@ -83,6 +85,29 @@ export function RateChips({ bundle }: { bundle: KaziProfileBundle }) {
   );
 }
 
+/** Availability pill. Tones: green available, amber busy, grey unavailable. */
+export function AvailabilityBadge({ value }: { value?: string | null }) {
+  const { label, tone } = availabilityTone(value);
+  const tones = {
+    success: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+    warning: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+    neutral: "bg-muted text-muted-foreground",
+  } as const;
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${tones[tone]}`}
+    >
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${
+          tone === "success" ? "bg-emerald-500" : tone === "warning" ? "bg-amber-500" : "bg-muted-foreground"
+        }`}
+      />
+      {label}
+    </span>
+  );
+}
+
 /** Photo, name, verified badge, headline, location, availability and rating. */
 export function ProfileHeaderCard({
   bundle,
@@ -113,6 +138,7 @@ export function ProfileHeaderCard({
             <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
               <Badge tone="primary">{profileTypeLabel(p.profile_type)}</Badge>
               {p.category && <Badge tone="gold">{p.category}</Badge>}
+              <AvailabilityBadge value={p.availability} />
             </div>
           </div>
         </div>
@@ -128,11 +154,6 @@ export function ProfileHeaderCard({
           {p.location && (
             <span className="inline-flex items-center gap-1">
               <MapPin className="h-3.5 w-3.5" /> {p.location}
-            </span>
-          )}
-          {p.availability && (
-            <span className="inline-flex items-center gap-1">
-              <Clock className="h-3.5 w-3.5" /> {p.availability}
             </span>
           )}
         </div>
@@ -209,6 +230,26 @@ export function AboutSection({ bundle, heading = true }: { bundle: KaziProfileBu
         <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
           {p.service_description}
         </p>
+      )}
+
+      {(p.category || p.cv_url) && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+          {p.category && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
+              <Briefcase className="h-3 w-3" /> {p.category}
+            </span>
+          )}
+          {p.cv_url && (
+            <a
+              href={p.cv_url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground"
+            >
+              <FileText className="h-3 w-3" /> View CV
+            </a>
+          )}
+        </div>
       )}
     </Card>
   );

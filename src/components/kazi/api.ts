@@ -9,6 +9,7 @@ import type {
   KaziEducation,
   KaziPortfolioItem,
   KaziReview,
+  KaziSearchResult,
 } from "./types";
 
 const API_BASE = import.meta.env.VITE_PESAKI_API_URL || "https://pesaki-server.onrender.com";
@@ -220,6 +221,18 @@ export const addReview = (body: {
 export const fetchReviews = (userId: string) =>
   kaziApi<{ reviews: KaziReview[]; rating: number | null; reviewCount: number }>(
     `/kazi/reviews/${userId}`
+  );
+
+// ─── Search ───────────────────────────────────────────────────────────────────
+
+export const searchProfiles = (
+  q: string,
+  type: "all" | "worker" | "service_provider" | "business" = "all",
+  limit = 20,
+  offset = 0
+) =>
+  kaziApi<{ results: KaziSearchResult[]; total: number; limit: number; offset: number }>(
+    `/kazi/search-profiles?q=${encodeURIComponent(q)}&type=${encodeURIComponent(type)}&limit=${limit}&offset=${offset}`
   );
 
 export type { KaziProfileRating };

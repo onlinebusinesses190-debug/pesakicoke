@@ -4,6 +4,7 @@ import {
   Copy,
   ExternalLink,
   Loader2,
+  MessageCircle,
   Pencil,
   RefreshCw,
   Share2,
@@ -136,6 +137,15 @@ export function KaziProfileTab() {
     else toast.error(`Could not copy automatically. Copy this link: ${url}`);
   };
 
+  /** WhatsApp is the primary sharing channel in Kenya. */
+  const handleWhatsApp = () => {
+    const url = publicUrl();
+    if (!url) return;
+    const name = bundle?.profile.full_name?.trim() || "My KAZI profile";
+    const text = `Check out ${name} on KAZI Link\n${url}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+  };
+
   if (loading) {
     return (
       <section className="mt-5 px-5">
@@ -190,6 +200,13 @@ export function KaziProfileTab() {
               className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-4 py-2 text-xs font-semibold text-foreground"
             >
               <Share2 className="h-3.5 w-3.5" /> Share Profile
+            </button>
+            <button
+              onClick={handleWhatsApp}
+              aria-label="Share on WhatsApp"
+              className="grid h-9 w-9 place-items-center rounded-full bg-[#25D366] text-white"
+            >
+              <MessageCircle className="h-4 w-4" />
             </button>
           </>
         }

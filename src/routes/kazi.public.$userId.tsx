@@ -116,27 +116,60 @@ function KaziPublicProfile() {
   const shareUrl = () =>
     typeof window === "undefined" ? "" : `${window.location.origin}/kazi/public/${userId}`;
 
+  const shareText = () => {
+    const p = bundle?.profile;
+    const name = p?.full_name?.trim() || "this KAZI member";
+    const bits: string[] = [];
+    if (p?.headline) bits.push(p.headline);
+    if (p?.category) bits.push(p.category);
+    if (p?.location) bits.push(p.location);
+    const suffix = bits.length ? `\n${bits.join(" · ")}` : "";
+    return `Check out ${name} on KAZI Link${suffix}\n${shareUrl()}`;
+  };
+
+  /**
+   * KAZI messaging is job-scoped: both /kazi/messages?jobId= and
+   * /kazi/send-message require a jobId, and there is no user-to-user channel.
+   * Rather than navigating to a chat that cannot exist, say so and send the
+   * viewer to KAZI where they can message from an application or job.
+   */
+  const handleMessage = () => {
+    const name = bundle?.profile.full_name?.trim() || "them";
+    toast(
+      `Messaging on KAZI runs through a job, so there is no direct chat with ${name} yet. Open the job or application to message them.`,
+      { duration: 6000 }
+    );
+    navigate({ to: "/kazi" });
+  };
+
+  const handleHire = () => {
+    const name = bundle?.profile.full_name?.trim() || "this KAZI member";
+    navigate({ to: "/kazi", search: { hireFor: name } as never });
+  };
+
   const handleShare = async () => {
     const url = shareUrl();
     const name = bundle?.profile.full_name?.trim() || "KAZI profile";
     if (navigator.share) {
       try {
-        await navigator.share({
-          title: `${name} — KAZI Link`,
-          text: `Check out ${name}'s KAZI Link profile`,
-          url,
-        });
+        await navigator.share({ title: `${name} — KAZI Link`, text: shareText(), url });
         return;
       } catch {
         /* dismissed — copy instead */
       }
     }
     try {
-      await navigator.clipboard.writeText(url);
-      toast.success("Profile link copied");
+      await navigator.clipboard.writeText(shareText());
+      toast.success("Profile details copied");
     } catch {
       toast.error(`Copy this link: ${url}`);
     }
+  };
+
+  /** WhatsApp is the primary sharing channel in Kenya. */
+  const handleWhatsApp = () => {
+    const url = `https://wa.me/?text=${encodeURIComponent(shareText())}`;
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   if (loading) {
@@ -232,16 +265,23 @@ function KaziPublicProfile() {
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 px-5 py-3 backdrop-blur">
         <div className="mx-auto flex max-w-md items-center gap-2">
           <button
-            onClick={() => navigate({ to: "/kazi" })}
+            onClick={handleMessage}
             className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-border px-4 py-2.5 text-xs font-semibold text-foreground"
           >
             <MessageCircle className="h-4 w-4" /> Message
           </button>
           <button
-            onClick={() => navigate({ to: "/kazi" })}
+            onClick={handleHire}
             className="inline-flex flex-1 items-center justify-center gap-2 rounded-full gradient-primary px-4 py-2.5 text-xs font-semibold text-primary-foreground"
           >
             <UserCheck className="h-4 w-4" /> Hire
+          </button>
+          <button
+            onClick={handleWhatsApp}
+            aria-label="Share on WhatsApp"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#25D366] text-white"
+          >
+            <MessageCircle className="h-4 w-4" />
           </button>
           <button
             onClick={handleShare}
