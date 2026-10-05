@@ -96,13 +96,18 @@ async function requireKaziUser(
   }
 }
 
+/**
+ * True only for a genuinely absent relation (SQLSTATE 42P01 / PostgREST
+ * PGRST205). Do not match on "schema cache" alone: PostgREST also says that
+ * when it cannot resolve an embedded resource, which is not a missing table.
+ */
 function isMissingTable(err: any): boolean {
   const code = err?.code || '';
   const message = String(err?.message || '');
   return (
     code === '42P01' ||
     code === 'PGRST205' ||
-    /Could not find the table|schema cache|does not exist/i.test(message)
+    /Could not find the table/i.test(message)
   );
 }
 
@@ -2097,7 +2102,7 @@ server.get('/kazi/escrow/:jobId', async (request: FastifyRequest, reply: Fastify
 
       const { data, error } = await supabase
         .from('kazi_reviews')
-        .select('*, jobs:job_id (title)')
+        .select('*')
         .eq('reviewee_id', userId)
         .order('created_at', { ascending: false })
         .limit(100);
@@ -2105,12 +2110,32 @@ server.get('/kazi/escrow/:jobId', async (request: FastifyRequest, reply: Fastify
       if (error) throw error;
 
       const reviews = data || [];
-      const ratings = reviews.map((r: any) => Number(r.rating)).filter(Number.isFinite);
+
+      // kazi_reviews.job_id has no foreign key to jobs, so a PostgREST embed
+      // (jobs:job_id (title)) cannot be resolved. Look the titles up instead.
+      const jobIds = Array.from(
+        new Set(reviews.map((r: any) => r.job_id).filter(Boolean))
+      ) as string[];
+      let jobTitles: Record<string, string> = {};
+      if (jobIds.length > 0) {
+        const { data: jobs } = await supabase
+          .from('jobs')
+          .select('id, title')
+          .in('id', jobIds);
+        for (const job of jobs || []) jobTitles[job.id] = job.title;
+      }
+
+      const enriched = reviews.map((r: any) => ({
+        ...r,
+        jobs: r.job_id && jobTitles[r.job_id] ? { title: jobTitles[r.job_id] } : null,
+      }));
+
+      const ratings = enriched.map((r: any) => Number(r.rating)).filter(Number.isFinite);
       const rating = ratings.length
         ? Math.round((ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length) * 10) / 10
         : null;
 
-      return reply.send({ success: true, data: { reviews, rating, reviewCount: ratings.length } });
+      return reply.send({ success: true, data: { reviews: enriched, rating, reviewCount: ratings.length } });
     } catch (err: any) {
       return profileDbError(reply, err, 'Could not load the reviews');
     }
