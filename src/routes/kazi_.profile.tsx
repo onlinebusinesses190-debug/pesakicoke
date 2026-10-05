@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, rootRouteId, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -54,7 +54,12 @@ import {
 } from "@/components/kazi/types";
 import { Avatar } from "@/components/kazi/ProfileView";
 
-export const Route = createFileRoute("/kazi/profile")({
+export const Route = createFileRoute("/kazi_/profile")({
+  // The file is named kazi_.profile.tsx on purpose. A plain kazi.profile.tsx
+  // nests under the /kazi page, which renders no <Outlet />, so this editor
+  // would never mount and "Get Started" would look like a dead button. The
+  // trailing underscore escapes that nesting; the URL is still /kazi/profile.
+  getParentRoute: () => rootRouteId,
   head: () => ({
     meta: [
       { title: "Edit Profile — KAZI Link — PESAKI" },

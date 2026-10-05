@@ -44,7 +44,7 @@ import { Route as AdminTradingRouteImport } from './routes/admin.trading'
 import { Route as AdminTransactionsRouteImport } from './routes/admin.transactions'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminWithdrawalsRouteImport } from './routes/admin.withdrawals'
-import { Route as KaziProfileRouteImport } from './routes/kazi.profile'
+import { Route as KaziProfileRouteImport } from './routes/kazi_.profile'
 import { Route as TradingIndexRouteImport } from './routes/trading.index'
 import { Route as TradingAviatorRouteImport } from './routes/trading.aviator'
 import { Route as TradingForexRouteImport } from './routes/trading.forex'
@@ -53,7 +53,7 @@ import { Route as TradingInvestRouteImport } from './routes/trading.invest'
 import { Route as TradingSpinRouteImport } from './routes/trading.spin'
 import { Route as TradingUpDownRouteImport } from './routes/trading.up-down'
 import { Route as AdminUsersUserIdRouteImport } from './routes/admin.users.$userId'
-import { Route as KaziPublicUserIdRouteImport } from './routes/kazi.public.$userId'
+import { Route as KaziPublicUserIdRouteImport } from './routes/kazi_.public.$userId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -231,9 +231,9 @@ const AdminWithdrawalsRoute = AdminWithdrawalsRouteImport.update({
   getParentRoute: () => AdminRoute,
 } as any)
 const KaziProfileRoute = KaziProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => KaziRoute,
+  id: '/kazi_/profile',
+  path: '/kazi/profile',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const TradingIndexRoute = TradingIndexRouteImport.update({
   id: '/',
@@ -276,9 +276,9 @@ const AdminUsersUserIdRoute = AdminUsersUserIdRouteImport.update({
   getParentRoute: () => AdminUsersRoute,
 } as any)
 const KaziPublicUserIdRoute = KaziPublicUserIdRouteImport.update({
-  id: '/public/$userId',
-  path: '/public/$userId',
-  getParentRoute: () => KaziRoute,
+  id: '/kazi_/public/$userId',
+  path: '/kazi/public/$userId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -292,7 +292,7 @@ export interface FileRoutesByFullPath {
   '/compliance': typeof ComplianceRoute
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
-  '/kazi': typeof KaziRouteWithChildren
+  '/kazi': typeof KaziRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/refund': typeof RefundRoute
@@ -338,7 +338,7 @@ export interface FileRoutesByTo {
   '/compliance': typeof ComplianceRoute
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
-  '/kazi': typeof KaziRouteWithChildren
+  '/kazi': typeof KaziRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/refund': typeof RefundRoute
@@ -385,7 +385,7 @@ export interface FileRoutesById {
   '/compliance': typeof ComplianceRoute
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
-  '/kazi': typeof KaziRouteWithChildren
+  '/kazi': typeof KaziRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/refund': typeof RefundRoute
@@ -409,7 +409,7 @@ export interface FileRoutesById {
   '/admin/transactions': typeof AdminTransactionsRoute
   '/admin/users': typeof AdminUsersRouteWithChildren
   '/admin/withdrawals': typeof AdminWithdrawalsRoute
-  '/kazi/profile': typeof KaziProfileRoute
+  '/kazi_/profile': typeof KaziProfileRoute
   '/trading/aviator': typeof TradingAviatorRoute
   '/trading/forex': typeof TradingForexRoute
   '/trading/fx': typeof TradingFxRoute
@@ -419,7 +419,7 @@ export interface FileRoutesById {
   '/admin/': typeof AdminIndexRoute
   '/trading/': typeof TradingIndexRoute
   '/admin/users/$userId': typeof AdminUsersUserIdRoute
-  '/kazi/public/$userId': typeof KaziPublicUserIdRoute
+  '/kazi_/public/$userId': typeof KaziPublicUserIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -550,7 +550,7 @@ export interface FileRouteTypes {
     | '/admin/transactions'
     | '/admin/users'
     | '/admin/withdrawals'
-    | '/kazi/profile'
+    | '/kazi_/profile'
     | '/trading/aviator'
     | '/trading/forex'
     | '/trading/fx'
@@ -560,7 +560,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/trading/'
     | '/admin/users/$userId'
-    | '/kazi/public/$userId'
+    | '/kazi_/public/$userId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -574,7 +574,7 @@ export interface RootRouteChildren {
   ComplianceRoute: typeof ComplianceRoute
   ContactRoute: typeof ContactRoute
   CookiesRoute: typeof CookiesRoute
-  KaziRoute: typeof KaziRouteWithChildren
+  KaziRoute: typeof KaziRoute
   PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
   RefundRoute: typeof RefundRoute
@@ -583,6 +583,8 @@ export interface RootRouteChildren {
   TermsRoute: typeof TermsRoute
   TradingRoute: typeof TradingRouteWithChildren
   WalletRoute: typeof WalletRoute
+  KaziProfileRoute: typeof KaziProfileRoute
+  KaziPublicUserIdRoute: typeof KaziPublicUserIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -832,12 +834,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminWithdrawalsRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/kazi/profile': {
-      id: '/kazi/profile'
-      path: '/profile'
+    '/kazi_/profile': {
+      id: '/kazi_/profile'
+      path: '/kazi/profile'
       fullPath: '/kazi/profile'
       preLoaderRoute: typeof KaziProfileRouteImport
-      parentRoute: typeof KaziRoute
+      parentRoute: typeof rootRouteImport
     }
     '/trading/': {
       id: '/trading/'
@@ -895,12 +897,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminUsersUserIdRouteImport
       parentRoute: typeof AdminUsersRoute
     }
-    '/kazi/public/$userId': {
-      id: '/kazi/public/$userId'
-      path: '/public/$userId'
+    '/kazi_/public/$userId': {
+      id: '/kazi_/public/$userId'
+      path: '/kazi/public/$userId'
       fullPath: '/kazi/public/$userId'
       preLoaderRoute: typeof KaziPublicUserIdRouteImport
-      parentRoute: typeof KaziRoute
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -957,18 +959,6 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
-interface KaziRouteChildren {
-  KaziProfileRoute: typeof KaziProfileRoute
-  KaziPublicUserIdRoute: typeof KaziPublicUserIdRoute
-}
-
-const KaziRouteChildren: KaziRouteChildren = {
-  KaziProfileRoute: KaziProfileRoute,
-  KaziPublicUserIdRoute: KaziPublicUserIdRoute,
-}
-
-const KaziRouteWithChildren = KaziRoute._addFileChildren(KaziRouteChildren)
-
 interface TradingRouteChildren {
   TradingAviatorRoute: typeof TradingAviatorRoute
   TradingForexRoute: typeof TradingForexRoute
@@ -1003,7 +993,7 @@ const rootRouteChildren: RootRouteChildren = {
   ComplianceRoute: ComplianceRoute,
   ContactRoute: ContactRoute,
   CookiesRoute: CookiesRoute,
-  KaziRoute: KaziRouteWithChildren,
+  KaziRoute: KaziRoute,
   PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
   RefundRoute: RefundRoute,
@@ -1012,6 +1002,8 @@ const rootRouteChildren: RootRouteChildren = {
   TermsRoute: TermsRoute,
   TradingRoute: TradingRouteWithChildren,
   WalletRoute: WalletRoute,
+  KaziProfileRoute: KaziProfileRoute,
+  KaziPublicUserIdRoute: KaziPublicUserIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

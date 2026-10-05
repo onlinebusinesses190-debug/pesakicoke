@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, rootRouteId, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -22,7 +22,10 @@ import type {
 } from "@/components/kazi/types";
 import { CompletenessBar, ProfileHeaderCard, AboutSection, SkillsSection, ExperienceSection, EducationSection, PortfolioSection, ReviewsSection, RateChips } from "@/components/kazi/ProfileView";
 
-export const Route = createFileRoute("/kazi/public/$userId")({
+export const Route = createFileRoute("/kazi_/public/$userId")({
+  // See the note in kazi_.profile.tsx: the kazi_ prefix escapes nesting under
+  // the /kazi page, which has no <Outlet />. URL is still /kazi/public/$userId.
+  getParentRoute: () => rootRouteId,
   head: () => ({
     meta: [
       { title: "Profile — KAZI Link — PESAKI" },
