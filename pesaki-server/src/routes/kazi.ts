@@ -56,6 +56,279 @@ async function notifyUser(
 
 const FEE_RATE = 0.10;
 
+// ─── KAZI Profile helpers ─────────────────────────────────────────────────────
+// Every profile endpoint answers with { success: true, data } or
+// { success: false, error } and never with a 5xx, so a missing table or a
+// storage failure degrades to a readable message instead of breaking the page.
+
+const PROFILE_MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+const PROFILE_CV_TYPES = /^(application\/pdf|application\/msword|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document)$/i;
+const PROFILE_IMAGE_TYPES = /^image\/(jpeg|png|webp|gif|heic|heif)$/i;
+
+const CV_BUCKET = 'kazi-cvs';
+const PHOTO_BUCKET = 'kazi-photos';
+const PORTFOLIO_BUCKET = 'kazi-portfolio';
+
+type ProfileReply = FastifyReply;
+
+function profileFail(reply: ProfileReply, status: number, error: string) {
+  return reply.status(status).send({ success: false, error });
+}
+
+/**
+ * Reads the bearer token and resolves the user. Returns null (and already
+ * replied) when the caller is not authenticated.
+ */
+async function requireKaziUser(
+  request: FastifyRequest,
+  reply: ProfileReply
+) {
+  const token = request.headers.authorization?.replace('Bearer ', '');
+  if (!token) {
+    profileFail(reply, 401, 'Unauthorized: no token provided');
+    return null;
+  }
+  try {
+    return await getUserFromToken(token);
+  } catch {
+    profileFail(reply, 401, 'Unauthorized: invalid or expired token');
+    return null;
+  }
+}
+
+function isMissingTable(err: any): boolean {
+  const code = err?.code || '';
+  const message = String(err?.message || '');
+  return (
+    code === '42P01' ||
+    code === 'PGRST205' ||
+    /Could not find the table|schema cache|does not exist/i.test(message)
+  );
+}
+
+/**
+ * Turns a Supabase failure into a user-facing message. Missing relations are
+ * reported plainly so the UI can show a "not set up yet" state.
+ */
+function profileDbError(reply: ProfileReply, err: any, fallback: string) {
+  console.error('[kazi/profile]', fallback, err?.message || err);
+  if (isMissingTable(err)) {
+    return profileFail(
+      reply,
+      200,
+      'KAZI profiles are not set up on this database yet. Please run the kazi_profiles migration.'
+    );
+  }
+  return profileFail(reply, 200, err?.message || fallback);
+}
+
+function trimOrNull(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  const s = String(value).trim();
+  return s.length ? s : null;
+}
+
+function positiveNumberOrNull(value: unknown): number | null {
+  if (value === undefined || value === null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/**
+ * Completeness score:
+ * +10 headline, +10 bio, +10 photo, +10 CV, +10 category, +10 location,
+ * +5 per skill (max 15), +10 experience, +10 education,
+ * +5 portfolio (max 15). Capped at 100.
+ */
+function computeCompleteness(profile: any, counts: {
+  skills: number;
+  experience: number;
+  education: number;
+  portfolio: number;
+}) {
+  let score = 0;
+  if (trimOrNull(profile?.headline)) score += 10;
+  if (trimOrNull(profile?.bio)) score += 10;
+  if (trimOrNull(profile?.photo_url)) score += 10;
+  if (trimOrNull(profile?.cv_url)) score += 10;
+  if (trimOrNull(profile?.category)) score += 10;
+  if (trimOrNull(profile?.location)) score += 10;
+  score += Math.min(counts.skills * 5, 15);
+  if (counts.experience > 0) score += 10;
+  if (counts.education > 0) score += 10;
+  score += Math.min(counts.portfolio * 5, 15);
+  return Math.min(100, score);
+}
+
+async function getProfileCounts(userId: string) {
+  const [skills, experience, education, portfolio] = await Promise.all([
+    supabase.from('kazi_skills').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+    supabase.from('kazi_experience').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+    supabase.from('kazi_education').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+    supabase.from('kazi_portfolio').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+  ]);
+  const firstError = skills.error || experience.error || education.error || portfolio.error;
+  if (firstError) throw firstError;
+  return {
+    skills: skills.count || 0,
+    experience: experience.count || 0,
+    education: education.count || 0,
+    portfolio: portfolio.count || 0,
+  };
+}
+
+/**
+ * Fetches the caller's profile, creating a blank one on first visit so the
+ * Profile tab always has something to edit.
+ */
+async function ensureOwnProfile(userId: string, email?: string | null) {
+  const existing = await supabase
+    .from('kazi_profiles')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (existing.error) throw existing.error;
+  if (existing.data) return existing.data;
+
+  const created = await supabase
+    .from('kazi_profiles')
+    .insert({
+      user_id: userId,
+      full_name: trimOrNull(email?.split('@')[0]),
+      profile_type: 'worker',
+      is_verified: false,
+      completeness: 0,
+    })
+    .select('*')
+    .single();
+
+  if (created.error) throw created.error;
+  return created.data;
+}
+
+/** Average rating + review count for a user, derived from kazi_reviews. */
+async function getRating(userId: string) {
+  const { data, error } = await supabase
+    .from('kazi_reviews')
+    .select('rating')
+    .eq('reviewee_id', userId);
+  if (error) throw error;
+  const ratings = (data || []).map((r: any) => Number(r.rating)).filter((n: number) => Number.isFinite(n));
+  if (ratings.length === 0) return { rating: null, reviewCount: 0 };
+  const avg = ratings.reduce((a, b) => a + b, 0) / ratings.length;
+  return { rating: Math.round(avg * 10) / 10, reviewCount: ratings.length };
+}
+
+async function loadProfileSections(userId: string) {
+  const [skills, experience, education, portfolio] = await Promise.all([
+    supabase.from('kazi_skills').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
+    supabase.from('kazi_experience').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+    supabase.from('kazi_education').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+    supabase.from('kazi_portfolio').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
+  ]);
+  const err = skills.error || experience.error || education.error || portfolio.error;
+  if (err) throw err;
+  return {
+    skills: skills.data || [],
+    experience: experience.data || [],
+    education: education.data || [],
+    portfolio: portfolio.data || [],
+  };
+}
+
+/**
+ * Stores one multipart file in a public-read bucket and returns its URL.
+ * Rejects unknown content types and oversized files with a readable message.
+ */
+async function storeUploadedFile(options: {
+  request: FastifyRequest;
+  reply: ProfileReply;
+  bucket: string;
+  folder: string;
+  userId: string;
+  accept: RegExp;
+  label: string;
+  field?: string;
+}) {
+  const { request, reply, bucket, folder, userId, accept, label, field = 'file' } = options;
+
+  if (!request.isMultipart?.()) {
+    profileFail(reply, 400, `${label} upload must be sent as multipart/form-data`);
+    return null;
+  }
+
+  let buffer: Buffer | null = null;
+  let mimetype = '';
+  let originalName = '';
+
+  try {
+    for await (const part of request.parts()) {
+      if (part.type !== 'file') continue;
+      if (part.fieldname !== field) continue;
+      mimetype = String(part.mimetype || '');
+      originalName = String(part.filename || 'upload');
+      buffer = await part.toBuffer();
+      // @fastify/multipart caps the stream globally; `truncated` tells us the
+      // server stopped reading before the client finished sending.
+      if ((part.file as any).truncated) {
+        profileFail(
+          reply,
+          400,
+          `${label} is larger than the server upload limit. Please use a file under 1 MB.`
+        );
+        return null;
+      }
+    }
+  } catch (err: any) {
+    const tooLarge = err?.code === 'FST_REQ_FILE_TOO_LARGE' || /too large/i.test(String(err?.message || ''));
+    console.error('[kazi/upload]', err?.message || err);
+    profileFail(
+      reply,
+      400,
+      tooLarge
+        ? `${label} is larger than the server upload limit. Please use a file under 1 MB.`
+        : `Could not read the ${label.toLowerCase()} file.`
+    );
+    return null;
+  }
+
+  if (!buffer || buffer.length === 0) {
+    profileFail(reply, 400, `No ${label.toLowerCase()} file was received`);
+    return null;
+  }
+  if (buffer.length > PROFILE_MAX_UPLOAD_BYTES) {
+    profileFail(reply, 400, `${label} must be 5 MB or smaller`);
+    return null;
+  }
+  if (!accept.test(mimetype)) {
+    profileFail(reply, 400, `Unsupported ${label.toLowerCase()} file type: ${mimetype || 'unknown'}`);
+    return null;
+  }
+
+  const safeName = originalName.replace(/[^a-zA-Z0-9.\-]/g, '_') || 'file';
+  const path = `${folder}/${userId}-${Date.now()}-${safeName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(bucket)
+    .upload(path, buffer, { contentType: mimetype, upsert: true });
+
+  if (uploadError) {
+    console.error('[kazi/upload] storage error', uploadError);
+    const missing = /not found|bucket/i.test(uploadError.message);
+    return profileFail(
+      reply,
+      400,
+      missing
+        ? `The "${bucket}" storage bucket does not exist yet. Please create it in Supabase Storage.`
+        : `Could not save the ${label.toLowerCase()}.`
+    );
+  }
+
+  const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path);
+  return { url: urlData.publicUrl, path, bucket, size: buffer.length, mimetype };
+}
+
 export default async function kaziRoutes(server: FastifyInstance) {  // GET /kazi/jobs
   server.get('/kazi/jobs', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
@@ -1309,6 +1582,537 @@ server.get('/kazi/escrow/:jobId', async (request: FastifyRequest, reply: Fastify
     } catch (err) {
       console.error('Error in /kazi/mpesa/job-status:', err);
       return reply.status(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // KAZI PROFILE — public worker / service provider profile
+  // Added after the existing endpoints above; nothing above is modified.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // GET /kazi/profile/me — own profile, auto-created on first call
+  server.get('/kazi/profile/me', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await requireKaziUser(request, reply);
+    if (!user) return;
+    try {
+      const profile = await ensureOwnProfile(user.id, user.email);
+      const [counts, sections, rating] = await Promise.all([
+        getProfileCounts(user.id),
+        loadProfileSections(user.id),
+        getRating(user.id),
+      ]);
+      const completeness = computeCompleteness(profile, counts);
+      if (completeness !== profile.completeness) {
+        await supabase.from('kazi_profiles').update({ completeness }).eq('id', profile.id);
+        profile.completeness = completeness;
+      }
+      return reply.send({
+        success: true,
+        data: { profile: { ...profile, completeness }, rating, ...sections },
+      });
+    } catch (err: any) {
+      return profileDbError(reply, err, 'Could not load your profile');
+    }
+  });
+
+  // PUT /kazi/profile/me — update the basic fields
+  server.put('/kazi/profile/me', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await requireKaziUser(request, reply);
+    if (!user) return;
+    try {
+      const body = (request.body as any) || {};
+
+      const profileType = body.profile_type ?? 'worker';
+      if (!['worker', 'service_provider', 'business'].includes(profileType)) {
+        return profileFail(reply, 400, 'profile_type must be worker, service_provider or business');
+      }
+
+      const patch: Record<string, any> = {
+        profile_type: profileType,
+        updated_at: new Date().toISOString(),
+      };
+
+      if ('full_name' in body) patch.full_name = trimOrNull(body.full_name);
+      if ('headline' in body) patch.headline = trimOrNull(body.headline);
+      if ('bio' in body) patch.bio = trimOrNull(body.bio);
+      if ('photo_url' in body) patch.photo_url = trimOrNull(body.photo_url);
+      if ('cv_url' in body) patch.cv_url = trimOrNull(body.cv_url);
+      if ('category' in body) patch.category = trimOrNull(body.category);
+      if ('location' in body) patch.location = trimOrNull(body.location);
+      if ('availability' in body) patch.availability = trimOrNull(body.availability);
+      if ('service_name' in body) patch.service_name = trimOrNull(body.service_name);
+      if ('service_description' in body) patch.service_description = trimOrNull(body.service_description);
+      if ('hourly_rate' in body) patch.hourly_rate = positiveNumberOrNull(body.hourly_rate);
+      if ('daily_rate' in body) patch.daily_rate = positiveNumberOrNull(body.daily_rate);
+      if ('monthly_rate' in body) patch.monthly_rate = positiveNumberOrNull(body.monthly_rate);
+
+      const profile = await ensureOwnProfile(user.id, user.email);
+
+      const { data: updated, error: updateError } = await supabase
+        .from('kazi_profiles')
+        .update(patch)
+        .eq('id', profile.id)
+        .eq('user_id', user.id)
+        .select('*')
+        .single();
+
+      if (updateError) throw updateError;
+
+      const counts = await getProfileCounts(user.id);
+      const completeness = computeCompleteness(updated, counts);
+      if (completeness !== updated.completeness) {
+        await supabase.from('kazi_profiles').update({ completeness }).eq('id', updated.id);
+        updated.completeness = completeness;
+      }
+
+      return reply.send({ success: true, data: { profile: updated, completeness } });
+    } catch (err: any) {
+      return profileDbError(reply, err, 'Could not save your profile');
+    }
+  });
+
+  // GET /kazi/profile/:userId — public, read-only profile
+  server.get('/kazi/profile/:userId', async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const { userId } = request.params as { userId: string };
+      if (!userId) return profileFail(reply, 400, 'userId is required');
+
+      const { data: profile, error } = await supabase
+        .from('kazi_profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!profile) return profileFail(reply, 404, 'Profile not found');
+
+      const [sections, rating] = await Promise.all([
+        loadProfileSections(userId),
+        getRating(userId),
+      ]);
+
+      return reply.send({ success: true, data: { profile, rating, ...sections } });
+    } catch (err: any) {
+      return profileDbError(reply, err, 'Could not load this profile');
+    }
+  });
+
+  // POST /kazi/upload-cv — multipart PDF/DOC/DOCX into kazi-cvs
+  server.post('/kazi/upload-cv', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await requireKaziUser(request, reply);
+    if (!user) return;
+    try {
+      const stored = await storeUploadedFile({
+        request,
+        reply,
+        bucket: CV_BUCKET,
+        folder: 'cvs',
+        userId: user.id,
+        accept: PROFILE_CV_TYPES,
+        label: 'CV',
+      });
+      if (!stored || !('url' in stored)) return;
+      return reply.send({ success: true, data: stored });
+    } catch (err: any) {
+      return profileDbError(reply, err, 'Could not upload the CV');
+    }
+  });
+
+  // POST /kazi/upload-photo — multipart image into kazi-photos
+  server.post('/kazi/upload-photo', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await requireKaziUser(request, reply);
+    if (!user) return;
+    try {
+      const stored = await storeUploadedFile({
+        request,
+        reply,
+        bucket: PHOTO_BUCKET,
+        folder: 'photos',
+        userId: user.id,
+        accept: PROFILE_IMAGE_TYPES,
+        label: 'Photo',
+      });
+      if (!stored || !('url' in stored)) return;
+      return reply.send({ success: true, data: stored });
+    } catch (err: any) {
+      return profileDbError(reply, err, 'Could not upload the photo');
+    }
+  });
+
+  // POST /kazi/upload-portfolio — multipart image into kazi-portfolio
+  server.post('/kazi/upload-portfolio', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await requireKaziUser(request, reply);
+    if (!user) return;
+    try {
+      const stored = await storeUploadedFile({
+        request,
+        reply,
+        bucket: PORTFOLIO_BUCKET,
+        folder: 'portfolio',
+        userId: user.id,
+        accept: PROFILE_IMAGE_TYPES,
+        label: 'Portfolio image',
+        field: 'image',
+      });
+      if (!stored || !('url' in stored)) return;
+      return reply.send({ success: true, data: stored });
+    } catch (err: any) {
+      return profileDbError(reply, err, 'Could not upload the portfolio image');
+    }
+  });
+
+  // POST /kazi/skills
+  server.post('/kazi/skills', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await requireKaziUser(request, reply);
+    if (!user) return;
+    try {
+      const body = (request.body as any) || {};
+      const skillName = trimOrNull(body.skill_name);
+      if (!skillName) return profileFail(reply, 400, 'skill_name is required');
+
+      const proficiency = trimOrNull(body.proficiency);
+      if (proficiency && !['beginner', 'intermediate', 'advanced', 'expert'].includes(proficiency)) {
+        return profileFail(reply, 400, 'proficiency must be beginner, intermediate, advanced or expert');
+      }
+
+      const years = body.years_experience === undefined || body.years_experience === null || body.years_experience === ''
+        ? null
+        : Number(body.years_experience);
+      if (years !== null && (!Number.isFinite(years) || years < 0 || years > 80)) {
+        return profileFail(reply, 400, 'years_experience must be between 0 and 80');
+      }
+
+      await ensureOwnProfile(user.id, user.email);
+
+      const { data: skill, error } = await supabase
+        .from('kazi_skills')
+        .insert({
+          user_id: user.id,
+          skill_name: skillName,
+          proficiency,
+          years_experience: years,
+        })
+        .select('*')
+        .single();
+
+      if (error) throw error;
+
+      const counts = await getProfileCounts(user.id);
+      const completeness = computeCompleteness(await ensureOwnProfile(user.id, user.email), counts);
+      await supabase.from('kazi_profiles').update({ completeness }).eq('user_id', user.id);
+
+      return reply.send({ success: true, data: { skill, completeness } });
+    } catch (err: any) {
+      return profileDbError(reply, err, 'Could not add the skill');
+    }
+  });
+
+  // DELETE /kazi/skills/:id
+  server.delete('/kazi/skills/:id', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await requireKaziUser(request, reply);
+    if (!user) return;
+    try {
+      const { id } = request.params as { id: string };
+      const { error } = await supabase
+        .from('kazi_skills')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+      if (error) throw error;
+
+      const counts = await getProfileCounts(user.id);
+      const completeness = computeCompleteness(await ensureOwnProfile(user.id, user.email), counts);
+      await supabase.from('kazi_profiles').update({ completeness }).eq('user_id', user.id);
+
+      return reply.send({ success: true, data: { id, completeness } });
+    } catch (err: any) {
+      return profileDbError(reply, err, 'Could not remove the skill');
+    }
+  });
+
+  // POST /kazi/experience
+  server.post('/kazi/experience', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await requireKaziUser(request, reply);
+    if (!user) return;
+    try {
+      const body = (request.body as any) || {};
+      const jobTitle = trimOrNull(body.job_title);
+      if (!jobTitle) return profileFail(reply, 400, 'job_title is required');
+
+      const isCurrent = Boolean(body.is_current);
+
+      await ensureOwnProfile(user.id, user.email);
+
+      const { data: item, error } = await supabase
+        .from('kazi_experience')
+        .insert({
+          user_id: user.id,
+          job_title: jobTitle,
+          company: trimOrNull(body.company),
+          location: trimOrNull(body.location),
+          start_date: trimOrNull(body.start_date),
+          end_date: isCurrent ? null : trimOrNull(body.end_date),
+          is_current: isCurrent,
+          description: trimOrNull(body.description),
+        })
+        .select('*')
+        .single();
+
+      if (error) throw error;
+
+      const counts = await getProfileCounts(user.id);
+      const completeness = computeCompleteness(await ensureOwnProfile(user.id, user.email), counts);
+      await supabase.from('kazi_profiles').update({ completeness }).eq('user_id', user.id);
+
+      return reply.send({ success: true, data: { experience: item, completeness } });
+    } catch (err: any) {
+      return profileDbError(reply, err, 'Could not add the experience entry');
+    }
+  });
+
+  // DELETE /kazi/experience/:id
+  server.delete('/kazi/experience/:id', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await requireKaziUser(request, reply);
+    if (!user) return;
+    try {
+      const { id } = request.params as { id: string };
+      const { error } = await supabase
+        .from('kazi_experience')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+      if (error) throw error;
+
+      const counts = await getProfileCounts(user.id);
+      const completeness = computeCompleteness(await ensureOwnProfile(user.id, user.email), counts);
+      await supabase.from('kazi_profiles').update({ completeness }).eq('user_id', user.id);
+
+      return reply.send({ success: true, data: { id, completeness } });
+    } catch (err: any) {
+      return profileDbError(reply, err, 'Could not remove the experience entry');
+    }
+  });
+
+  // POST /kazi/education
+  server.post('/kazi/education', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await requireKaziUser(request, reply);
+    if (!user) return;
+    try {
+      const body = (request.body as any) || {};
+      const institution = trimOrNull(body.institution);
+      if (!institution) return profileFail(reply, 400, 'institution is required');
+
+      const year = (value: unknown) => {
+        if (value === undefined || value === null || value === '') return null;
+        const n = Number(value);
+        return Number.isInteger(n) && n >= 1900 && n <= 2200 ? n : null;
+      };
+
+      await ensureOwnProfile(user.id, user.email);
+
+      const { data: item, error } = await supabase
+        .from('kazi_education')
+        .insert({
+          user_id: user.id,
+          institution,
+          qualification: trimOrNull(body.qualification),
+          field_of_study: trimOrNull(body.field_of_study),
+          start_year: year(body.start_year),
+          end_year: year(body.end_year),
+        })
+        .select('*')
+        .single();
+
+      if (error) throw error;
+
+      const counts = await getProfileCounts(user.id);
+      const completeness = computeCompleteness(await ensureOwnProfile(user.id, user.email), counts);
+      await supabase.from('kazi_profiles').update({ completeness }).eq('user_id', user.id);
+
+      return reply.send({ success: true, data: { education: item, completeness } });
+    } catch (err: any) {
+      return profileDbError(reply, err, 'Could not add the education entry');
+    }
+  });
+
+  // DELETE /kazi/education/:id
+  server.delete('/kazi/education/:id', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await requireKaziUser(request, reply);
+    if (!user) return;
+    try {
+      const { id } = request.params as { id: string };
+      const { error } = await supabase
+        .from('kazi_education')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+      if (error) throw error;
+
+      const counts = await getProfileCounts(user.id);
+      const completeness = computeCompleteness(await ensureOwnProfile(user.id, user.email), counts);
+      await supabase.from('kazi_profiles').update({ completeness }).eq('user_id', user.id);
+
+      return reply.send({ success: true, data: { id, completeness } });
+    } catch (err: any) {
+      return profileDbError(reply, err, 'Could not remove the education entry');
+    }
+  });
+
+  // POST /kazi/portfolio
+  server.post('/kazi/portfolio', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await requireKaziUser(request, reply);
+    if (!user) return;
+    try {
+      const body = (request.body as any) || {};
+      const imageUrl = trimOrNull(body.image_url);
+      if (!imageUrl) return profileFail(reply, 400, 'image_url is required');
+
+      await ensureOwnProfile(user.id, user.email);
+
+      const { data: item, error } = await supabase
+        .from('kazi_portfolio')
+        .insert({
+          user_id: user.id,
+          image_url: imageUrl,
+          title: trimOrNull(body.title),
+          description: trimOrNull(body.description),
+        })
+        .select('*')
+        .single();
+
+      if (error) throw error;
+
+      const counts = await getProfileCounts(user.id);
+      const completeness = computeCompleteness(await ensureOwnProfile(user.id, user.email), counts);
+      await supabase.from('kazi_profiles').update({ completeness }).eq('user_id', user.id);
+
+      return reply.send({ success: true, data: { portfolio: item, completeness } });
+    } catch (err: any) {
+      return profileDbError(reply, err, 'Could not add the portfolio item');
+    }
+  });
+
+  // DELETE /kazi/portfolio/:id
+  server.delete('/kazi/portfolio/:id', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await requireKaziUser(request, reply);
+    if (!user) return;
+    try {
+      const { id } = request.params as { id: string };
+      const { error } = await supabase
+        .from('kazi_portfolio')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+      if (error) throw error;
+
+      const counts = await getProfileCounts(user.id);
+      const completeness = computeCompleteness(await ensureOwnProfile(user.id, user.email), counts);
+      await supabase.from('kazi_profiles').update({ completeness }).eq('user_id', user.id);
+
+      return reply.send({ success: true, data: { id, completeness } });
+    } catch (err: any) {
+      return profileDbError(reply, err, 'Could not remove the portfolio item');
+    }
+  });
+
+  // POST /kazi/review — only between two users who completed a contract
+  server.post('/kazi/review', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await requireKaziUser(request, reply);
+    if (!user) return;
+    try {
+      const body = (request.body as any) || {};
+      const revieweeId = trimOrNull(body.reviewee_id);
+      if (!revieweeId) return profileFail(reply, 400, 'reviewee_id is required');
+      if (revieweeId === user.id) return profileFail(reply, 400, 'You cannot review yourself');
+
+      const rating = Number(body.rating);
+      if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
+        return profileFail(reply, 400, 'rating must be a number between 1 and 5');
+      }
+
+      const comment = trimOrNull(body.comment);
+
+      // Only a completed KAZI contract between the two parties unlocks a review.
+      let contractQuery = supabase
+        .from('job_contracts')
+        .select('id, job_id')
+        .eq('status', 'completed')
+        .or(`employer_id.eq.${user.id},worker_id.eq.${user.id}`)
+        .limit(200);
+      if (body.job_id) contractQuery = contractQuery.eq('job_id', body.job_id);
+
+      const { data: contracts, error: contractError } = await contractQuery;
+      if (contractError) throw contractError;
+
+      const other = String(body.job_id || '');
+      const shared = (contracts || []).filter((c: any) => {
+        const matches = body.job_id ? c.job_id === body.job_id : true;
+        const counterpart = c.employer_id === user.id ? c.worker_id : c.employer_id;
+        return matches && counterpart === revieweeId;
+      });
+
+      if (shared.length === 0) {
+        return profileFail(
+          reply,
+          403,
+          'You can only review someone you completed a KAZI contract with'
+        );
+      }
+      if (other && body.job_id) {
+        const { data: existing } = await supabase
+          .from('kazi_reviews')
+          .select('id')
+          .eq('reviewee_id', revieweeId)
+          .eq('reviewer_id', user.id)
+          .eq('job_id', body.job_id)
+          .maybeSingle();
+        if (existing) return profileFail(reply, 400, 'You have already reviewed this person for this job');
+      }
+
+      const { data: review, error } = await supabase
+        .from('kazi_reviews')
+        .insert({
+          reviewer_id: user.id,
+          reviewee_id: revieweeId,
+          job_id: body.job_id || null,
+          rating: Math.round(rating),
+          comment,
+        })
+        .select('*')
+        .single();
+
+      if (error) throw error;
+
+      return reply.send({ success: true, data: { review } });
+    } catch (err: any) {
+      return profileDbError(reply, err, 'Could not save the review');
+    }
+  });
+
+  // GET /kazi/reviews/:userId — reviews written about a user
+  server.get('/kazi/reviews/:userId', async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const { userId } = request.params as { userId: string };
+      if (!userId) return profileFail(reply, 400, 'userId is required');
+
+      const { data, error } = await supabase
+        .from('kazi_reviews')
+        .select('*, jobs:job_id (title)')
+        .eq('reviewee_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+
+      const reviews = data || [];
+      const ratings = reviews.map((r: any) => Number(r.rating)).filter(Number.isFinite);
+      const rating = ratings.length
+        ? Math.round((ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length) * 10) / 10
+        : null;
+
+      return reply.send({ success: true, data: { reviews, rating, reviewCount: ratings.length } });
+    } catch (err: any) {
+      return profileDbError(reply, err, 'Could not load the reviews');
     }
   });
 }

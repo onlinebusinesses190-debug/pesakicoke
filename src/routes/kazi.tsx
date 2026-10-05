@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Badge, SectionTitle } from "@/components/ui-bits";
+import { KaziProfileTab, MyProfileShortcut } from "@/components/kazi/KaziProfileTab";
 import { useAuth } from "@/hooks/useAuth";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { toast } from "sonner";
@@ -25,7 +26,7 @@ export const Route = createFileRoute("/kazi")({
 
 const API_BASE = import.meta.env.VITE_PESAKI_API_URL || "https://pesaki-server.onrender.com";
 
-type Tab = "find" | "hire" | "mine";
+type Tab = "find" | "hire" | "mine" | "profile";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Job {
@@ -264,11 +265,12 @@ function KaziPage() {
       />
 
       <div className="px-5 pt-4">
-        <div className="grid grid-cols-4 gap-1 rounded-full bg-muted p-1">
+        <div className="grid grid-cols-5 gap-1 rounded-full bg-muted p-1">
           {([
             { k: "find", label: "Find Work" },
             { k: "hire", label: "Hire" },
             { k: "mine", label: "My Panel" },
+            { k: "profile", label: "Profile" },
           ] as const).map((t) => (
             <button
               key={t.k}
@@ -289,7 +291,7 @@ function KaziPage() {
         </div>
       </div>
 
-      {tab !== "mine" && (
+      {tab !== "mine" && tab !== "profile" && (
         <section className="mt-4 px-5">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -369,8 +371,11 @@ function KaziPage() {
           onChat={(app, job) => setChatApp({ application: app, job })}
           onRefresh={refreshData}
           user={user}
+          onOpenProfile={() => setTab("profile")}
         />
       )}
+
+      {tab === "profile" && <KaziProfileTab />}
 
       {applyJob && <ApplyJobSheet job={applyJob} onClose={() => setApplyJob(null)} onSuccess={refreshData} user={user} />}
       {postJob && <PostJobSheet onClose={() => setPostJob(false)} onSuccess={refreshData} user={user} />}
@@ -569,11 +574,13 @@ function ApplicantProfileModal({ application, onClose }: any) {
 }
 
 // ─── My Panel ─────────────────────────────────────────────────────────────────
-function MyPanel({ apps, postedJobs, contracts, onChat, onRefresh, user }: any) {
+function MyPanel({ apps, postedJobs, contracts, onChat, onRefresh, user, onOpenProfile }: any) {
   const [activeTab, setActiveTab] = useState<"applications" | "jobs" | "contracts">("applications");
 
   return (
     <section className="mt-5 px-5">
+      {onOpenProfile && <MyProfileShortcut onClick={onOpenProfile} />}
+
       <div className="flex gap-1 rounded-full bg-muted p-1 mb-4">
         <button
           onClick={() => setActiveTab("applications")}
