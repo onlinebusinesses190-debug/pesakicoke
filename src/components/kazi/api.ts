@@ -26,6 +26,21 @@ async function authHeaders(): Promise<Record<string, string>> {
 }
 
 /**
+ * A 404 from Fastify means the route isn't registered on the running backend,
+ * i.e. pesaki-server has not been redeployed yet. Say that plainly instead of
+ * leaking "Not Found" at the user.
+ */
+function notDeployedMessage(json: any, status: number): string | null {
+  if (status !== 404) return null;
+  if (json?.success === false) return null;
+  const looksLikeRouteMiss =
+    !json || json.statusCode === 404 || json.error === "Not Found" || json.message?.includes("not found");
+  return looksLikeRouteMiss
+    ? "KAZI profiles are not live yet — the pesaki-server backend needs to be redeployed."
+    : null;
+}
+
+/**
  * JSON request against the KAZI profile endpoints. Every endpoint answers with
  * { success, data } / { success, error } and never a 5xx, so a non-ok status
  * still carries a readable message.
@@ -57,7 +72,7 @@ export async function kaziApi<T>(
     if (!json || typeof json.success !== "boolean") {
       return {
         success: false,
-        error: json?.error || `Request failed (HTTP ${res.status})`,
+        error: notDeployedMessage(json, res.status) || json?.error || `Request failed (HTTP ${res.status})`,
       };
     }
     if (!json.success) {
@@ -95,7 +110,10 @@ export async function kaziUpload<T>(
     if (!json || json.success !== true) {
       return {
         success: false,
-        error: json?.error || `Upload failed (HTTP ${res.status})`,
+        error:
+          notDeployedMessage(json, res.status) ||
+          json?.error ||
+          `Upload failed (HTTP ${res.status})`,
       };
     }
     return { success: true, data: json.data as T };
