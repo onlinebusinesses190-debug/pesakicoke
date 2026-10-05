@@ -1,21 +1,22 @@
 import { createFileRoute, Link, rootRouteId, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   Briefcase,
   Check,
   ChevronDown,
+  CheckCircle2,
   FileText,
   GraduationCap,
   Images,
   Loader2,
   LogIn,
   Plus,
-  Save,
   Trash2,
   Upload,
   User as UserIcon,
   UserPlus,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell, PageHeader } from "@/components/AppShell";
@@ -274,7 +275,6 @@ export function KaziProfileEditor() {
   const [experience, setExperience] = useState<KaziExperience[]>([]);
   const [education, setEducation] = useState<KaziEducation[]>([]);
   const [portfolio, setPortfolio] = useState<KaziPortfolioItem[]>([]);
-  const [completeness, setCompleteness] = useState(0);
 
   const [form, setForm] = useState<KaziProfileBasic>({
     profile_type: "worker",
@@ -294,11 +294,12 @@ export function KaziProfileEditor() {
   });
 
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<"cv" | "photo" | null>(null);
   const [uploadingPortfolio, setUploadingPortfolio] = useState(false);
   const [busyRow, setBusyRow] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle");
   const hasFetched = useRef(false);
+  const saveTimer = useRef<NodeJS.Timeout | null>(null);
 
   // ── Which add-form is open (only ever one) ────────────────────────────────
   const [openAdd, setOpenAdd] = useState<"skill" | "exp" | "edu" | "portfolio" | null>(null);
@@ -331,9 +332,84 @@ export function KaziProfileEditor() {
   const [portfolioDescription, setPortfolioDescription] = useState("");
   const [pendingPortfolioUrl, setPendingPortfolioUrl] = useState<string | null>(null);
 
+  // ── Refs ───────────────────────────────────────────────────────────────────
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Live completeness (local, instant) ─────────────────────────────────────
+  const completeness = useMemo(() => {
+    let score = 0;
+    if (form.headline?.trim()) score += 10;
+    if (form.bio?.trim()) score += 10;
+    if (form.photo_url?.trim()) score += 10;
+    if (form.cv_url?.trim()) score += 10;
+    if (form.category?.trim()) score += 10;
+    if (form.location?.trim()) score += 10;
+    score += Math.min(15, skills.length * 5);
+    if (experience.length > 0) score += 10;
+    if (education.length > 0) score += 10;
+    score += Math.min(15, portfolio.length * 5);
+    return Math.min(100, score);
+  }, [form, skills, experience, education, portfolio]);
+
+  // ── Auto-save helpers ──────────────────────────────────────────────────────
+  const triggerAutoSave = useCallback((updates: Partial<KaziProfileBasic>) => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    setSaveStatus("saving");
+    saveTimer.current = setTimeout(async () => {
+      if (!user) return;
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) return;
+
+      const payload = { ...form, ...updates };
+      try {
+        const res = await fetch(`${API_BASE}/kazi/profile/me`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            ...payload,
+            full_name: payload.full_name?.trim() || null,
+            headline: payload.headline?.trim() || null,
+            bio: payload.bio?.trim() || null,
+            location: payload.location?.trim() || null,
+            category: payload.category || null,
+            availability: payload.availability || null,
+            service_name: (payload.profile_type === "service_provider" || payload.profile_type === "business")
+              ? payload.service_name?.trim() || null
+              : null,
+            service_description: (payload.profile_type === "service_provider" || payload.profile_type === "business")
+              ? payload.service_description?.trim() || null
+              : null,
+            hourly_rate: payload.hourly_rate ?? null,
+            daily_rate: payload.daily_rate ?? null,
+            monthly_rate: payload.monthly_rate ?? null,
+          }),
+        });
+        const json = await res.json();
+        if (json.success) {
+          setSaveStatus("saved");
+          setTimeout(() => setSaveStatus("idle"), 2000);
+          if (json.data?.profile) setProfile(json.data.profile);
+        } else {
+          setSaveStatus("failed");
+          // retry on next change
+        }
+      } catch {
+        setSaveStatus("failed");
+      }
+    }, 800);
+  }, [form, user]);
+
+  // Wrapper that updates local state AND triggers auto-save
+  const setAndSave = <K extends keyof KaziProfileBasic>(key: K, value: KaziProfileBasic[K]) => {
+    setForm((f) => ({ ...f, [key]: value }));
+    triggerAutoSave({ [key]: value });
+  };
+
+  const API_BASE = import.meta.env.VITE_PESAKI_API_URL || "https://pesaki-server.onrender.com";
+
   useEffect(() => {
     if (!ready) return;
-    // Signed out: show the Get Started gate instead of silently bouncing.
     if (!user) {
       setLoading(false);
       return;
@@ -353,7 +429,6 @@ export function KaziProfileEditor() {
       setExperience(res.data.experience);
       setEducation(res.data.education);
       setPortfolio(res.data.portfolio);
-      setCompleteness(p.completeness ?? 0);
       setForm({
         profile_type: p.profile_type ?? "worker",
         full_name: p.full_name ?? "",
@@ -374,39 +449,11 @@ export function KaziProfileEditor() {
     });
   }, [ready, user]);
 
-  const set = <K extends keyof KaziProfileBasic>(key: K, value: KaziProfileBasic[K]) =>
+  // Keep set for internal draft fields that shouldn't auto-save
+  const setDraft = <K extends keyof KaziProfileBasic>(key: K, value: KaziProfileBasic[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
   const isService = form.profile_type === "service_provider" || form.profile_type === "business";
-
-  // ── Save basic info ────────────────────────────────────────────────────────
-  const handleSave = async () => {
-    if (!requireAuth()) return;
-    setSaving(true);
-    const res = await updateMyProfile({
-      ...form,
-      full_name: form.full_name?.trim() || null,
-      headline: form.headline?.trim() || null,
-      bio: form.bio?.trim() || null,
-      location: form.location?.trim() || null,
-      category: form.category || null,
-      availability: form.availability || null,
-      service_name: isService ? form.service_name?.trim() || null : null,
-      service_description: isService ? form.service_description?.trim() || null : null,
-      hourly_rate: form.hourly_rate ?? null,
-      daily_rate: form.daily_rate ?? null,
-      monthly_rate: form.monthly_rate ?? null,
-    });
-    setSaving(false);
-
-    if (!res.success) {
-      toast.error(res.error || "Could not save your profile");
-      return;
-    }
-    setProfile(res.data?.profile ?? null);
-    if (typeof res.data?.completeness === "number") setCompleteness(res.data.completeness);
-    toast.success("Profile saved");
-  };
 
   // ── Uploads ────────────────────────────────────────────────────────────────
   const handleCvUpload = async (file: File) => {
@@ -418,13 +465,11 @@ export function KaziProfileEditor() {
       toast.error(res.error || "Could not upload the CV");
       return;
     }
-    set("cv_url", (res.data as UploadedFile).url);
+    const url = (res.data as UploadedFile).url;
+    setAndSave("cv_url", url);
     toast.success("CV uploaded");
   };
 
-  // Detaching is a plain profile update, so no storage delete is attempted —
-  // an orphaned object in the bucket is harmless and removal may fail on
-  // objects this user no longer owns.
   const handleCvRemove = async () => {
     if (!requireAuth()) return;
     setBusyRow("cv-remove");
@@ -434,9 +479,8 @@ export function KaziProfileEditor() {
       toast.error(res.error || "Could not remove the CV");
       return;
     }
-    set("cv_url", "");
-    setProfile(res.data?.profile ?? null);
-    if (typeof res.data?.completeness === "number") setCompleteness(res.data.completeness);
+    setAndSave("cv_url", "");
+    if (res.data?.profile) setProfile(res.data.profile);
     toast.success("CV removed");
   };
 
@@ -449,8 +493,9 @@ export function KaziProfileEditor() {
       toast.error(res.error || "Could not upload the photo");
       return;
     }
-    set("photo_url", (res.data as UploadedFile).url);
-    toast.success("Photo uploaded");
+    const url = (res.data as UploadedFile).url;
+    setAndSave("photo_url", url);
+    toast.success("Photo updated");
   };
 
   const handlePortfolioUpload = async (file: File) => {
@@ -473,7 +518,9 @@ export function KaziProfileEditor() {
       toast.error(res.error || "Something went wrong");
       return false;
     }
-    if (typeof res.data?.completeness === "number") setCompleteness(res.data.completeness);
+    if (typeof res.data?.completeness === "number") {
+      // completeness is now computed locally, but we still update profile if returned
+    }
     toast.success(okMsg);
     return true;
   }, []);
@@ -485,7 +532,7 @@ export function KaziProfileEditor() {
       setExperience(res.data.experience);
       setEducation(res.data.education);
       setPortfolio(res.data.portfolio);
-      if (typeof res.data.profile.completeness === "number") setCompleteness(res.data.profile.completeness);
+      if (res.data.profile) setProfile(res.data.profile);
     }
   }, []);
 
@@ -654,13 +701,35 @@ export function KaziProfileEditor() {
         title="Edit Profile"
         subtitle="Your public KAZI Link profile"
         right={
-          <button
-            onClick={() => navigate({ to: "/kazi" })}
-            aria-label="Back to KAZI Link"
-            className="grid h-9 w-9 place-items-center rounded-full bg-muted text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              {saveStatus === "saving" && (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  <span className="text-xs text-primary">Saving…</span>
+                </>
+              )}
+              {saveStatus === "saved" && (
+                <>
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  <span className="text-xs text-emerald-600">Saved</span>
+                </>
+              )}
+              {saveStatus === "failed" && (
+                <>
+                  <X className="h-4 w-4 text-destructive" />
+                  <span className="text-xs text-destructive">Save failed</span>
+                </>
+              )}
+            </div>
+            <button
+              onClick={() => navigate({ to: "/kazi" })}
+              aria-label="Back to KAZI Link"
+              className="grid h-9 w-9 place-items-center rounded-full bg-muted text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+          </div>
         }
       />
 
@@ -682,23 +751,49 @@ export function KaziProfileEditor() {
           />
           <Card className="space-y-3">
             <div className="flex items-center gap-3">
-              <Avatar url={form.photo_url || profile?.photo_url} name={form.full_name || profile?.full_name} size={56} />
-              <div className="flex-1">
-                <FileDrop
-                  label="Profile photo"
+              <div className="relative">
+                <div className="w-24 h-24 rounded-full overflow-hidden bg-primary/10 flex items-center justify-center text-primary text-3xl font-bold">
+                  {form.photo_url ? (
+                    <img src={form.photo_url} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    <span>{(form.full_name || profile?.full_name || "U").trim().charAt(0).toUpperCase()}</span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => photoInputRef.current?.click()}
+                  disabled={uploading === "photo"}
+                  className="absolute bottom-0 right-0 h-8 w-8 rounded-full bg-emerald-600 text-white flex items-center justify-center border-2 border-white shadow-md disabled:opacity-50"
+                  aria-label="Change profile photo"
+                >
+                  {uploading === "photo" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                </button>
+                <input
+                  ref={photoInputRef}
+                  type="file"
                   accept={KAZI_IMAGE_ACCEPT}
-                  busy={uploading === "photo"}
-                  onPick={handlePhotoUpload}
-                  hint="JPG, PNG, WEBP or GIF · max 5 MB"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      if (file.size > KAZI_MAX_UPLOAD_BYTES) {
+                        toast.error("File must be 5 MB or smaller");
+                        return;
+                      }
+                      handlePhotoUpload(file);
+                    }
+                    e.target.value = "";
+                  }}
                 />
               </div>
+              <p className="text-xs text-muted-foreground">Tap + to add or change your photo</p>
             </div>
 
             <div>
               <FieldLabel>Full name</FieldLabel>
               <input
                 value={form.full_name || ""}
-                onChange={(e) => set("full_name", e.target.value)}
+                onChange={(e) => setAndSave("full_name", e.target.value)}
                 placeholder="e.g. Amina Wanjiru"
                 className={inputCls}
               />
@@ -708,7 +803,7 @@ export function KaziProfileEditor() {
               <FieldLabel>Headline</FieldLabel>
               <input
                 value={form.headline || ""}
-                onChange={(e) => set("headline", e.target.value)}
+                onChange={(e) => setAndSave("headline", e.target.value)}
                 placeholder="e.g. Experienced house help and nanny"
                 className={inputCls}
               />
@@ -718,7 +813,7 @@ export function KaziProfileEditor() {
               <FieldLabel>Bio</FieldLabel>
               <textarea
                 value={form.bio || ""}
-                onChange={(e) => set("bio", e.target.value)}
+                onChange={(e) => setAndSave("bio", e.target.value)}
                 rows={4}
                 placeholder="Tell employers about yourself, your strengths and what you are looking for."
                 className={inputCls}
@@ -729,7 +824,7 @@ export function KaziProfileEditor() {
               <FieldLabel>Category</FieldLabel>
               <select
                 value={form.category || ""}
-                onChange={(e) => set("category", e.target.value)}
+                onChange={(e) => setAndSave("category", e.target.value)}
                 className={inputCls}
               >
                 <option value="">Select a category</option>
@@ -745,7 +840,7 @@ export function KaziProfileEditor() {
               <FieldLabel>Location</FieldLabel>
               <input
                 value={form.location || ""}
-                onChange={(e) => set("location", e.target.value)}
+                onChange={(e) => setAndSave("location", e.target.value)}
                 placeholder="e.g. Westlands, Nairobi"
                 className={inputCls}
               />
@@ -760,7 +855,7 @@ export function KaziProfileEditor() {
                     <button
                       key={a}
                       type="button"
-                      onClick={() => set("availability", active ? "" : a)}
+                      onClick={() => setAndSave("availability", active ? "" : a)}
                       className={`flex items-center justify-center gap-1.5 rounded-xl border px-2 py-2.5 text-xs font-semibold transition-colors ${
                         active
                           ? "border-primary bg-primary text-primary-foreground"
@@ -794,7 +889,7 @@ export function KaziProfileEditor() {
               <button
                 key={t.value}
                 type="button"
-                onClick={() => set("profile_type", t.value)}
+                onClick={() => setAndSave("profile_type", t.value)}
                 className={`flex w-full items-start gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors ${
                   form.profile_type === t.value
                     ? "border-primary bg-primary/5"
@@ -821,7 +916,7 @@ export function KaziProfileEditor() {
                   <FieldLabel>Service / business name</FieldLabel>
                   <input
                     value={form.service_name || ""}
-                    onChange={(e) => set("service_name", e.target.value)}
+                    onChange={(e) => setAndSave("service_name", e.target.value)}
                     placeholder="e.g. Amina Home Services"
                     className={inputCls}
                   />
@@ -830,7 +925,7 @@ export function KaziProfileEditor() {
                   <FieldLabel>Service description</FieldLabel>
                   <textarea
                     value={form.service_description || ""}
-                    onChange={(e) => set("service_description", e.target.value)}
+                    onChange={(e) => setAndSave("service_description", e.target.value)}
                     rows={3}
                     placeholder="Describe the services you offer and who you serve."
                     className={inputCls}
@@ -851,7 +946,7 @@ export function KaziProfileEditor() {
                 type="number"
                 min={0}
                 value={form.hourly_rate ?? ""}
-                onChange={(e) => set("hourly_rate", e.target.value ? Number(e.target.value) : null)}
+                onChange={(e) => setAndSave("hourly_rate", e.target.value ? Number(e.target.value) : null)}
                 placeholder="KES"
                 className={inputCls}
               />
@@ -862,7 +957,7 @@ export function KaziProfileEditor() {
                 type="number"
                 min={0}
                 value={form.daily_rate ?? ""}
-                onChange={(e) => set("daily_rate", e.target.value ? Number(e.target.value) : null)}
+                onChange={(e) => setAndSave("daily_rate", e.target.value ? Number(e.target.value) : null)}
                 placeholder="KES"
                 className={inputCls}
               />
@@ -873,7 +968,7 @@ export function KaziProfileEditor() {
                 type="number"
                 min={0}
                 value={form.monthly_rate ?? ""}
-                onChange={(e) => set("monthly_rate", e.target.value ? Number(e.target.value) : null)}
+                onChange={(e) => setAndSave("monthly_rate", e.target.value ? Number(e.target.value) : null)}
                 placeholder="KES"
                 className={inputCls}
               />
@@ -886,45 +981,59 @@ export function KaziProfileEditor() {
           <SectionTitle title="CV" />
           <Card className="space-y-3">
             {form.cv_url ? (
-              <div className="flex items-center gap-3 rounded-xl border border-border bg-background px-3 py-2.5">
-                <FileText className="h-5 w-5 shrink-0 text-primary" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-foreground">CV on file</p>
-                  <a
-                    href={form.cv_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="truncate text-xs text-primary underline"
-                  >
-                    View CV
-                  </a>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background px-3 py-2.5">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <FileText className="h-5 w-5 shrink-0 text-primary" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-foreground">CV on file</p>
+                      <a
+                        href={form.cv_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="truncate text-xs text-primary underline"
+                      >
+                        View CV
+                      </a>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleCvUpload}
+                      disabled={uploading === "cv"}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground disabled:opacity-50"
+                    >
+                      {uploading === "cv" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                      Replace
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCvRemove}
+                      disabled={busyRow === "cv-remove"}
+                      aria-label="Remove CV"
+                      className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-muted text-foreground disabled:opacity-50"
+                    >
+                      {busyRow === "cv-remove" ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleCvRemove}
-                  disabled={busyRow === "cv-remove"}
-                  aria-label="Remove CV"
-                  className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-muted text-foreground disabled:opacity-50"
-                >
-                  {busyRow === "cv-remove" ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-3.5 w-3.5" />
-                  )}
-                </button>
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground">
-                No CV uploaded yet. Employers can filter profiles by CV.
-              </p>
+              <button
+                type="button"
+                onClick={handleCvUpload}
+                disabled={uploading === "cv"}
+                className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-card px-4 py-4 text-sm font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50"
+              >
+                <FileText className="h-5 w-5" />
+                <span>+ Upload CV</span>
+              </button>
             )}
-            <FileDrop
-              label={form.cv_url ? "Replace CV" : "Upload CV"}
-              accept={KAZI_CV_ACCEPT}
-              busy={uploading === "cv"}
-              onPick={handleCvUpload}
-              hint="PDF, DOC or DOCX · max 5 MB"
-            />
           </Card>
         </section>
 
@@ -1272,21 +1381,6 @@ export function KaziProfileEditor() {
         </section>
 
         <div className="h-24" />
-      </div>
-
-      {/* ── Sticky save ────────────────────────────────────────────────── */}
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 px-5 py-3 backdrop-blur">
-        <div className="mx-auto flex max-w-md items-center gap-3">
-          <Badge tone={completeness >= 80 ? "success" : "primary"}>{completeness}% complete</Badge>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="ml-auto inline-flex items-center gap-2 rounded-full gradient-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {saving ? "Saving…" : "Save Profile"}
-          </button>
-        </div>
       </div>
     </AppShell>
   );
