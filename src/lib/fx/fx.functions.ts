@@ -27,15 +27,15 @@ export const getAccount = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
-    let { data: w } = await supabase.from("fx_wallets").select("demo_balance, real_balance").eq("user_id", userId).maybeSingle();
+    let { data: w } = await supabase.from("pesaki_fx_wallets").select("demo_balance, real_balance").eq("user_id", userId).maybeSingle();
     if (!w) {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      await supabaseAdmin.from("fx_wallets").upsert({ user_id: userId }, { onConflict: "user_id", ignoreDuplicates: true });
+      await supabaseAdmin.from("pesaki_fx_wallets").upsert({ user_id: userId }, { onConflict: "user_id", ignoreDuplicates: true });
       w = { demo_balance: DEMO_START, real_balance: 0 };
     }
     const [open, closed] = await Promise.all([
-      supabase.from("fx_trades").select("*").eq("status", "open").order("opened_at", { ascending: false }),
-      supabase.from("fx_trades").select("*").eq("status", "closed").order("closed_at", { ascending: false }).limit(100),
+      supabase.from("pesaki_fx_trades").select("*").eq("status", "open").order("opened_at", { ascending: false }),
+      supabase.from("pesaki_fx_trades").select("*").eq("status", "closed").order("closed_at", { ascending: false }).limit(100),
     ]);
     return {
       wallet: { demo: Number(w.demo_balance), real: Number(w.real_balance) },
@@ -60,7 +60,7 @@ export const openTrade = createServerFn({ method: "POST" })
     const q = quoteAt(pair, Date.now() / 1000);
     const entry = data.side === "buy" ? q.ask : q.bid;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: id, error } = await supabaseAdmin.rpc("fx_open_trade", {
+    const { data: id, error } = await supabaseAdmin.rpc("pesaki_fx_open_trade", {
       _user: context.userId, _mode: data.mode, _symbol: data.symbol, _side: data.side,
       _amount: Math.round(data.amount * 100) / 100, _leverage: LEVERAGE, _entry: entry,
     });
@@ -76,14 +76,14 @@ export const closeTrade = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { data: row } = await context.supabase.from("fx_trades").select("*").eq("id", data.id).eq("status", "open").maybeSingle();
+    const { data: row } = await context.supabase.from("pesaki_fx_trades").select("*").eq("id", data.id).eq("status", "open").maybeSingle();
     if (!row) return { ok: false as const, error: "This trade is already closed." };
     const t = norm(row as Row);
     const pair = getPair(t.symbol)!;
     const { exit, pnl } = calcPnl(t, quoteAt(pair, Date.now() / 1000));
     const reason = pnl <= -t.margin ? "stopout" : "manual";
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin.rpc("fx_close_trade", {
+    const { error } = await supabaseAdmin.rpc("pesaki_fx_close_trade", {
       _user: context.userId, _trade: t.id, _exit: exit, _pnl: Math.max(pnl, -t.margin), _reason: reason,
     });
     if (error) { console.error(error); return { ok: false as const, error: "Could not close the trade." }; }
@@ -94,7 +94,7 @@ export const resetDemo = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await supabaseAdmin.from("fx_trades").delete().eq("user_id", context.userId).eq("mode", "demo");
-    await supabaseAdmin.from("fx_wallets").upsert({ user_id: context.userId, demo_balance: DEMO_START }, { onConflict: "user_id" });
+    await supabaseAdmin.from("pesaki_fx_trades").delete().eq("user_id", context.userId).eq("mode", "demo");
+    await supabaseAdmin.from("pesaki_fx_wallets").upsert({ user_id: context.userId, demo_balance: DEMO_START }, { onConflict: "user_id" });
     return { ok: true };
   });
