@@ -27,12 +27,48 @@ export const getAccount = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
-    let { data: w } = await supabase.from("pesaki_fx_wallets").select("demo_balance, real_balance").eq("user_id", userId).maybeSingle();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Sync real balance from the main PESAKI wallet so real mode sees actual funds.
+    const { data: mainWallet } = await supabaseAdmin
+      .from("wallets")
+      .select("balance")
+      .eq("user_id", userId)
+      .maybeSingle();
+    const mainRealBalance = Number(mainWallet?.balance ?? 0);
+
+    let { data: w } = await supabase
+      .from("pesaki_fx_wallets")
+      .select("demo_balance, real_balance")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    // Fetch open real trades — if any exist, their margin is already deducted
+    // from pesaki_fx_wallets.real_balance, so we must NOT top up the forex wallet.
+    const { data: openReal } = await supabase
+      .from("pesaki_fx_trades")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("status", "open")
+      .eq("mode", "real");
+    const hasOpenReal = openReal && openReal.length > 0;
+
     if (!w) {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      await supabaseAdmin.from("pesaki_fx_wallets").upsert({ user_id: userId }, { onConflict: "user_id", ignoreDuplicates: true });
-      w = { demo_balance: DEMO_START, real_balance: 0 };
+      // First access — initialize from main wallet so real mode works immediately.
+      await supabaseAdmin.from("pesaki_fx_wallets").upsert(
+        { user_id: userId, real_balance: mainRealBalance },
+        { onConflict: "user_id", ignoreDuplicates: true },
+      );
+      w = { demo_balance: DEMO_START, real_balance: mainRealBalance };
+    } else if (Number(w.real_balance) < mainRealBalance && !hasOpenReal) {
+      // User deposited more since the last sync and no open real trades — top up.
+      await supabaseAdmin
+        .from("pesaki_fx_wallets")
+        .update({ real_balance: mainRealBalance, updated_at: new Date().toISOString() })
+        .eq("user_id", userId);
+      w.real_balance = mainRealBalance;
     }
+
     const [open, closed] = await Promise.all([
       supabase.from("pesaki_fx_trades").select("*").eq("status", "open").order("opened_at", { ascending: false }),
       supabase.from("pesaki_fx_trades").select("*").eq("status", "closed").order("closed_at", { ascending: false }).limit(100),
@@ -95,6 +131,9 @@ export const resetDemo = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("pesaki_fx_trades").delete().eq("user_id", context.userId).eq("mode", "demo");
-    await supabaseAdmin.from("pesaki_fx_wallets").upsert({ user_id: context.userId, demo_balance: DEMO_START }, { onConflict: "user_id" });
+    await supabaseAdmin
+      .from("pesaki_fx_wallets")
+      .update({ demo_balance: DEMO_START, updated_at: new Date().toISOString() })
+      .eq("user_id", context.userId);
     return { ok: true };
   });
