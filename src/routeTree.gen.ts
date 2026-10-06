@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -28,6 +29,7 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as TradingRouteImport } from './routes/trading'
 import { Route as WalletRouteImport } from './routes/wallet'
+import { Route as AuthenticatedTradeRouteImport } from './routes/_authenticated/trade'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminActionsRouteImport } from './routes/admin.actions'
 import { Route as AdminBankingRouteImport } from './routes/admin.banking'
@@ -60,6 +62,10 @@ import { Route as KaziPublicUserIdRouteImport } from './routes/kazi_.public.$use
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AboutRoute = AboutRouteImport.update({
@@ -151,6 +157,11 @@ const WalletRoute = WalletRouteImport.update({
   id: '/wallet',
   path: '/wallet',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedTradeRoute = AuthenticatedTradeRouteImport.update({
+  id: '/trade',
+  path: '/trade',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
@@ -313,6 +324,7 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/trading': typeof TradingRouteWithChildren
   '/wallet': typeof WalletRoute
+  '/trade': typeof AuthenticatedTradeRoute
   '/admin/actions': typeof AdminActionsRoute
   '/admin/banking': typeof AdminBankingRoute
   '/admin/business': typeof AdminBusinessRoute
@@ -360,6 +372,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
   '/wallet': typeof WalletRoute
+  '/trade': typeof AuthenticatedTradeRoute
   '/admin/actions': typeof AdminActionsRoute
   '/admin/banking': typeof AdminBankingRoute
   '/admin/business': typeof AdminBusinessRoute
@@ -392,6 +405,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/about': typeof AboutRoute
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
@@ -410,6 +424,7 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/trading': typeof TradingRouteWithChildren
   '/wallet': typeof WalletRoute
+  '/_authenticated/trade': typeof AuthenticatedTradeRoute
   '/admin/actions': typeof AdminActionsRoute
   '/admin/banking': typeof AdminBankingRoute
   '/admin/business': typeof AdminBusinessRoute
@@ -461,6 +476,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/trading'
     | '/wallet'
+    | '/trade'
     | '/admin/actions'
     | '/admin/banking'
     | '/admin/business'
@@ -508,6 +524,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/terms'
     | '/wallet'
+    | '/trade'
     | '/admin/actions'
     | '/admin/banking'
     | '/admin/business'
@@ -539,6 +556,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/_authenticated'
     | '/about'
     | '/admin'
     | '/auth'
@@ -557,6 +575,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/trading'
     | '/wallet'
+    | '/_authenticated/trade'
     | '/admin/actions'
     | '/admin/banking'
     | '/admin/business'
@@ -589,6 +608,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AboutRoute: typeof AboutRoute
   AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRoute
@@ -618,6 +638,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/about': {
@@ -745,6 +772,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/wallet'
       preLoaderRoute: typeof WalletRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/trade': {
+      id: '/_authenticated/trade'
+      path: '/trade'
+      fullPath: '/trade'
+      preLoaderRoute: typeof AuthenticatedTradeRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/admin/': {
       id: '/admin/'
@@ -945,6 +979,17 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedTradeRoute: typeof AuthenticatedTradeRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedTradeRoute: AuthenticatedTradeRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 interface AdminUsersRouteChildren {
   AdminUsersUserIdRoute: typeof AdminUsersUserIdRoute
 }
@@ -1034,6 +1079,7 @@ const TradingRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AboutRoute: AboutRoute,
   AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRoute,
