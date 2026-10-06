@@ -2,9 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 
 const BASE_URL = "https://pesaki.co.ke";
 
-// Member-only routes (/kazi, /business, /banking, /wallet, /profile) are
-// login-walled and intentionally excluded so crawlers are not sent to sign up.
-const PAGES = [
+// Static pages (non-KAZI)
+const STATIC_PAGES = [
   { path: "/", priority: 1.0, changefreq: "daily" },
   { path: "/about", priority: 0.7, changefreq: "monthly" },
   { path: "/business-funding", priority: 0.7, changefreq: "monthly" },
@@ -18,9 +17,9 @@ const PAGES = [
   { path: "/auth", priority: 0.4, changefreq: "monthly" },
 ];
 
-function buildSitemap(): string {
+function buildStaticSitemap(): string {
   const today = new Date().toISOString().slice(0, 10);
-  const urls = PAGES.map(
+  const urls = STATIC_PAGES.map(
     (p) => `  <url>
     <loc>${BASE_URL}${p.path}</loc>
     <lastmod>${today}</lastmod>
@@ -38,13 +37,46 @@ ${urls}
 export const Route = createFileRoute("/sitemap.xml")({
   server: {
     handlers: {
-      GET: () =>
-        new Response(buildSitemap(), {
-          headers: {
-            "Content-Type": "application/xml; charset=utf-8",
-            "Cache-Control": "public, max-age=3600",
-          },
-        }),
+      GET: async () => {
+        // Fetch dynamic KAZI profiles from backend
+        let kaziUrls = "";
+        try {
+          const res = await fetch("https://pesaki-server.onrender.com/kazi/sitemap");
+          if (res.ok) {
+            const xml = await res.text();
+            // Extract <url> entries from backend response and merge
+            const urlMatches = xml.match(/<url>[\s\S]*?<\/url>/g);
+            if (urlMatches) kaziUrls = urlMatches.join("\n");
+          }
+        } catch {
+          // Silently fall back to static only
+        }
+
+        const today = new Date().toISOString().slice(0, 10);
+        const staticUrls = STATIC_PAGES.map(
+          (p) => `  <url>
+    <loc>${BASE_URL}${p.path}</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>${p.changefreq}</changefreq>
+    <priority>${p.priority.toFixed(1)}</priority>
+  </url>`,
+        ).join("\n");
+
+        const allUrls = kaziUrls ? `${kaziUrls}\n${staticUrls}` : staticUrls;
+
+        return new Response(
+          `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${allUrls}
+</urlset>`,
+          {
+            headers: {
+              "Content-Type": "application/xml; charset=utf-8",
+              "Cache-Control": "public, max-age=3600",
+            },
+          }
+        );
+      },
     },
   },
 });

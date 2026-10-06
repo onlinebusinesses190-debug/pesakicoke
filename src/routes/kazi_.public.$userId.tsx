@@ -33,6 +33,7 @@ export const Route = createFileRoute("/kazi_/public/$userId")({
         name: "description",
         content: "A public KAZI Link worker or service provider profile.",
       },
+      { name: "robots", content: "index, follow" },
     ],
   }),
   component: KaziPublicProfile,
@@ -91,6 +92,78 @@ function KaziPublicProfile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const hasFetched = useRef(false);
+
+  // ── JSON-LD Structured Data ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!bundle) return;
+    const p = bundle.profile;
+    const mainEntity: Record<string, any> = {
+      "@type": "Person",
+      name: p.full_name?.trim() || "KAZI member",
+    };
+    if (p.headline?.trim()) mainEntity.jobTitle = p.headline.trim();
+    if (p.bio?.trim()) mainEntity.description = p.bio.trim();
+    if (p.location?.trim()) {
+      mainEntity.address = {
+        "@type": "PostalAddress",
+        addressLocality: p.location.trim(),
+        addressCountry: "KE",
+      };
+    }
+    if (p.photo_url?.trim()) mainEntity.image = p.photo_url.trim();
+    mainEntity.url = `${window.location.origin}/kazi/public/${userId}`;
+    mainEntity.worksFor = {
+      "@type": "Organization",
+      name: "KAZI Link by PESAKI",
+    };
+
+    const jsonLd = {
+      "@context": "https://schema.org",
+      "@type": "ProfilePage",
+      mainEntity,
+    };
+
+    const script = document.createElement("script");
+    script.type = "application/ld+json";
+    script.text = JSON.stringify(jsonLd);
+    script.id = "kazi-profile-jsonld";
+
+    document.getElementById("kazi-profile-jsonld")?.remove();
+    document.head.appendChild(script);
+
+    return () => {
+      document.getElementById("kazi-profile-jsonld")?.remove();
+    };
+  }, [bundle, userId]);
+
+  // ── Dynamic Title & Meta Description ─────────────────────────────────────
+  useEffect(() => {
+    if (!bundle) return;
+    const p = bundle.profile;
+    const name = p.full_name?.trim() || "KAZI member";
+    const headline = p.headline?.trim() || "Worker";
+    document.title = `${name} — ${headline} | KAZI Link`;
+
+    let metaDesc = document.querySelector('meta[name="description"]');
+    if (!metaDesc) {
+      metaDesc = document.createElement("meta");
+      metaDesc.setAttribute("name", "description");
+      document.head.appendChild(metaDesc);
+    }
+    const desc = (p.bio?.trim() || `${name} — ${headline} on KAZI Link`).slice(0, 160);
+    metaDesc.setAttribute("content", desc);
+  }, [bundle]);
+
+  // ── Robots Meta ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    let robots = document.querySelector('meta[name="robots"]');
+    if (!robots) {
+      robots = document.createElement("meta");
+      robots.setAttribute("name", "robots");
+      document.head.appendChild(robots);
+    }
+    robots.setAttribute("content", "index, follow");
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);

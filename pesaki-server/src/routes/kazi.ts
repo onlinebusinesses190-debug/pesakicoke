@@ -2319,4 +2319,34 @@ server.get('/kazi/escrow/:jobId', async (request: FastifyRequest, reply: Fastify
       return profileDbError(reply, err, 'Could not search profiles');
     }
   });
+
+  // GET /kazi/sitemap — public sitemap for KAZI profiles (no auth required)
+  server.get('/kazi/sitemap', async (_request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const { data: profiles, error } = await supabase
+        .from('kazi_profiles')
+        .select('user_id')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const baseUrl = 'https://pesaki.co.ke';
+      const urls = (profiles || []).map((p: any) => `
+  <url>
+    <loc>${baseUrl}/kazi/public/${p.user_id}</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>`).join('');
+
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}
+</urlset>`;
+
+      reply.header('Content-Type', 'application/xml; charset=utf-8');
+      return reply.send(xml);
+    } catch (err: any) {
+      console.error('[kazi/sitemap] error:', err);
+      return reply.status(500).send('Could not generate sitemap');
+    }
+  });
 }
