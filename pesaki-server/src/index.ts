@@ -13,6 +13,7 @@ import { setupRateLimit } from './middleware/rateLimit';
 import { getEngine } from './services/forex/marketEngine';
 import { hydrateAndAttach } from './services/forex/persistence';
 import { startPositionMonitor } from './services/forex/positionMonitor';
+import { startBinaryFxExpiryWorker, stopBinaryFxExpiryWorker } from './services/binaryFx/expiryWorker';
 
 import walletRoutes from './routes/wallet';
 import kaziRoutes from './routes/kazi';
@@ -22,6 +23,7 @@ import { bankingRoutes } from './routes/banking';
 import referralRoutes from './routes/referrals';
 import adminRoutes from './routes/admin';
 import userRoutes from './routes/user';
+import { bfxRoutes } from './routes/binaryFx';
 
 const startServer = async () => {
   try {
@@ -48,6 +50,8 @@ const startServer = async () => {
     server.register(referralRoutes);
     server.register(adminRoutes);
     server.register(userRoutes);
+    // Binary FX: isolated from /games/fx and /forex. Own routes, own table.
+    server.register(bfxRoutes, { prefix: '/games/bfx' });
 
     // Add dummy endpoints for missing ones
     server.get('/user/stats', async (_request, reply) => {
@@ -81,9 +85,13 @@ const startServer = async () => {
     const stopPersistence = await hydrateAndAttach(getEngine());
     getEngine().start();
     startPositionMonitor();
+    // Binary FX expiry worker: settles trades whose expires_at has passed,
+    // regardless of whether the user has the app open.
+    startBinaryFxExpiryWorker();
 
     const shutdown = () => {
       logger.info('Shutting down PESAKI Forex engine');
+      stopBinaryFxExpiryWorker();
       getEngine().stop();
       if (stopPersistence) stopPersistence();
       process.exit(0);

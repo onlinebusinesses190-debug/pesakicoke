@@ -15,6 +15,7 @@ import { Route as AboutRouteImport } from './routes/about'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as BankingRouteImport } from './routes/banking'
+import { Route as BinaryFxRouteImport } from './routes/binary-fx'
 import { Route as BusinessRouteImport } from './routes/business'
 import { Route as BusinessFundingRouteImport } from './routes/business-funding'
 import { Route as ComplianceRouteImport } from './routes/compliance'
@@ -86,6 +87,11 @@ const AuthRoute = AuthRouteImport.update({
 const BankingRoute = BankingRouteImport.update({
   id: '/banking',
   path: '/banking',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BinaryFxRoute = BinaryFxRouteImport.update({
+  id: '/binary-fx',
+  path: '/binary-fx',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BusinessRoute = BusinessRouteImport.update({
@@ -310,6 +316,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/banking': typeof BankingRoute
+  '/binary-fx': typeof BinaryFxRoute
   '/business': typeof BusinessRoute
   '/business-funding': typeof BusinessFundingRoute
   '/compliance': typeof ComplianceRoute
@@ -359,6 +366,7 @@ export interface FileRoutesByTo {
   '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
   '/banking': typeof BankingRoute
+  '/binary-fx': typeof BinaryFxRoute
   '/business': typeof BusinessRoute
   '/business-funding': typeof BusinessFundingRoute
   '/compliance': typeof ComplianceRoute
@@ -410,6 +418,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/banking': typeof BankingRoute
+  '/binary-fx': typeof BinaryFxRoute
   '/business': typeof BusinessRoute
   '/business-funding': typeof BusinessFundingRoute
   '/compliance': typeof ComplianceRoute
@@ -462,6 +471,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/banking'
+    | '/binary-fx'
     | '/business'
     | '/business-funding'
     | '/compliance'
@@ -511,6 +521,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/auth'
     | '/banking'
+    | '/binary-fx'
     | '/business'
     | '/business-funding'
     | '/compliance'
@@ -561,6 +572,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/banking'
+    | '/binary-fx'
     | '/business'
     | '/business-funding'
     | '/compliance'
@@ -613,6 +625,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRoute
   BankingRoute: typeof BankingRoute
+  BinaryFxRoute: typeof BinaryFxRoute
   BusinessRoute: typeof BusinessRoute
   BusinessFundingRoute: typeof BusinessFundingRoute
   ComplianceRoute: typeof ComplianceRoute
@@ -673,6 +686,13 @@ declare module '@tanstack/react-router' {
       path: '/banking'
       fullPath: '/banking'
       preLoaderRoute: typeof BankingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/binary-fx': {
+      id: '/binary-fx'
+      path: '/binary-fx'
+      fullPath: '/binary-fx'
+      preLoaderRoute: typeof BinaryFxRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/business': {
@@ -1084,6 +1104,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRoute,
   BankingRoute: BankingRoute,
+  BinaryFxRoute: BinaryFxRoute,
   BusinessRoute: BusinessRoute,
   BusinessFundingRoute: BusinessFundingRoute,
   ComplianceRoute: ComplianceRoute,

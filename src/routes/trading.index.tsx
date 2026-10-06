@@ -41,9 +41,9 @@ const icons: Record<string, React.ComponentType<{ className?: string }>> = {
 
 const routeFor: Record<
   string,
-  "/trading/fx" | "/trading/up-down" | "/trading/aviator" | "/trading/invest" | "/trading/spin"
+  "/games/binary-fx" | "/trading/up-down" | "/trading/aviator" | "/trading/invest" | "/trading/spin"
 > = {
-  binary: "/trading/fx",
+  binary: "/games/binary-fx",
   updown: "/trading/up-down",
   avi: "/trading/aviator",
   invest: "/trading/invest",
