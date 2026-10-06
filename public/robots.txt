@@ -7,5 +7,7 @@ Allow: /
 Disallow: /admin/
 Disallow: /wallet/
 Disallow: /auth
+Disallow: /kazi/profile
+Disallow: /kazi/public/
 
 Sitemap: https://pesaki.co.ke/sitemap.xml

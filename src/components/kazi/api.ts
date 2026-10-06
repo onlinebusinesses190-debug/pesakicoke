@@ -145,6 +145,9 @@ export const updateMyProfile = (patch: KaziProfileBasic) =>
 export const fetchPublicProfile = (userId: string) =>
   kaziApi<KaziProfileBundle>(`/kazi/profile/${userId}`);
 
+export const fetchPublicProfileBySlug = (slug: string) =>
+  kaziApi<KaziProfileBundle>(`/kazi/profile/by-slug/${slug}`);
+
 export const uploadCv = (file: File) => kaziUpload<UploadedFile>("/kazi/upload-cv", file);
 export const uploadPhoto = (file: File) => kaziUpload<UploadedFile>("/kazi/upload-photo", file);
 export const uploadPortfolioImage = (file: File) =>

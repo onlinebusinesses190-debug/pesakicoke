@@ -16,7 +16,7 @@ import {
 import { toast } from "sonner";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card } from "@/components/ui-bits";
-import { fetchPublicProfile, fetchReviews } from "@/components/kazi/api";
+import { fetchPublicProfileBySlug, fetchReviews } from "@/components/kazi/api";
 import type {
   KaziProfileBundle,
   KaziReview,
@@ -24,9 +24,7 @@ import type {
 import { CompletenessBar, ProfileHeaderCard, AboutSection, SkillsSection, ExperienceSection, EducationSection, PortfolioSection, ReviewsSection, RateChips } from "@/components/kazi/ProfileView";
 import { useAuth } from "@/hooks/useAuth";
 
-export const Route = createFileRoute("/kazi_/public/$userId")({
-  // See the note in kazi_.profile.tsx: the kazi_ prefix escapes nesting under
-  // the /kazi page, which has no <Outlet />. URL is still /kazi/public/$userId.
+export const Route = createFileRoute("/kazi/m/$slug")({
   getParentRoute: () => rootRouteId,
   head: () => ({
     meta: [
@@ -38,7 +36,7 @@ export const Route = createFileRoute("/kazi_/public/$userId")({
       { name: "robots", content: "index, follow" },
     ],
   }),
-  component: KaziPublicProfile,
+  component: KaziPublicProfileBySlug,
 });
 
 type SectionTab = "about" | "skills" | "experience" | "education" | "portfolio" | "reviews";
@@ -52,7 +50,6 @@ const TABS: { key: SectionTab; label: string; icon: typeof Sparkles }[] = [
   { key: "reviews", label: "Reviews", icon: MessageCircle },
 ];
 
-/** Renders only the selected section so the tab strip actually switches. */
 function TabSection({
   bundle,
   reviews,
@@ -84,8 +81,8 @@ function TabSection({
   }
 }
 
-function KaziPublicProfile() {
-  const { userId } = Route.useParams();
+function KaziPublicProfileBySlug() {
+  const { slug } = Route.useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -116,7 +113,7 @@ function KaziPublicProfile() {
       };
     }
     if (p.photo_url?.trim()) mainEntity.image = p.photo_url.trim();
-    mainEntity.url = `${window.location.origin}/kazi/public/${userId}`;
+    mainEntity.url = `${window.location.origin}/kazi/m/${slug}`;
     mainEntity.worksFor = {
       "@type": "Organization",
       name: "KAZI Link by PESAKI",
@@ -139,7 +136,7 @@ function KaziPublicProfile() {
     return () => {
       document.getElementById("kazi-profile-jsonld")?.remove();
     };
-  }, [bundle, userId]);
+  }, [bundle, slug]);
 
   // ── Dynamic Title & Meta Description ─────────────────────────────────────
   useEffect(() => {
@@ -174,7 +171,7 @@ function KaziPublicProfile() {
     setLoading(true);
     setError(null);
 
-    const res = await fetchPublicProfile(userId);
+    const res = await fetchPublicProfileBySlug(slug);
     if (!res.success || !res.data) {
       setError(res.error || "Profile not found");
       setBundle(null);
@@ -184,9 +181,9 @@ function KaziPublicProfile() {
     setBundle(res.data);
     setLoading(false);
 
-    const reviewRes = await fetchReviews(userId);
+    const reviewRes = await fetchReviews(res.data.profile.user_id);
     if (reviewRes.success && reviewRes.data?.reviews) setReviews(reviewRes.data.reviews);
-  }, [userId]);
+  }, [slug]);
 
   useEffect(() => {
     if (hasFetched.current) return;
@@ -195,7 +192,7 @@ function KaziPublicProfile() {
   }, [load]);
 
   const shareUrl = () =>
-    typeof window === "undefined" ? "" : `${window.location.origin}/kazi/public/${userId}`;
+    typeof window === "undefined" ? "" : `${window.location.origin}/kazi/m/${slug}`;
 
   const shareText = () => {
     const p = bundle?.profile;
@@ -208,12 +205,6 @@ function KaziPublicProfile() {
     return `Check out ${name} on KAZI Link${suffix}\n${shareUrl()}`;
   };
 
-  /**
-   * KAZI messaging is job-scoped: both /kazi/messages?jobId= and
-   * /kazi/send-message require a jobId, and there is no user-to-user channel.
-   * Rather than navigating to a chat that cannot exist, say so and send the
-   * viewer to KAZI where they can message from an application or job.
-   */
   const handleMessage = () => {
     const name = bundle?.profile.full_name?.trim() || "them";
     toast(
@@ -247,7 +238,6 @@ function KaziPublicProfile() {
     }
   };
 
-  /** WhatsApp is the primary sharing channel in Kenya. */
   const handleWhatsApp = () => {
     const url = `https://wa.me/?text=${encodeURIComponent(shareText())}`;
     window.open(url, "_blank", "noopener,noreferrer");

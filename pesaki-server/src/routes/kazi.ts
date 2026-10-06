@@ -1655,6 +1655,32 @@ server.get('/kazi/escrow/:jobId', async (request: FastifyRequest, reply: Fastify
 
       const profile = await ensureOwnProfile(user.id, user.email);
 
+      // Auto-generate slug from full_name when full_name changes and no slug exists yet
+      if ('full_name' in body && body.full_name && !profile.slug) {
+        const baseSlug = body.full_name
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+        if (baseSlug) {
+          // Check if slug exists, append number if needed
+          let finalSlug = baseSlug;
+          let counter = 1;
+          while (true) {
+            const { data: existing } = await supabase
+              .from('kazi_profiles')
+              .select('id')
+              .eq('slug', finalSlug)
+              .neq('id', profile.id)
+              .maybeSingle();
+            if (!existing) break;
+            counter++;
+            finalSlug = `${baseSlug}-${counter}`;
+          }
+          patch.slug = finalSlug;
+        }
+      }
+
       const { data: updated, error: updateError } = await supabase
         .from('kazi_profiles')
         .update(patch)
@@ -1675,6 +1701,42 @@ server.get('/kazi/escrow/:jobId', async (request: FastifyRequest, reply: Fastify
       return reply.send({ success: true, data: { profile: updated, completeness } });
     } catch (err: any) {
       return profileDbError(reply, err, 'Could not save your profile');
+    }
+  });
+
+  // GET /kazi/profile/by-slug/:slug — public, read-only profile by slug
+  server.get('/kazi/profile/by-slug/:slug', async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const { slug } = request.params as { slug: string };
+      if (!slug) return profileFail(reply, 400, 'slug is required');
+
+      const { data: profile, error } = await supabase
+        .from('kazi_profiles')
+        .select('*')
+        .eq('slug', slug)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!profile) return profileFail(reply, 404, 'Profile not found');
+
+      const userId = profile.user_id;
+      const [sections, rating] = await Promise.all([
+        loadProfileSections(userId),
+        getRating(userId),
+      ]);
+
+      const completeness = computeCompleteness(profile, await getProfileCounts(userId));
+      if (completeness !== profile.completeness) {
+        await supabase.from('kazi_profiles').update({ completeness }).eq('id', profile.id);
+        profile.completeness = completeness;
+      }
+
+      return reply.send({
+        success: true,
+        data: { profile: { ...profile, completeness }, rating, ...sections },
+      });
+    } catch (err: any) {
+      return profileDbError(reply, err, 'Could not load the profile');
     }
   });
 
@@ -2325,15 +2387,17 @@ server.get('/kazi/escrow/:jobId', async (request: FastifyRequest, reply: Fastify
     try {
       const { data: profiles, error } = await supabase
         .from('kazi_profiles')
-        .select('user_id')
-        .order('created_at', { ascending: false });
+        .select('slug, updated_at')
+        .not('slug', 'is', null)
+        .order('updated_at', { ascending: false });
 
       if (error) throw error;
 
       const baseUrl = 'https://pesaki.co.ke';
       const urls = (profiles || []).map((p: any) => `
   <url>
-    <loc>${baseUrl}/kazi/public/${p.user_id}</loc>
+    <loc>${baseUrl}/kazi/m/${p.slug}</loc>
+    <lastmod>${new Date(p.updated_at).toISOString().split('T')[0]}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>`).join('');
