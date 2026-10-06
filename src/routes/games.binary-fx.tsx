@@ -50,7 +50,7 @@ type Config = {
 const formatKes = (n: number) =>
   n.toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export const Route = createFileRoute("/binary-fx")({
+export const Route = createFileRoute("/games/binary-fx")({
   validateSearch: (search: Record<string, unknown>) => ({
     mode: (search.mode as string) === "real" ? "real" : "demo",
   }),

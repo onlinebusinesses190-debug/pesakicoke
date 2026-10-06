@@ -15,7 +15,6 @@ import { Route as AboutRouteImport } from './routes/about'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as BankingRouteImport } from './routes/banking'
-import { Route as BinaryFxRouteImport } from './routes/binary-fx'
 import { Route as BusinessRouteImport } from './routes/business'
 import { Route as BusinessFundingRouteImport } from './routes/business-funding'
 import { Route as ComplianceRouteImport } from './routes/compliance'
@@ -47,6 +46,7 @@ import { Route as AdminTradingRouteImport } from './routes/admin.trading'
 import { Route as AdminTransactionsRouteImport } from './routes/admin.transactions'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminWithdrawalsRouteImport } from './routes/admin.withdrawals'
+import { Route as GamesBinaryFxRouteImport } from './routes/games.binary-fx'
 import { Route as KaziGoogleCardHelpRouteImport } from './routes/kazi.google-card-help'
 import { Route as KaziProfileRouteImport } from './routes/kazi_.profile'
 import { Route as TradingIndexRouteImport } from './routes/trading.index'
@@ -87,11 +87,6 @@ const AuthRoute = AuthRouteImport.update({
 const BankingRoute = BankingRouteImport.update({
   id: '/banking',
   path: '/banking',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BinaryFxRoute = BinaryFxRouteImport.update({
-  id: '/binary-fx',
-  path: '/binary-fx',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BusinessRoute = BusinessRouteImport.update({
@@ -249,6 +244,11 @@ const AdminWithdrawalsRoute = AdminWithdrawalsRouteImport.update({
   path: '/withdrawals',
   getParentRoute: () => AdminRoute,
 } as any)
+const GamesBinaryFxRoute = GamesBinaryFxRouteImport.update({
+  id: '/games/binary-fx',
+  path: '/games/binary-fx',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const KaziGoogleCardHelpRoute = KaziGoogleCardHelpRouteImport.update({
   id: '/google-card-help',
   path: '/google-card-help',
@@ -316,7 +316,6 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/banking': typeof BankingRoute
-  '/binary-fx': typeof BinaryFxRoute
   '/business': typeof BusinessRoute
   '/business-funding': typeof BusinessFundingRoute
   '/compliance': typeof ComplianceRoute
@@ -347,6 +346,7 @@ export interface FileRoutesByFullPath {
   '/admin/transactions': typeof AdminTransactionsRoute
   '/admin/users': typeof AdminUsersRouteWithChildren
   '/admin/withdrawals': typeof AdminWithdrawalsRoute
+  '/games/binary-fx': typeof GamesBinaryFxRoute
   '/kazi/google-card-help': typeof KaziGoogleCardHelpRoute
   '/kazi/profile': typeof KaziProfileRoute
   '/trading/aviator': typeof TradingAviatorRoute
@@ -366,7 +366,6 @@ export interface FileRoutesByTo {
   '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
   '/banking': typeof BankingRoute
-  '/binary-fx': typeof BinaryFxRoute
   '/business': typeof BusinessRoute
   '/business-funding': typeof BusinessFundingRoute
   '/compliance': typeof ComplianceRoute
@@ -396,6 +395,7 @@ export interface FileRoutesByTo {
   '/admin/transactions': typeof AdminTransactionsRoute
   '/admin/users': typeof AdminUsersRouteWithChildren
   '/admin/withdrawals': typeof AdminWithdrawalsRoute
+  '/games/binary-fx': typeof GamesBinaryFxRoute
   '/kazi/google-card-help': typeof KaziGoogleCardHelpRoute
   '/kazi/profile': typeof KaziProfileRoute
   '/trading/aviator': typeof TradingAviatorRoute
@@ -418,7 +418,6 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/banking': typeof BankingRoute
-  '/binary-fx': typeof BinaryFxRoute
   '/business': typeof BusinessRoute
   '/business-funding': typeof BusinessFundingRoute
   '/compliance': typeof ComplianceRoute
@@ -449,6 +448,7 @@ export interface FileRoutesById {
   '/admin/transactions': typeof AdminTransactionsRoute
   '/admin/users': typeof AdminUsersRouteWithChildren
   '/admin/withdrawals': typeof AdminWithdrawalsRoute
+  '/games/binary-fx': typeof GamesBinaryFxRoute
   '/kazi/google-card-help': typeof KaziGoogleCardHelpRoute
   '/kazi_/profile': typeof KaziProfileRoute
   '/trading/aviator': typeof TradingAviatorRoute
@@ -471,7 +471,6 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/banking'
-    | '/binary-fx'
     | '/business'
     | '/business-funding'
     | '/compliance'
@@ -502,6 +501,7 @@ export interface FileRouteTypes {
     | '/admin/transactions'
     | '/admin/users'
     | '/admin/withdrawals'
+    | '/games/binary-fx'
     | '/kazi/google-card-help'
     | '/kazi/profile'
     | '/trading/aviator'
@@ -521,7 +521,6 @@ export interface FileRouteTypes {
     | '/about'
     | '/auth'
     | '/banking'
-    | '/binary-fx'
     | '/business'
     | '/business-funding'
     | '/compliance'
@@ -551,6 +550,7 @@ export interface FileRouteTypes {
     | '/admin/transactions'
     | '/admin/users'
     | '/admin/withdrawals'
+    | '/games/binary-fx'
     | '/kazi/google-card-help'
     | '/kazi/profile'
     | '/trading/aviator'
@@ -572,7 +572,6 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/banking'
-    | '/binary-fx'
     | '/business'
     | '/business-funding'
     | '/compliance'
@@ -603,6 +602,7 @@ export interface FileRouteTypes {
     | '/admin/transactions'
     | '/admin/users'
     | '/admin/withdrawals'
+    | '/games/binary-fx'
     | '/kazi/google-card-help'
     | '/kazi_/profile'
     | '/trading/aviator'
@@ -625,7 +625,6 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRoute
   BankingRoute: typeof BankingRoute
-  BinaryFxRoute: typeof BinaryFxRoute
   BusinessRoute: typeof BusinessRoute
   BusinessFundingRoute: typeof BusinessFundingRoute
   ComplianceRoute: typeof ComplianceRoute
@@ -640,6 +639,7 @@ export interface RootRouteChildren {
   TermsRoute: typeof TermsRoute
   TradingRoute: typeof TradingRouteWithChildren
   WalletRoute: typeof WalletRoute
+  GamesBinaryFxRoute: typeof GamesBinaryFxRoute
   KaziProfileRoute: typeof KaziProfileRoute
   KaziPublicUserIdRoute: typeof KaziPublicUserIdRoute
 }
@@ -686,13 +686,6 @@ declare module '@tanstack/react-router' {
       path: '/banking'
       fullPath: '/banking'
       preLoaderRoute: typeof BankingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/binary-fx': {
-      id: '/binary-fx'
-      path: '/binary-fx'
-      fullPath: '/binary-fx'
-      preLoaderRoute: typeof BinaryFxRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/business': {
@@ -912,6 +905,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminWithdrawalsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/games/binary-fx': {
+      id: '/games/binary-fx'
+      path: '/games/binary-fx'
+      fullPath: '/games/binary-fx'
+      preLoaderRoute: typeof GamesBinaryFxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/kazi/google-card-help': {
       id: '/kazi/google-card-help'
       path: '/google-card-help'
@@ -1104,7 +1104,6 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRoute,
   BankingRoute: BankingRoute,
-  BinaryFxRoute: BinaryFxRoute,
   BusinessRoute: BusinessRoute,
   BusinessFundingRoute: BusinessFundingRoute,
   ComplianceRoute: ComplianceRoute,
@@ -1119,6 +1118,7 @@ const rootRouteChildren: RootRouteChildren = {
   TermsRoute: TermsRoute,
   TradingRoute: TradingRouteWithChildren,
   WalletRoute: WalletRoute,
+  GamesBinaryFxRoute: GamesBinaryFxRoute,
   KaziProfileRoute: KaziProfileRoute,
   KaziPublicUserIdRoute: KaziPublicUserIdRoute,
 }
