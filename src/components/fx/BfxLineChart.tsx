@@ -53,53 +53,56 @@ export const BfxLineChart = ({
   const seriesRef = useRef<ISeriesApi<"Line"> | null>(null);
 
   useEffect(() => {
-    if (!data || data.length === 0) return;
+    if (!chartContainerRef.current) return;
+
+    const chart = createChart(chartContainerRef.current, {
+      layout: {
+        background: { type: ColorType.Solid, color: backgroundColor },
+        textColor,
+      },
+      width: chartContainerRef.current.clientWidth,
+      height: chartContainerRef.current.clientHeight || 280,
+      grid: {
+        vertLines: { color: "rgba(255, 255, 255, 0.05)" },
+        horzLines: { color: "rgba(255, 255, 255, 0.05)" },
+      },
+      timeScale: {
+        timeVisible: true,
+        secondsVisible: true,
+      },
+      crosshair: { mode: 0 },
+    });
+    chartRef.current = chart;
+
+    const newSeries = chart.addLineSeries({
+      color: "#dcb13c",
+      lineWidth: 2,
+      crosshairMarkerVisible: true,
+      crosshairMarkerRadius: 4,
+      crosshairMarkerBorderColor: "#dcb13c",
+      crosshairMarkerBackgroundColor: "#1e2027",
+    });
+    seriesRef.current = newSeries;
+
+    if (data && data.length > 0) {
+      newSeries.setData(data);
+      chart.timeScale().fitContent();
+    }
 
     const handleResize = () => {
       if (chartRef.current && chartContainerRef.current) {
         chartRef.current.applyOptions({ width: chartContainerRef.current.clientWidth });
-        chartRef.current.timeScale().fitContent();
       }
     };
+    window.addEventListener("resize", handleResize);
 
-    if (chartContainerRef.current) {
-      const chart = createChart(chartContainerRef.current, {
-        layout: {
-          background: { type: ColorType.Solid, color: backgroundColor },
-          textColor,
-        },
-        width: chartContainerRef.current.clientWidth,
-        height: chartContainerRef.current.clientHeight || 280,
-        grid: {
-          vertLines: { color: "rgba(255, 255, 255, 0.05)" },
-          horzLines: { color: "rgba(255, 255, 255, 0.05)" },
-        },
-        timeScale: {
-          timeVisible: true,
-          secondsVisible: true,
-        },
-        crosshair: { mode: 0 },
-      });
-      chartRef.current = chart;
-
-      const newSeries = chart.addLineSeries({
-        color: "#dcb13c",
-        lineWidth: 2,
-        crosshairMarkerVisible: true,
-        crosshairMarkerRadius: 4,
-      });
-      seriesRef.current = newSeries;
-      newSeries.setData(data);
-      chart.timeScale().fitContent();
-
-      window.addEventListener("resize", handleResize);
-
-      return () => {
-        window.removeEventListener("resize", handleResize);
-        chart.remove();
-      };
-    }
-  }, [backgroundColor, textColor, data]);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      chart.remove();
+      chartRef.current = null;
+      seriesRef.current = null;
+    };
+  }, [backgroundColor, textColor]);
 
   useEffect(() => {
     if (seriesRef.current && data && data.length > 0) {
