@@ -23,9 +23,9 @@ import {
   Lock,
   FileText,
   Headset,
-  CircleUser,
-  Users,
-  MapPin,
+   CircleUser,
+   MapPin,
+
   CheckCircle2,
   Wallet,
   Landmark as LandmarkIcon,
@@ -46,10 +46,9 @@ import {
   COMPANY,
   HOW_IT_WORKS,
   OFFICES,
-  REFERRAL,
-  REGISTRATION_STATEMENT,
-  REGULATORY_STATEMENT,
-  SERVICES,
+   REGISTRATION_STATEMENT,
+   REGULATORY_STATEMENT,
+   SERVICES,
   organizationJsonLd,
 } from "@/lib/pesaki-facts";
 
@@ -301,8 +300,8 @@ function HomePage() {
             <span className="mb-6 grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
               <Briefcase className="h-4 w-4" />
             </span>
-            <p className="text-sm font-bold">KAZI Link</p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">Find work · Hire talent</p>
+             <p className="text-sm font-bold">KAZI Link</p>
+             <p className="mt-0.5 text-[11px] text-muted-foreground">Find work. Hire talent.</p>
             <ChevronRight className="absolute bottom-3 right-3 h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
           </Link>
           <Link
@@ -312,8 +311,8 @@ function HomePage() {
             <span className="mb-6 grid h-9 w-9 place-items-center rounded-xl gradient-gold text-gold-foreground">
               <Building2 className="h-4 w-4" />
             </span>
-            <p className="text-sm font-bold">Business Hub</p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">Grow · Fund · Scale</p>
+             <p className="text-sm font-bold">Business Hub</p>
+             <p className="mt-0.5 text-[11px] text-muted-foreground">Fund · Grow · Scale · Free to apply</p>
             <ChevronRight className="absolute bottom-3 right-3 h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
           </Link>
           <Link
@@ -459,21 +458,21 @@ function HomePage() {
 const HUB_CARDS = [
   {
     title: "KAZI Link",
-    subtitle: "Find work • Hire talent",
+    subtitle: "Find work. Hire talent.",
     to: "/kazi",
     icon: Briefcase,
     circle: "bg-brand-tint-green text-brand-ink",
   },
   {
     title: "Business Hub",
-    subtitle: "Fund • Grow • Scale",
+    subtitle: "Business mentorship, support and funding opportunities for SME, startups, ongoing businesses, eligible entrepreneurs. Free to apply for business funding.",
     to: "/business",
     icon: Building2,
     circle: "bg-brand-tint-gold text-brand-gold-deep",
   },
   {
     title: "Banking Hub",
-    subtitle: "Manage finances • Access services",
+    subtitle: "Save · Lock · Borrow",
     to: "/banking",
     icon: Landmark,
     circle: "bg-brand-tint-green text-brand-ink",
@@ -765,7 +764,7 @@ function PublicHome() {
       {/* ───────────── Business Hub funding model ───────────── */}
       <section className="px-5 pb-2 pt-8">
         <h2 className="font-display text-lg font-bold tracking-tight text-brand-deep">
-          Business Hub: how funding works
+          Business Hub
         </h2>
         <span className="mt-2 block h-1 w-9 rounded-full bg-brand-gold" />
         <Card className="mt-4 !p-4">
@@ -774,37 +773,17 @@ function PublicHome() {
               <Building2 className="h-[18px] w-[18px]" />
             </span>
             <div className="min-w-0">
-              <p className="text-[13px] font-bold text-brand-deep">Mentorship, then an agreement</p>
+              <p className="text-[13px] font-bold text-brand-deep">Business mentorship, support and funding opportunities for SME, startups, ongoing businesses, eligible entrepreneurs.</p>
               <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-                Business Hub is designed to support small and emerging businesses. Eligible
-                entrepreneurs may receive approximately 3 hours of structured mentorship focused on
-                understanding and starting or growing an SME — covering business fundamentals, how
-                the business will operate, the responsibilities that come with funding, and how the
-                business will be monitored.
+                The Business Hub supports small and emerging businesses through mentorship and eligible
+                funding opportunities. Eligible entrepreneurs may receive approximately 3 hours of
+                structured mentorship focused on understanding and starting or growing an SME.
               </p>
             </div>
           </div>
-          <ul className="mt-3 space-y-2">
-            {[
-              "The parties agree on the applicable terms.",
-              "The entrepreneur signs the relevant agreement.",
-              "Funding is provided according to the agreement.",
-              "PESAKI monitors the supported business and provides ongoing guidance.",
-              "The entrepreneur provides the agreed return according to the contract.",
-            ].map((item) => (
-              <li key={item} className="flex items-start gap-2 text-[11px] text-muted-foreground">
-                <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-ink" />
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
-          <div className="mt-3 rounded-xl bg-brand-tint-gold p-3">
-            <p className="text-[11px] leading-relaxed text-brand-gold-deep">
-              The current intended model is{" "}
-              <span className="font-bold">an agreed 10% of monthly business profit</span> under the
-              signed agreement. This is a share of profit, not company ownership.
-            </p>
-          </div>
+          <p className="mt-3 text-[11px] leading-relaxed text-brand-ink">
+            Free to apply for business funding.
+          </p>
           <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
             Funding is subject to eligibility, assessment and approval. Terms are disclosed and
             agreed before funding is provided.
@@ -813,59 +792,28 @@ function PublicHome() {
             to="/business-funding"
             className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand-ink hover:underline"
           >
-            Read the full funding model <ChevronRight className="h-3.5 w-3.5" />
+            Learn about Business Hub <ChevronRight className="h-3.5 w-3.5" />
           </Link>
         </Card>
       </section>
 
-      {/* ───────────── Referrals ───────────── */}
+      {/* ───────────── Referral ───────────── */}
       <section className="px-5 pb-2 pt-8">
         <h2 className="font-display text-lg font-bold tracking-tight text-brand-deep">
-          Earn through referrals
+          Refer and earn
         </h2>
         <span className="mt-2 block h-1 w-9 rounded-full bg-brand-gold" />
         <Card className="mt-4 !p-4">
-          <div className="flex items-start gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand-tint-green text-brand-ink">
-              <Users className="h-[18px] w-[18px]" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-[13px] font-bold text-brand-deep">{REFERRAL.headline}</p>
-              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-                You earn 10% of your referred user&apos;s first qualifying deposit,{" "}
-                {REFERRAL.creditWindow}. Your referred user receives a {REFERRAL.welcomeBonus}.
-              </p>
-            </div>
-          </div>
-          <ol className="mt-3 space-y-1.5">
-            {[
-              "Register for PESAKI.",
-              "Log in to your account.",
-              "Open the Referral section in your profile.",
-              "Find your unique referral link or code.",
-              "Share it with people you know.",
-              "Eligible referral activity generates earnings according to the current referral programme.",
-              "Track referral activity and earnings from your account.",
-              "Withdraw or use earnings according to the currently supported withdrawal rules.",
-            ].map((item, i) => (
-              <li key={item} className="flex items-start gap-2 text-[11px] text-muted-foreground">
-                <span className="mt-px grid h-4 w-4 shrink-0 place-items-center rounded-full bg-brand-tint-green text-[9px] font-bold text-brand-ink">
-                  {i + 1}
-                </span>
-                <span>{item}</span>
-              </li>
-            ))}
-          </ol>
-          <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-            Earn 10% of your referred user&apos;s first qualifying deposit, and they receive a{" "}
-            {REFERRAL.welcomeBonus}. Eligibility conditions: {REFERRAL.conditions.join(" ")}
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            PESAKI rewards members who refer others to the platform. Referral earnings are visible
+            inside your account after sign in, along with the full terms of the referral programme.
           </p>
           <Link
             to="/auth"
             search={{ mode: "signup" } as never}
             className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand-ink hover:underline"
           >
-            Create your account to get a referral code <ChevronRight className="h-3.5 w-3.5" />
+            Create your account to access referral details <ChevronRight className="h-3.5 w-3.5" />
           </Link>
         </Card>
       </section>

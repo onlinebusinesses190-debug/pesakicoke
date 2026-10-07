@@ -87,19 +87,19 @@ export const SERVICES = [
     key: "kazi",
     name: "KAZI Link",
     to: "/kazi",
-    description: "Find work and connect with opportunities.",
+    description: "Find work and hire talent across Kenya.",
   },
   {
     key: "business",
     name: "Business Hub",
     to: "/business",
-    description: "Access business support, mentorship and eligible funding opportunities.",
+    description: "Business mentorship, support and funding opportunities for SME, startups, ongoing businesses, eligible entrepreneurs. Free to apply for business funding.",
   },
   {
     key: "banking",
     name: "Banking Hub",
     to: "/banking",
-    description: "Access the financial services and tools available through PESAKI.",
+    description: "Save, lock and borrow. Manage financial services available through PESAKI.",
   },
   {
     key: "wallet",
