@@ -75,7 +75,7 @@ function BinaryFxPage() {
   const [settledTrades, setSettledTrades] = useState<BfxTrade[]>([]);
   const [showDeposit, setShowDeposit] = useState(false);
 
-  const priceDataRef = useRef<{ time: number; value: number }[]>([]);
+  const [priceData, setPriceData] = useState<{ time: number; value: number }[]>([]);
   const [now, setNow] = useState(Date.now());
   const lastSettleScanRef = useRef(0);
 
@@ -100,8 +100,11 @@ function BinaryFxPage() {
       const p = data.price;
       setPrice(p);
       const t = Math.floor(Date.now() / 1000);
-      priceDataRef.current.push({ time: t, value: p });
-      if (priceDataRef.current.length > 200) priceDataRef.current.shift();
+      setPriceData((prev) => {
+        const updated = [...prev, { time: t, value: p }];
+        if (updated.length > 200) updated.shift();
+        return updated;
+      });
       setConnected(true);
       return p;
     } catch {
@@ -175,7 +178,7 @@ function BinaryFxPage() {
   useEffect(() => {
     const interval = setInterval(() => {
       fetchPrice(selectedAsset);
-    }, 5000);
+    }, 2000);
     return () => clearInterval(interval);
   }, [fetchPrice, selectedAsset]);
 
@@ -315,8 +318,8 @@ function BinaryFxPage() {
   const payout = config.payout;
   const potentialWin = stakeNum >= config.minStake ? stakeNum * (1 + payout) : 0;
 
-  const chartData = priceDataRef.current.length > 0
-    ? priceDataRef.current
+  const chartData = priceData.length > 0
+    ? priceData
     : [{ time: Math.floor(Date.now() / 1000), value: price ?? 0 }];
 
   const markers: BfxMarker[] = openTrades.map((t) => {
