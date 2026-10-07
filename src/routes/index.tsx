@@ -301,7 +301,10 @@ function HomePage() {
               <Briefcase className="h-4 w-4" />
             </span>
              <p className="text-sm font-bold">KAZI Link</p>
-             <p className="mt-0.5 text-[11px] text-muted-foreground">Find work. Hire talent.</p>
+             <p className="mt-0.5 text-xs text-muted-foreground">Find work. Hire talent.</p>
+             <p className="mt-0.5 text-xs text-muted-foreground">Build up your work profile/CV</p>
+             <p className="mt-0.5 text-xs text-muted-foreground">Connect with work opportunities and skilled talent across Kenya.</p>
+             <p className="mt-0.5 text-xs text-muted-foreground">Free to use.</p>
             <ChevronRight className="absolute bottom-3 right-3 h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
           </Link>
           <Link
@@ -312,7 +315,8 @@ function HomePage() {
               <Building2 className="h-4 w-4" />
             </span>
              <p className="text-sm font-bold">Business Hub</p>
-             <p className="mt-0.5 text-[11px] text-muted-foreground">Fund · Grow · Scale · Free to apply</p>
+             <p className="mt-0.5 text-xs text-muted-foreground">Business mentorship, support and funding opportunities for SME, startups, ongoing businesses, eligible entrepreneurs.</p>
+             <p className="mt-0.5 text-xs text-muted-foreground">Free to apply for business funding.</p>
             <ChevronRight className="absolute bottom-3 right-3 h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
           </Link>
           <Link
@@ -458,7 +462,7 @@ function HomePage() {
 const HUB_CARDS = [
   {
     title: "KAZI Link",
-    subtitle: "Find work. Hire talent.",
+    subtitle: "Find work. Hire talent. Build up your work profile/CV. Connect with work opportunities and skilled talent across Kenya. Free to use.",
     to: "/kazi",
     icon: Briefcase,
     circle: "bg-brand-tint-green text-brand-ink",

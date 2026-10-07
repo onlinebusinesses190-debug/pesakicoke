@@ -87,7 +87,7 @@ export const SERVICES = [
     key: "kazi",
     name: "KAZI Link",
     to: "/kazi",
-    description: "Find work and hire talent across Kenya.",
+    description: "Find work and hire talent. Build up your work profile/CV. Connect with work opportunities and skilled talent across Kenya. Free to use.",
   },
   {
     key: "business",
