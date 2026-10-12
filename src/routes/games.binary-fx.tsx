@@ -70,7 +70,6 @@ function BinaryFxPage() {
   const [settledTrades, setSettledTrades] = useState<BfxTrade[]>([]);
   const [showDeposit, setShowDeposit] = useState(false);
 
-  const [priceData, setPriceData] = useState<{ time: number; value: number }[]>([]);
   const [now, setNow] = useState(Date.now());
   const lastSettleScanRef = useRef(0);
 
@@ -90,7 +89,7 @@ function BinaryFxPage() {
       const cfg: Config = {
         assets: data.assets || [],
         expiries: data.expiries || [],
-        payout: data.payout ?? 0.9,
+        payout: data.payout ?? 0.6,
         minStake: data.minStake ?? 10,
         maxStake: data.maxStake ?? 5000,
         maxOpen: data.maxOpen ?? 10,
@@ -111,12 +110,6 @@ function BinaryFxPage() {
       );
       const p = data.price;
       setPrice(p);
-      const t = Math.floor(Date.now() / 1000);
-      setPriceData((prev) => {
-        const updated = [...prev, { time: t, value: p }];
-        if (updated.length > 200) updated.shift();
-        return updated;
-      });
       setConnected(true);
       return p;
     } catch {
@@ -303,13 +296,6 @@ function BinaryFxPage() {
     fetchSettledTrades();
   }, [user, fetchBalance, fetchOpenTrades, fetchSettledTrades, defaultMode]);
 
-  // Poll price every 1 second (fixed interval, matches the internal engine tick)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchPrice(selectedAsset);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [fetchPrice, selectedAsset]);
 
   useEffect(() => {
     const handleVisibility = () => {
@@ -324,7 +310,7 @@ function BinaryFxPage() {
   // Auto-settle expired trades
   useEffect(() => {
     const nowMs = Date.now();
-    if (nowMs - lastSettleScanRef.current < 5000) return;
+    if (nowMs - lastSettleScanRef.current < 1000) return;
     lastSettleScanRef.current = nowMs;
 
     const expired = openTrades.filter(
@@ -338,9 +324,6 @@ function BinaryFxPage() {
   const sentimentTrades: SentimentTrade[] = [...settledTrades, ...openTrades].map((t) => ({
     direction: t.direction,
   }));
-
-  const chartData =
-    priceData.length > 0 ? priceData : [{ time: Math.floor(Date.now() / 1000), value: price ?? 0 }];
 
   const markers: BfxMarker[] = openTrades.map((t) => {
     const expiresAtMs = new Date(t.expires_at).getTime();
@@ -398,8 +381,6 @@ function BinaryFxPage() {
     !placing &&
     connected;
   const insufficientFunds = isRealMode && balance !== null && balance < stakeNum;
-  const expiryLabel =
-    config.expiries.find((e) => e.seconds === selectedExpiry)?.label ?? `${selectedExpiry}s`;
 
   // ── Render ──
   return (
@@ -493,9 +474,10 @@ function BinaryFxPage() {
         {/* ── Chart ── */}
         <div className="relative rounded-xl overflow-hidden border border-[#2b313f]">
           <BfxLineChart
-            data={chartData}
+            pair={selectedAsset}
             markers={markers}
             colors={{ backgroundColor: "#0a0e27", textColor: "#94a3bc" }}
+            onPrice={(p) => setPrice(p)}
             onMarkerPosition={(coords) => {
               markerCoordsRef.current = coords;
             }}
@@ -503,11 +485,31 @@ function BinaryFxPage() {
 
           {/* Marker overlays */}
           <div className="absolute inset-0 pointer-events-none">
-            {markers
-              .filter((m) => m.status === "open" || m.status === "win" || m.status === "loss")
-              .map((m) => {
+            {(() => {
+              const activeMarkers = markers.filter(
+                (m) => m.status === "open" || m.status === "win" || m.status === "loss",
+              );
+
+              const stacks: Record<string, { marker: BfxMarker; coord: { id: string; x: number; y: number } }[]> = {};
+              activeMarkers.forEach((m) => {
+                const coord = markerCoordsRef.current.find((c) => c.id === m.id);
+                if (!coord) return;
+                const key = Math.round(coord.y / 20).toString();
+                if (!stacks[key]) stacks[key] = [];
+                stacks[key].push({ marker: m, coord });
+              });
+
+              const offsetMap: Record<string, number> = {};
+              Object.values(stacks).forEach((stack) => {
+                stack.forEach((item, i) => {
+                  offsetMap[item.marker.id] = i * 14;
+                });
+              });
+
+              return activeMarkers.map((m) => {
                 const coord = markerCoordsRef.current.find((c) => c.id === m.id);
                 if (!coord) return null;
+                const stackOffset = offsetMap[m.id] || 0;
 
                 const isUp = m.direction === "up";
                 const color =
@@ -521,12 +523,11 @@ function BinaryFxPage() {
 
                 return (
                   <div key={m.id} className="absolute pointer-events-none">
-                    {/* Stake label above */}
                     <div
                       className="absolute text-[9px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap"
                       style={{
                         left: coord.x,
-                        top: coord.y - 26,
+                        top: coord.y - 26 - stackOffset,
                         transform: "translateX(-50%)",
                         background: color,
                         color: "#000",
@@ -535,12 +536,11 @@ function BinaryFxPage() {
                       KSh {formatKes(m.stake)}
                     </div>
 
-                    {/* Direction triangle */}
                     <div
                       className="absolute"
                       style={{
                         left: coord.x,
-                        top: coord.y,
+                        top: coord.y - stackOffset,
                         transform: "translate(-50%, -50%)",
                         color,
                       }}
@@ -564,13 +564,12 @@ function BinaryFxPage() {
                       </svg>
                     </div>
 
-                    {/* Countdown for active trades */}
                     {m.status === "open" && m.remainingSeconds > 0 && (
                       <div
                         className="absolute text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-black/70 text-amber-300 whitespace-nowrap"
                         style={{
                           left: coord.x,
-                          top: coord.y + 8,
+                          top: coord.y + 8 - stackOffset,
                           transform: "translateX(-50%)",
                         }}
                       >
@@ -580,7 +579,8 @@ function BinaryFxPage() {
                     )}
                   </div>
                 );
-              })}
+              });
+            })()}
           </div>
 
           {/* Active trade countdown */}
@@ -597,10 +597,20 @@ function BinaryFxPage() {
         {/* ── Compact Trade Panel ── */}
         <div className="rounded-xl border border-[#2b313f] bg-[#0b0e14] p-3">
           <div className="grid grid-cols-2 gap-2 text-sm">
-            <div>
-              <div className="text-[10px] uppercase text-gray-500">Time</div>
-              <div className="font-semibold text-white text-sm">{expiryLabel}</div>
-            </div>
+             <div>
+               <div className="text-[10px] uppercase text-gray-500">Time</div>
+               <select
+                 value={selectedExpiry}
+                 onChange={(e) => setSelectedExpiry(Number(e.target.value))}
+                 className="mt-1 w-full bg-[#0a0e27] border border-[#2b313f] rounded-xl px-2 py-1 text-sm font-semibold text-white focus:outline-none focus:border-[#4a9eff] appearance-none"
+               >
+                 {config.expiries.map((e) => (
+                   <option key={e.seconds} value={e.seconds} className="bg-[#0a0e27]">
+                     {e.label}
+                   </option>
+                 ))}
+               </select>
+             </div>
             <div>
               <div className="text-[10px] uppercase text-gray-500">Price</div>
               <div className="font-mono font-semibold text-gold text-base">

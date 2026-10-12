@@ -18,8 +18,8 @@ export const BFX = {
     { label: "15m", seconds: 900 },
   ] as const,
 
-  /** Payout as a fraction of stake (0.90 = 90%). Configurable per asset. */
-  PAYOUT: 0.9 as const,
+  /** Payout as a fraction of stake (0.60 = 60%). Configurable per asset. */
+  PAYOUT: 0.6 as const,
 
   /** Stake limits, in KES. */
   MIN_STAKE: 10,

@@ -55,7 +55,7 @@ export const SentimentBar = ({ trades }: { trades: SentimentTrade[] }) => {
   const downCount = trades.filter((t) => t.direction === "down").length;
   const total = upCount + downCount;
 
-  const upPct = total > 0 ? Math.round((upCount / total) * 100) : 50;
+  const upPct = total >= 5 ? Math.round((upCount / total) * 100) : 55;
   const downPct = 100 - upPct;
 
   return (
