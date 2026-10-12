@@ -1,19 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useCallback, useRef } from "react";
-import {
-  RefreshCw,
-  Timer,
-  TrendingUp,
-  TrendingDown,
-  Wallet,
-} from "lucide-react";
+import { ArrowLeft, Timer, TrendingUp, TrendingDown, Wallet, RefreshCw } from "lucide-react";
 import { apiRequest } from "@/utils/api";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
-import { AppShell, PageHeader } from "@/components/AppShell";
-import { Card, Badge, SectionTitle } from "@/components/ui-bits";
 import { DepositSheet } from "@/components/DepositSheet";
 import { toast } from "sonner";
 import { BfxLineChart, type BfxMarker } from "@/components/fx/BfxLineChart";
+import { AssetSelector, SentimentBar, type SentimentTrade } from "@/components/fx/SentimentBar";
 
 const API_URL = import.meta.env.VITE_PESAKI_API_URL || "https://pesaki-server.onrender.com";
 
@@ -50,6 +43,8 @@ type Config = {
 const formatKes = (n: number) =>
   n.toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+const priceDecimals = (asset: string) => (asset.includes("JPY") ? 3 : 5);
+
 export const Route = createFileRoute("/games/binary-fx")({
   validateSearch: (search: Record<string, unknown>) => ({
     mode: (search.mode as string) === "real" ? "real" : "demo",
@@ -81,10 +76,27 @@ function BinaryFxPage() {
 
   const fetchConfig = useCallback(async () => {
     try {
-      const data = await apiRequest<{ success: boolean; data: Config } | Config>(
-        `${API_URL}/games/bfx/config`,
-      );
-      const cfg = (data as { success: boolean; data: Config }).data ?? (data as Config);
+      const data = await apiRequest<{
+        success: boolean;
+        assets: string[];
+        expiries: { label: string; seconds: number }[];
+        payout: number;
+        minStake: number;
+        maxStake: number;
+        maxOpen: number;
+        tie: string;
+        demoStart: number;
+      }>(`${API_URL}/games/bfx/config`);
+      const cfg: Config = {
+        assets: data.assets || [],
+        expiries: data.expiries || [],
+        payout: data.payout ?? 0.9,
+        minStake: data.minStake ?? 10,
+        maxStake: data.maxStake ?? 5000,
+        maxOpen: data.maxOpen ?? 10,
+        tie: data.tie ?? "loss",
+        demoStart: data.demoStart ?? 10000,
+      };
       setConfig(cfg);
       setConnected(true);
     } catch {
@@ -113,12 +125,11 @@ function BinaryFxPage() {
   }, []);
 
   const fetchBalance = useCallback(async () => {
-    if (!user) return;
+    if (!user && defaultMode === "real") return;
     try {
-      const data = await apiRequest<{
-        balance: number;
-        demo_balance: number;
-      }>(`${API_URL}/wallet/balance`);
+      const data = await apiRequest<{ balance: number; demo_balance: number }>(
+        `${API_URL}/wallet/balance`,
+      );
       const bal = defaultMode === "real" ? data.balance : data.demo_balance;
       setBalance(bal);
     } catch {
@@ -127,28 +138,30 @@ function BinaryFxPage() {
   }, [user, defaultMode]);
 
   const fetchOpenTrades = useCallback(async () => {
-    if (!user) return;
+    if (!user && defaultMode === "real") return;
     try {
       const data = await apiRequest<{ success: boolean; data: BfxTrade[] }>(
         `${API_URL}/games/bfx/trades/open`,
       );
-      setOpenTrades(data.data || []);
-    } catch {
-      // silent
+      const all = data.data || [];
+      setOpenTrades(all.filter((t) => t.mode === defaultMode));
+    } catch (e) {
+      console.error("Failed to fetch open trades:", e);
     }
-  }, [user]);
+  }, [user, defaultMode]);
 
   const fetchSettledTrades = useCallback(async () => {
-    if (!user) return;
+    if (!user && defaultMode === "real") return;
     try {
       const data = await apiRequest<{ success: boolean; data: BfxTrade[] }>(
         `${API_URL}/games/bfx/trades/settled?limit=50`,
       );
-      setSettledTrades(data.data || []);
-    } catch {
-      // silent
+      const all = data.data || [];
+      setSettledTrades(all.filter((t) => t.mode === defaultMode));
+    } catch (e) {
+      console.error("Failed to fetch settled trades:", e);
     }
-  }, [user]);
+  }, [user, defaultMode]);
 
   const refreshAll = useCallback(() => {
     fetchConfig();
@@ -157,65 +170,51 @@ function BinaryFxPage() {
     fetchSettledTrades();
   }, [fetchConfig, fetchBalance, fetchOpenTrades, fetchSettledTrades]);
 
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
+  const settleTrade = useCallback(
+    async (tradeId: string) => {
+      try {
+        const result = await apiRequest<{
+          success: boolean;
+          status: string;
+          profit: number;
+          total_return: number;
+          new_balance: number;
+        }>(`${API_URL}/games/bfx/trade/${tradeId}/settle`, {
+          method: "POST",
+          body: JSON.stringify({}),
+        });
 
-  useEffect(() => {
-    fetchConfig();
-    fetchPrice(selectedAsset);
-  }, [fetchConfig, fetchPrice, selectedAsset]);
-
-  useEffect(() => {
-    if (user) {
-      fetchBalance();
-      fetchOpenTrades();
-      fetchSettledTrades();
-    }
-  }, [user, fetchBalance, fetchOpenTrades, fetchSettledTrades, defaultMode]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchPrice(selectedAsset);
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [fetchPrice, selectedAsset]);
-
-  useEffect(() => {
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible") {
-        refreshAll();
+        if (result.success) {
+          const trade = openTrades.find((t) => t.id === tradeId);
+          if (trade) {
+            const profit = result.profit ?? trade.profit;
+            if (result.status === "win") {
+              toast.success(`🎉 WON! +KSh ${formatKes(profit)}`, { duration: 3000 });
+            } else {
+              toast.error(`💀 LOST! -KSh ${formatKes(trade.stake)}`, { duration: 3000 });
+            }
+            if (result.new_balance !== undefined) {
+              setBalance(result.new_balance);
+            }
+            setOpenTrades((prev) => prev.filter((t) => t.id !== tradeId));
+            fetchSettledTrades();
+          }
+        }
+      } catch (err: unknown) {
+        console.error("Settle failed:", err);
       }
-    };
-    document.addEventListener("visibilitychange", handleVisibility);
-    return () => document.removeEventListener("visibilitychange", handleVisibility);
-  }, [refreshAll]);
-
-  const settleTrade = async (tradeId: string) => {
-    try {
-      await apiRequest(`${API_URL}/games/bfx/trade/${tradeId}/settle`, {
-        method: "POST",
-        body: JSON.stringify({}),
-      });
-      fetchOpenTrades();
-      fetchSettledTrades();
-      fetchBalance();
-    } catch {
-      // silent
-    }
-  };
-
-  useEffect(() => {
-    const expired = openTrades.filter(
-      (t) => t.status === "open" && new Date(t.expires_at).getTime() <= now,
-    );
-    if (expired.length === 0) return;
-    expired.forEach((t) => settleTrade(t.id));
-  }, [openTrades, now]);
+    },
+    [openTrades, fetchSettledTrades],
+  );
 
   const placeTrade = async (direction: "up" | "down") => {
-    if (!user) return;
+    if (!user && defaultMode === "real") {
+      navigate({
+        to: "/auth",
+        search: { mode: defaultMode, redirect: "/games/binary-fx" } as never,
+      });
+      return;
+    }
     if (placing) return;
     if (!config) return;
 
@@ -225,8 +224,9 @@ function BinaryFxPage() {
       return;
     }
 
-    if (balance !== null && balance < stakeNum) {
-      toast(`Insufficient balance. Current: KSh ${formatKes(balance)}`);
+    const currentBalance = defaultMode === "real" ? balance : (balance ?? config.demoStart);
+    if (currentBalance !== null && currentBalance < stakeNum) {
+      toast(`Insufficient balance. Current: KSh ${formatKes(currentBalance ?? 0)}`);
       setShowDeposit(true);
       return;
     }
@@ -283,44 +283,64 @@ function BinaryFxPage() {
 
   const toggleMode = () => {
     const newMode = defaultMode === "real" ? "demo" : "real";
-    if (newMode === "real" && !user) {
-      navigate({ to: "/auth", search: { redirect: `/games/binary-fx?mode=real` } as never });
-      return;
-    }
     window.location.href = `/games/binary-fx?mode=${newMode}`;
   };
 
-  if (!authReady || !config) {
-    return (
-      <AppShell>
-        <PageHeader title="Binary FX" subtitle="Quick UP/DOWN predictions on major pairs" />
-        <div className="p-5 space-y-3">
-          {!config && (
-            <Card>
-              <div className="text-center py-8 text-muted-foreground">Loading configuration…</div>
-            </Card>
-          )}
-          <Card>
-            <div className="flex items-center justify-center py-6 text-muted-foreground">
-              <RefreshCw className="h-5 w-5 animate-spin mr-2" />
-              <span>Connecting to Binary FX engine…</span>
-            </div>
-          </Card>
-        </div>
-      </AppShell>
+  // ── Data fetching & polling ──
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    fetchConfig();
+    fetchPrice(selectedAsset);
+  }, [fetchConfig, fetchPrice, selectedAsset]);
+
+  useEffect(() => {
+    fetchBalance();
+    fetchOpenTrades();
+    fetchSettledTrades();
+  }, [user, fetchBalance, fetchOpenTrades, fetchSettledTrades, defaultMode]);
+
+  // Poll price every 1 second (fixed interval, matches the internal engine tick)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchPrice(selectedAsset);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [fetchPrice, selectedAsset]);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        refreshAll();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [refreshAll]);
+
+  // Auto-settle expired trades
+  useEffect(() => {
+    const nowMs = Date.now();
+    if (nowMs - lastSettleScanRef.current < 5000) return;
+    lastSettleScanRef.current = nowMs;
+
+    const expired = openTrades.filter(
+      (t) => t.status === "open" && new Date(t.expires_at).getTime() <= nowMs,
     );
-  }
+    if (expired.length === 0) return;
+    expired.forEach((t) => settleTrade(t.id));
+  }, [openTrades, now, settleTrade]);
 
-  const isRealMode = defaultMode === "real";
-  const stakeNum = parseFloat(stake) || 0;
-  const canTrade = user !== null && balance !== null && balance >= stakeNum && !placing;
-  const insufficientFunds = balance !== null && balance < stakeNum;
-  const payout = config.payout;
-  const potentialWin = stakeNum >= config.minStake ? stakeNum * (1 + payout) : 0;
+  // ── Derived values ──
+  const sentimentTrades: SentimentTrade[] = [...settledTrades, ...openTrades].map((t) => ({
+    direction: t.direction,
+  }));
 
-  const chartData = priceData.length > 0
-    ? priceData
-    : [{ time: Math.floor(Date.now() / 1000), value: price ?? 0 }];
+  const chartData =
+    priceData.length > 0 ? priceData : [{ time: Math.floor(Date.now() / 1000), value: price ?? 0 }];
 
   const markers: BfxMarker[] = openTrades.map((t) => {
     const expiresAtMs = new Date(t.expires_at).getTime();
@@ -337,233 +357,336 @@ function BinaryFxPage() {
     };
   });
 
-  const activeMarker = openTrades.reduce((soonest, t) => {
-    const tRemaining = new Date(t.expires_at).getTime() - now;
-    if (tRemaining < 0) return soonest;
-    if (!soonest || tRemaining < (new Date(soonest.expires_at).getTime() - now)) {
-      return t;
-    }
-    return soonest;
-  }, null as BfxTrade | null);
+  const markerCoordsRef = useRef<{ id: string; x: number; y: number }[]>([]);
+
+  const activeMarker = openTrades.reduce(
+    (soonest, t) => {
+      const tRemaining = new Date(t.expires_at).getTime() - now;
+      if (tRemaining < 0) return soonest;
+      if (!soonest || tRemaining < new Date(soonest.expires_at).getTime() - now) {
+        return t;
+      }
+      return soonest;
+    },
+    null as BfxTrade | null,
+  );
 
   const countdownSeconds = activeMarker
     ? Math.max(0, Math.ceil((new Date(activeMarker.expires_at).getTime() - now) / 1000))
     : 0;
 
-  const handleDeposit = () => setShowDeposit(true);
+  // ── Loading ──
+  if (!authReady || !config) {
+    return (
+      <div className="min-h-screen bg-[#0a0e27] text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#4a9eff] mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading Binary FX…</p>
+        </div>
+      </div>
+    );
+  }
 
+  // ── Computed values ──
+  const isRealMode = defaultMode === "real";
+  const stakeNum = parseFloat(stake) || 0;
+  const payout = config.payout;
+  const potentialWin = stakeNum >= config.minStake ? stakeNum * (1 + payout) : 0;
+  const displayBalance = isRealMode ? (balance ?? 0) : (balance ?? config.demoStart);
+  const canTrade =
+    (isRealMode ? user !== null && balance !== null && balance >= stakeNum : true) &&
+    !placing &&
+    connected;
+  const insufficientFunds = isRealMode && balance !== null && balance < stakeNum;
+  const expiryLabel =
+    config.expiries.find((e) => e.seconds === selectedExpiry)?.label ?? `${selectedExpiry}s`;
+
+  // ── Render ──
   return (
-    <AppShell>
-      <PageHeader
-        title="Binary FX"
-        subtitle="Predict direction. Win 90% if you're right."
-        right={
-          <button
-            onClick={toggleMode}
-            className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-              isRealMode
-                ? "bg-primary/10 text-primary border border-primary/30"
-                : "bg-muted/50 text-muted-foreground border border-border"
-            }`}
-          >
-            {isRealMode ? "REAL" : "DEMO"}
-          </button>
-        }
-      />
-
-      <div className="px-5 pt-4 space-y-4 pb-6">
-        {/* ── Balance & Connection Status ── */}
-        <Card className="!p-3">
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-2">
-              <Wallet className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Balance</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="font-bold text-lg text-gold">
-                KSh {balance !== null ? formatKes(balance) : "—"}
-              </span>
-              {!connected && (
-                <Badge tone="destructive" className="text-[10px]">
-                  OFFLINE
-                </Badge>
-              )}
-              {insufficientFunds && (
-                <button
-                  onClick={handleDeposit}
-                  className="rounded-full border border-warning px-2 py-0.5 text-[10px] font-semibold text-warning-foreground hover:bg-warning/20"
-                >
-                  Deposit
-                </button>
-              )}
-            </div>
-          </div>
-        </Card>
-
-        {/* ── Asset Picker ── */}
-        <Card className="!p-3">
-          <SectionTitle title="Asset" />
-          <select
-            value={selectedAsset}
-            onChange={(e) => setSelectedAsset(e.target.value)}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary"
-          >
-            {config.assets.map((a) => (
-              <option key={a} value={a}>
-                {a}
-              </option>
-            ))}
-          </select>
-
-          <div className="mt-2 grid grid-cols-2 gap-3">
+    <div className="min-h-screen bg-[#0a0e27] text-white pb-6">
+      <div className="max-w-md mx-auto px-3 pt-4 space-y-3">
+        {/* ── Top Bar: Back arrow + Title + Mode toggle + Balance ── */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => window.history.back()}
+              className="rounded-lg border border-[#2b313f] bg-[#0b0e14] p-1.5 text-gray-400 hover:text-white"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
             <div>
-              <label className="text-[10px] uppercase text-muted-foreground">Expiry</label>
-              <select
-                value={selectedExpiry}
-                onChange={(e) => setSelectedExpiry(Number(e.target.value))}
-                className="mt-1 w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-              >
-                {config.expiries.map((e) => (
-                  <option key={e.seconds} value={e.seconds}>
-                    {e.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-[10px] uppercase text-muted-foreground">Current Price</label>
-              <div className="mt-1 flex items-center gap-2">
-                <span className="font-bold text-xl text-gold">
-                  {price?.toFixed(5) ?? "—"}
-                </span>
-                <Badge tone={connected ? "success" : "destructive"} className="text-[9px]">
-                  {connected ? "LIVE" : "OFFLINE"}
-                </Badge>
+              <div className="text-[10px] uppercase text-gray-500">Balance</div>
+              <div className="font-bold text-sm text-gold">
+                KSh {displayBalance !== null ? formatKes(displayBalance) : "—"}
               </div>
             </div>
           </div>
-        </Card>
 
-        {/* ── Chart ── */}
-        <Card className="!relative !p-3">
-          <div className="mb-2 flex items-center justify-between">
-            <SectionTitle title="Price Chart" />
+          {/* Demo / Real pill toggle */}
+          <div className="flex items-center gap-2">
+            <div className="flex rounded-full bg-[#1a1e2e] p-0.5 text-xs font-semibold">
+              <button
+                onClick={() => toggleMode()}
+                disabled={defaultMode === "demo"}
+                className={`rounded-full px-3 py-1 transition-all ${
+                  defaultMode === "demo"
+                    ? "bg-emerald-500 text-black"
+                    : "text-gray-500 hover:text-gray-300"
+                }`}
+              >
+                Demo
+              </button>
+              <button
+                onClick={() => {
+                  if (!user) {
+                    navigate({
+                      to: "/auth",
+                      search: { mode: "real", redirect: "/games/binary-fx" } as never,
+                    });
+                  } else {
+                    toggleMode();
+                  }
+                }}
+                disabled={defaultMode === "real"}
+                className={`rounded-full px-3 py-1 transition-all ${
+                  defaultMode === "real"
+                    ? "bg-gold text-black"
+                    : "text-gray-500 hover:text-gray-300"
+                }`}
+              >
+                Real
+              </button>
+            </div>
+
             <button
               onClick={() => fetchPrice(selectedAsset)}
-              className="rounded-lg border border-border bg-background px-2 py-1 text-xs"
+              className="rounded-lg border border-[#2b313f] bg-[#0b0e14] px-2 py-1 text-xs text-gray-400 hover:text-white"
               disabled={!connected}
             >
               <RefreshCw className="h-3 w-3" />
             </button>
+
+            <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-400">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400"></span>
+              </span>
+              LIVE
+            </span>
           </div>
+        </div>
+
+        {/* ── Asset Selector + Sentiment ── */}
+        <div className="flex items-end gap-3">
+          <AssetSelector
+            value={selectedAsset}
+            assets={config.assets}
+            onChange={(v) => {
+              setSelectedAsset(v);
+              setPriceData([]);
+              fetchPrice(v);
+            }}
+          />
+          <SentimentBar trades={sentimentTrades} />
+        </div>
+
+        {/* ── Chart ── */}
+        <div className="relative rounded-xl overflow-hidden border border-[#2b313f]">
           <BfxLineChart
             data={chartData}
             markers={markers}
-            colors={{ backgroundColor: "transparent", textColor: "#9ca3af" }}
+            colors={{ backgroundColor: "#0a0e27", textColor: "#94a3bc" }}
+            onMarkerPosition={(coords) => {
+              markerCoordsRef.current = coords;
+            }}
           />
+
+          {/* Marker overlays */}
+          <div className="absolute inset-0 pointer-events-none">
+            {markers
+              .filter((m) => m.status === "open" || m.status === "win" || m.status === "loss")
+              .map((m) => {
+                const coord = markerCoordsRef.current.find((c) => c.id === m.id);
+                if (!coord) return null;
+
+                const isUp = m.direction === "up";
+                const color =
+                  m.status === "win"
+                    ? "#22c55e"
+                    : m.status === "loss"
+                      ? "#ef4444"
+                      : isUp
+                        ? "#22c55e"
+                        : "#ef4444";
+
+                return (
+                  <div key={m.id} className="absolute pointer-events-none">
+                    {/* Stake label above */}
+                    <div
+                      className="absolute text-[9px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap"
+                      style={{
+                        left: coord.x,
+                        top: coord.y - 26,
+                        transform: "translateX(-50%)",
+                        background: color,
+                        color: "#000",
+                      }}
+                    >
+                      KSh {formatKes(m.stake)}
+                    </div>
+
+                    {/* Direction triangle */}
+                    <div
+                      className="absolute"
+                      style={{
+                        left: coord.x,
+                        top: coord.y,
+                        transform: "translate(-50%, -50%)",
+                        color,
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 14 14">
+                        {isUp ? (
+                          <polygon
+                            points="7,2 13,12 1,12"
+                            fill={color}
+                            stroke="#000"
+                            strokeWidth="0.5"
+                          />
+                        ) : (
+                          <polygon
+                            points="7,12 13,2 1,2"
+                            fill={color}
+                            stroke="#000"
+                            strokeWidth="0.5"
+                          />
+                        )}
+                      </svg>
+                    </div>
+
+                    {/* Countdown for active trades */}
+                    {m.status === "open" && m.remainingSeconds > 0 && (
+                      <div
+                        className="absolute text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-black/70 text-amber-300 whitespace-nowrap"
+                        style={{
+                          left: coord.x,
+                          top: coord.y + 8,
+                          transform: "translateX(-50%)",
+                        }}
+                      >
+                        {String(Math.floor(m.remainingSeconds / 60)).padStart(2, "0")}:
+                        {String(m.remainingSeconds % 60).padStart(2, "0")}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+          </div>
+
+          {/* Active trade countdown */}
           {countdownSeconds > 0 && activeMarker && (
-            <div className="absolute top-3 right-3 rounded-lg bg-card/90 border border-border px-3 py-1.5 text-center">
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Timer className="h-3 w-3" />
-                <span>{activeMarker.direction.toUpperCase()}</span>
-              </div>
-              <div className="text-lg font-bold text-gold">
+            <div className="absolute top-2 right-2 bg-[#0b0e14]/90 border border-[#2b313f] rounded-lg px-2 py-1 flex items-center gap-1">
+              <Timer className="h-3 w-3 text-amber-300" />
+              <span className="text-amber-300 font-mono text-xs font-bold">
                 {Math.floor(countdownSeconds / 60)}:{String(countdownSeconds % 60).padStart(2, "0")}
-              </div>
+              </span>
             </div>
           )}
-        </Card>
+        </div>
 
-        {/* ── Stake Input & Trade Buttons ── */}
-        <Card className="!p-4">
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-[10px] uppercase text-muted-foreground">Stake (KSh)</label>
-                <input
-                  type="number"
-                  value={stake}
-                  onChange={(e) => setStake(e.target.value)}
-                  min={config.minStake}
-                  max={config.maxStake}
-                  step="10"
-                  className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-bold focus:outline-none focus:ring-1 focus:ring-primary"
-                  disabled={placing}
-                />
-              </div>
-              <div>
-                <label className="text-[10px] uppercase text-muted-foreground">Potential Win</label>
-                <div className="mt-1 flex items-center">
-                  <span className="font-bold text-xl text-green-400">
-                    {stakeNum >= config.minStake
-                      ? `KSh ${formatKes(potentialWin)}`
-                      : "—"}
-                  </span>
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    ({Math.round(payout * 100)}% payout)
-                  </span>
-                </div>
+        {/* ── Compact Trade Panel ── */}
+        <div className="rounded-xl border border-[#2b313f] bg-[#0b0e14] p-3">
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div>
+              <div className="text-[10px] uppercase text-gray-500">Time</div>
+              <div className="font-semibold text-white text-sm">{expiryLabel}</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase text-gray-500">Price</div>
+              <div className="font-mono font-semibold text-gold text-base">
+                {price?.toFixed(priceDecimals(selectedAsset)) ?? "—"}
               </div>
             </div>
-
-            {insufficientFunds && (
-              <div className="flex items-center justify-between rounded-lg bg-warning/10 border border-warning/20 px-3 py-2 text-xs">
-                <span className="text-warning-foreground">
-                  Insufficient balance. You need at least KSh {formatKes(stakeNum)}.
+            <div>
+              <div className="text-[10px] uppercase text-gray-500">Amount</div>
+              <input
+                type="number"
+                value={stake}
+                onChange={(e) => setStake(e.target.value)}
+                min={config.minStake}
+                max={config.maxStake}
+                step="10"
+                disabled={placing}
+                className="mt-1 w-full h-11 bg-[#0a0e27] border border-[#2b313f] rounded-xl px-3 text-sm font-bold text-white focus:outline-none focus:border-[#4a9eff] disabled:opacity-50"
+              />
+            </div>
+            <div>
+              <div className="text-[10px] uppercase text-gray-500">Potential Payout</div>
+              <div className="font-bold text-emerald-400 text-sm">
+                {stakeNum >= config.minStake ? `KSh ${formatKes(potentialWin)}` : "—"}
+                <span className="text-[10px] text-gray-500 ml-1">
+                  ({Math.round(payout * 100)}%)
                 </span>
-                <button
-                  onClick={handleDeposit}
-                  className="rounded-full border border-warning px-3 py-1 text-xs font-semibold text-warning-foreground hover:bg-warning/20"
-                >
-                  Deposit
-                </button>
               </div>
-            )}
+            </div>
+          </div>
 
-            <div className="grid grid-cols-2 gap-3">
+          {insufficientFunds && (
+            <div className="mt-2 flex items-center justify-between rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-xs">
+              <span className="text-amber-400">
+                Insufficient balance. You need at least KSh {formatKes(stakeNum)}.
+              </span>
               <button
-                onClick={() => placeTrade("up")}
-                disabled={!canTrade || placing || !connected}
-                className={`flex flex-col items-center gap-1 rounded-xl py-3 font-bold transition-all ${
-                  placing || !connected
-                    ? "cursor-wait opacity-50"
-                    : "gradient-primary text-primary-foreground hover:scale-105 active:scale-95"
-                }`}
+                onClick={() => setShowDeposit(true)}
+                className="rounded-full border border-amber-400 px-3 py-0.5 text-xs font-semibold text-amber-300 hover:bg-amber-500/20"
               >
-                <TrendingUp className="h-5 w-5" />
-                <span>UP</span>
-              </button>
-              <button
-                onClick={() => placeTrade("down")}
-                disabled={!canTrade || placing || !connected}
-                className={`flex flex-col items-center gap-1 rounded-xl py-3 font-bold transition-all ${
-                  placing || !connected
-                    ? "cursor-wait opacity-50"
-                    : "gradient-primary text-primary-foreground hover:scale-105 active:scale-95"
-                }`}
-              >
-                <TrendingDown className="h-5 w-5" />
-                <span>DOWN</span>
+                Deposit Funds
               </button>
             </div>
+          )}
+        </div>
 
-            {placing && (
-              <div className="text-center text-xs text-muted-foreground">
-                Placing trade…
-              </div>
-            )}
-          </div>
-        </Card>
+        {/* ── BUY / SELL Buttons ── */}
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => placeTrade("up")}
+            disabled={!canTrade || placing}
+            className={`relative overflow-hidden rounded-xl h-13 py-3 font-bold text-lg transition-all flex flex-col items-center justify-center gap-1 ${
+              placing || !connected
+                ? "cursor-wait opacity-50"
+                : "bg-emerald-500 hover:bg-emerald-400 text-black hover:scale-[1.02] active:scale-95 shadow-lg shadow-emerald-500/20"
+            }`}
+          >
+            <TrendingUp className="h-5 w-5" />
+            <span>BUY</span>
+            <span className="text-[10px] opacity-60">Higher</span>
+          </button>
+          <button
+            onClick={() => placeTrade("down")}
+            disabled={!canTrade || placing}
+            className={`relative overflow-hidden rounded-xl h-13 py-3 font-bold text-lg transition-all flex flex-col items-center justify-center gap-1 ${
+              placing || !connected
+                ? "cursor-wait opacity-50"
+                : "bg-red-500 hover:bg-red-400 text-white hover:scale-[1.02] active:scale-95 shadow-lg shadow-red-500/20"
+            }`}
+          >
+            <TrendingDown className="h-5 w-5" />
+            <span>SELL</span>
+            <span className="text-[10px] opacity-60">Lower</span>
+          </button>
+        </div>
+
+        {placing && <div className="text-center text-xs text-gray-400">Placing trade…</div>}
 
         {/* ── Open Trades ── */}
         <div className="space-y-2">
-          <SectionTitle title="Open Trades" />
+          <h3 className="text-[10px] uppercase text-gray-500 font-semibold">
+            Open Trades ({openTrades.length})
+          </h3>
           {openTrades.length === 0 ? (
-            <Card>
-              <p className="text-center py-4 text-sm text-muted-foreground">
-                No open trades. Place your first prediction above.
-              </p>
-            </Card>
+            <div className="rounded-xl border border-[#2b313f] bg-[#0b0e14] p-4 text-center text-sm text-gray-500">
+              No open trades. Place your first prediction above.
+            </div>
           ) : (
             <div className="space-y-2">
               {openTrades.map((t) => {
@@ -572,93 +695,98 @@ function BinaryFxPage() {
                 const mins = Math.floor(remaining / 60);
                 const secs = remaining % 60;
                 const currentPrice = price ?? 0;
-                const isWinning = t.direction === "up"
-                  ? currentPrice > t.entry_price
-                  : currentPrice < t.entry_price;
+                const isWinning =
+                  t.direction === "up"
+                    ? currentPrice > t.entry_price
+                    : currentPrice < t.entry_price;
                 return (
-                  <Card key={t.id} className="!p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Badge tone={t.direction === "up" ? "success" : "warning"}>
-                          {t.direction.toUpperCase()}
-                        </Badge>
-                        <div>
-                          <div className="font-semibold">{t.asset}</div>
-                          <div className="text-xs text-muted-foreground">
-                            Entry: {t.entry_price.toFixed(5)} | Stake: KSh {formatKes(t.stake)}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div
-                          className={`font-bold text-sm ${isWinning ? "text-green-400" : "text-red-400"}`}
-                        >
-                          {mins}:{String(secs).padStart(2, "0")}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          Potential: KSh {formatKes(t.stake * (1 + payout))}
+                  <div
+                    key={t.id}
+                    className="flex items-center justify-between p-3 rounded-xl border bg-[#0b0e14] border-[#2b313f]"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                          t.direction === "up"
+                            ? "bg-emerald-500/20 text-emerald-400"
+                            : "bg-red-500/20 text-red-400"
+                        }`}
+                      >
+                        {t.direction.toUpperCase()}
+                      </span>
+                      <div>
+                        <div className="font-semibold text-sm">{t.asset}</div>
+                        <div className="text-[10px] text-gray-500 font-mono">
+                          Entry: {t.entry_price.toFixed(priceDecimals(t.asset))}
                         </div>
                       </div>
                     </div>
-                  </Card>
+                    <div className="text-right">
+                      <div
+                        className={`font-bold text-sm ${isWinning ? "text-emerald-400" : "text-red-400"}`}
+                      >
+                        {mins}:{String(secs).padStart(2, "0")}
+                      </div>
+                      <div className="text-[10px] text-gray-500">
+                        KSh {formatKes(t.stake)} → KSh {formatKes(t.stake * (1 + payout))}
+                      </div>
+                    </div>
+                  </div>
                 );
               })}
             </div>
           )}
         </div>
 
-        {/* ── Settled Trades ── */}
+        {/* ── Recent Results ── */}
         <div className="space-y-2">
-          <SectionTitle title="Recent Results" />
+          <h3 className="text-[10px] uppercase text-gray-500 font-semibold">Recent Results</h3>
           {settledTrades.length === 0 ? (
-            <Card>
-              <p className="text-center py-4 text-sm text-muted-foreground">
-                No settled trades yet.
-              </p>
-            </Card>
+            <div className="rounded-xl border border-[#2b313f] bg-[#0b0e14] p-4 text-center text-sm text-gray-500">
+              No settled trades yet.
+            </div>
           ) : (
             <div className="space-y-2">
               {settledTrades.map((t) => {
                 const isWin = t.status === "win";
                 const isLoss = t.status === "loss" || t.status === "tie";
+                const timeStr = new Date(t.opened_at).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                });
                 return (
-                  <Card key={t.id} className="!p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Badge
-                          tone={isWin ? "success" : isLoss ? "destructive" : "neutral"}
-                        >
-                          {t.status.toUpperCase()}
-                        </Badge>
-                        <div>
-                          <div className="font-semibold">{t.asset}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {new Date(t.opened_at).toLocaleTimeString()}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div
-                          className={`font-bold ${
-                            isWin
-                              ? "text-green-400"
-                              : isLoss
-                                ? "text-red-400"
-                                : "text-muted-foreground"
-                          }`}
-                        >
-                          {t.profit > 0
-                            ? `+KSh ${formatKes(t.profit)}`
-                            : t.profit < 0
-                              ? `-KSh ${formatKes(Math.abs(t.profit))}`
-                              : "—"}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          Stake: KSh {formatKes(t.stake)}
-                        </div>
+                  <div
+                    key={t.id}
+                    className="flex items-center justify-between p-3 rounded-xl border bg-[#0b0e14] border-[#2b313f]"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                          isWin
+                            ? "bg-emerald-500/20 text-emerald-400"
+                            : "bg-red-500/20 text-red-400"
+                        }`}
+                      >
+                        {t.status.toUpperCase()}
+                      </span>
+                      <div>
+                        <div className="font-semibold text-sm">{t.asset}</div>
+                        <div className="text-[10px] text-gray-500">{timeStr}</div>
                       </div>
                     </div>
-                  </Card>
+                    <div className="text-right">
+                      <div className={`font-bold ${isWin ? "text-emerald-400" : "text-red-400"}`}>
+                        {t.profit > 0
+                          ? `+KSh ${formatKes(t.profit)}`
+                          : t.profit < 0
+                            ? `-KSh ${formatKes(Math.abs(t.profit))}`
+                            : "—"}
+                      </div>
+                      <div className="text-[10px] text-gray-500">
+                        Stake: KSh {formatKes(t.stake)}
+                      </div>
+                    </div>
+                  </div>
                 );
               })}
             </div>
@@ -673,6 +801,6 @@ function BinaryFxPage() {
           onDepositComplete={handleDepositSuccess}
         />
       )}
-    </AppShell>
+    </div>
   );
 }
