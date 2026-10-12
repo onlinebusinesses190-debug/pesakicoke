@@ -3,19 +3,27 @@ import {
   ColorType,
   IChartApi,
   ISeriesApi,
-  type Time,
   type SeriesMarker,
 } from "lightweight-charts";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+
+/**
+ * Binary FX line chart.
+ *
+ * Deliberately separate from TradingChart.tsx (candlesticks) so the existing
+ * PESAKI FX product keeps its candlestick interface untouched. Binary FX uses
+ * a clean continuous line: one price point per tick, no OHLC bars.
+ */
 
 export type BfxMarker = {
   id: string;
-  time: number;
+  time: number; // unix seconds
   price: number;
   direction: "up" | "down";
   stake: number;
   status: "open" | "win" | "loss" | "tie";
   remainingSeconds: number;
+  expiresAt: number; // unix ms
 };
 
 const markerColor = (m: BfxMarker): string => {
@@ -24,46 +32,32 @@ const markerColor = (m: BfxMarker): string => {
   return m.direction === "up" ? "#22c55e" : "#ef4444";
 };
 
-const buildLcMarkers = (markers: BfxMarker[]): SeriesMarker<Time>[] => {
+const buildLcMarkers = (markers: BfxMarker[]): SeriesMarker<"time">[] => {
   return markers.map((m) => {
     const isUp = m.direction === "up";
-    return {
-      time: m.time as Time,
-      position: isUp ? "belowBar" : "aboveBar",
-      color: markerColor(m),
-      shape: isUp ? "arrowUp" : "arrowDown",
-      text: m.status === "win" ? "W" : m.status === "loss" ? "L" : undefined,
-    };
+    const position: "belowBar" | "aboveBar" = isUp ? "belowBar" : "aboveBar";
+    const shape: "arrowUp" | "arrowDown" = isUp ? "arrowUp" : "arrowDown";
+    const color = markerColor(m);
+    const text = m.status === "win" ? "W" : m.status === "loss" ? "L" : undefined;
+    return { time: m.time as any, position, color, shape, text };
   });
 };
-
-type PricePoint = { time: number; value: number };
 
 export const BfxLineChart = ({
   data,
   markers = [],
-  colors: { backgroundColor = "#0a0e27", textColor = "#94a3bc" } = {},
+  colors: { backgroundColor = "transparent", textColor = "silver" } = {},
   onMarkerPosition,
 }: {
-  data: PricePoint[];
+  data: { time: number; value: number }[];
   markers?: BfxMarker[];
-  colors?: { backgroundColor?: string; textColor?: string };
+  colors?: any;
   onMarkerPosition?: (coords: { id: string; x: number; y: number }[]) => void;
 }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const seriesRef = useRef<ISeriesApi<"Area"> | null>(null);
-  const lastTimeRef = useRef<number | null>(null);
-  const lastValueRef = useRef<number | null>(null);
-  const dataLengthRef = useRef(0);
-  const initializedRef = useRef(false);
-  const [lastPriceCoord, setLastPriceCoord] = useState<{
-    x: number;
-    y: number;
-    price: number;
-  } | null>(null);
+  const seriesRef = useRef<ISeriesApi<"Line"> | null>(null);
 
-  // ── Init chart once ──
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
@@ -73,7 +67,7 @@ export const BfxLineChart = ({
         textColor,
       },
       width: chartContainerRef.current.clientWidth,
-      height: chartContainerRef.current.clientHeight || 180,
+      height: chartContainerRef.current.clientHeight || 280,
       grid: {
         vertLines: { color: "rgba(255, 255, 255, 0.05)" },
         horzLines: { color: "rgba(255, 255, 255, 0.05)" },
@@ -94,29 +88,20 @@ export const BfxLineChart = ({
     });
     chartRef.current = chart;
 
-    const series = chart.addAreaSeries({
-      lineColor: "#4a9eff",
+    const newSeries = chart.addLineSeries({
+      color: "#4a9eff",
       lineWidth: 2,
-      topColor: "rgba(74, 158, 255, 0.35)",
-      bottomColor: "rgba(74, 158, 255, 0)",
-      priceLineVisible: false,
-      lastValueVisible: false,
       crosshairMarkerVisible: true,
       crosshairMarkerRadius: 4,
       crosshairMarkerBorderColor: "#4a9eff",
       crosshairMarkerBackgroundColor: "#0a0e27",
     });
-    seriesRef.current = series;
+    seriesRef.current = newSeries;
 
     if (data && data.length > 0) {
-      series.setData(data);
+      newSeries.setData(data);
       chart.timeScale().fitContent();
-      lastTimeRef.current = data[data.length - 1].time;
-      lastValueRef.current = data[data.length - 1].value;
-      dataLengthRef.current = data.length;
     }
-
-    initializedRef.current = true;
 
     const handleResize = () => {
       if (chartRef.current && chartContainerRef.current) {
@@ -130,126 +115,59 @@ export const BfxLineChart = ({
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
-      initializedRef.current = false;
     };
-  }, []);
+  }, [backgroundColor, textColor]);
 
-  // ── Incremental data updates: use update() only, never setData() after init ──
   useEffect(() => {
-    if (!seriesRef.current || !data || data.length === 0) return;
-    if (!initializedRef.current) return;
-    if (data.length <= dataLengthRef.current) return;
-
-    const lastPoint = data[data.length - 1];
-    const lastTime = lastTimeRef.current;
-    const lastValue = lastValueRef.current;
-
-    // Skip if same second AND same value
-    if (lastTime !== null && lastPoint.time === lastTime && lastPoint.value === lastValue) {
-      return;
+    if (seriesRef.current && data && data.length > 0) {
+      seriesRef.current.setData(data);
+      if (chartRef.current) {
+        chartRef.current.timeScale().fitContent();
+      }
     }
-
-    if (lastTime !== null && lastPoint.time > lastTime) {
-      seriesRef.current.update(lastPoint);
-      chartRef.current?.timeScale().scrollToRealTime();
-    }
-
-    lastTimeRef.current = lastPoint.time;
-    lastValueRef.current = lastPoint.value;
-    dataLengthRef.current = data.length;
   }, [data]);
 
-  // ── Markers ──
   useEffect(() => {
-    if (!seriesRef.current) return;
-    if (markers && markers.length > 0) {
+    if (seriesRef.current && markers && markers.length > 0) {
       seriesRef.current.setMarkers(buildLcMarkers(markers));
-    } else {
+    } else if (seriesRef.current) {
       seriesRef.current.setMarkers([]);
     }
   }, [markers]);
 
-  // ── Frame loop: marker coords + last price dot position ──
   useEffect(() => {
-    if (!data || data.length === 0) return;
+    if (markers.length === 0 || !chartRef.current || !seriesRef.current) return;
     let cancelled = false;
-
     const tick = () => {
       if (cancelled) return;
       const chart = chartRef.current;
       const series = seriesRef.current;
       if (!chart || !series) return;
-
-      // Marker pixel coords
       const coords: { id: string; x: number; y: number }[] = [];
       for (const m of markers) {
-        const x = chart.timeScale().timeToCoordinate(m.time as Time);
+        const x = chart.timeScale().timeToCoordinate(m.time as any);
         const y = series.priceToCoordinate(m.price);
-        if (x != null && y != null) coords.push({ id: m.id, x, y });
+        if (x != null && y != null) {
+          coords.push({ id: m.id, x, y });
+        }
       }
       onMarkerPosition?.(coords);
-
-      // Last price dot + label coords
-      const lastPoint = data[data.length - 1];
-      const x = chart.timeScale().timeToCoordinate(lastPoint.time as Time);
-      const y = series.priceToCoordinate(lastPoint.value);
-      if (x != null && y != null) {
-        setLastPriceCoord({ x, y, price: lastPoint.value });
-      }
-
       requestAnimationFrame(tick);
     };
-
     const id = requestAnimationFrame(tick);
     return () => {
       cancelled = true;
       cancelAnimationFrame(id);
     };
-  }, [markers, onMarkerPosition, data]);
+  }, [markers, onMarkerPosition]);
 
   if (!data || data.length === 0) {
     return (
-      <div
-        className="w-full h-[180px] flex items-center justify-center text-gray-500 text-sm rounded-xl"
-        style={{ backgroundColor }}
-      >
-        Loading chart data…
+      <div className="w-full h-[180px] md:h-[240px] flex items-center justify-center text-gray-500 text-sm bg-[#0a0e27] rounded-xl">
+        Loading chart data...
       </div>
     );
   }
 
-  return (
-    <div ref={chartContainerRef} className="w-full h-[180px] relative">
-      {lastPriceCoord && (
-        <>
-          <div
-            className="absolute rounded-full"
-            style={{
-              left: lastPriceCoord.x,
-              top: lastPriceCoord.y,
-              width: "8px",
-              height: "8px",
-              background: "#4a9eff",
-              boxShadow: "0 0 8px #4a9eff, 0 0 16px #4a9eff",
-              transform: "translate(-50%, -50%)",
-              pointerEvents: "none",
-            }}
-          />
-          <div
-            className="absolute px-2 py-0.5 rounded text-[10px] font-mono font-bold whitespace-nowrap"
-            style={{
-              left: lastPriceCoord.x,
-              top: lastPriceCoord.y - 20,
-              background: "#4a9eff",
-              color: "#ffffff",
-              transform: "translate(-50%, -50%)",
-              pointerEvents: "none",
-            }}
-          >
-            {lastPriceCoord.price.toFixed(5)}
-          </div>
-        </>
-      )}
-    </div>
-  );
+  return <div ref={chartContainerRef} className="w-full h-[180px] md:h-[240px] relative" />;
 };
