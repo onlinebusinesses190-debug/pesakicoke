@@ -61,7 +61,6 @@ function BinaryFxPage() {
   const [balance, setBalance] = useState<number | null>(null);
   const [price, setPrice] = useState<number | null>(null);
   const [connected, setConnected] = useState(false);
-
   const [selectedAsset, setSelectedAsset] = useState("EUR/USD");
   const [selectedExpiry, setSelectedExpiry] = useState(60);
   const [stake, setStake] = useState("100");
@@ -72,7 +71,6 @@ function BinaryFxPage() {
 
   const [now, setNow] = useState(Date.now());
   const lastSettleScanRef = useRef(0);
-
   const fetchConfig = useCallback(async () => {
     try {
       const data = await apiRequest<{
@@ -334,7 +332,7 @@ function BinaryFxPage() {
       price: t.entry_price,
       direction: t.direction,
       stake: t.stake,
-      status: t.status,
+      status: t.status as BfxMarker["status"],
       remainingSeconds,
       expiresAt: expiresAtMs,
     };
@@ -357,6 +355,8 @@ function BinaryFxPage() {
   const countdownSeconds = activeMarker
     ? Math.max(0, Math.ceil((new Date(activeMarker.expires_at).getTime() - now) / 1000))
     : 0;
+
+  const expiryTime = activeMarker ? new Date(activeMarker.expires_at).getTime() : null;
 
   // ── Loading ──
   if (!authReady || !config) {
@@ -464,7 +464,6 @@ function BinaryFxPage() {
             assets={config.assets}
             onChange={(v) => {
               setSelectedAsset(v);
-              setPriceData([]);
               fetchPrice(v);
             }}
           />
@@ -475,8 +474,9 @@ function BinaryFxPage() {
         <div className="relative rounded-xl overflow-hidden border border-[#2b313f]">
           <BfxLineChart
             pair={selectedAsset}
+            expiryTime={expiryTime}
             markers={markers}
-            colors={{ backgroundColor: "#0a0e27", textColor: "#94a3bc" }}
+            colors={{ backgroundColor: "#0a0e27", textColor: "#7a82a8" }}
             onPrice={(p) => setPrice(p)}
             onMarkerPosition={(coords) => {
               markerCoordsRef.current = coords;
@@ -663,26 +663,26 @@ function BinaryFxPage() {
             disabled={!canTrade || placing}
             className={`relative overflow-hidden rounded-xl h-13 py-3 font-bold text-lg transition-all flex flex-col items-center justify-center gap-1 ${
               placing || !connected
-                ? "cursor-wait opacity-50"
-                : "bg-emerald-500 hover:bg-emerald-400 text-black hover:scale-[1.02] active:scale-95 shadow-lg shadow-emerald-500/20"
+                ? "cursor-wait bg-[#26a65b] text-black"
+                : "bg-[#26a65b] hover:bg-[#229954] text-black hover:scale-[1.02] active:scale-95 shadow-lg shadow-[#26a65b]/20"
             }`}
           >
             <TrendingUp className="h-5 w-5" />
             <span>BUY</span>
-            <span className="text-[10px] opacity-60">Higher</span>
+            <span className="text-[10px]">Higher</span>
           </button>
           <button
             onClick={() => placeTrade("down")}
             disabled={!canTrade || placing}
             className={`relative overflow-hidden rounded-xl h-13 py-3 font-bold text-lg transition-all flex flex-col items-center justify-center gap-1 ${
               placing || !connected
-                ? "cursor-wait opacity-50"
-                : "bg-red-500 hover:bg-red-400 text-white hover:scale-[1.02] active:scale-95 shadow-lg shadow-red-500/20"
+                ? "cursor-wait bg-[#e74c3c] text-white"
+                : "bg-[#e74c3c] hover:bg-[#c0392b] text-white hover:scale-[1.02] active:scale-95 shadow-lg shadow-[#e74c3c]/20"
             }`}
           >
             <TrendingDown className="h-5 w-5" />
             <span>SELL</span>
-            <span className="text-[10px] opacity-60">Lower</span>
+            <span className="text-[10px]">Lower</span>
           </button>
         </div>
 

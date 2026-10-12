@@ -4,8 +4,10 @@ import {
   IChartApi,
   ISeriesApi,
   type SeriesMarker,
+  type ChartOptions,
 } from "lightweight-charts";
 import { useEffect, useRef, useState } from "react";
+import { midAt, type Pair, PAIRS } from "@/lib/fx/market";
 
 export type BfxMarker = {
   id: string;
@@ -18,7 +20,12 @@ export type BfxMarker = {
   expiresAt: number;
 };
 
-const API_BASE = import.meta.env.VITE_PESAKI_API_URL || "https://pesaki-server.onrender.com";
+const pairCache: Record<string, Pair | null> = {};
+const getPairByLabel = (label: string): Pair | null => {
+  if (label in pairCache) return pairCache[label];
+  pairCache[label] = PAIRS.find((p) => p.label === label) ?? null;
+  return pairCache[label];
+};
 
 const markerColor = (m: BfxMarker): string => {
   if (m.status === "win") return "#26a65b";
@@ -39,12 +46,14 @@ const buildLcMarkers = (markers: BfxMarker[]): SeriesMarker<"time">[] => {
 
 export const BfxLineChart = ({
   pair,
+  expiryTime,
   markers = [],
-  colors: { backgroundColor = "#0a0e27", textColor = "#94a3bc" } = {},
+  colors: { backgroundColor = "#0a0e27", textColor = "#7a82a8" } = {},
   onMarkerPosition,
   onPrice,
 }: {
   pair: string;
+  expiryTime?: number | null;
   markers?: BfxMarker[];
   colors?: { backgroundColor?: string; textColor?: string };
   onMarkerPosition?: (coords: { id: string; x: number; y: number }[]) => void;
@@ -57,48 +66,75 @@ export const BfxLineChart = ({
   const lastTimeRef = useRef<number>(0);
   const bufferRef = useRef<{ time: number; value: number }[]>([]);
   const initializedRef = useRef(false);
+  const pricePillRef = useRef<HTMLDivElement>(null);
+  const dotRef = useRef<HTMLDivElement>(null);
+  const priceLineRef = useRef<any>(null);
+
+  const [chartHeight, setChartHeight] = useState(320);
 
   useEffect(() => {
-    if (!chartContainerRef.current) return;
+    const updateHeight = () => {
+      setChartHeight(window.innerWidth < 640 ? 320 : 420);
+    };
+    updateHeight();
+    window.addEventListener("resize", updateHeight);
+    return () => window.removeEventListener("resize", updateHeight);
+  }, []);
+
+  useEffect(() => {
+    if (!chartContainerRef.current || chartRef.current) return;
 
     const chart = createChart(chartContainerRef.current, {
+      width: chartContainerRef.current.clientWidth,
+      height: chartHeight,
       layout: {
         background: { type: ColorType.Solid, color: backgroundColor },
         textColor,
+        fontSize: 11,
       },
-      width: chartContainerRef.current.clientWidth,
-      height: chartContainerRef.current.clientHeight || 180,
       grid: {
-        vertLines: { color: "rgba(255, 255, 255, 0.05)" },
-        horzLines: { color: "rgba(255, 255, 255, 0.05)" },
+        vertLines: { color: "rgba(74, 158, 255, 0.05)" },
+        horzLines: { color: "rgba(74, 158, 255, 0.05)" },
+      },
+      rightPriceScale: {
+        borderColor: "rgba(74, 158, 255, 0.15)",
+        scaleMargins: { top: 0.1, bottom: 0.1 },
       },
       timeScale: {
+        borderColor: "rgba(74, 158, 255, 0.15)",
         timeVisible: true,
         secondsVisible: true,
         borderVisible: false,
       },
       crosshair: {
         mode: 0,
-        lineColor: "rgba(74, 158, 255, 0.4)",
-        textColor: "#ffffff",
+        vertLine: {
+          color: "#4a9eff",
+          width: 1,
+          style: 2,
+          labelVisible: false,
+        },
+        horzLine: {
+          color: "#4a9eff",
+          width: 1,
+          style: 2,
+          labelVisible: false,
+        },
       },
-      rightPriceScale: {
-        borderVisible: false,
-      },
-    });
+    } as ChartOptions);
     chartRef.current = chart;
 
     const series = chart.addAreaSeries({
       topColor: "rgba(74, 158, 255, 0.35)",
-      bottomColor: "rgba(74, 158, 255, 0)",
+      bottomColor: "rgba(74, 158, 255, 0.0)",
       lineColor: "#4a9eff",
       lineWidth: 2,
       priceLineVisible: false,
       lastValueVisible: false,
       crosshairMarkerVisible: true,
-      crosshairMarkerRadius: 4,
-      crosshairMarkerBorderColor: "#4a9eff",
-      crosshairMarkerBackgroundColor: "#0a0e27",
+      crosshairMarkerRadius: 6,
+      crosshairMarkerBorderColor: "#0a0e27",
+      crosshairMarkerBackgroundColor: "#4a9eff",
     });
     seriesRef.current = series;
 
@@ -114,60 +150,103 @@ export const BfxLineChart = ({
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
-      initializedRef.current = false;
+      priceLineRef.current = null;
     };
-  }, [backgroundColor, textColor]);
+  }, [backgroundColor, textColor, chartHeight]);
 
   useEffect(() => {
-    const tick = async () => {
-      const now = Math.floor(Date.now() / 1000);
-      if (now === lastTimeRef.current) return;
+    if (!seriesRef.current || !chartRef.current) return;
+
+    const pairObj = getPairByLabel(pair);
+    if (!pairObj) return;
+
+    const digits = pairObj.digits;
+    const tickInterval = 200; // 5 updates per second for jagged look
+
+    const tick = () => {
+      const nowMs = Date.now();
+      const nowSec = Math.floor(nowMs / 1000);
+      const fractionalNow = nowMs / 1000;
 
       let price: number | null = null;
       try {
-        const res = await fetch(`${API_BASE}/games/bfx/price?asset=${encodeURIComponent(pair)}`);
-        const data = await res.json();
-        const raw = Number(data?.price ?? data?.data?.price);
-        if (isFinite(raw) && raw > 0) price = raw;
+        price = midAt(pairObj, fractionalNow);
       } catch {}
 
-      if (price === null) {
+      if (price === null || !isFinite(price) || price <= 0) {
         price = lastPriceRef.current;
       }
       if (price === null) return;
 
-      lastPriceRef.current = price;
-      lastTimeRef.current = now;
-      onPrice?.(price);
+      const rounded = (m: number) => {
+        const f = Math.pow(10, digits);
+        return Math.round(m * f) / f;
+      };
+      const displayPrice = rounded(price);
 
-      const point = { time: now, value: price };
-      bufferRef.current.push(point);
-      if (bufferRef.current.length > 120) bufferRef.current.shift();
+      lastPriceRef.current = displayPrice;
+      onPrice?.(displayPrice);
 
-      if (seriesRef.current && chartRef.current) {
-        if (!initializedRef.current) {
-          seriesRef.current.setData(bufferRef.current);
-          chartRef.current.timeScale().fitContent();
-          initializedRef.current = true;
+      const point = { time: nowSec as any, value: displayPrice };
+
+      const series = seriesRef.current;
+      const chart = chartRef.current;
+      if (!series || !chart) return;
+
+      if (!initializedRef.current) {
+        bufferRef.current = [];
+        const startTime = nowSec - 120;
+        for (let i = 0; i < 120; i++) {
+          const t = startTime + i;
+          const p = rounded(midAt(pairObj, t + Math.random()));
+          bufferRef.current.push({ time: t as any, value: p });
+        }
+        series.setData(bufferRef.current as any);
+        chart.timeScale().fitContent();
+        initializedRef.current = true;
+      } else {
+        if (nowSec !== lastTimeRef.current) {
+          lastTimeRef.current = nowSec;
+          bufferRef.current.push(point);
+          if (bufferRef.current.length > 240) bufferRef.current.shift();
+          series.update(point as any);
         } else {
-          seriesRef.current.update(point);
-          chartRef.current.timeScale().scrollToRealTime();
+          series.update(point as any);
+        }
+        chart.timeScale().scrollToRealTime();
+      }
+
+      // Update price pill overlay
+      if (pricePillRef.current) {
+        pricePillRef.current.textContent = displayPrice.toFixed(digits);
+      }
+
+      // Update blue dot position
+      if (dotRef.current) {
+        const x = chart.timeScale().timeToCoordinate(nowSec as any);
+        const y = series.priceToCoordinate(displayPrice);
+        if (x != null && y != null) {
+          dotRef.current.style.left = `${x}px`;
+          dotRef.current.style.top = `${y}px`;
         }
       }
     };
 
-    const id = setInterval(tick, 1000);
+    const id = setInterval(tick, tickInterval);
     tick();
-    return () => clearInterval(id);
-  }, [pair, onPrice]);
+
+    return () => {
+      clearInterval(id);
+      initializedRef.current = false;
+      bufferRef.current = [];
+    };
+  }, [pair, chartHeight]);
 
   useEffect(() => {
-    if (seriesRef.current) {
-      if (markers && markers.length > 0) {
-        seriesRef.current.setMarkers(buildLcMarkers(markers));
-      } else {
-        seriesRef.current.setMarkers([]);
-      }
+    if (seriesRef.current && markers && markers.length > 0) {
+      seriesRef.current.setMarkers(buildLcMarkers(markers));
+    } else if (seriesRef.current) {
+      seriesRef.current.setMarkers([]);
     }
   }, [markers]);
 
@@ -177,9 +256,8 @@ export const BfxLineChart = ({
     let cancelled = false;
     const tick = () => {
       if (cancelled) return;
-      const chart = chartRef.current;
-      const series = seriesRef.current;
-      if (!chart || !series) return;
+      const chart = chartRef.current!;
+      const series = seriesRef.current!;
 
       const coords: { id: string; x: number; y: number }[] = [];
       for (const m of markers) {
@@ -200,5 +278,45 @@ export const BfxLineChart = ({
     };
   }, [markers, onMarkerPosition]);
 
-  return <div ref={chartContainerRef} className="w-full h-[180px] md:h-[240px] relative" />;
+  return (
+    <div
+      ref={chartContainerRef}
+      className="w-full relative rounded-xl overflow-hidden"
+      style={{ height: chartHeight, backgroundColor: "#0a0e27" }}
+    >
+      {pricePillRef && (
+        <>
+          <div
+            ref={pricePillRef}
+            className="absolute top-2 right-12 px-2 py-0.5 rounded text-xs font-mono font-bold z-10"
+            style={{
+              background: "#4a9eff",
+              color: "#ffffff",
+            }}
+          />
+          <div
+            ref={dotRef}
+            className="absolute w-2 h-2 rounded-full shadow-[0_0_8px_rgba(74,158,255,0.8)] pointer-events-none z-10"
+            style={{
+              background: "#4a9eff",
+              transform: "translate(-50%, -50%)",
+            }}
+          />
+          {expiryTime && (
+            <div className="absolute top-2 right-1 z-10 text-right">
+              <p className="text-[10px] text-[#7a82a8]">Expiration time</p>
+              <p className="text-[11px] text-[#e8eaf6] font-medium">
+                {new Date(expiryTime).toLocaleTimeString("en-KE", {
+                  hour12: false,
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                })}
+              </p>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
 };
