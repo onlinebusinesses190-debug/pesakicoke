@@ -13,6 +13,11 @@ export default defineConfig({
       outDir: ".output/public",
       ssrOutDir: ".output/server",
     },
+    resolve: {
+      alias: {
+        "fancy-canvas/coordinate-space": "fancy-canvas/coordinate-space.js",
+      },
+    },
     plugins: [
       VitePWA({
         registerType: "autoUpdate",

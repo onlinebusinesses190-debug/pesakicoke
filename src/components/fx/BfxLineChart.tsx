@@ -306,10 +306,10 @@ export const BfxLineChart = ({
       if (cancelled) return;
       const coords: { id: string; x: number; y: number }[] = [];
       for (const m of markers) {
-        const x = chart.timeScale().timeToCoordinate(m.time as any) as number;
-        const y = series.priceToCoordinate(m.price);
-        if (x != null && y != null) {
-          coords.push({ id: m.id, x: x as number, y: y as number });
+        const xRaw = chart.timeScale().timeToCoordinate(m.time as any);
+        const yRaw = series.priceToCoordinate(m.price);
+        if (xRaw != null && yRaw != null) {
+          coords.push({ id: m.id, x: xRaw as number, y: yRaw as number });
         }
       }
       onMarkerPositionRef.current?.(coords);
