@@ -6,6 +6,7 @@ import {
   IPriceLine,
   type SeriesMarker,
   type ChartOptions,
+  type LineStyle,
 } from "lightweight-charts";
 import { useEffect, useRef, useState } from "react";
 import { midAt, type Pair, PAIRS } from "@/lib/fx/market";
@@ -29,37 +30,20 @@ const getPairByLabel = (label: string): Pair | null => {
   return pairCache[label];
 };
 
-const markerColor = (m: BfxMarker): string => {
-  if (m.status === "win") return "#26a65b";
-  if (m.status === "loss" || m.status === "tie") return "#e74c3c";
-  return m.direction === "up" ? "#26a65b" : "#e74c3c";
-};
-
-const buildLcMarkers = (markers: BfxMarker[]): SeriesMarker<"time">[] => {
-  return markers.map((m) => ({
-    time: m.time as any,
-    position: m.direction === "up" ? ("belowBar" as const) : ("aboveBar" as const),
-    color: markerColor(m),
-    shape: m.direction === "up" ? ("arrowUp" as const) : ("arrowDown" as const),
-    text: m.status === "win" ? "W" : m.status === "loss" ? "L" : undefined,
-    size: 2,
-  }));
-};
-
 export const BfxLineChart = ({
   pair,
   expiryTime,
   markers = [],
   colors: { backgroundColor = "#0a0e27", textColor = "#7a82a8" } = {},
-  onMarkerPosition,
   onPrice,
+  onChartReady,
 }: {
   pair: string;
   expiryTime?: number | null;
   markers?: BfxMarker[];
   colors?: { backgroundColor?: string; textColor?: string };
-  onMarkerPosition?: (coords: { id: string; x: number; y: number }[]) => void;
   onPrice?: (price: number) => void;
+  onChartReady?: (chart: IChartApi | null, series: ISeriesApi<"Area"> | null) => void;
 }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -145,12 +129,13 @@ export const BfxLineChart = ({
       price: 1.13,
       color: "#4a9eff",
       lineWidth: 1,
-      lineStyle: 0,
+      lineStyle: 0 as LineStyle,
       lineVisible: true,
       axisLabelVisible: false,
       title: "",
     });
 
+    onChartReady?.(chart, series);
     const handleResize = () => {
       if (chartRef.current && chartContainerRef.current) {
         chartRef.current.applyOptions({ width: chartContainerRef.current.clientWidth });
@@ -159,20 +144,21 @@ export const BfxLineChart = ({
     window.addEventListener("resize", handleResize);
 
     return () => {
+      onChartReady?.(null, null);
       window.removeEventListener("resize", handleResize);
-      const series = seriesRef.current;
+      const s = seriesRef.current;
       entryLinesRef.current.forEach((line) => {
-        if (series) series.removePriceLine(line);
+        if (s) s.removePriceLine(line);
       });
       entryLinesRef.current.clear();
-      if (series && priceLineRef.current) series.removePriceLine(priceLineRef.current);
+      if (s && priceLineRef.current) s.removePriceLine(priceLineRef.current);
       priceLineRef.current = null;
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
       initializedRef.current = false;
     };
-  }, [backgroundColor, textColor, chartHeight]);
+  }, [backgroundColor, textColor, chartHeight, onChartReady]);
 
   useEffect(() => {
     if (!seriesRef.current || !chartRef.current) return;
@@ -265,9 +251,8 @@ export const BfxLineChart = ({
   useEffect(() => {
     if (!seriesRef.current) return;
 
+    const series = seriesRef.current;
     const currentIds = new Set(markers.map((m) => m.id));
-
-    const series = seriesRef.current!;
 
     entryLinesRef.current.forEach((line, id) => {
       if (!currentIds.has(id)) {
@@ -279,11 +264,11 @@ export const BfxLineChart = ({
     markers.forEach((m) => {
       if (entryLinesRef.current.has(m.id)) return;
       const isUp = m.direction === "up";
-      const line = seriesRef.current!.createPriceLine({
+      const line = series.createPriceLine({
         price: m.price,
-        color: isUp ? "rgba(38,166,91,0.5)" : "rgba(231,76,60,0.5)",
+        color: isUp ? "rgba(38, 166, 91, 0.5)" : "rgba(231, 76, 60, 0.5)",
         lineWidth: 1,
-        lineStyle: 2,
+        lineStyle: 0 as LineStyle,
         lineVisible: true,
         axisLabelVisible: false,
         title: "",
@@ -291,42 +276,6 @@ export const BfxLineChart = ({
       entryLinesRef.current.set(m.id, line);
     });
   }, [markers]);
-
-  useEffect(() => {
-    if (seriesRef.current && markers && markers.length > 0) {
-      seriesRef.current.setMarkers(buildLcMarkers(markers));
-    } else if (seriesRef.current) {
-      seriesRef.current.setMarkers([]);
-    }
-  }, [markers]);
-
-  useEffect(() => {
-    if (markers.length === 0 || !chartRef.current || !seriesRef.current) return;
-
-    let cancelled = false;
-    const tick = () => {
-      if (cancelled) return;
-      const chart = chartRef.current!;
-      const series = seriesRef.current!;
-
-      const coords: { id: string; x: number; y: number }[] = [];
-      for (const m of markers) {
-        const x = chart.timeScale().timeToCoordinate(m.time as any);
-        const y = series.priceToCoordinate(m.price);
-        if (x != null && y != null) {
-          coords.push({ id: m.id, x, y });
-        }
-      }
-      onMarkerPosition?.(coords);
-      requestAnimationFrame(tick);
-    };
-
-    const animId = requestAnimationFrame(tick);
-    return () => {
-      cancelled = true;
-      cancelAnimationFrame(animId);
-    };
-  }, [markers, onMarkerPosition]);
 
   return (
     <div
