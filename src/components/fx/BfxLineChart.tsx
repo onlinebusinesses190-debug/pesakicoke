@@ -4,6 +4,7 @@ import {
   IChartApi,
   ISeriesApi,
   IPriceLine,
+  SeriesMarker,
   type ChartOptions,
   type LineStyle,
 } from "lightweight-charts";
@@ -272,6 +273,28 @@ export const BfxLineChart = ({
       bufferRef.current = [];
     };
   }, [pair, chartHeight]);
+
+  useEffect(() => {
+    if (!seriesRef.current) return;
+    const series = seriesRef.current;
+    if (markers.length > 0) {
+      series.setMarkers(
+        markers.map((m) => {
+          const isBuy = m.direction === "up";
+          const marker: SeriesMarker<"time"> = {
+            time: m.time as any,
+            position: isBuy ? "belowBar" : "aboveBar",
+            shape: isBuy ? "arrowUp" : "arrowDown",
+            color: isBuy ? "#26a65b" : "#e74c3c",
+            size: 2,
+          };
+          return marker;
+        }),
+      );
+    } else {
+      series.setMarkers([]);
+    }
+  }, [markers]);
 
   return (
     <div
