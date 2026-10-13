@@ -55,12 +55,14 @@ export const BfxLineChart = ({
   const pricePillRef = useRef<HTMLDivElement>(null);
   const dotRef = useRef<HTMLDivElement>(null);
   const entryLinesRef = useRef<Map<string, IPriceLine>>(new Map());
+  const onPriceRef = useRef(onPrice);
   const onChartReadyRef = useRef(onChartReady);
 
   const [chartHeight, setChartHeight] = useState(320);
 
   useEffect(() => {
     onChartReadyRef.current = onChartReady;
+    onPriceRef.current = onPrice;
   });
 
   useEffect(() => {
@@ -198,7 +200,7 @@ export const BfxLineChart = ({
       lastPriceRef.current = displayPrice;
 
       if (nowSec !== lastTimeRef.current) {
-        onPrice?.(displayPrice);
+        onPriceRef.current?.(displayPrice);
       }
 
       const point = { time: nowSec as any, value: displayPrice };
@@ -254,7 +256,7 @@ export const BfxLineChart = ({
       initializedRef.current = false;
       bufferRef.current = [];
     };
-  }, [pair, chartHeight, onPrice]);
+  }, [pair, chartHeight]);
 
   useEffect(() => {
     if (!seriesRef.current) return;
