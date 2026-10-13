@@ -3,11 +3,13 @@ import {
   ColorType,
   IChartApi,
   ISeriesApi,
+  IPriceLine,
   type SeriesMarker,
   type ChartOptions,
 } from "lightweight-charts";
 import { useEffect, useRef, useState } from "react";
 import { midAt, type Pair, PAIRS } from "@/lib/fx/market";
+import "./BfxLineChart.css";
 
 export type BfxMarker = {
   id: string;
@@ -66,9 +68,10 @@ export const BfxLineChart = ({
   const lastTimeRef = useRef<number>(0);
   const bufferRef = useRef<{ time: number; value: number }[]>([]);
   const initializedRef = useRef(false);
+  const priceLineRef = useRef<IPriceLine | null>(null);
   const pricePillRef = useRef<HTMLDivElement>(null);
   const dotRef = useRef<HTMLDivElement>(null);
-  const priceLineRef = useRef<any>(null);
+  const entryLinesRef = useRef<Map<string, IPriceLine>>(new Map());
 
   const [chartHeight, setChartHeight] = useState(320);
 
@@ -138,6 +141,16 @@ export const BfxLineChart = ({
     });
     seriesRef.current = series;
 
+    priceLineRef.current = series.createPriceLine({
+      price: 1.13,
+      color: "#4a9eff",
+      lineWidth: 1,
+      lineStyle: 0,
+      lineVisible: true,
+      axisLabelVisible: false,
+      title: "",
+    });
+
     const handleResize = () => {
       if (chartRef.current && chartContainerRef.current) {
         chartRef.current.applyOptions({ width: chartContainerRef.current.clientWidth });
@@ -147,10 +160,17 @@ export const BfxLineChart = ({
 
     return () => {
       window.removeEventListener("resize", handleResize);
+      const series = seriesRef.current;
+      entryLinesRef.current.forEach((line) => {
+        if (series) series.removePriceLine(line);
+      });
+      entryLinesRef.current.clear();
+      if (series && priceLineRef.current) series.removePriceLine(priceLineRef.current);
+      priceLineRef.current = null;
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
-      priceLineRef.current = null;
+      initializedRef.current = false;
     };
   }, [backgroundColor, textColor, chartHeight]);
 
@@ -161,7 +181,7 @@ export const BfxLineChart = ({
     if (!pairObj) return;
 
     const digits = pairObj.digits;
-    const tickInterval = 200; // 5 updates per second for jagged look
+    const tickInterval = 200;
 
     const tick = () => {
       const nowMs = Date.now();
@@ -216,12 +236,12 @@ export const BfxLineChart = ({
         chart.timeScale().scrollToRealTime();
       }
 
-      // Update price pill overlay
+      priceLineRef.current?.applyOptions({ price: displayPrice });
+
       if (pricePillRef.current) {
         pricePillRef.current.textContent = displayPrice.toFixed(digits);
       }
 
-      // Update blue dot position
       if (dotRef.current) {
         const x = chart.timeScale().timeToCoordinate(nowSec as any);
         const y = series.priceToCoordinate(displayPrice);
@@ -241,6 +261,36 @@ export const BfxLineChart = ({
       bufferRef.current = [];
     };
   }, [pair, chartHeight]);
+
+  useEffect(() => {
+    if (!seriesRef.current) return;
+
+    const currentIds = new Set(markers.map((m) => m.id));
+
+    const series = seriesRef.current!;
+
+    entryLinesRef.current.forEach((line, id) => {
+      if (!currentIds.has(id)) {
+        series.removePriceLine(line);
+        entryLinesRef.current.delete(id);
+      }
+    });
+
+    markers.forEach((m) => {
+      if (entryLinesRef.current.has(m.id)) return;
+      const isUp = m.direction === "up";
+      const line = seriesRef.current!.createPriceLine({
+        price: m.price,
+        color: isUp ? "rgba(38,166,91,0.5)" : "rgba(231,76,60,0.5)",
+        lineWidth: 1,
+        lineStyle: 2,
+        lineVisible: true,
+        axisLabelVisible: false,
+        title: "",
+      });
+      entryLinesRef.current.set(m.id, line);
+    });
+  }, [markers]);
 
   useEffect(() => {
     if (seriesRef.current && markers && markers.length > 0) {
@@ -284,38 +334,35 @@ export const BfxLineChart = ({
       className="w-full relative rounded-xl overflow-hidden"
       style={{ height: chartHeight, backgroundColor: "#0a0e27" }}
     >
-      {pricePillRef && (
-        <>
-          <div
-            ref={pricePillRef}
-            className="absolute top-2 right-12 px-2 py-0.5 rounded text-xs font-mono font-bold z-10"
-            style={{
-              background: "#4a9eff",
-              color: "#ffffff",
-            }}
-          />
-          <div
-            ref={dotRef}
-            className="absolute w-2 h-2 rounded-full shadow-[0_0_8px_rgba(74,158,255,0.8)] pointer-events-none z-10"
-            style={{
-              background: "#4a9eff",
-              transform: "translate(-50%, -50%)",
-            }}
-          />
-          {expiryTime && (
-            <div className="absolute top-2 right-1 z-10 text-right">
-              <p className="text-[10px] text-[#7a82a8]">Expiration time</p>
-              <p className="text-[11px] text-[#e8eaf6] font-medium">
-                {new Date(expiryTime).toLocaleTimeString("en-KE", {
-                  hour12: false,
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  second: "2-digit",
-                })}
-              </p>
-            </div>
-          )}
-        </>
+      <div
+        ref={pricePillRef}
+        className="absolute top-2 right-2 px-2 py-0.5 rounded text-xs font-mono font-bold z-10"
+        style={{
+          background: "#4a9eff",
+          color: "#ffffff",
+          boxShadow: "0 0 8px rgba(74, 158, 255, 0.4)",
+        }}
+      />
+      <div
+        ref={dotRef}
+        className="absolute w-2 h-2 rounded-full shadow-[0_0_8px_rgba(74,158,255,0.8)] pointer-events-none z-10"
+        style={{
+          background: "#4a9eff",
+          transform: "translate(-50%, -50%)",
+        }}
+      />
+      {expiryTime && (
+        <div className="absolute top-3 right-16 z-10 text-right">
+          <p className="text-[10px] text-[#7a82a8]">Expiration time</p>
+          <p className="text-[11px] text-[#e8eaf6] font-medium">
+            {new Date(expiryTime).toLocaleTimeString("en-KE", {
+              hour12: false,
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            })}
+          </p>
+        </div>
       )}
     </div>
   );

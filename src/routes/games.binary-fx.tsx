@@ -502,7 +502,7 @@ function BinaryFxPage() {
               const offsetMap: Record<string, number> = {};
               Object.values(stacks).forEach((stack) => {
                 stack.forEach((item, i) => {
-                  offsetMap[item.marker.id] = i * 14;
+                  offsetMap[item.marker.id] = i * 16;
                 });
               });
 
@@ -512,69 +512,33 @@ function BinaryFxPage() {
                 const stackOffset = offsetMap[m.id] || 0;
 
                 const isUp = m.direction === "up";
-                const color =
-                  m.status === "win"
-                    ? "#22c55e"
-                    : m.status === "loss"
-                      ? "#ef4444"
-                      : isUp
-                        ? "#22c55e"
-                        : "#ef4444";
+                const color = m.status === "win" ? "#26a65b" : m.status === "loss" ? "#e74c3c" : isUp ? "#26a65b" : "#e74c3c";
+
+                const remaining = m.status === "open"
+                  ? Math.max(0, Math.ceil((m.expiresAt - now) / 1000))
+                  : 0;
+                const mm = String(Math.floor(remaining / 60)).padStart(2, "0");
+                const ss = String(remaining % 60).padStart(2, "0");
 
                 return (
-                  <div key={m.id} className="absolute pointer-events-none">
+                  <div
+                    key={m.id}
+                    className="absolute pointer-events-none z-20"
+                    style={{
+                      left: coord.x,
+                      top: coord.y - stackOffset,
+                      transform: isUp ? "translate(-50%, -100%)" : "translate(-50%, 0)",
+                    }}
+                  >
                     <div
-                      className="absolute text-[9px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap"
-                      style={{
-                        left: coord.x,
-                        top: coord.y - 26 - stackOffset,
-                        transform: "translateX(-50%)",
-                        background: color,
-                        color: "#000",
-                      }}
+                      className="text-[11px] font-bold text-center"
+                      style={{ color }}
                     >
-                      KSh {formatKes(m.stake)}
+                      {isUp ? "▲" : "▼"} KSh {formatKes(m.stake)}
                     </div>
-
-                    <div
-                      className="absolute"
-                      style={{
-                        left: coord.x,
-                        top: coord.y - stackOffset,
-                        transform: "translate(-50%, -50%)",
-                        color,
-                      }}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 14 14">
-                        {isUp ? (
-                          <polygon
-                            points="7,2 13,12 1,12"
-                            fill={color}
-                            stroke="#000"
-                            strokeWidth="0.5"
-                          />
-                        ) : (
-                          <polygon
-                            points="7,12 13,2 1,2"
-                            fill={color}
-                            stroke="#000"
-                            strokeWidth="0.5"
-                          />
-                        )}
-                      </svg>
-                    </div>
-
-                    {m.status === "open" && m.remainingSeconds > 0 && (
-                      <div
-                        className="absolute text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-black/70 text-amber-300 whitespace-nowrap"
-                        style={{
-                          left: coord.x,
-                          top: coord.y + 8 - stackOffset,
-                          transform: "translateX(-50%)",
-                        }}
-                      >
-                        {String(Math.floor(m.remainingSeconds / 60)).padStart(2, "0")}:
-                        {String(m.remainingSeconds % 60).padStart(2, "0")}
+                    {m.status === "open" && (
+                      <div className="text-[9px] font-mono font-bold text-center text-[#8b92b8]">
+                        {mm}:{ss}
                       </div>
                     )}
                   </div>
