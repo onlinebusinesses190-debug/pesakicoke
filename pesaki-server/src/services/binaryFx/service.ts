@@ -141,7 +141,7 @@ export function determineOutcome(
   expiryPrice: number,
 ): BfxStatus {
   if (direction === "up" && expiryPrice > entryPrice) return "win";
-  if (direction === "down" && expiryPrice < entryPrice) return "loss";
+  if (direction === "down" && expiryPrice < entryPrice) return "win";
   if (expiryPrice === entryPrice) return BFX.TIE === "loss" ? "loss" : "tie";
   return "loss";
 }

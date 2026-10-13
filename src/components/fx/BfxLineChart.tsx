@@ -56,6 +56,7 @@ export const BfxLineChart = ({
   const priceLineRef = useRef<IPriceLine | null>(null);
   const pricePillRef = useRef<HTMLDivElement>(null);
   const dotRef = useRef<HTMLDivElement>(null);
+  const markersRef = useRef<BfxMarker[]>(markers);
   const onPriceRef = useRef(onPrice);
   const onMarkerPositionRef = useRef(onMarkerPosition);
   const onChartReadyRef = useRef(onChartReady);
@@ -66,6 +67,7 @@ export const BfxLineChart = ({
     onChartReadyRef.current = onChartReady;
     onPriceRef.current = onPrice;
     onMarkerPositionRef.current = onMarkerPosition;
+    markersRef.current = markers;
   });
 
   useEffect(() => {
@@ -231,6 +233,20 @@ export const BfxLineChart = ({
         chart.timeScale().scrollToRealTime();
       }
 
+      const mc = markersRef.current;
+      if (mc.length > 0) {
+        const ts = chart.timeScale();
+        const coords: { id: string; x: number; y: number }[] = [];
+        for (const m of mc) {
+          const xRaw = ts.timeToCoordinate(m.time as any);
+          const yRaw = series.priceToCoordinate(m.price);
+          if (xRaw != null && yRaw != null) {
+            coords.push({ id: m.id, x: xRaw as number, y: yRaw as number });
+          }
+        }
+        onMarkerPositionRef.current?.(coords);
+      }
+
       priceLineRef.current?.applyOptions({ price: displayPrice });
 
       if (pricePillRef.current) {
@@ -256,38 +272,6 @@ export const BfxLineChart = ({
       bufferRef.current = [];
     };
   }, [pair, chartHeight]);
-
-  useEffect(() => {
-    if (!seriesRef.current || !chartRef.current) return;
-    if (!markers || markers.length === 0) {
-      onMarkerPositionRef.current?.([]);
-      return;
-    }
-
-    const chart = chartRef.current;
-    const series = seriesRef.current;
-
-    let cancelled = false;
-    const tick = () => {
-      if (cancelled) return;
-      const coords: { id: string; x: number; y: number }[] = [];
-      for (const m of markers) {
-        const xRaw = chart.timeScale().timeToCoordinate(m.time as any);
-        const yRaw = series.priceToCoordinate(m.price);
-        if (xRaw != null && yRaw != null) {
-          coords.push({ id: m.id, x: xRaw as number, y: yRaw as number });
-        }
-      }
-      onMarkerPositionRef.current?.(coords);
-      requestAnimationFrame(tick);
-    };
-
-    const animId = requestAnimationFrame(tick);
-    return () => {
-      cancelled = true;
-      cancelAnimationFrame(animId);
-    };
-  }, [markers.length]);
 
   return (
     <div
