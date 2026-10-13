@@ -534,12 +534,15 @@ function BinaryFxPage() {
                       transform: isUp ? "translate(-50%, -100%)" : "translate(-50%, 0%)",
                     }}
                   >
-                    <div
-                      className="flex items-center gap-1 text-[11px] font-bold"
-                      style={{ color: isUp ? "#26a65b" : "#e74c3c" }}
-                    >
-                      <span>{isUp ? "▲" : "▼"}</span>
-                      <span>KSh {m.stake}</span>
+                    <div className="relative flex items-center gap-1 text-[11px] font-bold">
+                      <div
+                        className={`w-2.5 h-2.5 rounded-full shadow-[0_0_8px_rgba(74,158,255,0.8)] ${
+                          isUp ? "bg-[#26a65b]" : "bg-[#e74c3c]"
+                        }`}
+                      ></div>
+                      <span style={{ color: isUp ? "#26a65b" : "#e74c3c" }}>
+                        KSh {m.stake}
+                      </span>
                     </div>
                     <div className="text-[9px] text-[#8b92b8] text-center mt-0.5">
                       {mm}:{ss}

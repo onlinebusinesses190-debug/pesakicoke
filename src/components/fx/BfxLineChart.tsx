@@ -56,7 +56,6 @@ export const BfxLineChart = ({
   const priceLineRef = useRef<IPriceLine | null>(null);
   const pricePillRef = useRef<HTMLDivElement>(null);
   const dotRef = useRef<HTMLDivElement>(null);
-  const entryLinesRef = useRef<Map<string, IPriceLine>>(new Map());
   const onPriceRef = useRef(onPrice);
   const onMarkerPositionRef = useRef(onMarkerPosition);
   const onChartReadyRef = useRef(onChartReady);
@@ -158,10 +157,6 @@ export const BfxLineChart = ({
       onChartReadyRef.current?.(null, null);
       window.removeEventListener("resize", handleResize);
       const s = seriesRef.current;
-      entryLinesRef.current.forEach((line) => {
-        if (s) s.removePriceLine(line);
-      });
-      entryLinesRef.current.clear();
       if (s && priceLineRef.current) s.removePriceLine(priceLineRef.current);
       priceLineRef.current = null;
       chart.remove();
@@ -261,35 +256,6 @@ export const BfxLineChart = ({
       bufferRef.current = [];
     };
   }, [pair, chartHeight]);
-
-  useEffect(() => {
-    if (!seriesRef.current) return;
-
-    const series = seriesRef.current;
-    const currentIds = new Set(markers.map((m) => m.id));
-
-    entryLinesRef.current.forEach((line, id) => {
-      if (!currentIds.has(id)) {
-        series.removePriceLine(line);
-        entryLinesRef.current.delete(id);
-      }
-    });
-
-    markers.forEach((m) => {
-      if (entryLinesRef.current.has(m.id)) return;
-      const isUp = m.direction === "up";
-      const line = series.createPriceLine({
-        price: m.price,
-        color: isUp ? "rgba(38, 166, 91, 0.5)" : "rgba(231, 76, 60, 0.5)",
-        lineWidth: 1,
-        lineStyle: 0 as LineStyle,
-        lineVisible: true,
-        axisLabelVisible: false,
-        title: "",
-      });
-      entryLinesRef.current.set(m.id, line);
-    });
-  }, [markers]);
 
   useEffect(() => {
     if (!seriesRef.current || !chartRef.current) return;
