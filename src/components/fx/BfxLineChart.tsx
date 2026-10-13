@@ -35,6 +35,7 @@ export const BfxLineChart = ({
   markers = [],
   colors: { backgroundColor = "#0a0e27", textColor = "#7a82a8" } = {},
   onPrice,
+  onMarkerPosition,
   onChartReady,
 }: {
   pair: string;
@@ -42,6 +43,7 @@ export const BfxLineChart = ({
   markers?: BfxMarker[];
   colors?: { backgroundColor?: string; textColor?: string };
   onPrice?: (price: number) => void;
+  onMarkerPosition?: (coords: { id: string; x: number; y: number }[]) => void;
   onChartReady?: (chart: IChartApi | null, series: ISeriesApi<"Area"> | null) => void;
 }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -56,6 +58,7 @@ export const BfxLineChart = ({
   const dotRef = useRef<HTMLDivElement>(null);
   const entryLinesRef = useRef<Map<string, IPriceLine>>(new Map());
   const onPriceRef = useRef(onPrice);
+  const onMarkerPositionRef = useRef(onMarkerPosition);
   const onChartReadyRef = useRef(onChartReady);
 
   const [chartHeight, setChartHeight] = useState(320);
@@ -63,6 +66,7 @@ export const BfxLineChart = ({
   useEffect(() => {
     onChartReadyRef.current = onChartReady;
     onPriceRef.current = onPrice;
+    onMarkerPositionRef.current = onMarkerPosition;
   });
 
   useEffect(() => {
@@ -286,6 +290,38 @@ export const BfxLineChart = ({
       entryLinesRef.current.set(m.id, line);
     });
   }, [markers]);
+
+  useEffect(() => {
+    if (!seriesRef.current || !chartRef.current) return;
+    if (!markers || markers.length === 0) {
+      onMarkerPositionRef.current?.([]);
+      return;
+    }
+
+    const chart = chartRef.current;
+    const series = seriesRef.current;
+
+    let cancelled = false;
+    const tick = () => {
+      if (cancelled) return;
+      const coords: { id: string; x: number; y: number }[] = [];
+      for (const m of markers) {
+        const x = chart.timeScale().timeToCoordinate(m.time as any) as number;
+        const y = series.priceToCoordinate(m.price);
+        if (x != null && y != null) {
+          coords.push({ id: m.id, x: x as number, y: y as number });
+        }
+      }
+      onMarkerPositionRef.current?.(coords);
+      requestAnimationFrame(tick);
+    };
+
+    const animId = requestAnimationFrame(tick);
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(animId);
+    };
+  }, [markers.length]);
 
   return (
     <div
