@@ -7,6 +7,7 @@ import { DepositSheet } from "@/components/DepositSheet";
 import { toast } from "sonner";
 import { BfxLineChart, type BfxMarker } from "@/components/fx/BfxLineChart";
 import { AssetSelector, SentimentBar, type SentimentTrade } from "@/components/fx/SentimentBar";
+import type { IChartApi, ISeriesApi } from "lightweight-charts";
 
 const API_URL = import.meta.env.VITE_PESAKI_API_URL || "https://pesaki-server.onrender.com";
 
@@ -68,10 +69,11 @@ function BinaryFxPage() {
   const [openTrades, setOpenTrades] = useState<BfxTrade[]>([]);
   const [settledTrades, setSettledTrades] = useState<BfxTrade[]>([]);
   const [showDeposit, setShowDeposit] = useState(false);
+  const [chartApi, setChartApi] = useState<IChartApi | null>(null);
+  const [seriesApi, setSeriesApi] = useState<ISeriesApi<"Area"> | null>(null);
 
   const [now, setNow] = useState(Date.now());
   const [, forceTick] = useState(0);
-  const markerCoordsRef = useRef<{ id: string; x: number; y: number }[]>([]);
   const lastSettleScanRef = useRef(0);
   const fetchConfig = useCallback(async () => {
     try {
@@ -483,72 +485,79 @@ function BinaryFxPage() {
             markers={markers}
             colors={{ backgroundColor: "#0a0e27", textColor: "#7a82a8" }}
             onPrice={(p) => setPrice(p)}
-            onMarkerPosition={(coords) => {
-              markerCoordsRef.current = coords;
+            onChartReady={(chart, series) => {
+              setChartApi(chart);
+              setSeriesApi(series);
             }}
           />
 
           {/* Trade markers */}
-          <div className="absolute inset-0 pointer-events-none">
-            {(() => {
-              const activeMarkers = markers.filter(
-                (m) => m.status === "open",
+          {chartApi && seriesApi && (() => {
+            const activeTrades = openTrades.filter((t) => t.status === "open");
+            if (activeTrades.length === 0) return null;
+
+            const computed = activeTrades
+              .map((trade) => {
+                const x = chartApi.timeScale().timeToCoordinate(
+                  (new Date(trade.opened_at).getTime() / 1000) as any,
+                );
+                const y = seriesApi.priceToCoordinate(trade.entry_price);
+                return { trade, x: x as number, y: y as number };
+              })
+              .filter(
+                (c): c is { trade: BfxTrade; x: number; y: number } =>
+                  c.x != null && c.y != null,
               );
 
-              const stacks: Record<
-                string,
-                { marker: BfxMarker; coord: { id: string; x: number; y: number } }[]
-              > = {};
-              activeMarkers.forEach((m) => {
-                const coord = markerCoordsRef.current.find((c) => c.id === m.id);
-                if (!coord) return;
-                const key = Math.round(coord.y / 20).toString();
-                if (!stacks[key]) stacks[key] = [];
-                stacks[key].push({ marker: m, coord });
+            const stacks: Record<string, { trade: BfxTrade; x: number; y: number }[]> = {};
+            computed.forEach((c) => {
+              const key = Math.round(c.y / 20).toString();
+              if (!stacks[key]) stacks[key] = [];
+              stacks[key].push(c);
+            });
+
+            const offsetMap: Record<string, number> = {};
+            Object.values(stacks).forEach((stack) => {
+              stack.forEach((item, i) => {
+                offsetMap[item.trade.id] = i * 16;
               });
+            });
 
-              const offsetMap: Record<string, number> = {};
-              Object.values(stacks).forEach((stack) => {
-                stack.forEach((item, i) => {
-                  offsetMap[item.marker.id] = i * 16;
-                });
-              });
+            return computed.map((c) => {
+              const { trade, x, y } = c;
+              const isUp = trade.direction === "up";
+              const stackOffset = offsetMap[trade.id] || 0;
+              const secondsLeft = Math.max(
+                0,
+                Math.floor((new Date(trade.expires_at).getTime() - Date.now()) / 1000),
+              );
+              const mm = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
+              const ss = String(secondsLeft % 60).padStart(2, "0");
 
-              return activeMarkers.map((m) => {
-                const coord = markerCoordsRef.current.find((c) => c.id === m.id);
-                if (!coord) return null;
-                const stackOffset = offsetMap[m.id] || 0;
-
-                const isUp = m.direction === "up";
-                const secondsLeft = Math.max(0, Math.ceil((m.expiresAt - now) / 1000));
-                const mm = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
-                const ss = String(secondsLeft % 60).padStart(2, "0");
-
-                return (
+              return (
+                <div
+                  key={trade.id}
+                  className="absolute pointer-events-none z-30"
+                  style={{
+                    left: x,
+                    top: y - stackOffset,
+                    transform: isUp ? "translate(-50%, -100%)" : "translate(-50%, 0%)",
+                  }}
+                >
                   <div
-                    key={m.id}
-                    className="absolute pointer-events-none z-30"
-                    style={{
-                      left: coord.x,
-                      top: coord.y - stackOffset,
-                      transform: isUp ? "translate(-50%, -100%)" : "translate(-50%, 0%)",
-                    }}
+                    className="flex items-center gap-1 text-[11px] font-bold"
+                    style={{ color: isUp ? "#26a65b" : "#e74c3c" }}
                   >
-                    <div
-                      className="flex items-center gap-1 text-[11px] font-bold"
-                      style={{ color: isUp ? "#26a65b" : "#e74c3c" }}
-                    >
-                      <span>{isUp ? "▲" : "▼"}</span>
-                      <span>KSh {m.stake}</span>
-                    </div>
-                    <div className="text-[9px] text-[#8b92b8] text-center mt-0.5">
-                      {mm}:{ss}
-                    </div>
+                    <span>{isUp ? "▲" : "▼"}</span>
+                    <span>KSh {trade.stake}</span>
                   </div>
-                );
-              });
-            })()}
-          </div>
+                  <div className="text-[9px] text-[#8b92b8] text-center mt-0.5">
+                    {mm}:{ss}
+                  </div>
+                </div>
+              );
+            });
+          })()}
 
           {/* Active trade countdown */}
           {countdownSeconds > 0 && activeMarker && (

@@ -4,7 +4,6 @@ import {
   IChartApi,
   ISeriesApi,
   IPriceLine,
-  type SeriesMarker,
   type ChartOptions,
   type LineStyle,
 } from "lightweight-charts";
@@ -36,7 +35,6 @@ export const BfxLineChart = ({
   markers = [],
   colors: { backgroundColor = "#0a0e27", textColor = "#7a82a8" } = {},
   onPrice,
-  onMarkerPosition,
   onChartReady,
 }: {
   pair: string;
@@ -44,7 +42,6 @@ export const BfxLineChart = ({
   markers?: BfxMarker[];
   colors?: { backgroundColor?: string; textColor?: string };
   onPrice?: (price: number) => void;
-  onMarkerPosition?: (coords: { id: string; x: number; y: number }[]) => void;
   onChartReady?: (chart: IChartApi | null, series: ISeriesApi<"Area"> | null) => void;
 }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -58,8 +55,13 @@ export const BfxLineChart = ({
   const pricePillRef = useRef<HTMLDivElement>(null);
   const dotRef = useRef<HTMLDivElement>(null);
   const entryLinesRef = useRef<Map<string, IPriceLine>>(new Map());
+  const onChartReadyRef = useRef(onChartReady);
 
   const [chartHeight, setChartHeight] = useState(320);
+
+  useEffect(() => {
+    onChartReadyRef.current = onChartReady;
+  });
 
   useEffect(() => {
     const updateHeight = () => {
@@ -137,7 +139,7 @@ export const BfxLineChart = ({
       title: "",
     });
 
-    onChartReady?.(chart, series);
+    onChartReadyRef.current?.(chart, series);
 
     const handleResize = () => {
       if (chartRef.current && chartContainerRef.current) {
@@ -147,7 +149,7 @@ export const BfxLineChart = ({
     window.addEventListener("resize", handleResize);
 
     return () => {
-      onChartReady?.(null, null);
+      onChartReadyRef.current?.(null, null);
       window.removeEventListener("resize", handleResize);
       const s = seriesRef.current;
       entryLinesRef.current.forEach((line) => {
@@ -161,7 +163,7 @@ export const BfxLineChart = ({
       seriesRef.current = null;
       initializedRef.current = false;
     };
-  }, [backgroundColor, textColor, chartHeight, onChartReady]);
+  }, [backgroundColor, textColor, chartHeight]);
 
   useEffect(() => {
     if (!seriesRef.current || !chartRef.current) return;
@@ -195,7 +197,6 @@ export const BfxLineChart = ({
 
       lastPriceRef.current = displayPrice;
 
-      // Only propagate to parent once per second to avoid excessive re-renders
       if (nowSec !== lastTimeRef.current) {
         onPrice?.(displayPrice);
       }
@@ -254,35 +255,6 @@ export const BfxLineChart = ({
       bufferRef.current = [];
     };
   }, [pair, chartHeight, onPrice]);
-
-  useEffect(() => {
-    if (!seriesRef.current || !chartRef.current) return;
-    if (!markers || markers.length === 0) return;
-
-    const chart = chartRef.current;
-    const series = seriesRef.current;
-
-    let cancelled = false;
-    const tick = () => {
-      if (cancelled) return;
-      const coords: { id: string; x: number; y: number }[] = [];
-      for (const m of markers) {
-        const x = chart.timeScale().timeToCoordinate(m.time as any);
-        const y = series.priceToCoordinate(m.price);
-        if (x != null && y != null) {
-          coords.push({ id: m.id, x, y });
-        }
-      }
-      onMarkerPosition?.(coords);
-      requestAnimationFrame(tick);
-    };
-
-    const animId = requestAnimationFrame(tick);
-    return () => {
-      cancelled = true;
-      cancelAnimationFrame(animId);
-    };
-  }, [markers, onMarkerPosition]);
 
   useEffect(() => {
     if (!seriesRef.current) return;
