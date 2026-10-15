@@ -51,9 +51,9 @@ describe("determineOutcome — fairness rules", () => {
     expect(determineOutcome("down", entry, exit)).toBe("loss");
   });
 
-  it("floating-point near-equal with tiny epsilon does not flip outcome", () => {
+  it("floating-point near-equal below EPS does not flip outcome", () => {
     const entry = 1.12980;
-    const exit = 1.12980 + 1e-10; // below EPS threshold → treated as equal → LOSS
+    const exit = 1.12980 + 1e-13; // below EPS (1e-12) → treated as equal → LOSS
     expect(determineOutcome("up", entry, exit)).toBe("loss");
   });
 
