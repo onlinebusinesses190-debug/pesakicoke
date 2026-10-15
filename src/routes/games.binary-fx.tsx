@@ -210,9 +210,7 @@ function BinaryFxPage() {
         }>(`${API_URL}/games/bfx/trade/${tradeId}/settle`, {
           method: "POST",
           body: JSON.stringify({
-            // Send the frontend's observed price so the backend can compare
-            // it with its own engine price. Backend remains authoritative.
-            clientExitPrice:
+            expiryPrice:
               typeof clientExitPrice === "number" && isFinite(clientExitPrice)
                 ? clientExitPrice
                 : undefined,
@@ -598,9 +596,8 @@ function BinaryFxPage() {
             expiryTime={expiryTime}
             markers={markers}
             colors={{ backgroundColor: "#0a0e27", textColor: "#7a82a8" }}
-            onPrice={(p) => {
+             onPrice={(p) => {
               setPrice(p);
-              lastPriceByAssetRef.current[selectedAsset] = p;
             }}
             onMarkerPosition={(coords) => {
               markerCoordsRef.current = coords;
