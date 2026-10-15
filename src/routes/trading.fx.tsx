@@ -777,7 +777,7 @@ function TradingPage() {
             <div className={`flex items-center gap-1 border-b px-2 py-1 text-xs ${headerBg}`}>
               <span className="font-bold mr-2">{selectedPair}</span>
 
-              {/* Timeframe Dropdown */}
+               {/* Timeframe Dropdown */}
               <div className="relative">
                 <select
                   value={selectedTimeframe}
@@ -792,6 +792,16 @@ function TradingPage() {
                 </select>
                 <ChevronDown className="absolute right-1 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
               </div>
+
+              {/* Live Price / Bid / Ask / Spread */}
+              {price !== null && (
+                <div className={`ml-3 flex items-center gap-2 text-[10px] font-mono ${isLight ? "text-[#1a1a2e]" : "text-white"}`}>
+                  <span className="font-semibold">{price.toFixed(pairObj.digits)}</span>
+                  <span className="text-gray-500 dark:text-gray-400">Bid: {bid.toFixed(pairObj.digits)}</span>
+                  <span className="text-gray-500 dark:text-gray-400">Ask: {ask.toFixed(pairObj.digits)}</span>
+                  <span className="text-gray-500 dark:text-gray-400">Spread: {spread.toFixed(pairObj.digits)}</span>
+                </div>
+              )}
 
               {/* Crosshair & Indicators */}
               <div className="ml-auto flex items-center gap-1">
