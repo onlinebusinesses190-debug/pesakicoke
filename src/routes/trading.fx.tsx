@@ -1,7 +1,6 @@
 ﻿import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  Activity,
   RefreshCw,
   Timer,
   ArrowLeft,
@@ -11,7 +10,6 @@ import {
   TrendingDown,
   BarChart3,
   Moon,
-  Sun,
 } from "lucide-react";
 import { TradingChart, type FxMarker } from "@/components/fx/TradingChart";
 import { apiRequest } from "@/utils/api";
@@ -19,7 +17,7 @@ import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { DepositSheet } from "@/components/DepositSheet";
 import { toast } from "sonner";
 import { midAt, quoteAt, PAIRS, TIMEFRAMES, type Pair, type TF } from "@/lib/fx/market";
-import { ksh, when } from "@/lib/fx/format";
+import { supabase } from "@/utils/supabase/client";
 
 const API_URL = import.meta.env.VITE_PESAKI_API_URL || "https://pesaki-server.onrender.com";
 
@@ -317,20 +315,22 @@ function TradingPage() {
   );
 
   // ── Initial load ─────────────────────────────────────────────────────
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     const init = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) {
+        navigate({ to: "/auth" });
+        return;
+      }
       await fetchConfig();
       await fetchBalance();
       await fetchOpenTrades();
       await fetchSettledTrades();
-      try {
-        const {
-          data: { session },
-        } = await import("@/utils/supabase/client").then((m) => m.supabase.auth.getSession());
-        if (!session) navigate({ to: "/auth" });
-      } catch (err) {
-        console.error("Auth check failed:", err);
-      }
+      setLoading(false);
     };
     init();
   }, []);
@@ -547,16 +547,20 @@ function TradingPage() {
   const spread = 0.00004;
   const decimals = pairObj?.digits ?? 5;
 
-  return (
-    <div className="flex flex-col min-h-screen bg-[#0f1420] text-gray-200">
-      {/* ─── Title Bar ─── */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-[#2b313f] bg-[#0b0e14]">
-        <div className="flex items-center gap-2">
-          <Link
-            to="/trading"
-            className="text-gray-400 hover:text-white transition-colors"
-            title="Back to Trading Hub"
-          >
+  return loading ? (
+    <div className="flex items-center justify-center min-h-screen bg-[#0f1420]">
+      <div className="w-8 h-8 border-2 border-[#4a90d9] border-t-transparent rounded-full animate-spin" />
+    </div>
+  ) : (
+  <div className="flex flex-col min-h-screen bg-[#0f1420] text-gray-200">
+    {/* ─── Title Bar ─── */}
+    <div className="flex items-center justify-between px-3 py-2 border-b border-[#2b313f] bg-[#0b0e14]">
+      <div className="flex items-center gap-2">
+        <Link
+          to="/trading"
+          className="text-gray-400 hover:text-white transition-colors"
+          title="Back to Trading Hub"
+        >
             <ArrowLeft size={24} />
           </Link>
           <div className="flex items-center gap-2">

@@ -1,7 +1,6 @@
 import { supabase } from "../../lib/supabase";
 import { logger } from "../../utils/logger";
 import { getEngine } from "../forex/marketEngine";
-import { getInstrument } from "../forex/instruments";
 import { debit, credit, getBalance } from "../../wallet/service";
 import { BFX, type BfxAsset, type BfxDirection, type BfxMode, type BfxStatus } from "./config";
 

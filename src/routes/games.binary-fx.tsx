@@ -128,7 +128,7 @@ function BinaryFxPage() {
   }, []);
 
   const fetchBalance = useCallback(async () => {
-    if (!user && defaultMode === "real") return;
+    if (!user) return;
     try {
       const data = await apiRequest<{ balance: number; demo_balance: number }>(
         `${API_URL}/wallet/balance`,
@@ -141,7 +141,7 @@ function BinaryFxPage() {
   }, [user, defaultMode]);
 
   const fetchOpenTrades = useCallback(async () => {
-    if (!user && defaultMode === "real") return;
+    if (!user) return;
     try {
       const data = await apiRequest<{ success: boolean; data: BfxTrade[] }>(
         `${API_URL}/games/bfx/trades/open`,
@@ -158,7 +158,7 @@ function BinaryFxPage() {
   }, [user, defaultMode]);
 
   const fetchSettledTrades = useCallback(async () => {
-    if (!user && defaultMode === "real") return;
+    if (!user) return;
     try {
       const data = await apiRequest<{ success: boolean; data: BfxTrade[] }>(
         `${API_URL}/games/bfx/trades/settled?limit=50`,
