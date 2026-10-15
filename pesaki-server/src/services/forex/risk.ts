@@ -146,7 +146,7 @@ export function marginForLots(
 /** Minimum committed trade amount, in KSh. Server-side configuration. */
 export function minTradeAmount(): number {
   const raw = Number(process.env.PESAKI_FX_MIN_TRADE_AMOUNT);
-  return Number.isFinite(raw) && raw > 0 ? raw : 1;
+  return Number.isFinite(raw) && raw > 0 ? raw : 100;
 }
 
 /**

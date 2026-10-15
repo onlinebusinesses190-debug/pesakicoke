@@ -2,7 +2,7 @@ import { useState } from "react";
 import { MAX_AMOUNT, MIN_AMOUNT, configuredLeverage, quoteAt, type Pair, type Side } from "@/lib/fx/market";
 import { ksh } from "@/lib/fx/format";
 
-const CHIPS = [1, 5, 10, 50, 100, 1000];
+const CHIPS = [100, 500, 1000, 5000, 10000];
 
 export function amountError(amount: number, balance: number, mode: string) {
   return amount < MIN_AMOUNT ? `Minimum trade is ${ksh(MIN_AMOUNT)}`

@@ -99,7 +99,7 @@ function BinaryFxPage() {
         assets: data.assets || [],
         expiries: data.expiries || [],
         payout: data.payout ?? 0.6,
-        minStake: data.minStake ?? 1,
+        minStake: data.minStake ?? 10,
         maxStake: data.maxStake ?? 5000,
         maxOpen: data.maxOpen ?? 10,
         tie: data.tie ?? "loss",
