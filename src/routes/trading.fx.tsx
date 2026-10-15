@@ -1,6 +1,7 @@
 ﻿import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
+  Activity,
   RefreshCw,
   Timer,
   ArrowLeft,
@@ -127,10 +128,8 @@ function TradingPage() {
   const [placing, setPlacing] = useState(false);
   const [showDeposit, setShowDeposit] = useState(false);
   const [showMarketWatch, setShowMarketWatch] = useState(true);
-  const [chartType, setChartType] = useState<"candlestick" | "line">("candlestick");
+  const [selectedTimeframe, setSelectedTimeframe] = useState<TF>("M1");
   const [selectedPair, setSelectedPair] = useState("EUR/USD");
-  const [showSettings, setShowSettings] = useState(false);
-  const [darkMode] = useState(true);
   const [activeView, setActiveView] = useState<"positions" | "history">("positions");
 
   // Per-trade stats shown in the header.
@@ -341,7 +340,7 @@ function TradingPage() {
     refreshAll();
   };
 
-  // ── Chart price tick ───────────────────────────────────────────────────
+   // ── Chart price tick ──
   const updatePrice = useCallback(() => {
     if (!pairObj) return;
     const q = quoteAt(pairObj, nowSeconds());
@@ -350,20 +349,20 @@ function TradingPage() {
 
     setData((prev) => {
       if (prev.length === 0) {
-        return generateCandles(pairObj, 50, nowSeconds(), "M1");
+        return generateCandles(pairObj, 50, nowSeconds(), selectedTimeframe);
       }
       const last = prev[prev.length - 1];
-      const sec = TIMEFRAMES.M1;
+      const sec = TIMEFRAMES[selectedTimeframe];
       const curBucket = Math.floor(nowSeconds() / sec) * sec;
       if (Math.floor(last.time) >= curBucket) return prev;
       const newCandle = candleFor(pairObj, curBucket, sec, nowSeconds());
       return [...prev.slice(1), newCandle];
     });
-  }, [pairObj]);
+  }, [pairObj, selectedTimeframe]);
 
   useEffect(() => {
     updatePrice();
-  }, [selectedPair]);
+  }, [selectedPair, selectedTimeframe]);
 
   useEffect(() => {
     tickIntervalRef.current = setInterval(updatePrice, 1000);
@@ -597,23 +596,14 @@ function TradingPage() {
             >
               Real
             </button>
-          </div>
+           </div>
 
-          {/* Settings */}
-          <button
-            onClick={() => setShowSettings(true)}
-            className="p-1 rounded-md text-gray-400 hover:text-white hover:bg-[#181d29] transition-colors"
-            title="Settings"
-          >
-            <Activity size={14} />
-          </button>
-
-          {/* Dark Mode indicator */}
-          <div className="px-2 py-0.5 rounded text-[10px] text-gray-500">
-            <Moon size={10} className="inline" /> PRO
-          </div>
-        </div>
-      </div>
+           {/* Mode indicator */}
+           <div className="px-2 py-0.5 rounded text-[10px] text-gray-500">
+             <Moon size={10} className="inline" /> PRO
+           </div>
+         </div>
+       </div>
 
       {/* ─── Account Summary Bar ─── */}
       <div className="flex items-center gap-4 px-3 py-2 text-xs border-b border-[#1e2330] bg-[#0b0e14]">
@@ -704,15 +694,15 @@ function TradingPage() {
 
               {/* Timeframe buttons */}
               <div className="flex flex-wrap gap-0.5">
-                {(["M1", "M5", "M15", "H1", "H4"] as TF[]).map((tf) => (
-                  <button
-                    key={tf}
-                    onClick={() => {}}
-                    className="px-1.5 py-0.5 rounded text-[10px] font-semibold text-gray-400 hover:text-white hover:bg-[#181d29] transition-colors"
-                  >
-                    {tf}
-                  </button>
-                ))}
+                 {(["M1", "M5", "M15", "H1", "H4"] as TF[]).map((tf) => (
+                   <button
+                     key={tf}
+                     onClick={() => setSelectedTimeframe(tf)}
+                     className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${selectedTimeframe === tf ? "bg-[#22c55e] text-black" : "text-gray-400 hover:text-white hover:bg-[#181d29]"}`}
+                   >
+                     {tf}
+                   </button>
+                 ))}
               </div>
 
               {/* Live price display */}
