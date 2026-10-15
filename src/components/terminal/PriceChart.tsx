@@ -254,29 +254,29 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
         {symbol}, {tf}: {s.desc}
       </div>
       <div
-        className="absolute left-2 top-6 flex items-stretch shadow"
+        className="absolute left-1 top-3 flex items-stretch shadow"
         onPointerDown={(ev) => ev.stopPropagation()}
       >
         <button
           onClick={() => trade("sell")}
-          className="flex w-16 flex-col items-center bg-sell px-1 py-0.5 text-trade-foreground hover:opacity-90 text-xs font-semibold"
+          className="flex w-10 flex-col items-center bg-sell px-0.5 py-0.25 text-trade-foreground hover:opacity-90 text-[9px] font-semibold"
         >
           <span>SELL</span>
-          <span className="font-mono text-sm font-bold">{q.bid.toFixed(s.digits)}</span>
+          <span className="font-mono text-xs font-bold">{q.bid.toFixed(s.digits)}</span>
         </button>
         <input
           value={lots}
           onChange={(ev) => setLots(ev.target.value)}
           inputMode="decimal"
           aria-label="Volume"
-          className="mt-input w-12 text-center text-xs"
+          className="mt-input w-8 text-center text-[9px]"
         />
         <button
           onClick={() => trade("buy")}
-          className="flex w-16 flex-col items-center bg-buy px-1 py-0.5 text-trade-foreground hover:opacity-90 text-xs font-semibold"
+          className="flex w-10 flex-col items-center bg-buy px-0.5 py-0.25 text-trade-foreground hover:opacity-90 text-[9px] font-semibold"
         >
           <span>BUY</span>
-          <span className="font-mono text-sm font-bold">{q.ask.toFixed(s.digits)}</span>
+          <span className="font-mono text-xs font-bold">{q.ask.toFixed(s.digits)}</span>
         </button>
       </div>
     </div>

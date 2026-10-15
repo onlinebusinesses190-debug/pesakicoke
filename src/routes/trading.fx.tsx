@@ -1062,34 +1062,34 @@ function TradingPage() {
                   <button
                     onClick={() => placeTrade("up")}
                     disabled={placing || !price || !config || tradeActive}
-                    className={`py-1 px-2.5 rounded-lg font-semibold text-[11px] transition-all active:scale-95 disabled:opacity-50 ${
+                    className={`py-0.5 px-1 rounded-lg font-semibold text-[9px] transition-all active:scale-95 disabled:opacity-50 ${
                       placing || tradeActive
                         ? "bg-[#236e40] text-white cursor-not-allowed"
                         : "bg-[#2ecc71] hover:bg-[#27ae60] text-white shadow shadow-[#2ecc71]/20"
                     }`}
                   >
-                    <div className="flex items-center justify-center gap-1">
-                      <TrendingUp size={12} />
+                    <div className="flex items-center justify-center gap-0.5">
+                      <TrendingUp size={8} />
                       <span>UP</span>
                     </div>
-                    <div className="text-[7px] opacity-80">
+                    <div className="text-[6px] opacity-80">
                       {price?.toFixed(pairObj.digits)}
                     </div>
                   </button>
                   <button
                     onClick={() => placeTrade("down")}
                     disabled={placing || !price || !config || tradeActive}
-                    className={`py-1 px-2.5 rounded-lg font-semibold text-[11px] transition-all active:scale-95 disabled:opacity-50 ${
+                    className={`py-0.5 px-1 rounded-lg font-semibold text-[9px] transition-all active:scale-95 disabled:opacity-50 ${
                       placing || tradeActive
                         ? "bg-[#6e2525] text-white cursor-not-allowed"
                         : "bg-[#e74c3c] hover:bg-[#c0392b] text-white shadow shadow-[#e74c3c]/20"
                     }`}
                   >
-                    <div className="flex items-center justify-center gap-1">
-                      <TrendingDown size={12} />
+                    <div className="flex items-center justify-center gap-0.5">
+                      <TrendingDown size={8} />
                       <span>DOWN</span>
                     </div>
-                    <div className="text-[7px] opacity-80">
+                    <div className="text-[6px] opacity-80">
                       {price?.toFixed(pairObj.digits)}
                     </div>
                   </button>

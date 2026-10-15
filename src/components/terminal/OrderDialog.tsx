@@ -217,7 +217,7 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
       {exec === "market" ? (
         <div className="grid grid-cols-2 gap-2">
           <button
-            className="bg-sell px-2 py-1.5 text-trade-foreground hover:opacity-90 text-sm font-semibold"
+            className="bg-sell px-1 py-0.5 text-trade-foreground hover:opacity-90 text-[9px] font-semibold"
             onClick={() =>
               done(
                 e.placeOrder({ symbol, type: "sell", lots: num(lots), sl: num(sl), tp: num(tp) }),
@@ -227,7 +227,7 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
             Sell
           </button>
           <button
-            className="bg-buy px-2 py-1.5 text-trade-foreground hover:opacity-90 text-sm font-semibold"
+            className="bg-buy px-1 py-0.5 text-trade-foreground hover:opacity-90 text-[9px] font-semibold"
             onClick={() =>
               done(e.placeOrder({ symbol, type: "buy", lots: num(lots), sl: num(sl), tp: num(tp) }))
             }
