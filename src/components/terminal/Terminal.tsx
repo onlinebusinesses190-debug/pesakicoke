@@ -20,6 +20,7 @@ export function Terminal() {
   const [depositAmount, setDepositAmount] = useState("");
   const [depositErr, setDepositErr] = useState("");
   const [depositLoading, setDepositLoading] = useState(false);
+  const [darkMode, setDarkMode] = useState(true);
   // REAL balance is held in the PESAKI wallet and kept in sync via the backend;
   // DEMO balance lives in the client engine, so only the live figure is remote.
   const [realBalance, setRealBalance] = useState<number | null>(null);
@@ -53,12 +54,11 @@ export function Terminal() {
   };
 
   return (
-    // The terminal is an MT4-style dark interface. Force dark mode on the
-    // subtree so the chrome/chart palette is right regardless of the global
-    // theme (the root shell does not apply a dark class). The chart itself
-    // is toggled separately via the chart-light class so it can be light too.
+    // The terminal is an MT4-style interface. The global theme (dark/light) is
+    // toggled by the ☀/🌙 button so the chrome and chart palette stay in sync.
+    // The chart background itself is toggled separately via the chart-light class.
     <div
-      className={`dark flex min-h-screen flex-col bg-background md:h-screen ${fullscreen ? "fixed inset-0 z-50" : ""} ${chartLight ? "chart-light" : ""}`}
+      className={`${darkMode ? "dark" : ""} flex min-h-screen flex-col bg-background md:h-screen ${fullscreen ? "fixed inset-0 z-50" : ""} ${chartLight ? "chart-light" : ""}`}
     >
       <div className="flex flex-wrap items-center gap-1 border-b border-border bg-chrome px-1 py-0.5">
         <span className="px-2 font-bold text-primary">MetaTrader Web</span>
@@ -86,10 +86,10 @@ export function Terminal() {
         </button>
         <button
           className="px-2 hover:bg-accent"
-          onClick={() => setChartLight((l) => !l)}
-          title={chartLight ? "Dark chart" : "Light chart"}
+          onClick={() => { setDarkMode((d) => !d); setChartLight((l) => !l); }}
+          title={darkMode ? "Light mode" : "Dark mode"}
         >
-          ☀/🌙
+          {darkMode ? "🌙" : "☀"}
         </button>
         <button
           className="px-2 hover:bg-accent"
@@ -177,15 +177,15 @@ export function Terminal() {
             </div>
             <p className="mb-2 text-xs text-muted-foreground">
               {e.mode === "live"
-                ? "Add real money to your trading wallet. Minimum KSh 100, maximum KSh 10,000."
-                : "Add virtual money to your demo account. Minimum KSh 100, maximum KSh 10,000."}
+                ? "Add real money to your trading wallet. Minimum KSh 1, maximum KSh 10,000."
+                : "Add virtual money to your demo account. Minimum KSh 1, maximum KSh 10,000."}
             </p>
             <input
               className="mt-input w-full"
               type="number"
-              min={100}
+              min={1}
               max={10000}
-              step={1}
+              step={0.1}
               inputMode="numeric"
               placeholder="Amount in KSh"
               value={depositAmount}
@@ -202,7 +202,7 @@ export function Terminal() {
                 onClick={async () => {
                   const n = Number(depositAmount);
                   if (!Number.isFinite(n)) return setDepositErr("Enter an amount");
-                  if (n < 100) return setDepositErr("Minimum deposit is KSh 100");
+                  if (n < 1) return setDepositErr("Minimum deposit is KSh 1");
                   if (n > 10000) return setDepositErr("Maximum deposit is KSh 10,000");
                   setDepositErr("");
                   setDepositLoading(true);

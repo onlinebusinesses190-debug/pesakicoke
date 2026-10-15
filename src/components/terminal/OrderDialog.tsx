@@ -217,22 +217,22 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
       {exec === "market" ? (
         <div className="grid grid-cols-2 gap-2">
           <button
-            className="bg-sell py-2 text-trade-foreground hover:opacity-90"
+            className="bg-sell px-2 py-1.5 text-trade-foreground hover:opacity-90 text-sm font-semibold"
             onClick={() =>
               done(
                 e.placeOrder({ symbol, type: "sell", lots: num(lots), sl: num(sl), tp: num(tp) }),
               )
             }
           >
-            Sell by Market
+            Sell
           </button>
           <button
-            className="bg-buy py-2 text-trade-foreground hover:opacity-90"
+            className="bg-buy px-2 py-1.5 text-trade-foreground hover:opacity-90 text-sm font-semibold"
             onClick={() =>
               done(e.placeOrder({ symbol, type: "buy", lots: num(lots), sl: num(sl), tp: num(tp) }))
             }
           >
-            Buy by Market
+            Buy
           </button>
         </div>
       ) : (

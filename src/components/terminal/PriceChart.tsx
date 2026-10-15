@@ -106,7 +106,7 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
     }
     ctx.setLineDash([]);
 
-    const bw = Math.max(1, Math.floor(sp * 0.7));
+    const bw = Math.max(1, Math.floor(sp * 0.5));
     bars.forEach((b, i) => {
       const x = Math.round(xOf(i));
       const bull = b.c >= b.o;
@@ -259,9 +259,9 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
       >
         <button
           onClick={() => trade("sell")}
-          className="flex w-20 flex-col items-center bg-sell px-1 py-0.5 text-trade-foreground hover:opacity-90"
+          className="flex w-16 flex-col items-center bg-sell px-1 py-0.5 text-trade-foreground hover:opacity-90 text-xs font-semibold"
         >
-          <span className="text-[10px]">SELL</span>
+          <span>SELL</span>
           <span className="font-mono text-sm font-bold">{q.bid.toFixed(s.digits)}</span>
         </button>
         <input
@@ -269,13 +269,13 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
           onChange={(ev) => setLots(ev.target.value)}
           inputMode="decimal"
           aria-label="Volume"
-          className="mt-input w-14 text-center"
+          className="mt-input w-12 text-center text-xs"
         />
         <button
           onClick={() => trade("buy")}
-          className="flex w-20 flex-col items-center bg-buy px-1 py-0.5 text-trade-foreground hover:opacity-90"
+          className="flex w-16 flex-col items-center bg-buy px-1 py-0.5 text-trade-foreground hover:opacity-90 text-xs font-semibold"
         >
-          <span className="text-[10px]">BUY</span>
+          <span>BUY</span>
           <span className="font-mono text-sm font-bold">{q.ask.toFixed(s.digits)}</span>
         </button>
       </div>

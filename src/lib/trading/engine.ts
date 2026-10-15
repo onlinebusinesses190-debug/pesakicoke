@@ -94,6 +94,21 @@ export interface JournalEntry {
 }
 export type Result = { ok: true; ticket?: number } | { ok: false; error: string };
 
+import { configuredLeverage } from "@/lib/fx/market";
+
+// Spread definitions: [symbolName, spreadPtsAt0Decimals].
+// Spread is expressed in points (fractional pips), so EURUSD=12 means 1.2 pips.
+// These are live-market-style spreads for demo simulation.
+const SPREADS: Record<string, number> = {
+  EURUSD: 12, GBPUSD: 15, USDJPY: 14, AUDUSD: 14,
+  USDCAD: 18, USDCHF: 16, NZDUSD: 18, EURJPY: 20,
+  GBPJPY: 28, XAUUSD: 30,
+};
+
+function spreadFor(symbol: string): number {
+  return SPREADS[symbol] ?? 15;
+}
+
 const RAW: [string, string, number, number, number, number][] = [
   ["EURUSD", "Euro vs US Dollar", 5, 12, 100000, 1.0852],
   ["GBPUSD", "Great Britain Pound vs US Dollar", 5, 15, 100000, 1.2648],
@@ -112,7 +127,7 @@ export const SYMBOLS: SymbolSpec[] = RAW.map(([name, desc, digits, spread, contr
   desc,
   digits,
   point: Math.pow(10, -digits),
-  spread,
+  spread: spreadFor(name),
   contract,
   start,
   vol: start * 1.6e-5,
@@ -164,7 +179,7 @@ export class Engine {
   quotes: Record<string, Quote> = {};
   candles: Record<string, Record<TF, Candle[]>> = {};
   balance = START_BALANCE;
-  leverage = 100;
+  leverage = configuredLeverage();
   currency = "USD";
   // Demo by default. Switching to live routes deposits and orders through the
   // backend (the client engine is a demo simulator and must never touch real
