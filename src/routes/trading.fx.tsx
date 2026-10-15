@@ -1062,7 +1062,7 @@ function TradingPage() {
                   <button
                     onClick={() => placeTrade("up")}
                     disabled={placing || !price || !config || tradeActive}
-                    className={`py-1.5 px-3 rounded-lg font-semibold text-xs transition-all active:scale-95 disabled:opacity-50 ${
+                    className={`py-1 px-2.5 rounded-lg font-semibold text-[11px] transition-all active:scale-95 disabled:opacity-50 ${
                       placing || tradeActive
                         ? "bg-[#236e40] text-white cursor-not-allowed"
                         : "bg-[#2ecc71] hover:bg-[#27ae60] text-white shadow shadow-[#2ecc71]/20"
@@ -1079,7 +1079,7 @@ function TradingPage() {
                   <button
                     onClick={() => placeTrade("down")}
                     disabled={placing || !price || !config || tradeActive}
-                    className={`py-1.5 px-3 rounded-lg font-semibold text-xs transition-all active:scale-95 disabled:opacity-50 ${
+                    className={`py-1 px-2.5 rounded-lg font-semibold text-[11px] transition-all active:scale-95 disabled:opacity-50 ${
                       placing || tradeActive
                         ? "bg-[#6e2525] text-white cursor-not-allowed"
                         : "bg-[#e74c3c] hover:bg-[#c0392b] text-white shadow shadow-[#e74c3c]/20"

@@ -258,12 +258,12 @@ describe("sizeFromTradeAmount", () => {
     expect(out.margin).toBeLessThanOrEqual(100_000);
   });
 
-  it("can express the product minimum of KSh 100 as a real position", () => {
-    // A 0.01 lot is ~KSh 14,700 of notional, so the KSh 100 minimum is
+  it("can express the product minimum of KSh 1 as a real position", () => {
+    // A 0.01 lot is ~KSh 14,700 of notional, so the KSh 1 minimum is
     // impossible to express in lots. In units it is a legitimate small trade.
-    const out = sizeFromTradeAmount({ ...base, tradeAmount: 100 });
+    const out = sizeFromTradeAmount({ ...base, tradeAmount: 1 });
     expect(out.units).toBeGreaterThan(0);
-    expect(out.margin).toBe(100);
+    expect(out.margin).toBe(1);
   });
 
   it("keeps the derived lots consistent with the derived units", () => {
@@ -313,12 +313,12 @@ describe("computePnlFromUnits", () => {
 
 describe("validateTradeAmount", () => {
   it("accepts the minimum and above", () => {
-    expect(validateTradeAmount(100, 100_000).ok).toBe(true);
+    expect(validateTradeAmount(1, 100_000).ok).toBe(true);
     expect(validateTradeAmount(5_000, 100_000).ok).toBe(true);
   });
 
   it("rejects amounts below the configured minimum", () => {
-    const check = validateTradeAmount(50, 100_000);
+    const check = validateTradeAmount(0.5, 100_000);
     expect(check.ok).toBe(false);
     expect(check.error).toContain(String(minTradeAmount()));
   });

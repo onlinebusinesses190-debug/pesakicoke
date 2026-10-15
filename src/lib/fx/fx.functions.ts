@@ -2,7 +2,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { DEMO_START, MAX_AMOUNT, MIN_AMOUNT, PAIRS, calcPnl, getPair, quoteAt, type Side } from "./market";
+import { DEMO_START, MAX_AMOUNT, MIN_AMOUNT, PAIRS, calcPnl, configuredLeverage, getPair, quoteAt, type Side } from "./market";
 
 export interface Trade {
   id: string; mode: "demo" | "real"; symbol: string; side: Side;
@@ -75,6 +75,7 @@ export const getAccount = createServerFn({ method: "GET" })
     ]);
     return {
       wallet: { demo: Number(w.demo_balance), real: Number(w.real_balance) },
+      leverage: configuredLeverage(),
       open: ((open.data ?? []) as Row[]).map(norm),
       closed: ((closed.data ?? []) as Row[]).map(norm),
       serverNow: Date.now(),
@@ -98,7 +99,7 @@ export const openTrade = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: id, error } = await supabaseAdmin.rpc("pesaki_fx_open_trade", {
       _user: context.userId, _mode: data.mode, _symbol: data.symbol, _side: data.side,
-      _amount: Math.round(data.amount * 100) / 100, _leverage: 1, _entry: entry,
+      _amount: Math.round(data.amount * 100) / 100, _leverage: configuredLeverage(), _entry: entry,
     });
     if (error) {
       if (error.message.includes("Insufficient")) return { ok: false as const, error: `Not enough money in your ${data.mode} wallet.` };

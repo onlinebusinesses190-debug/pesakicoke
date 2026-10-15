@@ -21,9 +21,18 @@ export const PAIRS: Pair[] = [
   { symbol: "XAUUSD", label: "XAU/USD", name: "Gold vs US Dollar", base: 2351.4, digits: 2, spreadPts: 30, volMul: 1.6 },
 ];
 
-export const MIN_AMOUNT = 100;
+export const MIN_AMOUNT = 1;
 export const MAX_AMOUNT = 100_000;
 export const DEMO_START = 100_000;
+
+/** Server-side configured leverage multiplier (e.g. 10 = 1:10). */
+export function configuredLeverage(): number {
+  if (typeof process !== "undefined") {
+    const raw = Number(process.env.PESAKI_FX_LEVERAGE);
+    if (Number.isFinite(raw) && raw > 0) return raw;
+  }
+  return 10;
+}
 
 export const TIMEFRAMES = { M1: 60, M5: 300, M15: 900, H1: 3600, H4: 14400 } as const;
 export type TF = keyof typeof TIMEFRAMES;

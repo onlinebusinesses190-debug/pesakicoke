@@ -22,7 +22,7 @@ export const BFX = {
   PAYOUT: 0.6 as const,
 
   /** Stake limits, in KES. */
-  MIN_STAKE: 10,
+  MIN_STAKE: 1,
   MAX_STAKE: 5000,
 
   /** Maximum number of concurrent open binary trades per user. */

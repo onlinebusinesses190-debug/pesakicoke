@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { MAX_AMOUNT, MIN_AMOUNT, quoteAt, type Pair, type Side } from "@/lib/fx/market";
+import { MAX_AMOUNT, MIN_AMOUNT, configuredLeverage, quoteAt, type Pair, type Side } from "@/lib/fx/market";
 import { ksh } from "@/lib/fx/format";
 
-const CHIPS = [100, 500, 1000, 5000, 10000];
+const CHIPS = [1, 5, 10, 50, 100, 1000];
 
 export function amountError(amount: number, balance: number, mode: string) {
   return amount < MIN_AMOUNT ? `Minimum trade is ${ksh(MIN_AMOUNT)}`
@@ -48,6 +48,7 @@ export function ExecBar({ pair, now, mode, amount, balance, busy, onTrade }: {
   const q = quoteAt(pair, now);
   const err = amountError(amount, balance, mode);
   const spread = Math.round((q.ask - q.bid) * 10 ** pair.digits);
+  const leverage = configuredLeverage();
   const go = (side: Side) => { if (err) return; if (mode === "real") setConfirm(side); else onTrade(side, amount); };
 
   return (
@@ -60,6 +61,8 @@ export function ExecBar({ pair, now, mode, amount, balance, busy, onTrade }: {
         </button>
         <div className="flex flex-col items-center justify-center text-xs text-muted-foreground">
           <span>Spread</span><span className="num font-bold text-foreground">{spread}</span>
+          <span className="mt-1">1:{leverage}</span>
+          <span className="text-[7px] uppercase">Lev</span>
         </div>
         <button disabled={!!err || busy} onClick={() => go("buy")}
           className="rounded-lg bg-buy px-2 py-2.5 text-trade-foreground hover:opacity-90 disabled:opacity-40">

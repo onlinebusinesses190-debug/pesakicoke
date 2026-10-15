@@ -113,6 +113,7 @@ export function FxTerminal() {
           <button onClick={() => setMode("real")} className={`rounded-full px-4 py-1 font-bold ${mode === "real" ? "bg-real text-real-foreground" : "text-muted-foreground"}`}>Real</button>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1">
+          <span><span className="text-xs text-muted-foreground">1:{data?.leverage ?? 10}</span> <span className="text-xs text-muted-foreground">Leverage</span></span>
           <span><span className="text-xs text-muted-foreground">{mode === "demo" ? "Virtual balance" : "Real wallet"}</span> <b className="num text-lg">{ksh(balance)}</b></span>
           <span><span className="text-xs text-muted-foreground">Equity</span> <b className="num">{ksh(equity)}</b></span>
         </div>
