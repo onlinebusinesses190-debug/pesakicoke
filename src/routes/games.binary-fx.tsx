@@ -73,6 +73,15 @@ function BinaryFxPage() {
   const [, forceTick] = useState(0);
   const markerCoordsRef = useRef<{ id: string; x: number; y: number }[]>([]);
   const lastSettleScanRef = useRef(0);
+
+  // ── Fairness refs ──
+  // Latest known price per asset from the frontend's own live feed.
+  const lastPriceByAssetRef = useRef<Record<string, number>>({});
+  // Trades already being settled (prevents double-settle spam).
+  const settlingIdsRef = useRef<Set<string>>(new Set());
+  // Trades we've already settled locally (prevents repeat calls after refetch).
+  const settledIdsRef = useRef<Set<string>>(new Set());
+
   const fetchConfig = useCallback(async () => {
     try {
       const data = await apiRequest<{
@@ -110,6 +119,7 @@ function BinaryFxPage() {
       );
       const p = data.price;
       setPrice(p);
+      lastPriceByAssetRef.current[asset] = p; // record for fairness checks
       setConnected(true);
       return p;
     } catch {
@@ -137,7 +147,11 @@ function BinaryFxPage() {
         `${API_URL}/games/bfx/trades/open`,
       );
       const all = data.data || [];
-      setOpenTrades(all.filter((t) => t.mode === defaultMode));
+      // Filter out trades we know are being/already settled locally
+      const filtered = all.filter(
+        (t) => t.mode === defaultMode && !settledIdsRef.current.has(t.id),
+      );
+      setOpenTrades(filtered);
     } catch (e) {
       console.error("Failed to fetch open trades:", e);
     }
@@ -163,8 +177,21 @@ function BinaryFxPage() {
     fetchSettledTrades();
   }, [fetchConfig, fetchBalance, fetchOpenTrades, fetchSettledTrades]);
 
-   const settleTrade = useCallback(
+  // ─── Fairness-aware settlement ──────────────────────────────────────────
+  const settleTrade = useCallback(
     async (tradeId: string) => {
+      // Guard: don't settle the same trade twice
+      if (settlingIdsRef.current.has(tradeId)) return;
+      settlingIdsRef.current.add(tradeId);
+
+      const trade = openTrades.find((t) => t.id === tradeId);
+
+      // Capture the frontend's last observed price for this asset as a
+      // fairness cross-check for the backend.
+      const clientExitPrice = trade
+        ? lastPriceByAssetRef.current[trade.asset]
+        : undefined;
+
       try {
         const result = await apiRequest<{
           success: boolean;
@@ -182,48 +209,104 @@ function BinaryFxPage() {
           already_settled?: boolean;
         }>(`${API_URL}/games/bfx/trade/${tradeId}/settle`, {
           method: "POST",
-          body: JSON.stringify({}),
+          body: JSON.stringify({
+            // Send the frontend's observed price so the backend can compare
+            // it with its own engine price. Backend remains authoritative.
+            clientExitPrice:
+              typeof clientExitPrice === "number" && isFinite(clientExitPrice)
+                ? clientExitPrice
+                : undefined,
+          }),
         });
 
         if (result.success) {
-          const trade = openTrades.find((t) => t.id === tradeId);
+          // Mark locally so we don't try again
+          settledIdsRef.current.add(tradeId);
+
           if (trade) {
             const profit = result.profit ?? trade.profit;
             const dir = result.direction ?? trade.direction;
             const asset = result.asset ?? trade.asset;
-            const stake = result.stake ?? trade.stake;
+            const stakeAmount = result.stake ?? trade.stake;
             const entryPrice = result.entry_price ?? trade.entry_price;
-            const exitPrice = result.exit_price ?? trade.expiry_price;
+            const exitPrice = result.exit_price ?? trade.expiry_price ?? 0;
             const entryTime = result.entry_time ?? trade.opened_at;
             const exitTime = result.exit_time ?? new Date().toISOString();
 
-            // Fairness receipt: show transparent entry/exit prices
-            const entryStr = entryPrice.toFixed(priceDecimals(asset));
-            const exitStr = (exitPrice ?? 0).toFixed(priceDecimals(asset));
-            const entryT = new Date(entryTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-            const exitT = new Date(exitTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+            const decimals = priceDecimals(asset);
+            const entryStr = entryPrice.toFixed(decimals);
+            const exitStr = Number(exitPrice).toFixed(decimals);
+            const entryT = new Date(entryTime).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            });
+            const exitT = new Date(exitTime).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            });
+
+            // ── Client-side fairness sanity check ──────────────────────────
+            // If the backend says "win" but the frontend's own price feed
+            // shows the opposite, log a warning so it can be investigated.
+            if (
+              typeof clientExitPrice === "number" &&
+              isFinite(clientExitPrice) &&
+              typeof entryPrice === "number"
+            ) {
+              const frontendWouldWin =
+                dir === "up"
+                  ? clientExitPrice > entryPrice
+                  : clientExitPrice < entryPrice;
+              const backendSaysWin = result.status === "win";
+              if (frontendWouldWin !== backendSaysWin) {
+                console.warn(
+                  "[BFX fairness] Frontend/backend mismatch",
+                  {
+                    tradeId,
+                    asset,
+                    direction: dir,
+                    entryPrice,
+                    clientExitPrice,
+                    backendExitPrice: exitPrice,
+                    frontendWouldWin,
+                    backendSaysWin,
+                  },
+                );
+              }
+            }
+
+            // ── Fairness receipt ───────────────────────────────────────────
+            const receipt =
+              `Entry: ${entryStr} @ ${entryT} → Exit: ${exitStr} @ ${exitT}` +
+              ` · ${dir?.toUpperCase()} · ${asset}`;
 
             if (result.status === "win") {
-              toast.success(
-                `🎉 WON! +KSh ${formatKes(profit)} · Entry: ${entryStr} @ ${entryT} → Exit: ${exitStr} @ ${exitT} · ${dir?.toUpperCase()}`,
-                { duration: 6000 },
-              );
+              toast.success(`🎉 WON! +KSh ${formatKes(profit)}\n${receipt}`, {
+                duration: 7000,
+              });
             } else {
-              toast.error(
-                `💀 LOST! -KSh ${formatKes(stake)} · Entry: ${entryStr} @ ${entryT} → Exit: ${exitStr} @ ${exitT} · ${dir?.toUpperCase()}`,
-                { duration: 6000 },
-              );
+              toast.error(`💀 LOST! -KSh ${formatKes(stakeAmount)}\n${receipt}`, {
+                duration: 7000,
+              });
             }
-            if (result.new_balance !== undefined) {
-              setBalance(result.new_balance);
-            }
+
+            if (result.new_balance !== undefined) setBalance(result.new_balance);
             setOpenTrades((prev) => prev.filter((t) => t.id !== tradeId));
             fetchSettledTrades();
           }
         }
-      } catch (err: unknown) {
+      } catch (err) {
         console.error("Settle failed:", err);
+        // Allow retry on network error
+        settlingIdsRef.current.delete(tradeId);
+        return;
       }
+
+      // Cleanup the "settling" marker after a short delay so the open-trades
+      // fetch has time to remove the trade from the list.
+      setTimeout(() => settlingIdsRef.current.delete(tradeId), 5000);
     },
     [openTrades, fetchSettledTrades],
   );
@@ -307,7 +390,7 @@ function BinaryFxPage() {
     window.location.href = `/games/binary-fx?mode=${newMode}`;
   };
 
-  // ── Data fetching & polling ──
+  // ── Timers ──
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
@@ -318,6 +401,7 @@ function BinaryFxPage() {
     return () => clearInterval(id);
   }, []);
 
+  // ── Initial loads ──
   useEffect(() => {
     fetchConfig();
     fetchPrice(selectedAsset);
@@ -329,26 +413,31 @@ function BinaryFxPage() {
     fetchSettledTrades();
   }, [user, fetchBalance, fetchOpenTrades, fetchSettledTrades, defaultMode]);
 
-
+  // Refresh on tab visible
   useEffect(() => {
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") {
-        refreshAll();
-      }
+      if (document.visibilityState === "visible") refreshAll();
     };
     document.addEventListener("visibilitychange", handleVisibility);
     return () => document.removeEventListener("visibilitychange", handleVisibility);
   }, [refreshAll]);
 
-  // Auto-settle expired trades
+  // ── Auto-settle expired trades (fairness-critical) ──
+  // Runs a scan every second. Only trades whose expires_at has passed AND
+  // which are not already being settled get queued.
   useEffect(() => {
     const nowMs = Date.now();
     if (nowMs - lastSettleScanRef.current < 1000) return;
     lastSettleScanRef.current = nowMs;
 
     const expired = openTrades.filter(
-      (t) => t.status === "open" && new Date(t.expires_at).getTime() <= nowMs,
+      (t) =>
+        t.status === "open" &&
+        new Date(t.expires_at).getTime() <= nowMs &&
+        !settledIdsRef.current.has(t.id) &&
+        !settlingIdsRef.current.has(t.id),
     );
+
     if (expired.length === 0) return;
     expired.forEach((t) => settleTrade(t.id));
   }, [openTrades, now, settleTrade]);
@@ -419,7 +508,7 @@ function BinaryFxPage() {
   return (
     <div className="min-h-screen bg-[#0a0e27] text-white pb-6">
       <div className="max-w-md mx-auto px-3 pt-4 space-y-3">
-        {/* ── Top Bar: Back arrow + Title + Mode toggle + Balance ── */}
+        {/* ── Top Bar ── */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <button
@@ -436,7 +525,6 @@ function BinaryFxPage() {
             </div>
           </div>
 
-          {/* Demo / Real pill toggle */}
           <div className="flex items-center gap-2">
             <div className="flex rounded-full bg-[#1a1e2e] p-0.5 text-xs font-semibold">
               <button
@@ -510,7 +598,10 @@ function BinaryFxPage() {
             expiryTime={expiryTime}
             markers={markers}
             colors={{ backgroundColor: "#0a0e27", textColor: "#7a82a8" }}
-            onPrice={(p) => setPrice(p)}
+            onPrice={(p) => {
+              setPrice(p);
+              lastPriceByAssetRef.current[selectedAsset] = p;
+            }}
             onMarkerPosition={(coords) => {
               markerCoordsRef.current = coords;
             }}
@@ -519,9 +610,7 @@ function BinaryFxPage() {
           {/* Trade markers */}
           <div className="absolute inset-0 pointer-events-none">
             {(() => {
-              const activeMarkers = markers.filter(
-                (m) => m.status === "open",
-              );
+              const activeMarkers = markers.filter((m) => m.status === "open");
 
               const stacks: Record<
                 string,
@@ -592,23 +681,23 @@ function BinaryFxPage() {
           )}
         </div>
 
-        {/* ── Compact Trade Panel ── */}
+        {/* ── Trade Panel ── */}
         <div className="rounded-xl border border-[#2b313f] bg-[#0b0e14] p-3">
           <div className="grid grid-cols-2 gap-2 text-sm">
-             <div>
-               <div className="text-[10px] uppercase text-gray-500">Time</div>
-               <select
-                 value={selectedExpiry}
-                 onChange={(e) => setSelectedExpiry(Number(e.target.value))}
-                 className="mt-1 w-full bg-[#0a0e27] border border-[#2b313f] rounded-xl px-2 py-1 text-sm font-semibold text-white focus:outline-none focus:border-[#4a9eff] appearance-none"
-               >
-                 {config.expiries.map((e) => (
-                   <option key={e.seconds} value={e.seconds} className="bg-[#0a0e27]">
-                     {e.label}
-                   </option>
-                 ))}
-               </select>
-             </div>
+            <div>
+              <div className="text-[10px] uppercase text-gray-500">Time</div>
+              <select
+                value={selectedExpiry}
+                onChange={(e) => setSelectedExpiry(Number(e.target.value))}
+                className="mt-1 w-full bg-[#0a0e27] border border-[#2b313f] rounded-xl px-2 py-1 text-sm font-semibold text-white focus:outline-none focus:border-[#4a9eff] appearance-none"
+              >
+                {config.expiries.map((e) => (
+                  <option key={e.seconds} value={e.seconds} className="bg-[#0a0e27]">
+                    {e.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div>
               <div className="text-[10px] uppercase text-gray-500">Price</div>
               <div className="font-mono font-semibold text-gold text-base">
@@ -654,7 +743,7 @@ function BinaryFxPage() {
           )}
         </div>
 
-        {/* ── BUY / SELL Buttons ── */}
+        {/* ── BUY / SELL ── */}
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={() => placeTrade("up")}
@@ -702,11 +791,12 @@ function BinaryFxPage() {
                 const remaining = Math.max(0, Math.ceil((expiresAt - now) / 1000));
                 const mins = Math.floor(remaining / 60);
                 const secs = remaining % 60;
-                const currentPrice = price ?? 0;
+                // Use the trade's OWN asset price — not the globally selected one.
+                const tradeAssetPrice = lastPriceByAssetRef.current[t.asset] ?? t.entry_price;
                 const isWinning =
                   t.direction === "up"
-                    ? currentPrice > t.entry_price
-                    : currentPrice < t.entry_price;
+                    ? tradeAssetPrice > t.entry_price
+                    : tradeAssetPrice < t.entry_price;
                 return (
                   <div
                     key={t.id}
@@ -725,7 +815,8 @@ function BinaryFxPage() {
                       <div>
                         <div className="font-semibold text-sm">{t.asset}</div>
                         <div className="text-[10px] text-gray-500 font-mono">
-                          Entry: {t.entry_price.toFixed(priceDecimals(t.asset))}
+                          Entry: {t.entry_price.toFixed(priceDecimals(t.asset))} · Now:{" "}
+                          {tradeAssetPrice.toFixed(priceDecimals(t.asset))}
                         </div>
                       </div>
                     </div>
@@ -755,51 +846,52 @@ function BinaryFxPage() {
             </div>
           ) : (
             <div className="space-y-2">
-                {settledTrades.map((t) => {
-                 const isWin = t.status === "win";
-                 const isLoss = t.status === "loss" || t.status === "tie";
-                 const timeStr = new Date(t.opened_at).toLocaleTimeString([], {
-                   hour: "2-digit",
-                   minute: "2-digit",
-                 });
-                 return (
-                   <div
-                     key={t.id}
-                     className="flex items-center justify-between p-3 rounded-xl border bg-[#0b0e14] border-[#2b313f]"
-                   >
-                     <div className="flex items-center gap-3">
-                       <span
-                         className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-                           isWin
-                             ? "bg-emerald-500/20 text-emerald-400"
-                             : "bg-red-500/20 text-red-400"
-                         }`}
-                       >
-                         {t.status.toUpperCase()}
-                       </span>
-                       <div>
-                         <div className="font-semibold text-sm">{t.asset}</div>
-                         <div className="text-[10px] text-gray-500">{timeStr}</div>
-                       </div>
-                     </div>
-                     <div className="text-right">
-                       <div className={`font-bold ${isWin ? "text-emerald-400" : "text-red-400"}`}>
-                         {t.profit > 0
-                           ? `+KSh ${formatKes(t.profit)}`
-                           : t.profit < 0
-                             ? `-KSh ${formatKes(Math.abs(t.profit))}`
-                             : "—"}
-                       </div>
-                       <div className="text-[9px] text-gray-600 dark:text-gray-500 font-mono">
-                         Entry: {t.entry_price.toFixed(priceDecimals(t.asset))} → Exit: {(t.expiry_price ?? 0).toFixed(priceDecimals(t.asset))} • {t.direction.toUpperCase()}
-                       </div>
-                       <div className="text-[10px] text-gray-500">
-                         Stake: KSh {formatKes(t.stake)}
-                       </div>
-                     </div>
-                   </div>
-                 );
-               })}
+              {settledTrades.map((t) => {
+                const isWin = t.status === "win";
+                const timeStr = new Date(t.opened_at).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                });
+                return (
+                  <div
+                    key={t.id}
+                    className="flex items-center justify-between p-3 rounded-xl border bg-[#0b0e14] border-[#2b313f]"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                          isWin
+                            ? "bg-emerald-500/20 text-emerald-400"
+                            : "bg-red-500/20 text-red-400"
+                        }`}
+                      >
+                        {t.status.toUpperCase()}
+                      </span>
+                      <div>
+                        <div className="font-semibold text-sm">{t.asset}</div>
+                        <div className="text-[10px] text-gray-500">{timeStr}</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className={`font-bold ${isWin ? "text-emerald-400" : "text-red-400"}`}>
+                        {t.profit > 0
+                          ? `+KSh ${formatKes(t.profit)}`
+                          : t.profit < 0
+                            ? `-KSh ${formatKes(Math.abs(t.profit))}`
+                            : "—"}
+                      </div>
+                      <div className="text-[9px] text-gray-600 dark:text-gray-500 font-mono">
+                        Entry: {t.entry_price.toFixed(priceDecimals(t.asset))} → Exit:{" "}
+                        {(t.expiry_price ?? 0).toFixed(priceDecimals(t.asset))} •{" "}
+                        {t.direction.toUpperCase()}
+                      </div>
+                      <div className="text-[10px] text-gray-500">
+                        Stake: KSh {formatKes(t.stake)}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
