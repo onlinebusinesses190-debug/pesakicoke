@@ -38,7 +38,6 @@ export interface BfxSettleResult {
   profit: number;
   total_return: number;
   new_balance: number;
-  /** Fairness receipt: full-precision prices for transparency. */
   entry_price: number;
   exit_price: number;
   entry_time: string;
@@ -49,25 +48,34 @@ export interface BfxSettleResult {
   already_settled: boolean;
 }
 
-const digitsFor = (asset: string): number => getInstrument(asset)?.digits ?? 4;
+// ═══════════════════════════════════════════════════════════════════════════
+// PRICE CAPTURE — FULL PRECISION (NO ROUNDING)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Rounding here would destroy sub-pip price moves and make outcomes unfair.
+// Example: EUR/USD at 4-digit precision turns 1.13379 → 1.1338, hiding the
+// real movement the user sees on the chart.
+//
+// Round ONLY for display, never for comparison or storage.
 
-/** Resolve the authoritative entry price from the internal market engine. */
-export function entryPrice(asset: BfxAsset): number {
+function rawMid(asset: BfxAsset): number {
   const engine = getEngine();
   const quote = engine.quote(asset);
-  return roundToDigits(quote.mid, digitsFor(asset));
+  return quote.mid;
 }
 
-function roundToDigits(price: number, digits: number): number {
-  const f = Math.pow(10, digits);
-  return Math.round(price * f) / f;
+export function entryPrice(asset: BfxAsset): number {
+  return rawMid(asset);
 }
 
 function settlementId(tradeId: string): string {
   return `${BFX.SETTLEMENT_PREFIX}${tradeId}`;
 }
 
-/** Open a binary trade atomically. Deducts stake, inserts row, returns trade. */
+// ═══════════════════════════════════════════════════════════════════════════
+// OPEN TRADE
+// ═══════════════════════════════════════════════════════════════════════════
+
 export async function openTrade(
   userId: string,
   mode: BfxMode,
@@ -81,7 +89,10 @@ export async function openTrade(
     return { success: false, error: "Expiry not supported" };
   }
   if (stake < BFX.MIN_STAKE || stake > BFX.MAX_STAKE) {
-    return { success: false, error: `Stake must be between KSh ${BFX.MIN_STAKE} and KSh ${BFX.MAX_STAKE}` };
+    return {
+      success: false,
+      error: `Stake must be between KSh ${BFX.MIN_STAKE} and KSh ${BFX.MAX_STAKE}`,
+    };
   }
 
   const balance = await getBalance(userId, mode);
@@ -101,7 +112,8 @@ export async function openTrade(
     return { success: false, error: `Maximum ${BFX.MAX_OPEN} open trades allowed` };
   }
 
-  const entry = entryPrice(asset);
+  // ✅ FULL PRECISION entry price — never rounded.
+  const entry = rawMid(asset);
   const now = new Date();
   const expiresAt = new Date(now.getTime() + expirySeconds * 1000);
 
@@ -133,7 +145,10 @@ export async function openTrade(
     return { success: false, error: "Failed to create trade" };
   }
 
-  logger.info({ tradeId: trade.id, userId, mode, asset, direction, stake, entry }, "BFX trade opened");
+  logger.info(
+    { tradeId: trade.id, userId, mode, asset, direction, stake, entry },
+    "BFX trade opened",
+  );
   return {
     success: true,
     trade: trade as BfxTrade,
@@ -143,20 +158,12 @@ export async function openTrade(
   };
 }
 
-/**
- * Determine the outcome of a binary trade from entry vs expiry price.
- *
- * Fairness rules (exact):
- * - BUY ("up")   → WIN only if exitPrice > entryPrice STRICTLY
- * - BUY ("up")   → LOSS if exitPrice <= entryPrice (including equal)
- * - SELL ("down") → WIN only if exitPrice < entryPrice STRICTLY
- * - SELL ("down") → LOSS if exitPrice >= entryPrice (including equal)
- *
- * Equal price is always a LOSS (house edge, standard in binary options).
- * A price move of 0.00001 must be respected — no rounding to 2 decimals.
- * Full precision is used; eps only guards against floating-point equality bugs.
- */
-const EPS = 0.0000001;
+// ═══════════════════════════════════════════════════════════════════════════
+// OUTCOME DECISION — STRICT, FULL PRECISION, EQUAL = LOSS
+// ═══════════════════════════════════════════════════════════════════════════
+
+// 1e-12 is only a floating-point guard — it will never flip a visible move.
+const EPS = 1e-12;
 
 export function determineOutcome(
   direction: BfxDirection,
@@ -165,28 +172,21 @@ export function determineOutcome(
 ): BfxStatus {
   if (direction === "up") {
     return exitPrice > entryPrice + EPS ? "win" : "loss";
-  } else {
-    return exitPrice < entryPrice - EPS ? "win" : "loss";
   }
+  return exitPrice < entryPrice - EPS ? "win" : "loss";
 }
 
-/**
- * Settle a binary trade idempotently.
- *
- * Safe to call repeatedly: a trade already settled returns immediately with
- * `already_settled: true` and never credits the wallet twice.
- *
- * Exit price is always captured fresh from the internal market engine at the
- * exact moment of settlement — never from a stale cache. If the frontend
- * supplies an exitPrice, it is sanity-checked against the engine's price and
- * replaced if it deviates by more than 0.5%.
- *
- * The DB update uses `AND status = 'open'` so a concurrent settle can never
- * double-settle or overwrite a settled result.
- */
+// ═══════════════════════════════════════════════════════════════════════════
+// SETTLE TRADE — IDEMPOTENT, FAIR, AUDITABLE
+// ═══════════════════════════════════════════════════════════════════════════
+
+// 0.1% — tight enough to catch manipulation, wide enough for legitimate
+// client/engine timing differences at small timeframes.
+const CLIENT_PRICE_TOLERANCE = 0.001;
+
 export async function settleTrade(
   tradeId: string,
-  expiryPrice?: number,
+  clientExitPrice?: number,
 ): Promise<BfxSettleResult | { success: false; error: string }> {
   const { data: trade, error: fetchError } = await supabase
     .from("bfx_trades")
@@ -195,15 +195,17 @@ export async function settleTrade(
     .maybeSingle();
 
   if (fetchError || !trade) return { success: false, error: "Trade not found" };
+
+  // ─── Idempotency: already settled ────────────────────────────────────────
   if (trade.status !== "open") {
     return {
       success: true,
       status: trade.status as BfxStatus,
       profit: Number(trade.profit ?? 0),
       total_return: Number(trade.total_return ?? 0),
-      new_balance: await getBalance(trade.user_id, trade.mode as BfxMode) ?? 0,
+      new_balance: (await getBalance(trade.user_id, trade.mode as BfxMode)) ?? 0,
       entry_price: Number(trade.entry_price),
-      exit_price: Number(trade.expiry_price),
+      exit_price: Number(trade.expiry_price ?? 0),
       entry_time: trade.opened_at,
       exit_time: trade.settled_at ?? new Date().toISOString(),
       direction: trade.direction as BfxDirection,
@@ -213,44 +215,72 @@ export async function settleTrade(
     };
   }
 
-  // Capture exit price from the internal engine — the source of truth.
-  const engine = getEngine();
-  const quote = engine.quote(trade.asset as BfxAsset);
-  const engineExit = roundToDigits(quote.mid, digitsFor(trade.asset));
+  // ─── Capture engine exit price at FULL PRECISION ─────────────────────────
+  const engineExit = rawMid(trade.asset as BfxAsset);
 
-  // If the frontend supplied an exit price, sanity-check it against the engine.
-  // Reject values that deviate by more than 0.5% — always use the engine price.
+  // ─── Client price sanity check ───────────────────────────────────────────
   let effectiveExit = engineExit;
-  if (expiryPrice !== undefined) {
-    const diff = Math.abs(engineExit - expiryPrice) / engineExit;
-    if (diff > 0.005) {
-      logger.warn(
-        { userExit: expiryPrice, engineExit, tradeId, diff },
-        "BFX settle: frontend sent suspicious exit price — using engine price",
+  let clientAccepted = false;
+
+  if (typeof clientExitPrice === "number" && isFinite(clientExitPrice)) {
+    const denom = Math.abs(engineExit) || 1;
+    const diff = Math.abs(engineExit - clientExitPrice) / denom;
+
+    if (diff <= CLIENT_PRICE_TOLERANCE) {
+      effectiveExit = clientExitPrice;
+      clientAccepted = true;
+      logger.info(
+        { tradeId, engineExit, clientExitPrice, diff },
+        "BFX settle: client price accepted (within tolerance)",
       );
     } else {
-      effectiveExit = expiryPrice;
+      logger.warn(
+        { tradeId, engineExit, clientExitPrice, diff },
+        "BFX settle: client price REJECTED (outside tolerance) — using engine price",
+      );
     }
   }
 
-  // Compute outcome using full precision (no rounding).
+  // ─── Decide outcome on FULL PRECISION values ─────────────────────────────
   const direction = trade.direction as BfxDirection;
-  const entryPrice = Number(trade.entry_price);
-  const outcome = determineOutcome(direction, entryPrice, effectiveExit);
+  const entryPriceStored = Number(trade.entry_price);
+  const outcome = determineOutcome(direction, entryPriceStored, effectiveExit);
 
-  // Idempotency: re-check status inside the transaction.
+  // ─── FAIRNESS AUDIT LOG — one line per settlement, always ────────────────
+  logger.info(
+    {
+      tradeId,
+      userId: trade.user_id,
+      mode: trade.mode,
+      asset: trade.asset,
+      direction,
+      stake: Number(trade.stake),
+      entryPrice: entryPriceStored,
+      exitPrice: effectiveExit,
+      engineExit,
+      clientExitPrice: clientExitPrice ?? null,
+      clientAccepted,
+      outcome,
+    },
+    "BFX settle decision",
+  );
+
   const id = settlementId(tradeId);
   const now = new Date().toISOString();
 
+  const stakeNum = Number(trade.stake);
+  const winProfit = Number((stakeNum * BFX.PAYOUT).toFixed(2));
+  const winTotalReturn = Number((stakeNum + winProfit).toFixed(2));
+
+  // ─── Atomic DB update — status guard prevents double-settle ──────────────
   const { data: updated, error: updateError } = await supabase
     .from("bfx_trades")
     .update({
       status: outcome,
       expiry_price: effectiveExit,
       settled_at: now,
-      profit: outcome === "win" ? Number((trade.stake * BFX.PAYOUT).toFixed(2)) : 0,
-      total_return:
-        outcome === "win" ? Number((trade.stake * (1 + BFX.PAYOUT)).toFixed(2)) : 0,
+      profit: outcome === "win" ? winProfit : 0,
+      total_return: outcome === "win" ? winTotalReturn : 0,
       settlement_id: id,
       updated_at: now,
     })
@@ -259,31 +289,27 @@ export async function settleTrade(
     .select("*")
     .single();
 
+  // ─── Concurrent settle beat us — return the existing settled result ──────
   if (updateError || !updated) {
-    // Another settle beat us — fetch the settled result and return it.
-    const { data: existing, error: reError } = await supabase
+    const { data: existing } = await supabase
       .from("bfx_trades")
       .select("*")
       .eq("id", tradeId)
       .maybeSingle();
 
-    if (reError || !existing) {
-      logger.error({ err: reError?.message, tradeId }, "BFX settle update failed");
+    if (!existing) {
+      logger.error({ err: updateError?.message, tradeId }, "BFX settle update failed");
       return { success: false, error: "Failed to settle trade" };
     }
 
-    // Idempotency: return the already-settled result.
-    const existingOutcome = existing.status as BfxStatus;
-    const existingProfit = Number(existing.profit ?? 0);
-    const existingTotalReturn = Number(existing.total_return ?? 0);
     return {
       success: true,
-      status: existingOutcome,
-      profit: existingProfit,
-      total_return: existingTotalReturn,
-      new_balance: await getBalance(existing.user_id, existing.mode as BfxMode) ?? 0,
+      status: existing.status as BfxStatus,
+      profit: Number(existing.profit ?? 0),
+      total_return: Number(existing.total_return ?? 0),
+      new_balance: (await getBalance(existing.user_id, existing.mode as BfxMode)) ?? 0,
       entry_price: Number(existing.entry_price),
-      exit_price: Number(existing.expiry_price),
+      exit_price: Number(existing.expiry_price ?? 0),
       entry_time: existing.opened_at,
       exit_time: existing.settled_at ?? now,
       direction: existing.direction as BfxDirection,
@@ -293,48 +319,55 @@ export async function settleTrade(
     };
   }
 
-  // Credit the wallet on a win.
-  let newBalance = await getBalance(trade.user_id, trade.mode as BfxMode) ?? 0;
+  // ─── Credit wallet on a win ──────────────────────────────────────────────
+  let newBalance = (await getBalance(trade.user_id, trade.mode as BfxMode)) ?? 0;
   let profit = 0;
   let totalReturn = 0;
 
   if (outcome === "win") {
-    profit = Number((trade.stake * BFX.PAYOUT).toFixed(2));
-    totalReturn = Number((trade.stake + profit).toFixed(2));
+    profit = winProfit;
+    totalReturn = winTotalReturn;
+
     const creditRes = await credit(
       trade.user_id,
       totalReturn,
       trade.mode as BfxMode,
       `Binary FX win on ${trade.asset}`,
     );
+
     if (!creditRes.success) {
       logger.error({ err: creditRes.error, tradeId }, "BFX win credit failed");
-      // The trade was already marked as won in the DB. Log but return success
-      // so the idempotency contract holds; the wallet will be corrected
-      // asynchronously.
+    } else {
+      newBalance = creditRes.newBalance ?? newBalance;
     }
-    newBalance = creditRes.newBalance ?? newBalance;
   }
 
-  logger.info({ tradeId, outcome, profit, totalReturn, newBalance }, "BFX trade settled");
+  logger.info(
+    { tradeId, outcome, profit, totalReturn, newBalance },
+    "BFX trade settled",
+  );
+
   return {
     success: true,
     status: outcome,
     profit,
     total_return: totalReturn,
     new_balance: newBalance,
-    entry_price: entryPrice,
+    entry_price: entryPriceStored,
     exit_price: effectiveExit,
     entry_time: trade.opened_at,
     exit_time: now,
     direction,
     asset: trade.asset,
-    stake: Number(trade.stake),
+    stake: stakeNum,
     already_settled: false,
   };
 }
 
-/** Fetch a user's open binary trades, newest first. */
+// ═══════════════════════════════════════════════════════════════════════════
+// LISTING
+// ═══════════════════════════════════════════════════════════════════════════
+
 export async function listOpen(userId: string): Promise<BfxTrade[]> {
   const { data, error } = await supabase
     .from("bfx_trades")
@@ -349,7 +382,6 @@ export async function listOpen(userId: string): Promise<BfxTrade[]> {
   return (data ?? []) as BfxTrade[];
 }
 
-/** Fetch a user's settled binary trades, newest first. */
 export async function listSettled(userId: string, limit = 100): Promise<BfxTrade[]> {
   const { data, error } = await supabase
     .from("bfx_trades")
