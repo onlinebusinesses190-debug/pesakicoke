@@ -128,7 +128,7 @@ export const ForexChart = ({
           timeVisible: true,
           secondsVisible: false,
           borderVisible: false,
-          barSpacing: 3,
+          barSpacing: 2,
         },
         rightPriceScale: {
           scaleMargins: { top: 0.05, bottom: 0.05 },
@@ -166,6 +166,14 @@ export const ForexChart = ({
 
       seriesRef.current = newSeries;
       newSeries.setData(data);
+
+      // Tight auto-scaling: shrink price margins so candles hug the visible range
+      if (chartRef.current) {
+        chartRef.current.priceScale("right").applyOptions({
+          scaleMargins: { top: 0.05, bottom: 0.05 },
+          autoScale: true,
+        });
+      }
       chart.timeScale().fitContent();
 
       window.addEventListener("resize", handleResize);

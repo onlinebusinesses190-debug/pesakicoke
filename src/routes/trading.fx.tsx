@@ -926,11 +926,11 @@ function TradingPage() {
                 {/* ─── Volume / Stake ─── */}
                 <div className="mb-3">
                   <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
-                    Volume (lots)
+                    Stake (KSh)
                   </label>
                   <div className="relative flex items-center justify-center">
                     <button
-                      onClick={() => setStake(Math.max(1, stake - 1))}
+                      onClick={() => setStake(Math.max(0.1, stake - 0.1))}
                       disabled={tradeActive || placing}
                       className="absolute left-0 px-2 py-1 text-gray-400 hover:text-gray-900 dark:hover:text-white disabled:opacity-50"
                     >
@@ -940,16 +940,16 @@ function TradingPage() {
                       type="number"
                       min={config?.minStake ?? 1}
                       max={config?.maxStake ?? 5000}
-                      step="1"
+                      step="0.1"
                       value={stake}
-                      onChange={(e) => setStake(Math.max(1, Number(e.target.value) || 1))}
+                      onChange={(e) => setStake(Math.max(0.1, Number(e.target.value) || 0.1))}
                       disabled={tradeActive || placing}
-                      className={`w-20 text-center bg-gray-100 dark:bg-[#181d29] border border-gray-300 dark:border-[#2b313f] rounded px-2 py-1 text-sm font-mono font-semibold focus:outline-none focus:border-[#dcb13c] disabled:opacity-50 ${
+                      className={`w-24 text-center bg-gray-100 dark:bg-[#181d29] border border-gray-300 dark:border-[#2b313f] rounded px-2 py-1 text-sm font-mono font-semibold focus:outline-none focus:border-[#dcb13c] disabled:opacity-50 ${
                         isLight ? "text-[#1a1a2e]" : "text-white"
                       }`}
                     />
                     <button
-                      onClick={() => setStake(stake + 1)}
+                      onClick={() => setStake(stake + 0.1)}
                       disabled={tradeActive || placing}
                       className="absolute right-0 px-2 py-1 text-gray-400 hover:text-gray-900 dark:hover:text-white disabled:opacity-50"
                     >
@@ -957,20 +957,20 @@ function TradingPage() {
                     </button>
                   </div>
                   <div className="mt-1 flex gap-1.5 flex-wrap justify-center">
-                    {[10, 50, 100, 500, 1000].map((v) => (
-                        <button
-                          key={v}
-                          onClick={() => setStake(v)}
-                          disabled={tradeActive || placing}
-                          className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors ${
-                            stake === v
-                              ? "bg-[#dcb13c] text-black"
-                              : "bg-gray-200 dark:bg-[#181d29] text-gray-400 hover:text-gray-900 dark:hover:text-white"
-                          } disabled:opacity-50`}
-                        >
-                          {v}
-                        </button>
-                      ))}
+                    {[0.1, 1, 2, 10, 50, 100].map((v) => (
+                      <button
+                        key={v}
+                        onClick={() => setStake(v)}
+                        disabled={tradeActive || placing}
+                        className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors ${
+                          stake === v
+                            ? "bg-[#dcb13c] text-black"
+                            : "bg-gray-200 dark:bg-[#181d29] text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                        } disabled:opacity-50`}
+                      >
+                        {v}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
@@ -1047,44 +1047,42 @@ function TradingPage() {
                   </span>
                 </div>
 
-                {/* ─── Buy / Sell Buttons (small, at bottom corners) ─── */}
-                <div className="relative mt-2">
-                  <div className="flex justify-between">
-                    <button
-                      onClick={() => placeTrade("up")}
-                      disabled={placing || !price || !config || tradeActive}
-                      className={`flex-1 py-2 px-3 rounded-l-lg font-bold text-sm transition-all active:scale-95 disabled:opacity-50 ${
-                        placing || tradeActive
-                          ? "bg-[#236e40] text-white cursor-not-allowed"
-                          : "bg-[#2ecc71] hover:bg-[#27ae60] text-white shadow-lg shadow-[#2ecc71]/20"
-                      }`}
-                    >
-                      <div className="flex items-center justify-center gap-1">
-                        <TrendingUp size={14} />
-                        <span>UP</span>
-                      </div>
-                      <div className="text-[9px] mt-0.5 opacity-80">
-                        {price?.toFixed(pairObj.digits)}
-                      </div>
-                    </button>
-                    <button
-                      onClick={() => placeTrade("down")}
-                      disabled={placing || !price || !config || tradeActive}
-                      className={`flex-1 py-2 px-3 rounded-r-lg font-bold text-sm transition-all active:scale-95 disabled:opacity-50 ${
-                        placing || tradeActive
-                          ? "bg-[#6e2525] text-white cursor-not-allowed"
-                          : "bg-[#e74c3c] hover:bg-[#c0392b] text-white shadow-lg shadow-[#e74c3c]/20"
-                      }`}
-                    >
-                      <div className="flex items-center justify-center gap-1">
-                        <TrendingDown size={14} />
-                        <span>DOWN</span>
-                      </div>
-                      <div className="text-[9px] mt-0.5 opacity-80">
-                        {price?.toFixed(pairObj.digits)}
-                      </div>
-                    </button>
-                  </div>
+                {/* ─── Buy / Sell Buttons ─── */}
+                <div className="grid grid-cols-2 gap-1 mt-2">
+                  <button
+                    onClick={() => placeTrade("up")}
+                    disabled={placing || !price || !config || tradeActive}
+                    className={`py-1.5 px-3 rounded-lg font-semibold text-xs transition-all active:scale-95 disabled:opacity-50 ${
+                      placing || tradeActive
+                        ? "bg-[#236e40] text-white cursor-not-allowed"
+                        : "bg-[#2ecc71] hover:bg-[#27ae60] text-white shadow shadow-[#2ecc71]/20"
+                    }`}
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <TrendingUp size={12} />
+                      <span>UP</span>
+                    </div>
+                    <div className="text-[7px] opacity-80">
+                      {price?.toFixed(pairObj.digits)}
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => placeTrade("down")}
+                    disabled={placing || !price || !config || tradeActive}
+                    className={`py-1.5 px-3 rounded-lg font-semibold text-xs transition-all active:scale-95 disabled:opacity-50 ${
+                      placing || tradeActive
+                        ? "bg-[#6e2525] text-white cursor-not-allowed"
+                        : "bg-[#e74c3c] hover:bg-[#c0392b] text-white shadow shadow-[#e74c3c]/20"
+                    }`}
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <TrendingDown size={12} />
+                      <span>DOWN</span>
+                    </div>
+                    <div className="text-[7px] opacity-80">
+                      {price?.toFixed(pairObj.digits)}
+                    </div>
+                  </button>
                 </div>
 
                 {tradeError && (
