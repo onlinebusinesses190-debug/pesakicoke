@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { closeTrade, getAccount, openTrade, resetDemo, type Trade } from "@/lib/fx/fx.functions";
+import { closeTrade, getAccount, openTrade, type Trade } from "@/lib/fx/fx.functions";
 import { TIMEFRAMES, calcPnl, getPair, quoteAt, type Side, type TF } from "@/lib/fx/market";
 import { EXIT_URL, ksh } from "@/lib/fx/format";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,7 +21,6 @@ export function FxTerminal() {
   const fetchAccount = useServerFn(getAccount);
   const doOpen = useServerFn(openTrade);
   const doClose = useServerFn(closeTrade);
-  const doReset = useServerFn(resetDemo);
   const { data, isLoading, error } = useQuery({ queryKey: ["fx-account"], queryFn: () => fetchAccount(), refetchInterval: 15000 });
 
   const [symbol, setSymbol] = useState("EURUSD");
@@ -96,8 +95,6 @@ export function FxTerminal() {
   }, [now, data]);
 
   const back = () => { if (window.history.length > 1) window.history.back(); else window.location.href = EXIT_URL; };
-  const signOut = async () => { await qc.cancelQueries(); qc.clear(); await supabase.auth.signOut(); navigate({ to: "/auth", replace: true }); };
-  const reset = async () => { if (window.confirm("Reset your demo wallet to KSh 100,000? Demo trades will be removed.")) { await doReset(); refresh(); } };
 
   const onTrade = async (side: Side, amount: number) => { await trade(side, amount); setView("positions"); };
   const pick = (s: string) => { setSymbol(s); setView("trade"); };
@@ -118,8 +115,6 @@ export function FxTerminal() {
         <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1">
           <span><span className="text-xs text-muted-foreground">{mode === "demo" ? "Virtual balance" : "Real wallet"}</span> <b className="num text-lg">{ksh(balance)}</b></span>
           <span><span className="text-xs text-muted-foreground">Equity</span> <b className="num">{ksh(equity)}</b></span>
-          {mode === "demo" && <button onClick={reset} className="text-xs font-semibold text-primary underline">Reset demo</button>}
-          <button onClick={signOut} className="text-xs font-semibold text-muted-foreground underline">Sign out</button>
         </div>
       </header>
 

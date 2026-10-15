@@ -21,7 +21,6 @@ export const PAIRS: Pair[] = [
   { symbol: "XAUUSD", label: "XAU/USD", name: "Gold vs US Dollar", base: 2351.4, digits: 2, spreadPts: 30, volMul: 1.6 },
 ];
 
-export const LEVERAGE = 10;
 export const MIN_AMOUNT = 100;
 export const MAX_AMOUNT = 100_000;
 export const DEMO_START = 100_000;

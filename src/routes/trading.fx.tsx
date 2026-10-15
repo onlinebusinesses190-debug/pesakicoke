@@ -3,16 +3,21 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Activity,
   RefreshCw,
-  Timer,
   ArrowLeft,
   PlusCircle,
   Clock,
+  Sun,
+  Moon,
+  ChevronDown,
+  ChevronUp,
+  Settings,
+  Target,
+  StopCircle,
+  BarChart3,
   TrendingUp,
   TrendingDown,
-  BarChart3,
-  Moon,
 } from "lucide-react";
-import { TradingChart, type FxMarker } from "@/components/fx/TradingChart";
+import { ForexChart, type FxMarker, type Theme } from "@/components/fx/ForexChart";
 import { apiRequest } from "@/utils/api";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { DepositSheet } from "@/components/DepositSheet";
@@ -55,8 +60,6 @@ type Config = {
 const formatKes = (n: number) =>
   n.toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-const priceDecimals = (asset: string) => (asset.includes("JPY") ? 3 : 5);
-
 function roundToDigits(price: number, digits: number): number {
   const f = Math.pow(10, digits);
   return Math.round(price * f) / f;
@@ -68,7 +71,10 @@ function nowSeconds() {
 
 function candleFor(pair: Pair, t0: number, sec: number, now: number): any {
   const t1 = Math.min(t0 + sec, now);
-  let h = -Infinity, l = Infinity, o = 0, c = 0;
+  let h = -Infinity,
+    l = Infinity,
+    o = 0,
+    c = 0;
   const S = 20;
   for (let k = 0; k <= S; k++) {
     const p = midAt(pair, t0 + ((t1 - t0) * k) / S);
@@ -117,6 +123,8 @@ function TradingPage() {
   const [updatingBalance, setUpdatingBalance] = useState(false);
 
   const [stake, setStake] = useState<number>(10);
+  const [tpPrice, setTpPrice] = useState<number | "">("");
+  const [slPrice, setSlPrice] = useState<number | "">("");
   const [selectedExpiry, setSelectedExpiry] = useState<{ label: string; seconds: number } | null>(null);
   const [tradeActive, setTradeActive] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
@@ -128,21 +136,26 @@ function TradingPage() {
   const [placing, setPlacing] = useState(false);
   const [showDeposit, setShowDeposit] = useState(false);
   const [showMarketWatch, setShowMarketWatch] = useState(true);
+  const [showTradePanel, setShowTradePanel] = useState(true);
   const [selectedTimeframe, setSelectedTimeframe] = useState<TF>("M1");
   const [selectedPair, setSelectedPair] = useState("EUR/USD");
   const [activeView, setActiveView] = useState<"positions" | "history">("positions");
+  const [theme, setTheme] = useState<Theme>("light");
 
-  // Per-trade stats shown in the header.
   const [todayPnl, setTodayPnl] = useState(0);
   const [winningTrades, setWinningTrades] = useState(0);
   const [activeTrades, setActiveTrades] = useState(0);
+  const [tpLinePrice, setTpLinePrice] = useState<number | undefined>(undefined);
+  const [slLinePrice, setSlLinePrice] = useState<number | undefined>(undefined);
 
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const tickIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const tradeActiveRef = useRef(false);
   const activeTradeIdRef = useRef<string | null>(null);
+  const countdownRef = useRef<number | null>(null);
 
   const pairObj = PAIRS.find((p) => p.label === selectedPair) || PAIRS[0];
+  const decimals = pairObj.digits;
 
   const fetchConfig = useCallback(async () => {
     try {
@@ -274,8 +287,9 @@ function TradingPage() {
             const entryTime = result.entry_time ?? trade.opened_at;
             const exitTime = result.exit_time ?? new Date().toISOString();
 
-            const entryStr = entryPrice.toFixed(priceDecimals(asset));
-            const exitStr = (exitPrice ?? 0).toFixed(priceDecimals(asset));
+            const d = pairObj;
+            const entryStr = entryPrice.toFixed(d.digits);
+            const exitStr = (exitPrice ?? 0).toFixed(d.digits);
             const entryT = new Date(entryTime).toLocaleTimeString([], {
               hour: "2-digit",
               minute: "2-digit",
@@ -313,7 +327,6 @@ function TradingPage() {
     [openTrades, fetchSettledTrades],
   );
 
-  // ── Initial load ─────────────────────────────────────────────────────
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -334,13 +347,11 @@ function TradingPage() {
     init();
   }, []);
 
-  // Refresh balance after a successful deposit
   const handleDepositSuccess = () => {
     fetchBalance();
     refreshAll();
   };
 
-   // ── Chart price tick ──
   const updatePrice = useCallback(() => {
     if (!pairObj) return;
     const q = quoteAt(pairObj, nowSeconds());
@@ -371,7 +382,6 @@ function TradingPage() {
     };
   }, [updatePrice]);
 
-  // ── Countdown timer ──
   const startTimer = (durationInSeconds: number) => {
     setTimeRemaining(durationInSeconds);
     tradeActiveRef.current = true;
@@ -395,8 +405,19 @@ function TradingPage() {
     }, 100);
   };
 
+  // TP / SL logic — auto-set if not manually entered
+  const computeTpSl = useCallback(() => {
+    if (!price) return { tp: undefined, sl: undefined };
+    const assetDigits = pairObj.digits;
+    const pip = Math.pow(10, -assetDigits) * 10; // 10 pips default
+    const tp = tpPrice !== "" ? Number(tpPrice) : price + pip * 3;
+    const sl = slPrice !== "" ? Number(slPrice) : price - pip * 3;
+    return { tp, sl };
+  }, [price, tpPrice, slPrice, pairObj]);
+
   const placeTrade = async (direction: "up" | "down") => {
-    if (!user && mode === "real") {
+    const session = await supabase.auth.getSession();
+    if (!session.data.session) {
       navigate({
         to: "/auth",
         search: { mode, redirect: "/trading/fx" } as never,
@@ -427,6 +448,12 @@ function TradingPage() {
 
     setPlacing(true);
     setTradeError(null);
+
+    // Set TP/SL lines
+    const { tp, sl } = computeTpSl();
+    if (tp) setTpLinePrice(tp);
+    if (sl) setSlLinePrice(sl);
+
     try {
       const pairLabel = pairObj?.label || selectedPair;
       const q = quoteAt(pairObj!, nowSeconds());
@@ -484,7 +511,7 @@ function TradingPage() {
 
         const dirLabel = direction === "up" ? "UP" : "DOWN";
         toast.success(
-          `${dirLabel} ${pairLabel} · Entry: ${entryPrice.toFixed(priceDecimals(pairLabel))} · Stake: KSh ${formatKes(stakeNum)}`,
+          `${dirLabel} ${pairLabel} · Entry: ${entryPrice.toFixed(pairObj!.digits)} · Stake: KSh ${formatKes(stakeNum)}`,
           { duration: 4000 },
         );
       } else {
@@ -497,7 +524,6 @@ function TradingPage() {
     }
   };
 
-  // ── Stats from settled trades ──
   useEffect(() => {
     const today = new Date().toDateString();
     let pnl = 0;
@@ -521,14 +547,6 @@ function TradingPage() {
     setActiveTrades(active);
   }, [settledTrades, openTrades]);
 
-  // ── Cleanup on unmount ──
-  useEffect(() => {
-    return () => {
-      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-      if (tickIntervalRef.current) clearInterval(tickIntervalRef.current);
-    };
-  }, []);
-
   const formatTime = (seconds: number | null) => {
     if (seconds === null) return "--:--";
     const mins = Math.floor(seconds / 60);
@@ -540,26 +558,53 @@ function TradingPage() {
   const payout = config?.payout ?? 0.5;
   const potentialWin = stake * (1 + payout);
   const currentBalance = mode === "real" ? balance : (balance ?? config?.demoStart ?? 10000);
+  const q = price !== null;
+  const bid = q ? roundToDigits(quoteAt(pairObj, nowSeconds()).bid, pairObj.digits) : 0;
+  const ask = q ? roundToDigits(quoteAt(pairObj, nowSeconds()).ask, pairObj.digits) : 0;
+  const spread = q ? roundToDigits(ask - bid, pairObj.digits) : 0;
 
-  const bid = price ? price - 0.00002 : 0;
-  const ask = price ? price + 0.00002 : 0;
-  const spread = 0.00004;
-  const decimals = pairObj?.digits ?? 5;
+  const isLight = theme === "light";
 
-  return loading ? (
-    <div className="flex items-center justify-center min-h-screen bg-[#0f1420]">
-      <div className="w-8 h-8 border-2 border-[#4a90d9] border-t-transparent rounded-full animate-spin" />
-    </div>
-  ) : (
-  <div className="flex flex-col min-h-screen bg-[#0f1420] text-gray-200">
-    {/* ─── Title Bar ─── */}
-    <div className="flex items-center justify-between px-3 py-2 border-b border-[#2b313f] bg-[#0b0e14]">
-      <div className="flex items-center gap-2">
-        <Link
-          to="/trading"
-          className="text-gray-400 hover:text-white transition-colors"
-          title="Back to Trading Hub"
-        >
+  const themeClasses = isLight
+    ? "bg-white text-[#1a1a2e]"
+    : "bg-[#0f1420] text-gray-200";
+
+  const panelBg = isLight ? "bg-[#f8fafc] border-[#e2e8f0]" : "bg-[#0b0e14] border-[#2b313f]";
+  const headerBg = isLight ? "bg-[#f1f5f9] border-[#e2e8f0]" : "bg-[#0b0e14] border-[#2b313f]";
+  const marketWatchBg = isLight ? "bg-[#f8fafc] border-[#cbd5e1]" : "bg-[#0b0e14] border-[#2b313f]";
+
+  const unrealizedPnl = (() => {
+    if (!price || openTrades.length === 0) return 0;
+    let total = 0;
+    for (const t of openTrades) {
+      const isBuy = t.direction === "up";
+      const dir = isBuy ? 1 : -1;
+      const exit = isBuy ? bid : ask;
+      total += Math.round(t.stake * dir * ((exit - t.entry_price) / t.entry_price) * 100) / 100;
+    }
+    return total;
+  })();
+
+  const pnlColor = unrealizedPnl >= 0 ? "text-emerald-500" : "text-red-500";
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[#0f1420]">
+        <div className="w-8 h-8 border-2 border-[#4a90d9] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className={`flex flex-col min-h-screen transition-colors ${themeClasses}`}>
+      {/* ─── Title Bar ─── */}
+      <div className={`flex items-center justify-between px-3 py-2 border-b ${headerBg}`}>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/trading"
+            className="text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+            title="Back to Trading Hub"
+          >
             <ArrowLeft size={24} />
           </Link>
           <div className="flex items-center gap-2">
@@ -567,11 +612,13 @@ function TradingPage() {
               <BarChart3 className="w-4 h-4 text-primary" />
             </div>
             <div>
-              <h1 className="text-lg md:text-xl font-bold text-white flex items-center gap-2">
+              <h1 className="text-lg md:text-xl font-bold flex items-center gap-2">
                 Pesaki Forex
-                <span className="text-xs text-gray-500 hidden sm:inline">• Professional Trading</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:inline">
+                  • Professional Trading
+                </span>
               </h1>
-              <div className="text-[9px] text-gray-500">
+              <div className="text-[9px] text-gray-400 dark:text-gray-500">
                 {pairObj?.name || "Major Currency Pairs"}
               </div>
             </div>
@@ -579,58 +626,90 @@ function TradingPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Mode Toggle */}
-          <div className="flex rounded-full bg-[#181d29] p-0.5 text-[10px] font-medium">
+          {/* Dark / Light Mode Toggle */}
+          <div className="flex rounded-full bg-gray-200 dark:bg-[#181d29] p-0.5 text-[10px] font-medium">
+            <button
+              onClick={() => setTheme("light")}
+              className={`p-1 rounded-full transition-all ${
+                isLight
+                  ? "bg-white dark:bg-[#2b313f] shadow text-[#1a1a2e]"
+                  : "text-gray-400 hover:text-gray-900"
+              }`}
+              title="Light mode"
+            >
+              <Sun size={12} />
+            </button>
+            <button
+              onClick={() => setTheme("dark")}
+              className={`p-1 rounded-full transition-all ${
+                !isLight
+                  ? "bg-[#2b313f] shadow text-white"
+                  : "text-gray-400 hover:text-white"
+              }`}
+              title="Dark mode"
+            >
+              <Moon size={12} />
+            </button>
+          </div>
+
+          {/* Demo / Real Toggle */}
+          <div className="flex rounded-full bg-gray-200 dark:bg-[#181d29] p-0.5 text-[10px] font-medium">
             <button
               onClick={() => navigate({ search: { mode: "demo" } as never })}
-              className={`px-2.5 py-1 rounded-full transition-all ${mode === "demo" ? "bg-[#dcb13c] text-black" : "text-gray-400 hover:text-white"}`}
+              className={`px-2.5 py-1 rounded-full transition-all ${
+                mode === "demo"
+                  ? "bg-[#dcb13c] text-black"
+                  : "text-gray-400 hover:text-gray-900"
+              }`}
             >
               Demo
             </button>
             <button
               onClick={() => {
-                if (!user) navigate({ to: "/auth", search: { mode: "real" } } as never);
-                else navigate({ search: { mode: "real" } as never });
+                if (mode === "real") {
+                  navigate({ search: { mode: "real" } as never });
+                } else {
+                  navigate({ search: { mode: "real" } as never });
+                }
               }}
-              className={`px-2.5 py-1 rounded-full transition-all ${mode === "real" ? "bg-[#e74c3c] text-white" : "text-gray-400 hover:text-white"}`}
+              className={`px-2.5 py-1 rounded-full transition-all ${
+                mode === "real"
+                  ? "bg-[#e74c3c] text-white"
+                  : "text-gray-400 hover:text-gray-900"
+              }`}
             >
               Real
             </button>
-           </div>
-
-           {/* Mode indicator */}
-           <div className="px-2 py-0.5 rounded text-[10px] text-gray-500">
-             <Moon size={10} className="inline" /> PRO
-           </div>
-         </div>
-       </div>
+          </div>
+        </div>
+      </div>
 
       {/* ─── Account Summary Bar ─── */}
-      <div className="flex items-center gap-4 px-3 py-2 text-xs border-b border-[#1e2330] bg-[#0b0e14]">
+      <div className={`flex items-center gap-4 px-3 py-2 text-xs border-b ${headerBg}`}>
         <div className="flex items-center gap-1">
-          <span className="text-gray-500">Balance</span>
-          <span className="font-mono font-semibold text-white">
+          <span className="text-gray-500 dark:text-gray-400">Balance</span>
+          <span className="font-mono font-semibold">
             {currentBalance !== null ? `${formatKes(currentBalance)} KES` : "—"}
           </span>
           {updatingBalance && <span className="text-gray-400 animate-pulse">⋯</span>}
         </div>
         <div className="flex items-center gap-1">
-          <span className={`font-mono font-semibold ${todayPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+          <span className={`font-mono font-semibold ${todayPnl >= 0 ? "text-emerald-500" : "text-red-500"}`}>
             {todayPnl >= 0 ? "+" : ""}
             {formatKes(todayPnl)} KES
           </span>
-          <span className="text-gray-500">P&amp;L (today)</span>
+          <span className="text-gray-500 dark:text-gray-400">P&amp;L (today)</span>
         </div>
         <div className="flex items-center gap-1">
-          <span className="font-mono font-semibold text-white">{activeTrades}</span>
-          <span className="text-gray-500">Active</span>
+          <span className="font-mono font-semibold">{activeTrades}</span>
+          <span className="text-gray-500 dark:text-gray-400">Active</span>
         </div>
         <div className="flex items-center gap-1">
-          <span className="font-mono font-semibold text-emerald-400">{winningTrades}</span>
-          <span className="text-gray-500">Wins</span>
+          <span className="font-mono font-semibold text-emerald-500">{winningTrades}</span>
+          <span className="text-gray-500 dark:text-gray-400">Wins</span>
         </div>
         <div className="ml-auto flex items-center gap-1">
-          <span className="text-xs text-gray-500">LIVE</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">LIVE</span>
           <span className="relative flex h-1.5 w-1.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400"></span>
@@ -642,12 +721,14 @@ function TradingPage() {
       <div className="flex-1 flex gap-2 p-2 overflow-hidden">
         {/* Market Watch Sidebar */}
         {showMarketWatch && (
-          <div className="w-56 flex-shrink-0 flex flex-col rounded-lg border border-[#2b313f] bg-[#0b0e14] overflow-hidden">
-            <div className="border-b border-[#1e2330] px-2 py-1.5">
-              <h3 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Market Watch</h3>
+          <div className={`w-56 flex-shrink-0 flex flex-col rounded-lg border overflow-hidden ${marketWatchBg}`}>
+            <div className="border-b px-2 py-1.5">
+              <h3 className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Market Watch
+              </h3>
             </div>
             <div className="overflow-y-auto flex-1">
-              <div className="grid grid-cols-[1fr_auto_auto] gap-x-2 px-2 py-1 text-[9px] font-semibold text-gray-500 uppercase">
+              <div className="grid grid-cols-[1fr_auto_auto] gap-x-2 px-2 py-1 text-[9px] font-semibold text-gray-500 dark:text-gray-400 uppercase">
                 <span>Symbol</span>
                 <span className="text-right">Bid</span>
                 <span className="text-right">Ask</span>
@@ -655,7 +736,7 @@ function TradingPage() {
               {PAIRS.map((p) => {
                 const q = quoteAt(p, nowSeconds());
                 const prev = quoteAt(p, nowSeconds() - 1);
-                const tick = q.bid > prev.bid ? "text-emerald-400" : q.bid < prev.bid ? "text-red-400" : "";
+                const tick = q.bid > prev.bid ? "text-emerald-500" : q.bid < prev.bid ? "text-red-500" : "";
                 const isSelected = selectedPair === p.label;
                 return (
                   <button
@@ -663,13 +744,17 @@ function TradingPage() {
                     onClick={() => setSelectedPair(p.label)}
                     className={`grid w-full grid-cols-[1fr_auto_auto] items-center gap-x-2 px-2 py-1.5 text-left transition-colors ${
                       isSelected
-                        ? "bg-[#2b313f] ring-1 ring-primary"
-                        : "hover:bg-[#181d29]/50"
+                        ? "bg-gray-200 dark:bg-[#2b313f] ring-1 ring-primary"
+                        : "hover:bg-gray-200/50 dark:hover:bg-[#181d29]/50"
                     }`}
                   >
                     <div>
-                      <span className="block font-bold text-xs">{p.label}</span>
-                      <span className="block text-[7px] text-gray-500">{p.name}</span>
+                      <span className={`block font-bold text-xs ${isSelected ? "text-[#1a1a2e] dark:text-white" : ""}`}>
+                        {p.label}
+                      </span>
+                      <span className="block text-[7px] text-gray-500 dark:text-gray-400">
+                        {p.name}
+                      </span>
                     </div>
                     <span className={`num font-mono text-right text-xs ${tick}`}>
                       {q.bid.toFixed(p.digits)}
@@ -686,54 +771,71 @@ function TradingPage() {
 
         {/* Chart Window + Order Panel */}
         <div className="flex-1 flex flex-col gap-2 min-w-0">
-          {/* Chart */}
-          <div className="flex-1 rounded-lg border border-[#2b313f] bg-[#0b0e14] overflow-hidden relative">
-            {/* Chart Toolbar */}
-            <div className="flex items-center gap-1 border-b border-[#1e2330] bg-[#0f1420] px-2 py-1 text-xs">
-              <span className="font-bold text-white mr-2">{selectedPair}</span>
+          {/* ─── Chart ─── */}
+          <div className={`flex-1 rounded-lg border overflow-hidden relative ${panelBg}`}>
+            {/* Chart Top Toolbar */}
+            <div className={`flex items-center gap-1 border-b px-2 py-1 text-xs ${headerBg}`}>
+              <span className="font-bold mr-2">{selectedPair}</span>
 
-              {/* Timeframe buttons */}
-              <div className="flex flex-wrap gap-0.5">
-                 {(["M1", "M5", "M15", "H1", "H4"] as TF[]).map((tf) => (
-                   <button
-                     key={tf}
-                     onClick={() => setSelectedTimeframe(tf)}
-                     className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${selectedTimeframe === tf ? "bg-[#22c55e] text-black" : "text-gray-400 hover:text-white hover:bg-[#181d29]"}`}
-                   >
-                     {tf}
-                   </button>
-                 ))}
+              {/* Timeframe Dropdown */}
+              <div className="relative">
+                <select
+                  value={selectedTimeframe}
+                  onChange={(e) => setSelectedTimeframe(e.target.value as TF)}
+                  className="appearance-none bg-transparent border border-gray-300 dark:border-[#2b313f] rounded px-2 py-0.5 text-[10px] font-semibold focus:outline-none focus:border-primary pr-6"
+                >
+                  {Object.entries(TIMEFRAMES).map(([tf, sec]) => (
+                    <option key={tf} value={tf}>
+                      {tf}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-1 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
               </div>
 
-              {/* Live price display */}
-              <div className="ml-auto flex items-center gap-2">
-                <div className="text-right">
-                  <div className="font-mono font-semibold text-white">
-                    {price !== null ? price.toFixed(decimals) : "—"}
-                  </div>
-                  <div className="flex items-center gap-1 text-[8px] text-gray-500">
-                    <span>Bid: {bid.toFixed(decimals)}</span>
-                    <span>Ask: {ask.toFixed(decimals)}</span>
-                    <span>Spread: {spread.toFixed(decimals)}</span>
-                  </div>
-                </div>
+              {/* Crosshair & Indicators */}
+              <div className="ml-auto flex items-center gap-1">
                 <button
-                  onClick={updatePrice}
-                  className="p-0.5 rounded text-gray-400 hover:text-white hover:bg-[#181d29] transition-colors"
-                  title="Refresh"
+                  onClick={() => {}}
+                  className="p-0.5 rounded text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-[#181d29] transition-colors"
+                  title="Crosshair (Ctrl)"
                 >
-                  <RefreshCw size={10} />
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="8" />
+                    <line x1="12" y1="16" x2="12" y2="8" />
+                    <line x1="8" y1="12" x2="16" y2="12" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => {}}
+                  className="p-0.5 rounded text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-[#181d29] transition-colors"
+                  title="Indicators"
+                >
+                  <span className="text-xs font-bold">f</span>
+                </button>
+                <button
+                  onClick={() => {}}
+                  className="p-0.5 rounded text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-[#181d29] transition-colors"
+                  title="Chart Settings"
+                >
+                  <Settings size={12} />
                 </button>
               </div>
             </div>
 
             {/* Chart Content */}
-            <div className="h-[calc(100%-33px)]">
+            <div className="h-[calc(100%-36px)]">
               {data.length > 0 ? (
-                <TradingChart
+                <ForexChart
                   data={data}
                   markers={markers}
-                  colors={{ backgroundColor: "#0b0e14", textColor: "#7a82a8" }}
+                  theme={theme}
+                  currentPrice={price !== null ? price : undefined}
+                  tp={tpLinePrice}
+                  sl={slLinePrice}
+                  onTpChange={setTpLinePrice}
+                  onSlChange={setSlLinePrice}
+                  pairDigits={pairObj.digits}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
@@ -742,10 +844,28 @@ function TradingPage() {
               )}
             </div>
 
+            {/* Floating P&L Label */}
+            {price !== null && openTrades.length > 0 && (
+              <div
+                className={`absolute top-2 right-2 px-2 py-1 rounded text-xs font-mono font-semibold ${
+                  unrealizedPnl >= 0
+                    ? "bg-emerald-500/20 text-emerald-500 border border-emerald-500/30"
+                    : "bg-red-500/20 text-red-500 border border-red-500/30"
+                }`}
+              >
+                {unrealizedPnl >= 0 ? "+" : ""}
+                {unrealizedPnl.toFixed(pairObj.digits)} {pairObj.symbol.slice(-3)}
+              </div>
+            )}
+
             {/* Countdown overlay */}
             {tradeActive && timeRemaining !== null && timeRemaining > 0 && (
-              <div className="absolute top-2 right-2 bg-black/80 border border-[#dcb13c]/30 rounded-lg px-3 py-1.5 flex items-center gap-2">
-                <Timer className="h-3 w-3 text-[#dcb13c]" />
+              <div
+                className={`absolute top-2 right-2 bg-black/80 border rounded-lg px-3 py-1.5 flex items-center gap-2 ${
+                  isLight ? "border-[#dcb13c]/30" : "border-[#dcb13c]/30"
+                }`}
+              >
+                <Clock className="h-3 w-3 text-[#dcb13c]" />
                 <span className="font-mono text-sm font-bold text-[#dcb13c]">
                   {formatTime(timeRemaining)}
                 </span>
@@ -768,144 +888,224 @@ function TradingPage() {
             )}
           </div>
 
-          {/* Order Panel */}
-          <div className="rounded-lg border border-[#2b313f] bg-[#0b0e14] p-3">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+          {/* ─── Order Panel (Collapsible) ─── */}
+          <div className={`rounded-lg border overflow-hidden ${panelBg}`}>
+            <div
+              className={`flex items-center justify-between px-3 py-2 cursor-pointer border-b ${headerBg}`}
+              onClick={() => setShowTradePanel(!showTradePanel)}
+            >
+              <h3 className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Order Panel
               </h3>
-              {mode === "real" && (
-                <button
-                  onClick={() => setShowDeposit(true)}
-                  className="flex items-center gap-0.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 text-[10px] font-semibold px-2 py-0.5 rounded transition-colors"
-                >
-                  <PlusCircle size={10} /> Deposit
-                </button>
-              )}
-            </div>
-
-            {/* Stake Input */}
-            <div className="mb-3">
-              <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                Stake (KES)
-              </label>
-              <input
-                type="number"
-                min={config?.minStake ?? 10}
-                max={config?.maxStake ?? 5000}
-                step="1"
-                value={stake}
-                onChange={(e) => setStake(Math.max(1, Number(e.target.value) || 1))}
-                disabled={tradeActive}
-                className="w-full bg-[#181d29] border border-[#2b313f] rounded-md px-3 py-2 text-sm font-mono font-semibold text-white focus:outline-none focus:border-[#dcb13c] disabled:opacity-50"
-              />
-              <div className="mt-1 flex gap-1.5 flex-wrap">
-                {[10, 50, 100, 500, 1000].map((v) => (
+              <div className="flex items-center gap-2">
+                {mode === "real" && (
                   <button
-                    key={v}
-                    onClick={() => setStake(v)}
-                    disabled={tradeActive}
-                    className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors ${
-                      stake === v
-                        ? "bg-[#dcb13c] text-black"
-                        : "bg-[#181d29] text-gray-400 hover:text-white"
-                    } disabled:opacity-50`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowDeposit(true);
+                    }}
+                    className="flex items-center gap-0.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 text-[10px] font-semibold px-2 py-0.5 rounded transition-colors"
                   >
-                    {v}
+                    <PlusCircle size={10} /> Deposit
                   </button>
-                ))}
+                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowTradePanel(!showTradePanel);
+                  }}
+                  className="p-0.5 text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                >
+                  {showTradePanel ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                </button>
               </div>
             </div>
 
-            {/* Expiry Selector */}
-            <div className="mb-3">
-              <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                Expiry
-              </label>
-              {config?.expiries && (
-                <div className="grid grid-cols-5 gap-1">
-                  {config.expiries.map((d) => (
+            {showTradePanel && (
+              <div className="p-3">
+                {/* ─── Volume / Stake ─── */}
+                <div className="mb-3">
+                  <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+                    Volume (lots)
+                  </label>
+                  <div className="relative flex items-center justify-center">
                     <button
-                      key={d.label}
-                      onClick={() => setSelectedExpiry(d)}
-                      disabled={tradeActive}
-                      className={`py-1.5 rounded text-xs font-semibold transition-all ${
-                        selectedExpiry?.label === d.label
-                          ? "bg-[#dcb13c] text-black"
-                          : "bg-[#181d29] text-gray-400 hover:text-white"
-                      } disabled:opacity-50`}
+                      onClick={() => setStake(Math.max(1, stake - 1))}
+                      disabled={tradeActive || placing}
+                      className="absolute left-0 px-2 py-1 text-gray-400 hover:text-gray-900 dark:hover:text-white disabled:opacity-50"
                     >
-                      {d.label}
+                      ‑
                     </button>
-                  ))}
+                    <input
+                      type="number"
+                      min={config?.minStake ?? 1}
+                      max={config?.maxStake ?? 5000}
+                      step="1"
+                      value={stake}
+                      onChange={(e) => setStake(Math.max(1, Number(e.target.value) || 1))}
+                      disabled={tradeActive || placing}
+                      className={`w-20 text-center bg-gray-100 dark:bg-[#181d29] border border-gray-300 dark:border-[#2b313f] rounded px-2 py-1 text-sm font-mono font-semibold focus:outline-none focus:border-[#dcb13c] disabled:opacity-50 ${
+                        isLight ? "text-[#1a1a2e]" : "text-white"
+                      }`}
+                    />
+                    <button
+                      onClick={() => setStake(stake + 1)}
+                      disabled={tradeActive || placing}
+                      className="absolute right-0 px-2 py-1 text-gray-400 hover:text-gray-900 dark:hover:text-white disabled:opacity-50"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <div className="mt-1 flex gap-1.5 flex-wrap justify-center">
+                    {[10, 50, 100, 500, 1000].map((v) => (
+                        <button
+                          key={v}
+                          onClick={() => setStake(v)}
+                          disabled={tradeActive || placing}
+                          className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors ${
+                            stake === v
+                              ? "bg-[#dcb13c] text-black"
+                              : "bg-gray-200 dark:bg-[#181d29] text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                          } disabled:opacity-50`}
+                        >
+                          {v}
+                        </button>
+                      ))}
+                  </div>
                 </div>
-              )}
-            </div>
 
-            {/* Payout Display */}
-            <div className="mb-3 p-2 rounded bg-[#181d29] flex justify-between items-center">
-              <span className="text-[10px] text-gray-500">Potential Return</span>
-              <span className="font-mono font-semibold text-emerald-400">
-                {formatKes(potentialWin)} KES
-              </span>
-            </div>
+                {/* ─── TP / SL ─── */}
+                <div className="mb-3 grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1 flex items-center gap-1">
+                      <Target size={10} className="text-emerald-500" />
+                      TP
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      step={Math.pow(10, -pairObj.digits)}
+                      value={tpPrice}
+                      onChange={(e) => setTpPrice(e.target.value === "" ? "" : Number(e.target.value))}
+                      disabled={tradeActive || placing}
+                      placeholder={price?.toFixed(pairObj.digits)}
+                      className={`w-full bg-gray-100 dark:bg-[#181d29] border border-gray-300 dark:border-[#2b313f] rounded px-2 py-1 text-sm font-mono font-semibold focus:outline-none focus:border-emerald-500 disabled:opacity-50 ${
+                        isLight ? "text-[#1a1a2e]" : "text-white"
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1 flex items-center gap-1">
+                      <StopCircle size={10} className="text-red-500" />
+                      SL
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      step={Math.pow(10, -pairObj.digits)}
+                      value={slPrice}
+                      onChange={(e) => setSlPrice(e.target.value === "" ? "" : Number(e.target.value))}
+                      disabled={tradeActive || placing}
+                      placeholder={price?.toFixed(pairObj.digits)}
+                      className={`w-full bg-gray-100 dark:bg-[#181d29] border border-gray-300 dark:border-[#2b313f] rounded px-2 py-1 text-sm font-mono font-semibold focus:outline-none focus:border-red-500 disabled:opacity-50 ${
+                        isLight ? "text-[#1a1a2e]" : "text-white"
+                      }`}
+                    />
+                  </div>
+                </div>
 
-            {/* Buy / Sell Buttons */}
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => placeTrade("up")}
-                disabled={placing || !price || !config || tradeActive}
-                className={`py-3 rounded-lg font-bold text-sm transition-all active:scale-95 disabled:opacity-50 ${
-                  tradeActive
-                    ? "bg-[#236e40] text-white cursor-not-allowed"
-                    : "bg-[#2ecc71] hover:bg-[#27ae60] text-white shadow-lg shadow-[#2ecc71]/20"
-                }`}
-              >
-                <div className="flex items-center justify-center gap-1">
-                  <TrendingUp size={14} />
-                  <span>UP</span>
+                {/* ─── Expiry Selector ─── */}
+                <div className="mb-3">
+                  <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+                    Expiry
+                  </label>
+                  {config?.expiries && (
+                    <div className="grid grid-cols-5 gap-1">
+                      {config.expiries.map((d) => (
+                        <button
+                          key={d.label}
+                          onClick={() => setSelectedExpiry(d)}
+                          disabled={tradeActive || placing}
+                          className={`py-1.5 rounded text-xs font-semibold transition-all ${
+                            selectedExpiry?.label === d.label
+                              ? "bg-[#dcb13c] text-black"
+                              : "bg-gray-200 dark:bg-[#181d29] text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                          } disabled:opacity-50`}
+                        >
+                          {d.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className="text-[10px] mt-0.5 opacity-80">
-                  {price?.toFixed(decimals)}
-                </div>
-              </button>
-              <button
-                onClick={() => placeTrade("down")}
-                disabled={placing || !price || !config || tradeActive}
-                className={`py-3 rounded-lg font-bold text-sm transition-all active:scale-95 disabled:opacity-50 ${
-                  tradeActive
-                    ? "bg-[#6e2525] text-white cursor-not-allowed"
-                    : "bg-[#e74c3c] hover:bg-[#c0392b] text-white shadow-lg shadow-[#e74c3c]/20"
-                }`}
-              >
-                <div className="flex items-center justify-center gap-1">
-                  <TrendingDown size={14} />
-                  <span>DOWN</span>
-                </div>
-                <div className="text-[10px] mt-0.5 opacity-80">
-                  {price?.toFixed(decimals)}
-                </div>
-              </button>
-            </div>
 
-            {tradeError && (
-              <div className="text-center text-red-500 text-sm font-medium mt-2">{tradeError}</div>
+                {/* ─── Potential Return ─── */}
+                <div className="mb-3 p-2 rounded bg-gray-200 dark:bg-[#181d29] flex justify-between items-center">
+                  <span className="text-[10px] text-gray-500 dark:text-gray-400">Potential Return</span>
+                  <span className="font-mono font-semibold text-emerald-500">
+                    {formatKes(potentialWin)} KES
+                  </span>
+                </div>
+
+                {/* ─── Buy / Sell Buttons (small, at bottom corners) ─── */}
+                <div className="relative mt-2">
+                  <div className="flex justify-between">
+                    <button
+                      onClick={() => placeTrade("up")}
+                      disabled={placing || !price || !config || tradeActive}
+                      className={`flex-1 py-2 px-3 rounded-l-lg font-bold text-sm transition-all active:scale-95 disabled:opacity-50 ${
+                        placing || tradeActive
+                          ? "bg-[#236e40] text-white cursor-not-allowed"
+                          : "bg-[#2ecc71] hover:bg-[#27ae60] text-white shadow-lg shadow-[#2ecc71]/20"
+                      }`}
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        <TrendingUp size={14} />
+                        <span>UP</span>
+                      </div>
+                      <div className="text-[9px] mt-0.5 opacity-80">
+                        {price?.toFixed(pairObj.digits)}
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => placeTrade("down")}
+                      disabled={placing || !price || !config || tradeActive}
+                      className={`flex-1 py-2 px-3 rounded-r-lg font-bold text-sm transition-all active:scale-95 disabled:opacity-50 ${
+                        placing || tradeActive
+                          ? "bg-[#6e2525] text-white cursor-not-allowed"
+                          : "bg-[#e74c3c] hover:bg-[#c0392b] text-white shadow-lg shadow-[#e74c3c]/20"
+                      }`}
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        <TrendingDown size={14} />
+                        <span>DOWN</span>
+                      </div>
+                      <div className="text-[9px] mt-0.5 opacity-80">
+                        {price?.toFixed(pairObj.digits)}
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {tradeError && (
+                  <div className="text-center text-red-500 text-sm font-medium mt-2">{tradeError}</div>
+                )}
+                {placing && <div className="text-center text-gray-500 text-xs mt-2">Placing trade…</div>}
+              </div>
             )}
-
-            {placing && <div className="text-center text-gray-500 text-xs mt-2">Placing trade…</div>}
           </div>
         </div>
       </div>
 
       {/* ─── Trade Tabs (Open / History) ─── */}
-      <div className="mx-2 mb-4 rounded-lg border border-[#2b313f] bg-[#0b0e14] overflow-hidden">
-        <div className="flex border-b border-[#1e2330]">
+      <div className={`mx-2 mb-4 rounded-lg border overflow-hidden ${panelBg}`}>
+        <div className="flex border-b">
           <button
             onClick={() => setActiveView("positions")}
             className={`px-3 py-1.5 text-xs font-semibold ${
               activeView === "positions"
                 ? "border-b-2 border-[#dcb13c] text-[#dcb13c]"
-                : "text-gray-400 hover:text-white"
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
             }`}
           >
             Open Trades ({openTrades.length})
@@ -915,7 +1115,7 @@ function TradingPage() {
             className={`px-3 py-1.5 text-xs font-semibold ${
               activeView === "history"
                 ? "border-b-2 border-[#dcb13c] text-[#dcb13c]"
-                : "text-gray-400 hover:text-white"
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
             }`}
           >
             Trade History ({settledTrades.length})
@@ -930,7 +1130,7 @@ function TradingPage() {
                 <div>No open trades. Select a pair and place your first trade.</div>
               </div>
             ) : (
-              <div className="divide-y divide-[#1e2330]">
+              <div className="divide-y divide-gray-200 dark:divide-[#1e2330]">
                 {openTrades.map((t) => {
                   const expiresAt = new Date(t.expires_at).getTime();
                   const remaining = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
@@ -955,17 +1155,19 @@ function TradingPage() {
                           {isBuy ? "UP" : "DOWN"}
                         </span>
                         <div>
-                          <div className="font-semibold text-sm text-white">{t.asset}</div>
-                          <div className="text-[9px] text-gray-500 font-mono">
-                            Entry: {t.entry_price.toFixed(priceDecimals(t.asset))}
+                          <div className="font-semibold text-sm">{t.asset}</div>
+                          <div className="text-[9px] text-gray-500 dark:text-gray-400 font-mono">
+                            Entry: {t.entry_price.toFixed(pairObj.digits)}
                           </div>
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className={`font-bold text-sm ${isWinning ? "text-emerald-400" : "text-red-400"}`}>
+                        <div
+                          className={`font-bold text-sm ${isWinning ? "text-emerald-500" : "text-red-500"}`}
+                        >
                           {mins}:{String(secs).padStart(2, "0")}
                         </div>
-                        <div className="text-[9px] text-gray-500 font-mono">
+                        <div className="text-[9px] text-gray-500 dark:text-gray-400 font-mono">
                           KSh {formatKes(t.stake)} → KSh {formatKes(t.stake * (1 + (config?.payout ?? 0.5)))}
                         </div>
                       </div>
@@ -975,42 +1177,44 @@ function TradingPage() {
               </div>
             )
           ) : settledTrades.length === 0 ? (
-            <div className="p-4 text-center text-gray-500 text-sm">
-              No settled trades yet.
-            </div>
+            <div className="p-4 text-center text-gray-500 text-sm">No settled trades yet.</div>
           ) : (
-            <div className="divide-y divide-[#1e2330]">
+            <div className="divide-y divide-gray-200 dark:divide-[#1e2330]">
               {settledTrades.map((t) => {
                 const isWin = t.status === "win";
                 const timeStr = new Date(t.opened_at).toLocaleTimeString([], {
                   hour: "2-digit",
                   minute: "2-digit",
                 });
-                const exitStr = (t.expiry_price ?? 0).toFixed(priceDecimals(t.asset));
+                const p = PAIRS.find((pp) => pp.label === t.asset) || PAIRS[0];
+                const exitStr = (t.expiry_price ?? 0).toFixed(p.digits);
                 return (
                   <div key={t.id} className="flex items-center justify-between p-2">
                     <div className="flex items-center gap-2">
                       <span
                         className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
                           isWin
-                            ? "bg-emerald-500/20 text-emerald-400"
-                            : "bg-red-500/20 text-red-400"
+                            ? "bg-emerald-500/20 text-emerald-500"
+                            : "bg-red-500/20 text-red-500"
                         }`}
                       >
                         {isWin ? "WIN" : "LOSS"}
                       </span>
                       <div>
-                        <div className="font-semibold text-sm text-white">{t.asset}</div>
-                        <div className="text-[8px] text-gray-500 font-mono">
-                          Entry: {t.entry_price.toFixed(priceDecimals(t.asset))} → Exit: {exitStr} · {t.direction.toUpperCase()} • {timeStr}
+                        <div className="font-semibold text-sm">{t.asset}</div>
+                        <div className="text-[8px] text-gray-500 dark:text-gray-400 font-mono">
+                          Entry: {t.entry_price.toFixed(p.digits)} → Exit: {exitStr} ·{" "}
+                          {t.direction.toUpperCase()} • {timeStr}
                         </div>
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className={`font-bold text-sm ${isWin ? "text-emerald-400" : "text-red-400"}`}>
+                      <div
+                        className={`font-bold text-sm ${isWin ? "text-emerald-500" : "text-red-500"}`}
+                      >
                         {t.profit > 0 ? `+KSh ${formatKes(t.profit)}` : "-KSh " + formatKes(t.stake)}
                       </div>
-                      <div className="text-[9px] text-gray-500">
+                      <div className="text-[9px] text-gray-500 dark:text-gray-400">
                         Stake: KSh {formatKes(t.stake)}
                       </div>
                     </div>
@@ -1023,7 +1227,7 @@ function TradingPage() {
       </div>
 
       {/* Deposit Sheet */}
-      {showDeposit && user && (
+      {showDeposit && (
         <DepositSheet
           user={user}
           onClose={() => setShowDeposit(false)}

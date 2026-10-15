@@ -1,23 +1,19 @@
 import { useState } from "react";
-import { LEVERAGE, MAX_AMOUNT, MIN_AMOUNT, quoteAt, type Pair, type Side } from "@/lib/fx/market";
+import { MAX_AMOUNT, MIN_AMOUNT, quoteAt, type Pair, type Side } from "@/lib/fx/market";
 import { ksh } from "@/lib/fx/format";
 
 const CHIPS = [100, 500, 1000, 5000, 10000];
 
 export function amountError(amount: number, balance: number, mode: string) {
-  const margin = Math.round((amount / LEVERAGE) * 100) / 100;
   return amount < MIN_AMOUNT ? `Minimum trade is ${ksh(MIN_AMOUNT)}`
     : amount > MAX_AMOUNT ? `Maximum trade is ${ksh(MAX_AMOUNT)}`
-    : margin > balance ? `Not enough money in your ${mode} wallet` : "";
+    : amount > balance ? `Not enough money in your ${mode} wallet` : "";
 }
 
-/** Amount entry + leverage explanation. */
 export function TradePanel({ pair, raw, setRaw, mode, balance }: {
   pair: Pair; raw: string; setRaw: (v: string) => void; mode: "demo" | "real"; balance: number;
 }) {
-  const [help, setHelp] = useState(false);
   const amount = Number(raw) || 0;
-  const margin = Math.round((amount / LEVERAGE) * 100) / 100;
   const err = amountError(amount, balance, mode);
 
   return (
@@ -39,25 +35,11 @@ export function TradePanel({ pair, raw, setRaw, mode, balance }: {
           </button>
         ))}
       </div>
-      <div className="rounded-md bg-muted p-2.5 text-sm">
-        <div className="flex items-center justify-between">
-          <span className="font-semibold">Leverage: {LEVERAGE}×</span>
-          <button onClick={() => setHelp((h) => !h)} className="text-xs font-semibold text-primary underline">{help ? "Hide" : "What is this?"}</button>
-        </div>
-        <p className="mt-1">You put down <b>{ksh(margin)}</b> to open a <b>{ksh(amount)}</b> trade.</p>
-        {help && (
-          <p className="mt-1.5 text-xs text-muted-foreground">
-            Profit and loss are counted on the full amount: if {pair.label} moves 1% your way you gain {ksh(amount * 0.01)},
-            1% against you loses {ksh(amount * 0.01)}. If losses use up your margin, the trade closes automatically — you can never lose more than {ksh(margin)}.
-          </p>
-        )}
-      </div>
       {err && <p className="text-sm font-semibold text-destructive">{err}</p>}
     </div>
   );
 }
 
-/** Permanent SELL / BUY bar using live bid/ask. */
 export function ExecBar({ pair, now, mode, amount, balance, busy, onTrade }: {
   pair: Pair; now: number; mode: "demo" | "real"; amount: number; balance: number; busy: boolean;
   onTrade: (side: Side, amount: number) => void;
@@ -93,7 +75,6 @@ export function ExecBar({ pair, now, mode, amount, balance, busy, onTrade }: {
             <dl className="mt-4 space-y-2">
               <div className="flex justify-between"><dt className="text-muted-foreground">Trade amount</dt><dd className="num font-bold">{ksh(amount)}</dd></div>
               <div className="flex justify-between"><dt className="text-muted-foreground">Price now</dt><dd className="num font-bold">{(confirm === "buy" ? q.ask : q.bid).toFixed(pair.digits)}</dd></div>
-              <div className="flex justify-between"><dt className="text-muted-foreground">Margin taken</dt><dd className="num font-bold">{ksh(amount / 10)}</dd></div>
             </dl>
             <p className="mt-3 text-xs text-muted-foreground">The final entry price is set the moment you confirm.</p>
             <div className="mt-5 grid grid-cols-2 gap-2">
