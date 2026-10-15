@@ -97,6 +97,14 @@ export const bfxRoutes = async (fastify: FastifyInstance) => {
         profit: result.profit,
         total_return: result.total_return,
         new_balance: result.new_balance,
+        entry_price: result.entry_price,
+        exit_price: result.exit_price,
+        entry_time: result.entry_time,
+        exit_time: result.exit_time,
+        direction: result.direction,
+        asset: result.asset,
+        stake: result.stake,
+        already_settled: result.already_settled,
       });
     } catch (err: any) {
       logger.error(err, 'BFX settle error');

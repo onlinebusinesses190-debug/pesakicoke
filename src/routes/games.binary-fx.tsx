@@ -163,7 +163,7 @@ function BinaryFxPage() {
     fetchSettledTrades();
   }, [fetchConfig, fetchBalance, fetchOpenTrades, fetchSettledTrades]);
 
-  const settleTrade = useCallback(
+   const settleTrade = useCallback(
     async (tradeId: string) => {
       try {
         const result = await apiRequest<{
@@ -172,6 +172,14 @@ function BinaryFxPage() {
           profit: number;
           total_return: number;
           new_balance: number;
+          entry_price?: number;
+          exit_price?: number;
+          entry_time?: string;
+          exit_time?: string;
+          direction?: "up" | "down";
+          asset?: string;
+          stake?: number;
+          already_settled?: boolean;
         }>(`${API_URL}/games/bfx/trade/${tradeId}/settle`, {
           method: "POST",
           body: JSON.stringify({}),
@@ -181,10 +189,30 @@ function BinaryFxPage() {
           const trade = openTrades.find((t) => t.id === tradeId);
           if (trade) {
             const profit = result.profit ?? trade.profit;
+            const dir = result.direction ?? trade.direction;
+            const asset = result.asset ?? trade.asset;
+            const stake = result.stake ?? trade.stake;
+            const entryPrice = result.entry_price ?? trade.entry_price;
+            const exitPrice = result.exit_price ?? trade.expiry_price;
+            const entryTime = result.entry_time ?? trade.opened_at;
+            const exitTime = result.exit_time ?? new Date().toISOString();
+
+            // Fairness receipt: show transparent entry/exit prices
+            const entryStr = entryPrice.toFixed(priceDecimals(asset));
+            const exitStr = (exitPrice ?? 0).toFixed(priceDecimals(asset));
+            const entryT = new Date(entryTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+            const exitT = new Date(exitTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
             if (result.status === "win") {
-              toast.success(`🎉 WON! +KSh ${formatKes(profit)}`, { duration: 3000 });
+              toast.success(
+                `🎉 WON! +KSh ${formatKes(profit)} · Entry: ${entryStr} @ ${entryT} → Exit: ${exitStr} @ ${exitT} · ${dir?.toUpperCase()}`,
+                { duration: 6000 },
+              );
             } else {
-              toast.error(`💀 LOST! -KSh ${formatKes(trade.stake)}`, { duration: 3000 });
+              toast.error(
+                `💀 LOST! -KSh ${formatKes(stake)} · Entry: ${entryStr} @ ${entryT} → Exit: ${exitStr} @ ${exitT} · ${dir?.toUpperCase()}`,
+                { duration: 6000 },
+              );
             }
             if (result.new_balance !== undefined) {
               setBalance(result.new_balance);
@@ -727,48 +755,51 @@ function BinaryFxPage() {
             </div>
           ) : (
             <div className="space-y-2">
-              {settledTrades.map((t) => {
-                const isWin = t.status === "win";
-                const isLoss = t.status === "loss" || t.status === "tie";
-                const timeStr = new Date(t.opened_at).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                });
-                return (
-                  <div
-                    key={t.id}
-                    className="flex items-center justify-between p-3 rounded-xl border bg-[#0b0e14] border-[#2b313f]"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-                          isWin
-                            ? "bg-emerald-500/20 text-emerald-400"
-                            : "bg-red-500/20 text-red-400"
-                        }`}
-                      >
-                        {t.status.toUpperCase()}
-                      </span>
-                      <div>
-                        <div className="font-semibold text-sm">{t.asset}</div>
-                        <div className="text-[10px] text-gray-500">{timeStr}</div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className={`font-bold ${isWin ? "text-emerald-400" : "text-red-400"}`}>
-                        {t.profit > 0
-                          ? `+KSh ${formatKes(t.profit)}`
-                          : t.profit < 0
-                            ? `-KSh ${formatKes(Math.abs(t.profit))}`
-                            : "—"}
-                      </div>
-                      <div className="text-[10px] text-gray-500">
-                        Stake: KSh {formatKes(t.stake)}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+                {settledTrades.map((t) => {
+                 const isWin = t.status === "win";
+                 const isLoss = t.status === "loss" || t.status === "tie";
+                 const timeStr = new Date(t.opened_at).toLocaleTimeString([], {
+                   hour: "2-digit",
+                   minute: "2-digit",
+                 });
+                 return (
+                   <div
+                     key={t.id}
+                     className="flex items-center justify-between p-3 rounded-xl border bg-[#0b0e14] border-[#2b313f]"
+                   >
+                     <div className="flex items-center gap-3">
+                       <span
+                         className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                           isWin
+                             ? "bg-emerald-500/20 text-emerald-400"
+                             : "bg-red-500/20 text-red-400"
+                         }`}
+                       >
+                         {t.status.toUpperCase()}
+                       </span>
+                       <div>
+                         <div className="font-semibold text-sm">{t.asset}</div>
+                         <div className="text-[10px] text-gray-500">{timeStr}</div>
+                       </div>
+                     </div>
+                     <div className="text-right">
+                       <div className={`font-bold ${isWin ? "text-emerald-400" : "text-red-400"}`}>
+                         {t.profit > 0
+                           ? `+KSh ${formatKes(t.profit)}`
+                           : t.profit < 0
+                             ? `-KSh ${formatKes(Math.abs(t.profit))}`
+                             : "—"}
+                       </div>
+                       <div className="text-[9px] text-gray-600 dark:text-gray-500 font-mono">
+                         Entry: {t.entry_price.toFixed(priceDecimals(t.asset))} → Exit: {(t.expiry_price ?? 0).toFixed(priceDecimals(t.asset))} • {t.direction.toUpperCase()}
+                       </div>
+                       <div className="text-[10px] text-gray-500">
+                         Stake: KSh {formatKes(t.stake)}
+                       </div>
+                     </div>
+                   </div>
+                 );
+               })}
             </div>
           )}
         </div>

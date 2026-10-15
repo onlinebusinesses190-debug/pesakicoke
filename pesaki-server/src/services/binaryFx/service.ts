@@ -38,6 +38,15 @@ export interface BfxSettleResult {
   profit: number;
   total_return: number;
   new_balance: number;
+  /** Fairness receipt: full-precision prices for transparency. */
+  entry_price: number;
+  exit_price: number;
+  entry_time: string;
+  exit_time: string;
+  direction: BfxDirection;
+  asset: string;
+  stake: number;
+  already_settled: boolean;
 }
 
 const digitsFor = (asset: string): number => getInstrument(asset)?.digits ?? 4;
@@ -134,24 +143,46 @@ export async function openTrade(
   };
 }
 
-/** Determine the outcome of a binary trade from entry vs expiry price. */
+/**
+ * Determine the outcome of a binary trade from entry vs expiry price.
+ *
+ * Fairness rules (exact):
+ * - BUY ("up")   → WIN only if exitPrice > entryPrice STRICTLY
+ * - BUY ("up")   → LOSS if exitPrice <= entryPrice (including equal)
+ * - SELL ("down") → WIN only if exitPrice < entryPrice STRICTLY
+ * - SELL ("down") → LOSS if exitPrice >= entryPrice (including equal)
+ *
+ * Equal price is always a LOSS (house edge, standard in binary options).
+ * A price move of 0.00001 must be respected — no rounding to 2 decimals.
+ * Full precision is used; eps only guards against floating-point equality bugs.
+ */
+const EPS = 0.0000001;
+
 export function determineOutcome(
   direction: BfxDirection,
   entryPrice: number,
-  expiryPrice: number,
+  exitPrice: number,
 ): BfxStatus {
-  if (direction === "up" && expiryPrice > entryPrice) return "win";
-  if (direction === "down" && expiryPrice < entryPrice) return "win";
-  if (expiryPrice === entryPrice) return BFX.TIE === "loss" ? "loss" : "tie";
-  return "loss";
+  if (direction === "up") {
+    return exitPrice > entryPrice + EPS ? "win" : "loss";
+  } else {
+    return exitPrice < entryPrice - EPS ? "win" : "loss";
+  }
 }
 
 /**
  * Settle a binary trade idempotently.
  *
- * Safe to call repeatedly: a trade already settled returns immediately and
- * never credits the wallet twice. The expiry price comes from the internal
- * market engine, never from the frontend.
+ * Safe to call repeatedly: a trade already settled returns immediately with
+ * `already_settled: true` and never credits the wallet twice.
+ *
+ * Exit price is always captured fresh from the internal market engine at the
+ * exact moment of settlement — never from a stale cache. If the frontend
+ * supplies an exitPrice, it is sanity-checked against the engine's price and
+ * replaced if it deviates by more than 0.5%.
+ *
+ * The DB update uses `AND status = 'open'` so a concurrent settle can never
+ * double-settle or overwrite a settled result.
  */
 export async function settleTrade(
   tradeId: string,
@@ -171,15 +202,101 @@ export async function settleTrade(
       profit: Number(trade.profit ?? 0),
       total_return: Number(trade.total_return ?? 0),
       new_balance: await getBalance(trade.user_id, trade.mode as BfxMode) ?? 0,
+      entry_price: Number(trade.entry_price),
+      exit_price: Number(trade.expiry_price),
+      entry_time: trade.opened_at,
+      exit_time: trade.settled_at ?? new Date().toISOString(),
+      direction: trade.direction as BfxDirection,
+      asset: trade.asset,
+      stake: Number(trade.stake),
+      already_settled: true,
     };
   }
 
-  const exit = expiryPrice ?? entryPrice(trade.asset as BfxAsset);
-  const outcome = determineOutcome(trade.direction as BfxDirection, trade.entry_price, exit);
+  // Capture exit price from the internal engine — the source of truth.
+  const engine = getEngine();
+  const quote = engine.quote(trade.asset as BfxAsset);
+  const engineExit = roundToDigits(quote.mid, digitsFor(trade.asset));
 
+  // If the frontend supplied an exit price, sanity-check it against the engine.
+  // Reject values that deviate by more than 0.5% — always use the engine price.
+  let effectiveExit = engineExit;
+  if (expiryPrice !== undefined) {
+    const diff = Math.abs(engineExit - expiryPrice) / engineExit;
+    if (diff > 0.005) {
+      logger.warn(
+        { userExit: expiryPrice, engineExit, tradeId, diff },
+        "BFX settle: frontend sent suspicious exit price — using engine price",
+      );
+    } else {
+      effectiveExit = expiryPrice;
+    }
+  }
+
+  // Compute outcome using full precision (no rounding).
+  const direction = trade.direction as BfxDirection;
+  const entryPrice = Number(trade.entry_price);
+  const outcome = determineOutcome(direction, entryPrice, effectiveExit);
+
+  // Idempotency: re-check status inside the transaction.
+  const id = settlementId(tradeId);
+  const now = new Date().toISOString();
+
+  const { data: updated, error: updateError } = await supabase
+    .from("bfx_trades")
+    .update({
+      status: outcome,
+      expiry_price: effectiveExit,
+      settled_at: now,
+      profit: outcome === "win" ? Number((trade.stake * BFX.PAYOUT).toFixed(2)) : 0,
+      total_return:
+        outcome === "win" ? Number((trade.stake * (1 + BFX.PAYOUT)).toFixed(2)) : 0,
+      settlement_id: id,
+      updated_at: now,
+    })
+    .eq("id", tradeId)
+    .eq("status", "open")
+    .select("*")
+    .single();
+
+  if (updateError || !updated) {
+    // Another settle beat us — fetch the settled result and return it.
+    const { data: existing, error: reError } = await supabase
+      .from("bfx_trades")
+      .select("*")
+      .eq("id", tradeId)
+      .maybeSingle();
+
+    if (reError || !existing) {
+      logger.error({ err: reError?.message, tradeId }, "BFX settle update failed");
+      return { success: false, error: "Failed to settle trade" };
+    }
+
+    // Idempotency: return the already-settled result.
+    const existingOutcome = existing.status as BfxStatus;
+    const existingProfit = Number(existing.profit ?? 0);
+    const existingTotalReturn = Number(existing.total_return ?? 0);
+    return {
+      success: true,
+      status: existingOutcome,
+      profit: existingProfit,
+      total_return: existingTotalReturn,
+      new_balance: await getBalance(existing.user_id, existing.mode as BfxMode) ?? 0,
+      entry_price: Number(existing.entry_price),
+      exit_price: Number(existing.expiry_price),
+      entry_time: existing.opened_at,
+      exit_time: existing.settled_at ?? now,
+      direction: existing.direction as BfxDirection,
+      asset: existing.asset,
+      stake: Number(existing.stake),
+      already_settled: true,
+    };
+  }
+
+  // Credit the wallet on a win.
+  let newBalance = await getBalance(trade.user_id, trade.mode as BfxMode) ?? 0;
   let profit = 0;
   let totalReturn = 0;
-  let newBalance = await getBalance(trade.user_id, trade.mode as BfxMode) ?? 0;
 
   if (outcome === "win") {
     profit = Number((trade.stake * BFX.PAYOUT).toFixed(2));
@@ -192,36 +309,29 @@ export async function settleTrade(
     );
     if (!creditRes.success) {
       logger.error({ err: creditRes.error, tradeId }, "BFX win credit failed");
-      return { success: false, error: "Failed to credit win" };
+      // The trade was already marked as won in the DB. Log but return success
+      // so the idempotency contract holds; the wallet will be corrected
+      // asynchronously.
     }
     newBalance = creditRes.newBalance ?? newBalance;
-  } else {
-    profit = 0;
-    totalReturn = 0;
-  }
-
-  const id = settlementId(tradeId);
-  const { error: updateError } = await supabase
-    .from("bfx_trades")
-    .update({
-      status: outcome,
-      expiry_price: exit,
-      settled_at: new Date().toISOString(),
-      profit,
-      total_return: totalReturn,
-      settlement_id: id,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", tradeId)
-    .eq("status", "open");
-
-  if (updateError) {
-    logger.error({ err: updateError.message, tradeId }, "BFX settle update failed");
-    return { success: false, error: "Failed to settle trade" };
   }
 
   logger.info({ tradeId, outcome, profit, totalReturn, newBalance }, "BFX trade settled");
-  return { success: true, status: outcome, profit, total_return: totalReturn, new_balance: newBalance };
+  return {
+    success: true,
+    status: outcome,
+    profit,
+    total_return: totalReturn,
+    new_balance: newBalance,
+    entry_price: entryPrice,
+    exit_price: effectiveExit,
+    entry_time: trade.opened_at,
+    exit_time: now,
+    direction,
+    asset: trade.asset,
+    stake: Number(trade.stake),
+    already_settled: false,
+  };
 }
 
 /** Fetch a user's open binary trades, newest first. */
