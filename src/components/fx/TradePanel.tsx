@@ -53,11 +53,11 @@ export function ExecBar({ pair, now, mode, amount, balance, busy, onTrade }: {
 
   return (
     <>
-      <div className="grid grid-cols-[1fr_auto_1fr] items-stretch gap-2">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-stretch gap-1">
         <button disabled={!!err || busy} onClick={() => go("sell")}
-          className="rounded-lg bg-sell px-2 py-2.5 text-trade-foreground hover:opacity-90 disabled:opacity-40">
-          <span className="block text-sm font-extrabold">SELL</span>
-          <span className="num block text-lg font-bold">{q.bid.toFixed(pair.digits)}</span>
+          className="rounded-lg bg-sell px-1 py-1.5 text-trade-foreground hover:opacity-90 disabled:opacity-40">
+          <span className="block text-xs font-extrabold">SELL</span>
+          <span className="num block text-sm font-bold">{q.bid.toFixed(pair.digits)}</span>
         </button>
         <div className="flex flex-col items-center justify-center text-xs text-muted-foreground">
           <span>Spread</span><span className="num font-bold text-foreground">{spread}</span>
@@ -65,9 +65,9 @@ export function ExecBar({ pair, now, mode, amount, balance, busy, onTrade }: {
           <span className="text-[7px] uppercase">Lev</span>
         </div>
         <button disabled={!!err || busy} onClick={() => go("buy")}
-          className="rounded-lg bg-buy px-2 py-2.5 text-trade-foreground hover:opacity-90 disabled:opacity-40">
-          <span className="block text-sm font-extrabold">BUY</span>
-          <span className="num block text-lg font-bold">{q.ask.toFixed(pair.digits)}</span>
+          className="rounded-lg bg-buy px-1 py-1.5 text-trade-foreground hover:opacity-90 disabled:opacity-40">
+          <span className="block text-xs font-extrabold">BUY</span>
+          <span className="num block text-sm font-bold">{q.ask.toFixed(pair.digits)}</span>
         </button>
       </div>
       {confirm && (
