@@ -6,7 +6,7 @@ import { MarketWatch } from "./MarketWatch";
 import { PriceChart } from "./PriceChart";
 import { Toolbox } from "./Toolbox";
 import { OrderDialog, type DialogState } from "./OrderDialog";
-import { Settings, TrendingDown, TrendingUp, Wallet, Menu } from "lucide-react";
+import { Wallet, Menu } from "lucide-react";
 
 export function Terminal() {
   const e = useEngine();
@@ -27,14 +27,17 @@ export function Terminal() {
   
   const [realBalance, setRealBalance] = useState<number | null>(null);
 
+  // Get live specs and quotes for the top bar
+  const s = e.spec(symbol);
+  const q = e.quotes[symbol];
+
   const open = (d: DialogState) => {
     setDlgKey((k) => k + 1);
     setDialog(d);
   };
 
   const handleTrade = (direction: "buy" | "sell") => {
-    open({ mode: "new", symbol, type: direction, lots } as any); 
-    // Note: You may need to adjust the "type" and "lots" props depending on how OrderDialog is built.
+    open({ mode: "new", symbol, type: direction, lots }); 
   };
 
   const deposit = () => {
@@ -70,12 +73,12 @@ export function Terminal() {
       {/* ─── MT5 Top Header (Account Info) ─── */}
       <div className="flex items-center justify-between px-3 py-2 bg-white border-b border-gray-300 shadow-sm z-20">
         <div className="flex items-center gap-3">
-          <Menu size={20} className="text-gray-600" />
+          <Menu size={20} className="text-gray-600 cursor-pointer" onClick={() => setMobileTab(mobileTab === "market" ? "chart" : "market")} />
           <div>
             <div className="text-sm font-bold text-gray-900 flex items-center gap-2">
-              EURUSD <span className="text-xs font-normal text-gray-500">Euro vs US Dollar</span>
+              {symbol} <span className="text-xs font-normal text-gray-500">{s?.desc}</span>
             </div>
-            <div className="text-[10px] text-gray-500">Forex Major</div>
+            <div className="text-[10px] text-gray-500">Forex</div>
           </div>
         </div>
         
@@ -106,8 +109,7 @@ export function Terminal() {
         >
           <span className="text-[10px] font-bold tracking-wider opacity-90">SELL</span>
           <span className="text-sm font-mono font-bold leading-tight">
-            {/* Replace with real bid from your engine if available */}
-            1.13418
+            {q?.bid.toFixed(s?.digits ?? 5) ?? "—"}
           </span>
         </button>
 
@@ -135,8 +137,7 @@ export function Terminal() {
         >
           <span className="text-[10px] font-bold tracking-wider opacity-90">BUY</span>
           <span className="text-sm font-mono font-bold leading-tight">
-             {/* Replace with real ask from your engine if available */}
-            1.13430
+             {q?.ask.toFixed(s?.digits ?? 5) ?? "—"}
           </span>
         </button>
       </div>
@@ -169,7 +170,8 @@ export function Terminal() {
         </aside>
 
         {/* Main Chart Area */}
-        <main className={`order-1 md:order-2 flex-1 flex flex-col min-w-0 ${mobileTab === "chart" ? "flex" : "hidden md:flex"}`}>
+        {/* FIX: Added h-[55vh] for mobile so the canvas doesn't collapse to 0 height */}
+        <main className={`order-1 md:order-2 flex-1 flex flex-col min-w-0 h-[55vh] md:h-auto ${mobileTab === "chart" ? "flex" : "hidden md:flex"}`}>
           
           {/* Chart Toolbar */}
           <div className="flex items-center justify-between px-2 py-1 bg-white border-b border-gray-200">
@@ -196,11 +198,9 @@ export function Terminal() {
           </div>
 
           {/* The Chart Component */}
-          <div className="flex-1 relative bg-white">
-             {/* IMPORTANT: See instructions below to fix candle sizes in PriceChart.tsx */}
+          <div className="flex-1 relative bg-white w-full h-full">
             <PriceChart symbol={symbol} tf={tf} zoom={zoom} />
             
-            {/* Pending Orders Overlay (Optional - can add later) */}
             <div className="absolute top-2 left-2 pointer-events-none">
               <span className="bg-white/80 border border-gray-300 text-[10px] px-1.5 py-0.5 rounded font-mono font-bold text-gray-700">
                 {symbol} • {tf}
@@ -230,10 +230,79 @@ export function Terminal() {
       {/* Modals */}
       {dialog && <OrderDialog key={dlgKey} state={dialog} onClose={() => setDialog(null)} />}
 
-      {/* Deposit Modal remains the same... */}
+      {/* Deposit Modal (Restored) */}
       {depositOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-           {/* ... your existing deposit code ... */}
+          <div className="w-full max-w-sm border border-gray-300 bg-white shadow-2xl rounded-sm overflow-hidden flex flex-col">
+            <div className="mb-0 flex items-center justify-between bg-[#1565c0] px-3 py-2 text-white">
+              <span className="text-sm font-bold">
+                {e.mode === "live" ? "Deposit Real Funds" : "Deposit Demo Funds"}
+              </span>
+              <button onClick={() => setDepositOpen(false)} aria-label="Close" className="px-2 text-lg leading-none hover:opacity-80 font-bold">
+                ✕
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <p className="text-xs text-gray-600">
+                {e.mode === "live"
+                  ? "Add real money to your trading wallet. Minimum KSh 1, maximum KSh 10,000."
+                  : "Add virtual money to your demo account. Minimum KSh 1, maximum KSh 10,000."}
+              </p>
+              <input
+                className="w-full border border-gray-300 rounded-sm px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#1565c0]"
+                type="number"
+                min={1}
+                max={10000}
+                step={0.1}
+                inputMode="numeric"
+                placeholder="Amount in KSh"
+                value={depositAmount}
+                onChange={(v) => setDepositAmount(v.target.value)}
+              />
+              {depositErr && <p className="text-xs text-[#c62828] font-bold">{depositErr}</p>}
+              <div className="flex gap-2 pt-2">
+                <button className="flex-1 bg-gray-200 text-gray-700 font-bold py-2 rounded-sm hover:bg-gray-300 transition-colors" onClick={() => setDepositOpen(false)}>
+                  Cancel
+                </button>
+                <button
+                  className="flex-1 bg-[#1565c0] hover:bg-[#0d47a1] text-white font-bold py-2 rounded-sm transition-colors disabled:opacity-50"
+                  disabled={depositLoading}
+                  onClick={async () => {
+                    const n = Number(depositAmount);
+                    if (!Number.isFinite(n)) return setDepositErr("Enter an amount");
+                    if (n < 1) return setDepositErr("Minimum deposit is KSh 1");
+                    if (n > 10000) return setDepositErr("Maximum deposit is KSh 10,000");
+                    setDepositErr("");
+                    setDepositLoading(true);
+                    try {
+                      if (e.mode === "live") {
+                        const res = await apiRequest<{
+                          success: boolean;
+                          balance: number;
+                          error?: string;
+                        }>("/forex/deposit", {
+                          method: "POST",
+                          body: JSON.stringify({ amount: n, account_type: "live" }),
+                        });
+                        if (!res.success) return setDepositErr(res.error ?? "Deposit failed");
+                        setRealBalance(res.balance);
+                      } else {
+                        e.deposit(n);
+                      }
+                      setDepositAmount("");
+                      setDepositOpen(false);
+                    } catch (err) {
+                      setDepositErr(err instanceof Error ? err.message : "Deposit failed");
+                    } finally {
+                      setDepositLoading(false);
+                    }
+                  }}
+                >
+                  {depositLoading ? "Depositing…" : "Deposit"}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
