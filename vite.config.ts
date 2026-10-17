@@ -27,6 +27,20 @@ export default defineConfig({
         devOptions: {
           enabled: true,
         },
+        injectRegister: "auto",
+        workbox: {
+          globPatterns: ["**/*.{js,css,html,ico,png,svg,json}"],
+          runtimeCaching: [
+            {
+              urlPattern: ({ url }) => url.pathname === "/",
+              handler: "CacheFirst",
+              options: {
+                cacheName: "root-redirect",
+                expiration: { maxEntries: 1, maxAgeSeconds: 60 },
+              },
+            },
+          ],
+        },
         includeAssets: [
           "favicon.ico",
           "icons/icon-192.png",
