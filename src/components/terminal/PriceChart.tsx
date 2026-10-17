@@ -8,53 +8,86 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
-  const view = useRef({ spacing: 8, offset: 0 });
+  
+  const view = useRef({ spacing: 5, offset: 0 });
   const mouse = useRef<{ x: number; y: number } | null>(null);
   const drag = useRef<{ x: number; off: number } | null>(null);
+  const pinch = useRef<{ dist: number; spacing: number } | null>(null);
   const [, setRedraw] = useState(0);
-  const [lots, setLots] = useState("0.10");
+  
   const s = e.spec(symbol);
   const q = e.quotes[symbol];
 
   useEffect(() => {
-    view.current.spacing = Math.min(30, Math.max(2, 8 * zoom));
+    view.current.spacing = Math.min(30, Math.max(2, 5 * zoom));
     setRedraw((x) => x + 1);
   }, [zoom]);
+
   useEffect(() => {
     view.current.offset = 0;
   }, [symbol, tf]);
 
+  // ─── BULLETPROOF MOBILE RESIZE LOGIC ───
   useEffect(() => {
-    const el = wrapRef.current!;
-    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }));
+    const el = wrapRef.current;
+    if (!el) return;
+
+    const measure = () => {
+      const rect = el.getBoundingClientRect();
+      // Fallback to window height if the container measures 0
+      const w = rect.width || el.clientWidth || window.innerWidth;
+      const h = rect.height || el.clientHeight || (window.innerHeight * 0.5);
+      setSize({ w, h });
+    };
+
+    const ro = new ResizeObserver(measure);
     ro.observe(el);
-    return () => ro.disconnect();
+    
+    // Trigger measurement immediately and after a slight delay
+    measure();
+    const timer = setTimeout(measure, 150);
+
+    return () => {
+      ro.disconnect();
+      clearTimeout(timer);
+    };
   }, []);
 
   useEffect(() => {
     const cv = canvasRef.current;
-    if (!cv || !size.w || !size.h) return;
+    if (!cv || size.w === 0 || size.h === 0) return;
+    
+    // Safety check: Don't draw if data is missing
+    if (!e.candles || !e.candles[symbol] || !e.candles[symbol][tf]) return;
+    if (!q) return;
+
     const dpr = window.devicePixelRatio || 1;
     cv.width = size.w * dpr;
     cv.height = size.h * dpr;
-    const ctx = cv.getContext("2d")!;
+    const ctx = cv.getContext("2d");
+    if (!ctx) return;
+    
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const css = getComputedStyle(wrapRef.current!);
-    const col = (n: string) => css.getPropertyValue(n).trim();
-    const W = size.w,
-      H = size.h,
-      axisW = 64,
-      axisH = 18;
-    const plotW = W - axisW,
-      plotH = H - axisH;
+    
+    const cBg = "#ffffff";
+    const cGrid = "#f0f3fa";
+    const cText = "#333333";
+    const cBull = "#089981"; 
+    const cBear = "#F23645"; 
+    const cAxisBg = "#f8f9fa";
+    const cCross = "#999999";
+
+    const W = size.w, H = size.h, axisW = 64, axisH = 20;
+    const plotW = W - axisW, plotH = H - axisH;
     const all = e.candles[symbol][tf];
     const sp = view.current.spacing;
     const count = Math.max(5, Math.floor((plotW - 12) / sp));
     const end = all.length - view.current.offset;
     const bars = all.slice(Math.max(0, end - count), end);
 
-    let lo = Infinity,
-      hi = -Infinity;
+    if (bars.length === 0) return;
+
+    let lo = Infinity, hi = -Infinity;
     for (const b of bars) {
       lo = Math.min(lo, b.l);
       hi = Math.max(hi, b.h);
@@ -69,15 +102,18 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
     const y = (p: number) => plotH - ((p - lo) / (hi - lo)) * plotH;
     const xOf = (i: number) => plotW - 12 - (bars.length - i - 0.5) * sp;
 
-    ctx.fillStyle = col("--chart-bg");
+    ctx.fillStyle = cBg;
     ctx.fillRect(0, 0, W, H);
-    ctx.font = "11px Tahoma, sans-serif";
+    ctx.fillStyle = cAxisBg;
+    ctx.fillRect(plotW, 0, axisW, H);
+    
+    ctx.font = "11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
     ctx.textBaseline = "middle";
 
     const steps = Math.max(3, Math.floor(plotH / 50));
-    ctx.strokeStyle = col("--chart-grid");
+    ctx.strokeStyle = cGrid;
     ctx.lineWidth = 1;
-    ctx.setLineDash([2, 3]);
+    ctx.setLineDash([]);
     for (let i = 0; i <= steps; i++) {
       const p = lo + ((hi - lo) * i) / steps;
       const yy = Math.round(y(p)) + 0.5;
@@ -85,9 +121,10 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
       ctx.moveTo(0, yy);
       ctx.lineTo(plotW, yy);
       ctx.stroke();
-      ctx.fillStyle = col("--chart-text");
+      ctx.fillStyle = cText;
       ctx.fillText(p.toFixed(s.digits), plotW + 4, yy);
     }
+
     const every = Math.max(1, Math.round(90 / sp));
     for (let i = bars.length - 1; i >= 0; i -= every) {
       const xx = Math.round(xOf(i)) + 0.5;
@@ -101,38 +138,26 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
         TIMEFRAMES[tf] >= 3600
           ? `${d.getDate()} ${d.toLocaleString("en", { month: "short" })} ${p2(d.getHours())}:00`
           : `${p2(d.getHours())}:${p2(d.getMinutes())}`;
-      ctx.fillStyle = col("--chart-text");
-      ctx.fillText(lbl, xx - 18, plotH + 9);
+      ctx.fillStyle = cText;
+      ctx.fillText(lbl, xx - 18, plotH + 10);
     }
-    ctx.setLineDash([]);
 
-    const bw = Math.max(1, Math.floor(sp * 0.5));
+    const bw = Math.max(1, Math.floor(sp * 0.6));
     bars.forEach((b, i) => {
       const x = Math.round(xOf(i));
       const bull = b.c >= b.o;
-      ctx.strokeStyle = ctx.fillStyle = col(bull ? "--chart-bull" : "--chart-bear");
+      ctx.strokeStyle = ctx.fillStyle = bull ? cBull : cBear;
       ctx.beginPath();
       ctx.moveTo(x + 0.5, y(b.h));
       ctx.lineTo(x + 0.5, y(b.l));
       ctx.stroke();
-      const top = y(Math.max(b.o, b.c)),
-        bh = Math.max(1, Math.abs(y(b.o) - y(b.c)));
+      const top = y(Math.max(b.o, b.c));
+      const bh = Math.max(1, Math.abs(y(b.o) - y(b.c)));
       if (bw <= 2) return;
-      if (bull) ctx.strokeRect(x - bw / 2 + 0.5, top + 0.5, bw - 1, bh);
-      else ctx.fillRect(x - bw / 2, top, bw, bh);
-      if (bull) {
-        ctx.fillStyle = col("--chart-bg");
-        ctx.fillRect(x - bw / 2 + 1, top + 1, bw - 2, Math.max(0, bh - 1));
-      }
+      ctx.fillRect(x - bw / 2, top, bw, bh);
     });
 
-    const hLine = (
-      p: number,
-      color: string,
-      label: string,
-      dash: number[] = [],
-      filled = false,
-    ) => {
+    const hLine = (p: number, color: string, label: string, dash: number[] = [], filled = false) => {
       if (p < lo || p > hi) return;
       const yy = Math.round(y(p)) + 0.5;
       ctx.strokeStyle = color;
@@ -144,8 +169,8 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
       ctx.setLineDash([]);
       if (filled) {
         ctx.fillStyle = color;
-        ctx.fillRect(plotW, yy - 7, axisW, 14);
-        ctx.fillStyle = col("--chart-bg");
+        ctx.fillRect(plotW, yy - 8, axisW, 16);
+        ctx.fillStyle = "#ffffff";
         ctx.fillText(p.toFixed(s.digits), plotW + 4, yy);
       }
       if (label) {
@@ -157,27 +182,23 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
     for (const p of e.positions.filter((x) => x.symbol === symbol)) {
       hLine(
         p.openPrice,
-        col(p.side === "buy" ? "--chart-entry-buy" : "--chart-entry-sell"),
+        p.side === "buy" ? cBull : cBear,
         `#${p.ticket} ${p.side} ${p.lots.toFixed(2)}  ${e.profitOf(p).toFixed(2)}`,
-        [6, 3],
+        [6, 3]
       );
-      if (p.sl) hLine(p.sl, col("--chart-sl"), `#${p.ticket} sl`, [3, 3]);
-      if (p.tp) hLine(p.tp, col("--chart-tp"), `#${p.ticket} tp`, [3, 3]);
+      if (p.sl) hLine(p.sl, "#F23645", `#${p.ticket} sl`, [3, 3]);
+      if (p.tp) hLine(p.tp, "#089981", `#${p.ticket} tp`, [3, 3]);
     }
     for (const o of e.orders.filter((x) => x.symbol === symbol)) {
-      hLine(
-        o.price,
-        col("--chart-text"),
-        `#${o.ticket} ${o.type.replace("_", " ")} ${o.lots.toFixed(2)}`,
-        [8, 4],
-      );
+      hLine(o.price, cText, `#${o.ticket} ${o.type.replace("_", " ")} ${o.lots.toFixed(2)}`, [8, 4]);
     }
-    hLine(q.ask, col("--chart-ask"), "", [], true);
-    hLine(q.bid, col("--chart-bid"), "", [], true);
+    
+    hLine(q.ask, "#F23645", "", [], true);
+    hLine(q.bid, "#089981", "", [], true);
 
     const m = mouse.current;
     if (m && m.x < plotW && m.y < plotH && !drag.current) {
-      ctx.strokeStyle = col("--chart-cross");
+      ctx.strokeStyle = cCross;
       ctx.setLineDash([3, 3]);
       ctx.beginPath();
       ctx.moveTo(m.x + 0.5, 0);
@@ -187,28 +208,37 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
       ctx.stroke();
       ctx.setLineDash([]);
       const price = lo + ((plotH - m.y) / plotH) * (hi - lo);
-      ctx.fillStyle = col("--chart-text");
-      ctx.fillRect(plotW, m.y - 7, axisW, 14);
-      ctx.fillStyle = col("--chart-bg");
+      ctx.fillStyle = "#555555";
+      ctx.fillRect(plotW, m.y - 8, axisW, 16);
+      ctx.fillStyle = "#ffffff";
       ctx.fillText(price.toFixed(s.digits), plotW + 4, m.y);
-      const idx = Math.round((m.x - xOf(0)) / sp);
-      const b = bars[idx];
-      if (b) {
-        ctx.fillStyle = col("--chart-text");
-        ctx.fillText(
-          `O ${b.o.toFixed(s.digits)}  H ${b.h.toFixed(s.digits)}  L ${b.l.toFixed(s.digits)}  C ${b.c.toFixed(s.digits)}`,
-          6,
-          plotH - 10,
-        );
-      }
     }
-    ctx.strokeStyle = col("--chart-grid");
+
+    ctx.strokeStyle = cGrid;
     ctx.strokeRect(0.5, 0.5, plotW, plotH);
   });
 
-  const total = e.candles[symbol][tf].length;
-  const trade = (side: "buy" | "sell") =>
-    e.placeOrder({ symbol, type: side, lots: parseFloat(lots) || 0 });
+  const total = e.candles?.[symbol]?.[tf]?.length || 0;
+
+  const handleTouchStart = (ev: React.TouchEvent) => {
+    if (ev.touches.length === 2) {
+      const dx = ev.touches[0].clientX - ev.touches[1].clientX;
+      const dy = ev.touches[0].clientY - ev.touches[1].clientY;
+      pinch.current = { dist: Math.sqrt(dx * dx + dy * dy), spacing: view.current.spacing };
+    }
+  };
+
+  const handleTouchMove = (ev: React.TouchEvent) => {
+    if (ev.touches.length === 2 && pinch.current) {
+      ev.preventDefault();
+      const dx = ev.touches[0].clientX - ev.touches[1].clientX;
+      const dy = ev.touches[0].clientY - ev.touches[1].clientY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const scale = dist / pinch.current.dist;
+      view.current.spacing = Math.min(30, Math.max(2, pinch.current.spacing * scale));
+      setRedraw((x) => x + 1);
+    }
+  };
 
   return (
     <div
@@ -217,17 +247,20 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
       onWheel={(ev) => {
         view.current.spacing = Math.min(
           30,
-          Math.max(2, view.current.spacing * (ev.deltaY < 0 ? 1.15 : 0.87)),
+          Math.max(2, view.current.spacing * (ev.deltaY < 0 ? 1.15 : 0.87))
         );
         setRedraw((x) => x + 1);
       }}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={() => { pinch.current = null; }}
       onPointerDown={(ev) => {
-        drag.current = { x: ev.clientX, off: view.current.offset };
-        (ev.target as HTMLElement).setPointerCapture?.(ev.pointerId);
+        if (ev.pointerType === "mouse" || ev.pointerType === "pen") {
+          drag.current = { x: ev.clientX, off: view.current.offset };
+          (ev.target as HTMLElement).setPointerCapture?.(ev.pointerId);
+        }
       }}
-      onPointerUp={() => {
-        drag.current = null;
-      }}
+      onPointerUp={() => { drag.current = null; }}
       onPointerLeave={() => {
         mouse.current = null;
         setRedraw((x) => x + 1);
@@ -244,40 +277,14 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
     >
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 h-full w-full"
+        className="absolute inset-0 h-full w-full block"
         style={{ width: size.w, height: size.h }}
       />
       <div
-        className="pointer-events-none absolute left-2 top-1 text-[11px]"
-        style={{ color: "var(--chart-text)" }}
+        className="pointer-events-none absolute left-2 top-1 text-[11px] font-bold"
+        style={{ color: "#333333" }}
       >
-        {symbol}, {tf}: {s.desc}
-      </div>
-      <div
-        className="absolute left-1 top-3 flex items-stretch shadow"
-        onPointerDown={(ev) => ev.stopPropagation()}
-      >
-        <button
-          onClick={() => trade("sell")}
-          className="flex w-10 flex-col items-center bg-sell px-0.5 py-0.25 text-trade-foreground hover:opacity-90 text-[9px] font-semibold"
-        >
-          <span>SELL</span>
-          <span className="font-mono text-xs font-bold">{q.bid.toFixed(s.digits)}</span>
-        </button>
-        <input
-          value={lots}
-          onChange={(ev) => setLots(ev.target.value)}
-          inputMode="decimal"
-          aria-label="Volume"
-          className="mt-input w-8 text-center text-[9px]"
-        />
-        <button
-          onClick={() => trade("buy")}
-          className="flex w-10 flex-col items-center bg-buy px-0.5 py-0.25 text-trade-foreground hover:opacity-90 text-[9px] font-semibold"
-        >
-          <span>BUY</span>
-          <span className="font-mono text-xs font-bold">{q.ask.toFixed(s.digits)}</span>
-        </button>
+        {symbol}, {tf}: {s?.desc}
       </div>
     </div>
   );
