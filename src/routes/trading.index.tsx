@@ -1,4 +1,4 @@
-﻿import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
@@ -99,13 +99,13 @@ function TradingPage() {
               </p>
               <div className="mt-3 flex gap-2">
                 <button
-                  onClick={() => openGame("/trade", "demo")}
+                  onClick={() => openGame("/trading/forex", "demo")}
                   className="inline-flex flex-1 items-center justify-center gap-1 rounded-full border border-border bg-background px-3 py-2 text-xs font-semibold"
                 >
                   <Play className="h-3 w-3" /> Demo
                 </button>
                 <button
-                  onClick={() => openGame("/trade", "real")}
+                  onClick={() => openGame("/trading/forex", "real")}
                   className="inline-flex flex-1 items-center justify-center gap-1 rounded-full gradient-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
                 >
                   Real Mode
