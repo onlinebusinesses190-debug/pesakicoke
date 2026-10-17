@@ -72,7 +72,6 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
     let lo = Infinity, hi = -Infinity;
     for (const b of bars) { lo = Math.min(lo, b.l); hi = Math.max(hi, b.h); }
     
-    // Include SL/TP in scale so they don't get cut off
     const symbolPositions = e.positions.filter((x) => x.symbol === symbol);
     for (const p of symbolPositions) {
       if (p.sl) { lo = Math.min(lo, p.sl); hi = Math.max(hi, p.sl); }
@@ -87,14 +86,35 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
 
     ctx.font = "11px -apple-system, sans-serif"; ctx.textBaseline = "middle";
 
-    // Grid
-    const steps = Math.max(3, Math.floor(plotH / 50));
+    // ─── TIGHT Y-AXIS GRID (Like Image 2) ───
+    // Force a grid line every ~35 pixels to tighten the spacing
+    const targetPixels = 35;
+    const rawStep = (hi - lo) / (plotH / targetPixels);
+    // Round to a "nice" number
+    const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
+    const norm = rawStep / mag;
+    let niceNorm = 1;
+    if (norm > 5) niceNorm = 10; else if (norm > 2) niceNorm = 5; else if (norm > 1) niceNorm = 2;
+    const step = niceNorm * mag;
+
     ctx.strokeStyle = cGrid; ctx.lineWidth = 1; ctx.setLineDash([]);
-    for (let i = 0; i <= steps; i++) {
-      const p = lo + ((hi - lo) * i) / steps;
+    
+    const startLine = Math.ceil(lo / step) * step;
+    for (let p = startLine; p <= hi; p += step) {
       const yy = Math.round(y(p)) + 0.5;
       ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke();
       ctx.fillStyle = cText; ctx.fillText(p.toFixed(s.digits), plotW + 4, yy);
+    }
+
+    // ─── X-AXIS GRID ───
+    const every = Math.max(1, Math.round(80 / sp));
+    for (let i = bars.length - 1; i >= 0; i -= every) {
+      const xx = Math.round(xOf(i)) + 0.5;
+      ctx.beginPath(); ctx.moveTo(xx, 0); ctx.lineTo(xx, plotH); ctx.stroke();
+      const d = new Date(bars[i].t * 1000);
+      const p2 = (n: number) => String(n).padStart(2, "0");
+      const lbl = TIMEFRAMES[tf] >= 3600 ? `${d.getDate()} ${d.toLocaleString("en", { month: "short" })} ${p2(d.getHours())}:00` : `${p2(d.getHours())}:${p2(d.getMinutes())}`;
+      ctx.fillStyle = cText; ctx.fillText(lbl, xx - 18, plotH + 10);
     }
 
     // Candles
@@ -107,24 +127,36 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
       if (bw > 2) ctx.fillRect(x - bw / 2, top, bw, bh);
     });
 
-    // ─── MT5 OVERLAYS ───
-    const drawDashedLine = (p: number, color: string, labelLeft: string, labelRight: string) => {
+    // Overlays
+    const drawSolidLine = (p: number, color: string, labelLeft: string) => {
       if (p < lo || p > hi) return;
       const yy = Math.round(y(p)) + 0.5;
-      ctx.strokeStyle = color; ctx.setLineDash([3, 3]);
+      ctx.strokeStyle = color; ctx.setLineDash([]); // Solid line for bid/ask
       ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke();
-      ctx.setLineDash([]);
       
-      // Right Axis Label
       ctx.fillStyle = color;
       ctx.fillRect(plotW, yy - 8, axisW, 16);
       ctx.fillStyle = "#ffffff";
       ctx.fillText(p.toFixed(s.digits), plotW + 4, yy);
       
-      // Left Chart Label
       if (labelLeft) {
-        ctx.fillStyle = color;
-        ctx.fillText(labelLeft, 6, yy - 10);
+        ctx.fillStyle = color; ctx.fillText(labelLeft, 6, yy - 10);
+      }
+    };
+
+    const drawDashedLine = (p: number, color: string, labelLeft: string) => {
+      if (p < lo || p > hi) return;
+      const yy = Math.round(y(p)) + 0.5;
+      ctx.strokeStyle = color; ctx.setLineDash([2, 3]); // Dashed for SL/TP
+      ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke();
+      ctx.setLineDash([]);
+      
+      ctx.strokeStyle = color; ctx.strokeRect(plotW, yy - 8, axisW, 16);
+      ctx.fillStyle = "#333";
+      ctx.fillText(p.toFixed(s.digits), plotW + 4, yy);
+
+      if (labelLeft) {
+        ctx.fillStyle = "#666"; ctx.fillText(labelLeft, 6, yy - 10);
       }
     };
 
@@ -132,10 +164,8 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
       const pnl = e.profitOf(p);
       const pnlText = `${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD`;
       
-      // Entry line (Dotted)
-      drawDashedLine(p.openPrice, p.side === "buy" ? cBull : cBear, `${p.side.toUpperCase()} ${p.lots.toFixed(2)}`, "");
+      drawDashedLine(p.openPrice, p.side === "buy" ? cBull : cBear, `${p.side.toUpperCase()} ${p.lots.toFixed(2)}`);
       
-      // Floating PNL Label (Image 2 & 3)
       if (p.openPrice > lo && p.openPrice < hi) {
         const yy = y(p.openPrice);
         ctx.fillStyle = pnl >= 0 ? "#1565c0" : "#c62828";
@@ -144,14 +174,13 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
         ctx.font = "11px -apple-system, sans-serif";
       }
 
-      // SL / TP
-      if (p.sl) drawDashedLine(p.sl, cBear, "SL", p.sl.toFixed(s.digits));
-      if (p.tp) drawDashedLine(p.tp, cBull, "TP", p.tp.toFixed(s.digits));
+      if (p.sl) drawDashedLine(p.sl, cBear, "SL");
+      if (p.tp) drawDashedLine(p.tp, cBull, "TP");
     }
 
-    // Bid / Ask Last Price Lines
-    drawDashedLine(q.ask, cBear, "", q.ask.toFixed(s.digits));
-    drawDashedLine(q.bid, cBull, "", q.bid.toFixed(s.digits));
+    // Bid / Ask Last Price Lines (SOLID)
+    drawSolidLine(q.ask, cBear, "");
+    drawSolidLine(q.bid, cBull, "");
 
     ctx.strokeStyle = cGrid; ctx.strokeRect(0.5, 0.5, plotW, plotH);
   });
