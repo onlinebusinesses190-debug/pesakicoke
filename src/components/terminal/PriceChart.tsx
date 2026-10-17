@@ -9,7 +9,6 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   
-  // Reduced default spacing from 8 to 5 to make candles skinnier like MT5
   const view = useRef({ spacing: 5, offset: 0 });
   const mouse = useRef<{ x: number; y: number } | null>(null);
   const drag = useRef<{ x: number; off: number } | null>(null);
@@ -28,18 +27,25 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
     view.current.offset = 0;
   }, [symbol, tf]);
 
-  // ─── RESIZE FIX FOR MOBILE BLANK CHART ───
+  // ─── BULLETPROOF MOBILE RESIZE LOGIC ───
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
-    
-    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }));
+
+    const measure = () => {
+      const rect = el.getBoundingClientRect();
+      // Fallback to window height if the container measures 0
+      const w = rect.width || el.clientWidth || window.innerWidth;
+      const h = rect.height || el.clientHeight || (window.innerHeight * 0.5);
+      setSize({ w, h });
+    };
+
+    const ro = new ResizeObserver(measure);
     ro.observe(el);
     
-    // Forces a redraw after 100ms in case mobile renders it at 0 height initially
-    const timer = setTimeout(() => {
-      if (el) setSize({ w: el.clientWidth, h: el.clientHeight });
-    }, 100);
+    // Trigger measurement immediately and after a slight delay
+    measure();
+    const timer = setTimeout(measure, 150);
 
     return () => {
       ro.disconnect();
@@ -49,36 +55,39 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
 
   useEffect(() => {
     const cv = canvasRef.current;
-    if (!cv || !size.w || !size.h) return;
+    if (!cv || size.w === 0 || size.h === 0) return;
+    
+    // Safety check: Don't draw if data is missing
+    if (!e.candles || !e.candles[symbol] || !e.candles[symbol][tf]) return;
+    if (!q) return;
+
     const dpr = window.devicePixelRatio || 1;
     cv.width = size.w * dpr;
     cv.height = size.h * dpr;
-    const ctx = cv.getContext("2d")!;
+    const ctx = cv.getContext("2d");
+    if (!ctx) return;
+    
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     
-    // MT5 Light Theme Hardcoded Fallbacks
     const cBg = "#ffffff";
     const cGrid = "#f0f3fa";
     const cText = "#333333";
-    const cBull = "#089981"; // MT5 Green
-    const cBear = "#F23645"; // MT5 Red
+    const cBull = "#089981"; 
+    const cBear = "#F23645"; 
     const cAxisBg = "#f8f9fa";
     const cCross = "#999999";
 
-    const W = size.w,
-      H = size.h,
-      axisW = 64,
-      axisH = 20;
-    const plotW = W - axisW,
-      plotH = H - axisH;
+    const W = size.w, H = size.h, axisW = 64, axisH = 20;
+    const plotW = W - axisW, plotH = H - axisH;
     const all = e.candles[symbol][tf];
     const sp = view.current.spacing;
     const count = Math.max(5, Math.floor((plotW - 12) / sp));
     const end = all.length - view.current.offset;
     const bars = all.slice(Math.max(0, end - count), end);
 
-    let lo = Infinity,
-      hi = -Infinity;
+    if (bars.length === 0) return;
+
+    let lo = Infinity, hi = -Infinity;
     for (const b of bars) {
       lo = Math.min(lo, b.l);
       hi = Math.max(hi, b.h);
@@ -93,16 +102,14 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
     const y = (p: number) => plotH - ((p - lo) / (hi - lo)) * plotH;
     const xOf = (i: number) => plotW - 12 - (bars.length - i - 0.5) * sp;
 
-    // Backgrounds
     ctx.fillStyle = cBg;
     ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = cAxisBg;
-    ctx.fillRect(plotW, 0, axisW, H); // Price Axis Background
+    ctx.fillRect(plotW, 0, axisW, H);
     
     ctx.font = "11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
     ctx.textBaseline = "middle";
 
-    // Grid & Price Axis
     const steps = Math.max(3, Math.floor(plotH / 50));
     ctx.strokeStyle = cGrid;
     ctx.lineWidth = 1;
@@ -118,7 +125,6 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
       ctx.fillText(p.toFixed(s.digits), plotW + 4, yy);
     }
 
-    // Time Axis
     const every = Math.max(1, Math.round(90 / sp));
     for (let i = bars.length - 1; i >= 0; i -= every) {
       const xx = Math.round(xOf(i)) + 0.5;
@@ -136,18 +142,15 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
       ctx.fillText(lbl, xx - 18, plotH + 10);
     }
 
-    // Candlesticks
-    const bw = Math.max(1, Math.floor(sp * 0.6)); // Slightly wider body relative to spacing
+    const bw = Math.max(1, Math.floor(sp * 0.6));
     bars.forEach((b, i) => {
       const x = Math.round(xOf(i));
       const bull = b.c >= b.o;
       ctx.strokeStyle = ctx.fillStyle = bull ? cBull : cBear;
-      // Wicks
       ctx.beginPath();
       ctx.moveTo(x + 0.5, y(b.h));
       ctx.lineTo(x + 0.5, y(b.l));
       ctx.stroke();
-      // Bodies
       const top = y(Math.max(b.o, b.c));
       const bh = Math.max(1, Math.abs(y(b.o) - y(b.c)));
       if (bw <= 2) return;
@@ -176,7 +179,6 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
       }
     };
 
-    // Orders & Positions Overlay
     for (const p of e.positions.filter((x) => x.symbol === symbol)) {
       hLine(
         p.openPrice,
@@ -191,11 +193,9 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
       hLine(o.price, cText, `#${o.ticket} ${o.type.replace("_", " ")} ${o.lots.toFixed(2)}`, [8, 4]);
     }
     
-    // Bid / Ask Lines
     hLine(q.ask, "#F23645", "", [], true);
     hLine(q.bid, "#089981", "", [], true);
 
-    // Crosshair
     const m = mouse.current;
     if (m && m.x < plotW && m.y < plotH && !drag.current) {
       ctx.strokeStyle = cCross;
@@ -218,9 +218,8 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
     ctx.strokeRect(0.5, 0.5, plotW, plotH);
   });
 
-  const total = e.candles[symbol][tf].length;
+  const total = e.candles?.[symbol]?.[tf]?.length || 0;
 
-  // ─── TOUCH & PINCH EVENTS ───
   const handleTouchStart = (ev: React.TouchEvent) => {
     if (ev.touches.length === 2) {
       const dx = ev.touches[0].clientX - ev.touches[1].clientX;
@@ -278,15 +277,14 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
     >
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 h-full w-full"
+        className="absolute inset-0 h-full w-full block"
         style={{ width: size.w, height: size.h }}
       />
-      {/* Top left chart label */}
       <div
         className="pointer-events-none absolute left-2 top-1 text-[11px] font-bold"
         style={{ color: "#333333" }}
       >
-        {symbol}, {tf}: {s.desc}
+        {symbol}, {tf}: {s?.desc}
       </div>
     </div>
   );
