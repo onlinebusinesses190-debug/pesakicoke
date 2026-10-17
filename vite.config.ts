@@ -30,13 +30,15 @@ export default defineConfig({
         injectRegister: "auto",
         workbox: {
           globPatterns: ["**/*.{js,css,html,ico,png,svg,json}"],
+          navigateFallback: null,
           runtimeCaching: [
             {
-              urlPattern: ({ url }) => url.pathname === "/",
-              handler: "CacheFirst",
+              urlPattern: ({ request }) => request.mode === "navigate",
+              handler: "NetworkFirst",
               options: {
-                cacheName: "root-redirect",
-                expiration: { maxEntries: 1, maxAgeSeconds: 60 },
+                cacheName: "pages",
+                expiration: { maxEntries: 50, maxAgeSeconds: 300 },
+                networkTimeoutSeconds: 10,
               },
             },
           ],
