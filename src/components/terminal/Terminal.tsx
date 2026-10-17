@@ -170,8 +170,8 @@ export function Terminal() {
         </aside>
 
         {/* Main Chart Area */}
-        {/* FIX: Added h-[55vh] for mobile so the canvas doesn't collapse to 0 height */}
-        <main className={`order-1 md:order-2 flex-1 flex flex-col min-w-0 h-[55vh] md:h-auto ${mobileTab === "chart" ? "flex" : "hidden md:flex"}`}>
+        {/* The h-[60vh] class is CRITICAL for mobile so the chart doesn't collapse to 0px height */}
+        <main className={`order-1 md:order-2 flex-1 flex flex-col min-w-0 h-[60vh] md:h-auto ${mobileTab === "chart" ? "flex" : "hidden md:flex"}`}>
           
           {/* Chart Toolbar */}
           <div className="flex items-center justify-between px-2 py-1 bg-white border-b border-gray-200">
@@ -198,7 +198,7 @@ export function Terminal() {
           </div>
 
           {/* The Chart Component */}
-          <div className="flex-1 relative bg-white w-full h-full">
+          <div className="flex-1 relative bg-white w-full h-full min-h-[300px]">
             <PriceChart symbol={symbol} tf={tf} zoom={zoom} />
             
             <div className="absolute top-2 left-2 pointer-events-none">
@@ -230,7 +230,7 @@ export function Terminal() {
       {/* Modals */}
       {dialog && <OrderDialog key={dlgKey} state={dialog} onClose={() => setDialog(null)} />}
 
-      {/* Deposit Modal (Restored) */}
+      {/* Deposit Modal */}
       {depositOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-sm border border-gray-300 bg-white shadow-2xl rounded-sm overflow-hidden flex flex-col">
