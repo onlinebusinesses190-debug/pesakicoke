@@ -6,7 +6,7 @@ import { MarketWatch } from "./MarketWatch";
 import { PriceChart } from "./PriceChart";
 import { Toolbox } from "./Toolbox";
 import { OrderDialog, type DialogState } from "./OrderDialog";
-import { Wallet, Menu, BarChart3, Clock, ArrowLeftRight, X } from "lucide-react";
+import { Wallet, Menu, ArrowLeftRight, BarChart3, Clock, MessageSquare, TrendingUp } from "lucide-react";
 
 export function Terminal() {
   const e = useEngine();
@@ -17,7 +17,7 @@ export function Terminal() {
   const [dlgKey, setDlgKey] = useState(0);
   
   const [lots, setLots] = useState(0.10); 
-  const [mobileTab, setMobileTab] = useState<"chart" | "market" | "positions" | "history">("chart");
+  const [mobileTab, setMobileTab] = useState<"chart" | "market" | "positions" | "history" | "messages">("chart");
   
   const [depositOpen, setDepositOpen] = useState(false);
   const [depositAmount, setDepositAmount] = useState("");
@@ -49,28 +49,12 @@ export function Terminal() {
     setDepositAmount("");
   };
 
-  const fetchRealBalance = async () => {
-    try {
-      const res = await apiRequest<{ success: boolean; balance: number }>(
-        "/forex/account?account_type=live",
-      );
-      setRealBalance(res.balance ?? 0);
-    } catch (err) {
-      setRealBalance(null);
-    }
-  };
-
-  const toggleMode = () => {
-    e.setMode(e.mode === "live" ? "demo" : "live");
-    if (e.mode !== "live") void fetchRealBalance();
-  };
-
   const marginLevel = e.margin > 0 ? (e.equity / e.margin) * 100 : 0;
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#f8f9fa] text-[#1e293b] font-sans">
+    <div className="flex min-h-screen flex-col bg-[#f8f9fa] text-[#1e293b] font-sans pb-14 md:pb-0">
       
-      {/* ─── MT5 Top Header ─── */}
+      {/* ─── Top Header ─── */}
       <div className="flex items-center justify-between px-3 py-2 bg-white border-b border-gray-300 shadow-sm z-20">
         <div className="flex items-center gap-3">
           <Menu size={20} className="text-gray-600 cursor-pointer" onClick={() => setMobileTab(mobileTab === "market" ? "chart" : "market")} />
@@ -90,7 +74,7 @@ export function Terminal() {
             </div>
           </div>
           <div className="flex gap-1">
-            <button className={`text-xs font-bold px-2 py-1 rounded ${e.mode === "live" ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`} onClick={toggleMode}>
+            <button className={`text-xs font-bold px-2 py-1 rounded ${e.mode === "live" ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`} onClick={() => e.setMode(e.mode === "live" ? "demo" : "live")}>
               {e.mode === "live" ? "LIVE" : "DEMO"}
             </button>
             <button className="text-xs px-2 py-1 bg-gray-100 rounded text-gray-700 font-bold" onClick={deposit}>
@@ -100,7 +84,7 @@ export function Terminal() {
         </div>
       </div>
 
-      {/* ─── MT5 Action Bar (SELL | Lot | BUY) ─── */}
+      {/* ─── Action Bar (SELL | Lot | BUY) ─── */}
       <div className="flex bg-white border-b border-gray-300 select-none z-10">
         <button
           onClick={() => handleTrade("sell")}
@@ -139,23 +123,8 @@ export function Terminal() {
         </button>
       </div>
 
-      {/* ─── Mobile Tabs ─── */}
-      <div className="flex border-b border-gray-300 bg-[#f1f3f4] md:hidden">
-        {(["chart", "market", "positions", "history"] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setMobileTab(tab)}
-            className={`flex-1 py-1.5 text-xs font-bold capitalize border-b-2 transition-colors ${
-              mobileTab === tab ? "border-[#1565c0] text-[#1565c0]" : "border-transparent text-gray-500"
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
-
       {/* ─── Main Layout ─── */}
-      <div className="flex flex-col md:flex-row flex-1 min-h-0">
+      <div className="flex flex-col md:flex-row flex-1 min-h-0 mb-12 md:mb-0">
         
         {/* Sidebar (Market Watch) */}
         <aside className={`order-2 md:order-1 md:w-64 border-r border-gray-300 bg-white ${mobileTab === "market" ? "block flex-1" : "hidden md:block"}`}>
@@ -194,11 +163,10 @@ export function Terminal() {
           </div>
         </main>
 
-        {/* ─── Positions / Trade View (Image 4) ─── */}
-        <div className={`order-3 md:w-80 md:h-auto border-t md:border-t-0 md:border-l border-gray-300 bg-white overflow-y-auto ${mobileTab === "positions" || mobileTab === "history" ? "block flex-1" : "hidden md:block"}`}>
+        {/* Positions / History View */}
+        <div className={`order-3 md:w-80 md:h-auto border-t md:border-t-0 md:border-l border-gray-300 bg-white overflow-y-auto ${["positions", "history", "messages"].includes(mobileTab) ? "block flex-1" : "hidden md:block"}`}>
           
-          {/* Account Summary Header (Only visible on mobile positions tab) */}
-          <div className="bg-[#f8f9fa] border-b border-gray-300 p-3 text-[11px] text-gray-700 space-y-1 md:block">
+          <div className="bg-[#f8f9fa] border-b border-gray-300 p-3 text-[11px] text-gray-700 space-y-1">
             <div className="flex justify-between"><span>Balance:</span> <span className="font-mono">{money(e.balance)}</span></div>
             <div className="flex justify-between"><span>Equity:</span> <span className="font-mono">{money(e.equity)}</span></div>
             <div className="flex justify-between"><span>Margin:</span> <span className="font-mono">{money(e.margin)}</span></div>
@@ -207,10 +175,9 @@ export function Terminal() {
           </div>
 
           <div className="p-2 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-            <h3 className="text-xs font-bold text-gray-700">{mobileTab === "history" ? "History" : "Positions"}</h3>
+            <h3 className="text-xs font-bold text-gray-700 capitalize">{mobileTab}</h3>
           </div>
 
-          {/* Positions List */}
           {mobileTab === "positions" && (
             <div className="divide-y divide-gray-100">
               {e.positions.length === 0 ? (
@@ -249,62 +216,46 @@ export function Terminal() {
             </div>
           )}
 
-          {/* History List */}
           {mobileTab === "history" && (
             <div className="divide-y divide-gray-100">
-              {e.history?.length === 0 ? (
-                 <div className="p-4 text-center text-xs text-gray-500">No history</div>
-              ) : (
-                e.history?.map((h: any) => (
-                  <div key={h.ticket} className="p-2 flex justify-between items-center">
-                    <div>
-                      <div className="text-xs font-bold">{h.symbol} <span className="text-gray-500 font-normal">{h.side} {h.lots.toFixed(2)}</span></div>
-                      <div className="text-[10px] text-gray-500 font-mono">{h.closeTime || "Closed"}</div>
-                    </div>
-                    <div className={`font-mono text-xs font-bold ${h.profit >= 0 ? "text-[#1565c0]" : "text-[#c62828]"}`}>
-                      {h.profit?.toFixed(2)}
-                    </div>
-                  </div>
-                ))
-              )}
+               <div className="p-4 text-center text-xs text-gray-500">History coming soon</div>
+            </div>
+          )}
+
+          {mobileTab === "messages" && (
+            <div className="divide-y divide-gray-100">
+               <div className="p-4 text-center text-xs text-gray-500">No new messages</div>
             </div>
           )}
         </div>
 
       </div>
 
-      {/* ─── Bottom Status Bar ─── */}
-      <div className="flex items-center justify-between px-2 py-1 border-t border-gray-300 bg-[#f1f3f4] text-[10px] text-gray-600 font-mono z-20">
-        <span className={e.notice?.error ? "text-red-600 font-bold" : ""}>
-          {e.notice?.msg ?? "Connected"}
-        </span>
-        <div className="flex gap-4">
-          <span>Margin: {money(e.margin)}</span>
-        </div>
+      {/* ─── Bottom Navigation (Exact MT5 Icons) ─── */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 flex justify-around py-1 md:hidden z-50">
+        <button onClick={() => setMobileTab("market")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "market" ? "text-[#1565c0]" : "text-gray-500"}`}>
+          <ArrowLeftRight size={18} />
+          <span className="text-[9px] font-semibold">Quotes</span>
+        </button>
+        <button onClick={() => setMobileTab("chart")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "chart" ? "text-[#1565c0]" : "text-gray-500"}`}>
+          <BarChart3 size={18} />
+          <span className="text-[9px] font-semibold">Charts</span>
+        </button>
+        <button onClick={() => setMobileTab("positions")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "positions" ? "text-[#1565c0]" : "text-gray-500"}`}>
+          <TrendingUp size={18} />
+          <span className="text-[9px] font-semibold">Trade</span>
+        </button>
+        <button onClick={() => setMobileTab("history")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "history" ? "text-[#1565c0]" : "text-gray-500"}`}>
+          <Clock size={18} />
+          <span className="text-[9px] font-semibold">History</span>
+        </button>
+        <button onClick={() => setMobileTab("messages")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "messages" ? "text-[#1565c0]" : "text-gray-500"}`}>
+          <MessageSquare size={18} />
+          <span className="text-[9px] font-semibold">Messages</span>
+        </button>
       </div>
 
       {dialog && <OrderDialog key={dlgKey} state={dialog} onClose={() => setDialog(null)} />}
-      
-      {/* Deposit Modal (Same as before) */}
-      {depositOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm border border-gray-300 bg-white shadow-2xl rounded-sm overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between bg-[#1565c0] px-3 py-2 text-white">
-              <span className="text-sm font-bold">{e.mode === "live" ? "Deposit Real Funds" : "Deposit Demo Funds"}</span>
-              <button onClick={() => setDepositOpen(false)} className="text-lg font-bold">✕</button>
-            </div>
-            <div className="p-4 space-y-4">
-              <input className="w-full border border-gray-300 px-3 py-2 text-sm" type="number" placeholder="Amount" value={depositAmount} onChange={(v) => setDepositAmount(v.target.value)} />
-              {depositErr && <p className="text-xs text-red-600">{depositErr}</p>}
-              <button className="w-full bg-[#1565c0] text-white py-2 font-bold" onClick={() => {
-                const n = Number(depositAmount);
-                if (e.mode === "live") { /* API CALL */ } else { e.deposit(n); }
-                setDepositOpen(false);
-              }}>Deposit</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
