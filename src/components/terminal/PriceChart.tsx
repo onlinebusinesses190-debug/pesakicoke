@@ -10,7 +10,6 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
   const [size, setSize] = useState({ w: 0, h: 0 });
   
   const view = useRef({ spacing: 5, offset: 0 });
-  const mouse = useRef<{ x: number; y: number } | null>(null);
   const pinch = useRef<{ dist: number; spacing: number } | null>(null);
   const [, setRedraw] = useState(0);
   
@@ -64,10 +63,7 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
     ctx.fillStyle = cBg; ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = cAxisBg; ctx.fillRect(plotW, 0, axisW, H);
 
-    if (bars.length === 0) {
-      ctx.fillStyle = "#666"; ctx.textAlign = "center"; ctx.fillText("Loading...", W / 2, H / 2);
-      return;
-    }
+    if (bars.length === 0) return;
 
     let lo = Infinity, hi = -Infinity;
     for (const b of bars) { lo = Math.min(lo, b.l); hi = Math.max(hi, b.h); }
@@ -86,11 +82,9 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
 
     ctx.font = "11px -apple-system, sans-serif"; ctx.textBaseline = "middle";
 
-    // ─── TIGHT Y-AXIS GRID (Like Image 2) ───
-    // Force a grid line every ~35 pixels to tighten the spacing
-    const targetPixels = 35;
+    // ─── TIGHT Y-AXIS GRID (Exactly 19 lines like Image 2) ───
+    const targetPixels = 18; // Very tight spacing
     const rawStep = (hi - lo) / (plotH / targetPixels);
-    // Round to a "nice" number
     const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
     const norm = rawStep / mag;
     let niceNorm = 1;
@@ -98,7 +92,6 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
     const step = niceNorm * mag;
 
     ctx.strokeStyle = cGrid; ctx.lineWidth = 1; ctx.setLineDash([]);
-    
     const startLine = Math.ceil(lo / step) * step;
     for (let p = startLine; p <= hi; p += step) {
       const yy = Math.round(y(p)) + 0.5;
@@ -106,7 +99,7 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
       ctx.fillStyle = cText; ctx.fillText(p.toFixed(s.digits), plotW + 4, yy);
     }
 
-    // ─── X-AXIS GRID ───
+    // X-Axis Grid
     const every = Math.max(1, Math.round(80 / sp));
     for (let i = bars.length - 1; i >= 0; i -= every) {
       const xx = Math.round(xOf(i)) + 0.5;
@@ -127,27 +120,31 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
       if (bw > 2) ctx.fillRect(x - bw / 2, top, bw, bh);
     });
 
+    // Labels top left (Image 2)
+    ctx.fillStyle = "#1565c0";
+    ctx.font = "bold 12px -apple-system, sans-serif";
+    ctx.fillText(`${symbol} ▼ ${tf}`, 8, 15);
+    ctx.fillStyle = "#666";
+    ctx.font = "10px -apple-system, sans-serif";
+    ctx.fillText(s.desc || "", 8, 28);
+
     // Overlays
-    const drawSolidLine = (p: number, color: string, labelLeft: string) => {
+    const drawSolidLine = (p: number, color: string) => {
       if (p < lo || p > hi) return;
       const yy = Math.round(y(p)) + 0.5;
-      ctx.strokeStyle = color; ctx.setLineDash([]); // Solid line for bid/ask
+      ctx.strokeStyle = color; ctx.setLineDash([]);
       ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke();
       
       ctx.fillStyle = color;
       ctx.fillRect(plotW, yy - 8, axisW, 16);
       ctx.fillStyle = "#ffffff";
       ctx.fillText(p.toFixed(s.digits), plotW + 4, yy);
-      
-      if (labelLeft) {
-        ctx.fillStyle = color; ctx.fillText(labelLeft, 6, yy - 10);
-      }
     };
 
     const drawDashedLine = (p: number, color: string, labelLeft: string) => {
       if (p < lo || p > hi) return;
       const yy = Math.round(y(p)) + 0.5;
-      ctx.strokeStyle = color; ctx.setLineDash([2, 3]); // Dashed for SL/TP
+      ctx.strokeStyle = color; ctx.setLineDash([2, 3]);
       ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke();
       ctx.setLineDash([]);
       
@@ -162,25 +159,15 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
 
     for (const p of symbolPositions) {
       const pnl = e.profitOf(p);
-      const pnlText = `${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD`;
+      const pnlText = `${p.side.toUpperCase()} ${p.lots.toFixed(2)}    ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD`;
       
-      drawDashedLine(p.openPrice, p.side === "buy" ? cBull : cBear, `${p.side.toUpperCase()} ${p.lots.toFixed(2)}`);
-      
-      if (p.openPrice > lo && p.openPrice < hi) {
-        const yy = y(p.openPrice);
-        ctx.fillStyle = pnl >= 0 ? "#1565c0" : "#c62828";
-        ctx.font = "bold 10px -apple-system, sans-serif";
-        ctx.fillText(pnlText, plotW - 80, yy - 12);
-        ctx.font = "11px -apple-system, sans-serif";
-      }
-
+      drawDashedLine(p.openPrice, p.side === "buy" ? cBull : cBear, pnlText);
       if (p.sl) drawDashedLine(p.sl, cBear, "SL");
       if (p.tp) drawDashedLine(p.tp, cBull, "TP");
     }
 
-    // Bid / Ask Last Price Lines (SOLID)
-    drawSolidLine(q.ask, cBear, "");
-    drawSolidLine(q.bid, cBull, "");
+    drawSolidLine(q.ask, cBear);
+    drawSolidLine(q.bid, cBull);
 
     ctx.strokeStyle = cGrid; ctx.strokeRect(0.5, 0.5, plotW, plotH);
   });
@@ -193,9 +180,6 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
       onTouchStart={(ev) => { if (ev.touches.length === 2) { const dx = ev.touches[0].clientX - ev.touches[1].clientX; const dy = ev.touches[0].clientY - ev.touches[1].clientY; pinch.current = { dist: Math.sqrt(dx * dx + dy * dy), spacing: view.current.spacing }; } }}
       onTouchMove={(ev) => { if (ev.touches.length === 2 && pinch.current) { ev.preventDefault(); const dx = ev.touches[0].clientX - ev.touches[1].clientX; const dy = ev.touches[0].clientY - ev.touches[1].clientY; const dist = Math.sqrt(dx * dx + dy * dy); view.current.spacing = Math.min(30, Math.max(2, pinch.current.spacing * (dist / pinch.current.dist))); setRedraw((x) => x + 1); } }}
       onTouchEnd={() => { pinch.current = null; }}
-      onPointerDown={(ev) => { if (ev.pointerType === "mouse") { mouse.current = null; } }}
-      onPointerMove={(ev) => { const r = wrapRef.current!.getBoundingClientRect(); mouse.current = { x: ev.clientX - r.left, y: ev.clientY - r.top }; setRedraw((x) => x + 1); }}
-      onPointerLeave={() => { mouse.current = null; setRedraw((x) => x + 1); }}
     >
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full block" style={{ width: size.w, height: size.h }} />
     </div>
