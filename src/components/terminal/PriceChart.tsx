@@ -9,7 +9,7 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   
-  // Reduced default spacing from 8 to 5 to make candles skinnier
+  // Reduced default spacing from 8 to 5 to make candles skinnier like MT5
   const view = useRef({ spacing: 5, offset: 0 });
   const mouse = useRef<{ x: number; y: number } | null>(null);
   const drag = useRef<{ x: number; off: number } | null>(null);
@@ -28,11 +28,23 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
     view.current.offset = 0;
   }, [symbol, tf]);
 
+  // ─── RESIZE FIX FOR MOBILE BLANK CHART ───
   useEffect(() => {
-    const el = wrapRef.current!;
+    const el = wrapRef.current;
+    if (!el) return;
+    
     const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }));
     ro.observe(el);
-    return () => ro.disconnect();
+    
+    // Forces a redraw after 100ms in case mobile renders it at 0 height initially
+    const timer = setTimeout(() => {
+      if (el) setSize({ w: el.clientWidth, h: el.clientHeight });
+    }, 100);
+
+    return () => {
+      ro.disconnect();
+      clearTimeout(timer);
+    };
   }, []);
 
   useEffect(() => {
@@ -44,19 +56,14 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
     const ctx = cv.getContext("2d")!;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     
-    // MT5 Light Theme Fallbacks
-    const col = (n: string, fallback: string) => {
-      const val = getComputedStyle(wrapRef.current!).getPropertyValue(n).trim();
-      return val || fallback;
-    };
-
-    const cBg = col("--chart-bg", "#ffffff");
-    const cGrid = col("--chart-grid", "#f0f3fa");
-    const cText = col("--chart-text", "#333333");
-    const cBull = col("--chart-bull", "#089981"); // MT5 Green
-    const cBear = col("--chart-bear", "#F23645"); // MT5 Red
-    const cAxisBg = col("--chart-axis-bg", "#f8f9fa");
-    const cCross = col("--chart-cross", "#999999");
+    // MT5 Light Theme Hardcoded Fallbacks
+    const cBg = "#ffffff";
+    const cGrid = "#f0f3fa";
+    const cText = "#333333";
+    const cBull = "#089981"; // MT5 Green
+    const cBear = "#F23645"; // MT5 Red
+    const cAxisBg = "#f8f9fa";
+    const cCross = "#999999";
 
     const W = size.w,
       H = size.h,
@@ -86,7 +93,7 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
     const y = (p: number) => plotH - ((p - lo) / (hi - lo)) * plotH;
     const xOf = (i: number) => plotW - 12 - (bars.length - i - 0.5) * sp;
 
-    // Background
+    // Backgrounds
     ctx.fillStyle = cBg;
     ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = cAxisBg;
@@ -95,7 +102,7 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
     ctx.font = "11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
     ctx.textBaseline = "middle";
 
-    // Grid Lines
+    // Grid & Price Axis
     const steps = Math.max(3, Math.floor(plotH / 50));
     ctx.strokeStyle = cGrid;
     ctx.lineWidth = 1;
@@ -111,6 +118,7 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
       ctx.fillText(p.toFixed(s.digits), plotW + 4, yy);
     }
 
+    // Time Axis
     const every = Math.max(1, Math.round(90 / sp));
     for (let i = bars.length - 1; i >= 0; i -= every) {
       const xx = Math.round(xOf(i)) + 0.5;
@@ -168,7 +176,7 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
       }
     };
 
-    // Orders & Positions
+    // Orders & Positions Overlay
     for (const p of e.positions.filter((x) => x.symbol === symbol)) {
       hLine(
         p.openPrice,
@@ -212,6 +220,7 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
 
   const total = e.candles[symbol][tf].length;
 
+  // ─── TOUCH & PINCH EVENTS ───
   const handleTouchStart = (ev: React.TouchEvent) => {
     if (ev.touches.length === 2) {
       const dx = ev.touches[0].clientX - ev.touches[1].clientX;
@@ -275,7 +284,7 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
       {/* Top left chart label */}
       <div
         className="pointer-events-none absolute left-2 top-1 text-[11px] font-bold"
-        style={{ color: "var(--chart-text, #333)" }}
+        style={{ color: "#333333" }}
       >
         {symbol}, {tf}: {s.desc}
       </div>
