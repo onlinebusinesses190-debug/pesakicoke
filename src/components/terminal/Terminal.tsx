@@ -53,6 +53,7 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
           );
           setRealBalance(res.balance ?? 0);
           setRealTradingUnavailable(false);
+          realTradingUnavailableRef.current = false;
         } catch (err) {
           if (isApiError(err) && err.statusCode === 403) {
             realTradingUnavailableRef.current = true;
@@ -74,8 +75,24 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
           setRatesLoading(false);
         }
       };
-      fetchBalance();
-      fetchRates();
+      const checkAndFetch = async () => {
+        try {
+          const health = await apiRequest<{ success: boolean; realTradingEnabled: boolean }>(
+            "/forex/health",
+          );
+          if (!health.realTradingEnabled) {
+            realTradingUnavailableRef.current = true;
+            setRealTradingUnavailable(true);
+            setRatesLoading(false);
+            return;
+          }
+          fetchBalance();
+        } catch {
+          fetchBalance();
+        }
+        fetchRates();
+      };
+      checkAndFetch();
       const interval = setInterval(() => {
         if (!realTradingUnavailableRef.current) fetchBalance();
       }, 30000);
