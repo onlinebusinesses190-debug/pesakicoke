@@ -4,6 +4,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { useEffect } from "react";
 
 export const Route = createFileRoute("/trading/forex")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    mode: (search.mode as string) === "real" ? "real" : "demo",
+  }),
   head: () => ({
     meta: [
       { title: "MetaTrader Web — Forex Trading Terminal" },
@@ -26,22 +29,22 @@ export const Route = createFileRoute("/trading/forex")({
 });
 
 function ForexPage() {
-  const { user, loading } = useAuth();
+  const { user, ready } = useAuth();
   const navigate = useNavigate();
 
   const search = Route.useSearch();
   const mode = (search?.mode as string) === "real" ? "real" : "demo";
 
   useEffect(() => {
-    if (mode === "real" && !loading && !user) {
+    if (mode === "real" && ready && !user) {
       navigate({
         to: "/auth",
         search: { mode: "signin", redirect: "/trading/forex?mode=real" } as never,
       });
     }
-  }, [mode, user, loading, navigate]);
+  }, [mode, user, ready, navigate]);
 
-  if (loading) {
+  if (!ready) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         Loading…

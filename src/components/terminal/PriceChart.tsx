@@ -181,13 +181,30 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
     ctx.strokeStyle = cGrid; ctx.strokeRect(0.5, 0.5, plotW, plotH);
   });
 
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+
+    const handler = (ev: TouchEvent) => {
+      if (ev.touches.length === 2 && pinch.current) {
+        ev.preventDefault();
+        const dx = ev.touches[0].clientX - ev.touches[1].clientX;
+        const dy = ev.touches[0].clientY - ev.touches[1].clientY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        view.current.spacing = Math.min(30, Math.max(2, pinch.current.spacing * (dist / pinch.current.dist)));
+        setRedraw((x) => x + 1);
+      }
+    };
+    el.addEventListener("touchmove", handler, { passive: false });
+    return () => el.removeEventListener("touchmove", handler);
+  }, []);
+
   return (
     <div
       ref={wrapRef}
       className="absolute inset-0 touch-none overflow-hidden bg-white"
       onWheel={(ev) => { view.current.spacing = Math.min(30, Math.max(2, view.current.spacing * (ev.deltaY < 0 ? 1.15 : 0.87))); setRedraw((x) => x + 1); }}
       onTouchStart={(ev) => { if (ev.touches.length === 2) { const dx = ev.touches[0].clientX - ev.touches[1].clientX; const dy = ev.touches[0].clientY - ev.touches[1].clientY; pinch.current = { dist: Math.sqrt(dx * dx + dy * dy), spacing: view.current.spacing }; } }}
-      onTouchMove={(ev) => { if (ev.touches.length === 2 && pinch.current) { ev.preventDefault(); const dx = ev.touches[0].clientX - ev.touches[1].clientX; const dy = ev.touches[0].clientY - ev.touches[1].clientY; const dist = Math.sqrt(dx * dx + dy * dy); view.current.spacing = Math.min(30, Math.max(2, pinch.current.spacing * (dist / pinch.current.dist))); setRedraw((x) => x + 1); } }}
       onTouchEnd={() => { pinch.current = null; }}
     >
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full block" style={{ width: size.w, height: size.h }} />

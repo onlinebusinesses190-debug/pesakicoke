@@ -86,7 +86,7 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
 
       <div className="flex items-center justify-between px-3 py-2 bg-white border-b border-gray-300 shadow-sm z-20">
         <div className="flex items-center gap-3">
-          <ArrowLeft size={20} className="text-gray-600 cursor-pointer" onClick={() => navigate({ to: "/trading/" })} />
+          <ArrowLeft size={20} className="text-gray-600 cursor-pointer" onClick={() => navigate({ to: "/trading" })} />
           <div>
             <div className="text-sm font-bold text-gray-900 flex items-center gap-2">
               {symbol} <span className="text-xs font-normal text-gray-500">{s?.desc}</span>
