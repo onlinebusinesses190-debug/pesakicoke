@@ -184,7 +184,7 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
           {/* CLOSE ALL BUTTON */}
           {mobileTab === "positions" && e.positions.length > 0 && (
             <div className="p-2 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-              <h3 className="text-xs font-bold text-gray-700">Open Positions</h3>
+              <h3 className="text-xs font-bold text-gray-700">Trade</h3>
               <button onClick={handleCloseAll} className="bg-red-50 text-red-600 px-2 py-1 rounded text-[10px] font-bold hover:bg-red-100">
                 Close All
               </button>
