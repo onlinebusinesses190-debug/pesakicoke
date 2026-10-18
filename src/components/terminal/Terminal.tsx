@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { TIMEFRAMES, type TF } from "@/lib/trading/engine";
 import { money, useEngine } from "@/lib/trading/use-engine";
@@ -29,6 +29,7 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
   const [usdKesRate, setUsdKesRate] = useState<number | null>(null);
   const [ratesLoading, setRatesLoading] = useState(true);
   const [realTradingUnavailable, setRealTradingUnavailable] = useState(false);
+  const realTradingUnavailableRef = useRef(false);
 
   const s = e.spec(symbol);
   const q = e.quotes[symbol];
@@ -52,8 +53,9 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
           );
           setRealBalance(res.balance ?? 0);
           setRealTradingUnavailable(false);
-        } catch (err) {
+          } catch (err) {
           if (isApiError(err) && err.statusCode === 403) {
+            realTradingUnavailableRef.current = true;
             setRealTradingUnavailable(true);
           } else {
             setRealBalance(null);
@@ -75,7 +77,7 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
       fetchBalance();
       fetchRates();
       const interval = setInterval(() => {
-        if (!realTradingUnavailable) fetchBalance();
+        if (!realTradingUnavailableRef.current) fetchBalance();
       }, 30000);
       return () => clearInterval(interval);
     } else {
