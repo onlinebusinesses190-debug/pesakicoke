@@ -53,7 +53,7 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
           );
           setRealBalance(res.balance ?? 0);
           setRealTradingUnavailable(false);
-          } catch (err) {
+        } catch (err) {
           if (isApiError(err) && err.statusCode === 403) {
             realTradingUnavailableRef.current = true;
             setRealTradingUnavailable(true);
