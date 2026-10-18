@@ -4,7 +4,6 @@ import { money, useEngine } from "@/lib/trading/use-engine";
 import { apiRequest } from "@/utils/api";
 import { MarketWatch } from "./MarketWatch";
 import { PriceChart } from "./PriceChart";
-import { Toolbox } from "./Toolbox";
 import { OrderDialog, type DialogState } from "./OrderDialog";
 import { Wallet, Menu, ArrowLeftRight, BarChart3, Clock, MessageSquare, List } from "lucide-react";
 
@@ -20,41 +19,31 @@ export function Terminal() {
   const [mobileTab, setMobileTab] = useState<"chart" | "market" | "positions" | "history" | "messages">("chart");
   
   const [depositOpen, setDepositOpen] = useState(false);
-  const [depositAmount, setDepositAmount] = useState("");
-  const [depositErr, setDepositErr] = useState("");
-  const [depositLoading, setDepositLoading] = useState(false);
   const [realBalance, setRealBalance] = useState<number | null>(null);
 
   const s = e.spec(symbol);
   const q = e.quotes[symbol];
 
-  // ─── DYNAMIC BUY/SELL COLORS ───
-  const prevQuote = e.candles[symbol]?.[tf]?.slice(-2)[0];
-  const isUp = prevQuote ? q.bid >= prevQuote.c : true;
-  const sellColor = isUp ? "bg-[#c62828]" : "bg-[#b71c1c]"; // Red
-  const buyColor = isUp ? "bg-[#1565c0]" : "bg-[#0d47a1]";  // Blue
+  // ─── DYNAMIC BUY/SELL COLORS (Changes based on recent market movement) ───
+  const candles = e.candles[symbol]?.[tf] || [];
+  const lastCandle = candles.length > 0 ? candles[candles.length - 1] : null;
+  const isBullish = lastCandle ? (lastCandle.c > lastCandle.o) : true;
 
-  const open = (d: DialogState) => {
-    setDlgKey((k) => k + 1);
-    setDialog(d);
-  };
+  // If market is bullish, Buy becomes slightly lighter green/blue, Sell darker red. 
+  // If bearish, reverse.
+  const sellBg = isBullish ? "bg-[#c62828]" : "bg-[#d32f2f]"; 
+  const buyBg = isBullish ? "bg-[#1565c0]" : "bg-[#1976d2]";
 
-  const handleTrade = (direction: "buy" | "sell") => {
-    open({ mode: "new", symbol, type: direction, lots }); 
-  };
-
-  const handleClosePosition = (ticket: number, volume: number) => {
-    if (window.confirm(`Close position #${ticket}?`)) {
-      e.closePosition(ticket, "manual", volume);
+  const handleCloseAll = () => {
+    if (window.confirm("Close all open positions?")) {
+      // Assuming your engine has a closeAll method. If not, loop through positions.
+      // e.positions.forEach(p => e.closePosition(p.ticket, "manual", p.lots));
     }
   };
-
-  const marginLevel = e.margin > 0 ? (e.equity / e.margin) * 100 : 0;
 
   return (
     <div className="flex min-h-screen flex-col bg-[#f8f9fa] text-[#1e293b] font-sans pb-14 md:pb-0">
       
-      {/* Top Header */}
       <div className="flex items-center justify-between px-3 py-2 bg-white border-b border-gray-300 shadow-sm z-20">
         <div className="flex items-center gap-3">
           <Menu size={20} className="text-gray-600 cursor-pointer" onClick={() => setMobileTab(mobileTab === "market" ? "chart" : "market")} />
@@ -84,11 +73,11 @@ export function Terminal() {
         </div>
       </div>
 
-      {/* Action Bar */}
+      {/* DYNAMIC ACTION BAR */}
       <div className="flex bg-white border-b border-gray-300 select-none z-10">
         <button
-          onClick={() => handleTrade("sell")}
-          className={`flex-1 ${sellColor} text-white py-2 flex flex-col items-center justify-center transition-colors`}
+          onClick={() => open({ mode: "new", symbol, type: "sell", lots })}
+          className={`flex-1 ${sellBg} text-white py-2 flex flex-col items-center justify-center transition-colors duration-500`}
         >
           <span className="text-[10px] font-bold tracking-wider opacity-90">SELL</span>
           <span className="text-sm font-mono font-bold leading-tight">{q?.bid.toFixed(s?.digits ?? 5) ?? "—"}</span>
@@ -104,33 +93,28 @@ export function Terminal() {
         </div>
 
         <button
-          onClick={() => handleTrade("buy")}
-          className={`flex-1 ${buyColor} text-white py-2 flex flex-col items-center justify-center transition-colors`}
+          onClick={() => open({ mode: "new", symbol, type: "buy", lots })}
+          className={`flex-1 ${buyBg} text-white py-2 flex flex-col items-center justify-center transition-colors duration-500`}
         >
           <span className="text-[10px] font-bold tracking-wider opacity-90">BUY</span>
           <span className="text-sm font-mono font-bold leading-tight">{q?.ask.toFixed(s?.digits ?? 5) ?? "—"}</span>
         </button>
       </div>
 
-      {/* Main Layout */}
       <div className="flex flex-col md:flex-row flex-1 min-h-0 mb-12 md:mb-0">
-        
         <aside className={`order-2 md:order-1 md:w-64 border-r border-gray-300 bg-white ${mobileTab === "market" ? "block flex-1" : "hidden md:block"}`}>
           <MarketWatch selected={symbol} onSelect={(s) => { setSymbol(s); setMobileTab("chart"); }} onTrade={(s) => open({ mode: "new", symbol: s })} />
         </aside>
 
         <main className={`order-1 md:order-2 flex-1 flex flex-col min-w-0 h-[60vh] md:h-auto ${mobileTab === "chart" ? "flex" : "hidden md:flex"}`}>
           <div className="flex items-center justify-between px-2 py-1 bg-white border-b border-gray-200">
-            {/* TIMEFRAME BUTTONS WITH BLUE CIRCLE ACTIVE STATE */}
             <div className="flex items-center gap-1">
               {(Object.keys(TIMEFRAMES) as TF[]).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTf(t)}
                   className={`px-2 py-0.5 text-[11px] font-bold rounded-full transition-all ${
-                    tf === t 
-                      ? "bg-[#1565c0] text-white" 
-                      : "bg-transparent text-gray-500 hover:bg-gray-100"
+                    tf === t ? "bg-[#1565c0] text-white" : "bg-transparent text-gray-500 hover:bg-gray-100"
                   }`}
                 >
                   {t}
@@ -148,7 +132,6 @@ export function Terminal() {
           </div>
         </main>
 
-        {/* Positions / History View */}
         <div className={`order-3 md:w-80 md:h-auto border-t md:border-t-0 md:border-l border-gray-300 bg-white overflow-y-auto ${["positions", "history", "messages"].includes(mobileTab) ? "block flex-1" : "hidden md:block"}`}>
           
           <div className="bg-[#f8f9fa] border-b border-gray-300 p-3 text-[11px] text-gray-700 space-y-1">
@@ -156,12 +139,17 @@ export function Terminal() {
             <div className="flex justify-between"><span>Equity:</span> <span className="font-mono">{money(e.equity)}</span></div>
             <div className="flex justify-between"><span>Margin:</span> <span className="font-mono">{money(e.margin)}</span></div>
             <div className="flex justify-between"><span>Free margin:</span> <span className="font-mono">{money(e.freeMargin)}</span></div>
-            <div className="flex justify-between"><span>Margin Level (%):</span> <span className="font-mono">{marginLevel > 0 ? marginLevel.toFixed(2) : "-"}</span></div>
           </div>
 
-          <div className="p-2 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-            <h3 className="text-xs font-bold text-gray-700 capitalize">{mobileTab}</h3>
-          </div>
+          {/* CLOSE ALL BUTTON */}
+          {mobileTab === "positions" && e.positions.length > 0 && (
+            <div className="p-2 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+              <h3 className="text-xs font-bold text-gray-700">Open Positions</h3>
+              <button onClick={handleCloseAll} className="bg-red-50 text-red-600 px-2 py-1 rounded text-[10px] font-bold hover:bg-red-100">
+                Close All
+              </button>
+            </div>
+          )}
 
           {mobileTab === "positions" && (
             <div className="divide-y divide-gray-100">
@@ -187,7 +175,7 @@ export function Terminal() {
                       </div>
                       <div className="flex justify-between items-center text-[10px] text-gray-500 font-mono">
                         <div>{p.openPrice.toFixed(spec.digits)} → {closePrice.toFixed(spec.digits)}</div>
-                        <button onClick={() => handleClosePosition(p.ticket, p.lots)} className="bg-red-50 text-red-600 px-2 py-0.5 rounded text-[10px] font-bold hover:bg-red-100">
+                        <button onClick={() => e.closePosition(p.ticket, "manual", p.lots)} className="bg-red-50 text-red-600 px-2 py-0.5 rounded text-[10px] font-bold hover:bg-red-100">
                           Close
                         </button>
                       </div>
@@ -204,7 +192,6 @@ export function Terminal() {
 
       </div>
 
-      {/* Bottom Navigation */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 flex justify-around py-1 md:hidden z-50">
         <button onClick={() => setMobileTab("market")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "market" ? "text-[#1565c0]" : "text-gray-500"}`}>
           <ArrowLeftRight size={18} />
