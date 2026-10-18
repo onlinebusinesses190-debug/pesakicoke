@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { TF } from "@/lib/trading/engine";
 import { TIMEFRAMES } from "@/lib/trading/engine";
 import { useEngine } from "@/lib/trading/use-engine";
+import { X } from "lucide-react";
 
 export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom: number }) {
   const e = useEngine();
@@ -42,6 +43,9 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
   useEffect(() => {
     const cv = canvasRef.current;
     if (!cv || size.w === 0 || size.h === 0) return;
+    
+    // We use e.candles but to ensure they don't randomly change, your engine needs to be deterministic.
+    // For the UI, we will just draw what the engine gives us.
     const all = e.candles?.[symbol]?.[tf] || [];
     if (!q) return;
 
@@ -82,8 +86,8 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
 
     ctx.font = "11px -apple-system, sans-serif"; ctx.textBaseline = "middle";
 
-    // ─── TIGHT Y-AXIS GRID (Exactly 19 lines like Image 2) ───
-    const targetPixels = 18; // Very tight spacing
+    // ─── TIGHT Y-AXIS GRID ───
+    const targetPixels = 18;
     const rawStep = (hi - lo) / (plotH / targetPixels);
     const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
     const norm = rawStep / mag;
@@ -99,7 +103,6 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
       ctx.fillStyle = cText; ctx.fillText(p.toFixed(s.digits), plotW + 4, yy);
     }
 
-    // X-Axis Grid
     const every = Math.max(1, Math.round(80 / sp));
     for (let i = bars.length - 1; i >= 0; i -= every) {
       const xx = Math.round(xOf(i)) + 0.5;
@@ -110,7 +113,6 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
       ctx.fillStyle = cText; ctx.fillText(lbl, xx - 18, plotH + 10);
     }
 
-    // Candles
     const bw = Math.max(1, Math.floor(sp * 0.6));
     bars.forEach((b, i) => {
       const x = Math.round(xOf(i)); const bull = b.c >= b.o;
@@ -120,7 +122,7 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
       if (bw > 2) ctx.fillRect(x - bw / 2, top, bw, bh);
     });
 
-    // Labels top left (Image 2)
+    // Top-left label
     ctx.fillStyle = "#1565c0";
     ctx.font = "bold 12px -apple-system, sans-serif";
     ctx.fillText(`${symbol} ▼ ${tf}`, 8, 15);
@@ -153,13 +155,20 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
       ctx.fillText(p.toFixed(s.digits), plotW + 4, yy);
 
       if (labelLeft) {
-        ctx.fillStyle = "#666"; ctx.fillText(labelLeft, 6, yy - 10);
+        ctx.fillStyle = color; 
+        // Use a background rect to prevent text from blending with candles
+        const textWidth = ctx.measureText(labelLeft).width;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(6, yy - 18, textWidth + 4, 14);
+        ctx.fillStyle = color;
+        ctx.fillText(labelLeft, 8, yy - 10);
       }
     };
 
+    // Draw positions with cleaned up text
     for (const p of symbolPositions) {
       const pnl = e.profitOf(p);
-      const pnlText = `${p.side.toUpperCase()} ${p.lots.toFixed(2)}    ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD`;
+      const pnlText = `${p.side.toUpperCase()} ${p.lots.toFixed(2)}  ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD`;
       
       drawDashedLine(p.openPrice, p.side === "buy" ? cBull : cBear, pnlText);
       if (p.sl) drawDashedLine(p.sl, cBear, "SL");
