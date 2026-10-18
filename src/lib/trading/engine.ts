@@ -130,7 +130,8 @@ export const SYMBOLS: SymbolSpec[] = RAW.map(([name, desc, digits, spread, contr
   spread: spreadFor(name),
   contract,
   start,
-  vol: start * 1.6e-5,
+  // Reduced volatility: smaller multiplier to avoid extreme spikes
+  vol: start * 0.8e-5,
 }));
 
 const STORAGE_KEY = "mt-terminal-v1";
@@ -175,7 +176,8 @@ export const typeLabel = (t: OrderType) => t.replace("_", " ");
 function genCandles(s: SymbolSpec, tfSec: number, nowSec: number, n = 400): Candle[] {
   const out: Candle[] = [];
   let p = s.start;
-  const subSigma = s.vol * Math.sqrt((tfSec * 2) / 6);
+  // Reduced volatility: smaller multiplier to avoid extreme spikes
+  const subSigma = s.vol * Math.sqrt((tfSec * 2) / 6) * 0.5;
   const last = Math.floor(nowSec / tfSec) * tfSec;
   const rng = seededRNG(s.name, last);
   for (let i = 0; i < n; i++) {
@@ -573,7 +575,8 @@ export class Engine {
       const rng = seededRNG(s.name, Math.floor(nowSec / 60) * 60);
       if (rng() < 0.25) continue;
       const prev = q.bid;
-      const bid = round(Math.max(s.point, prev + gaussFrom(rng) * s.vol), s.digits);
+      // Reduced volatility: smaller multiplier to avoid extreme spikes
+      const bid = round(Math.max(s.point, prev + gaussFrom(rng) * s.vol * 0.5), s.digits);
       const spreadPts = s.spread + Math.floor(rng() * (s.spread * 0.3));
       q.bid = bid;
       q.ask = round(bid + spreadPts * s.point, s.digits);

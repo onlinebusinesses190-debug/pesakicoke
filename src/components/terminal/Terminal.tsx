@@ -1,28 +1,62 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { TIMEFRAMES, type TF } from "@/lib/trading/engine";
 import { money, useEngine } from "@/lib/trading/use-engine";
 import { apiRequest } from "@/utils/api";
 import { MarketWatch } from "./MarketWatch";
 import { PriceChart } from "./PriceChart";
 import { OrderDialog, type DialogState } from "./OrderDialog";
-import { Wallet, Menu, ArrowLeftRight, BarChart3, Clock, MessageSquare, List } from "lucide-react";
+import { Wallet, Menu, ArrowLeftRight, BarChart3, Clock, MessageSquare, List, ArrowLeft } from "lucide-react";
 
-export function Terminal() {
+interface TerminalProps {
+  mode?: "demo" | "real";
+}
+
+export function Terminal({ mode = "demo" }: TerminalProps) {
   const e = useEngine();
+  const navigate = useNavigate();
   const [symbol, setSymbol] = useState("EURUSD");
   const [tf, setTf] = useState<TF>("M5");
   const [zoom, setZoom] = useState(1);
   const [dialog, setDialog] = useState<DialogState>(null);
   const [dlgKey, setDlgKey] = useState(0);
-  
-  const [lots, setLots] = useState(0.10); 
+
+  const [lots, setLots] = useState(0.10);
   const [mobileTab, setMobileTab] = useState<"chart" | "market" | "positions" | "history" | "messages">("chart");
-  
+
   const [depositOpen, setDepositOpen] = useState(false);
   const [realBalance, setRealBalance] = useState<number | null>(null);
 
   const s = e.spec(symbol);
   const q = e.quotes[symbol];
+
+  // Sync engine mode with route mode
+  useEffect(() => {
+    if (mode === "real" && e.mode !== "live") {
+      e.setMode("live");
+    } else if (mode === "demo" && e.mode !== "demo") {
+      e.setMode("demo");
+    }
+  }, [mode, e.mode]);
+
+  // Fetch real balance from backend in real mode
+  useEffect(() => {
+    if (mode === "real") {
+      const fetchBalance = async () => {
+        try {
+          const res = await apiRequest<{ success: boolean; balance: number }>(
+            "/forex/account?account_type=live",
+          );
+          setRealBalance(res.balance ?? 0);
+        } catch {
+          setRealBalance(null);
+        }
+      };
+      fetchBalance();
+      const interval = setInterval(fetchBalance, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [mode]);
 
   const open = (d: DialogState) => {
     setDlgKey((k) => k + 1);
@@ -39,12 +73,20 @@ export function Terminal() {
     }
   };
 
+  const handleDeposit = () => {
+    if (mode === "real") {
+      navigate({ to: "/wallet" });
+    } else {
+      setDepositOpen(true);
+    }
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-[#f8f9fa] text-[#1e293b] font-sans pb-14 md:pb-0">
-      
+
       <div className="flex items-center justify-between px-3 py-2 bg-white border-b border-gray-300 shadow-sm z-20">
         <div className="flex items-center gap-3">
-          <Menu size={20} className="text-gray-600 cursor-pointer" onClick={() => setMobileTab(mobileTab === "market" ? "chart" : "market")} />
+          <ArrowLeft size={20} className="text-gray-600 cursor-pointer" onClick={() => navigate({ to: "/trading/" })} />
           <div>
             <div className="text-sm font-bold text-gray-900 flex items-center gap-2">
               {symbol} <span className="text-xs font-normal text-gray-500">{s?.desc}</span>
@@ -52,19 +94,19 @@ export function Terminal() {
             <div className="text-[10px] text-gray-500">Forex</div>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-4">
           <div className="text-right">
             <div className="text-[9px] text-gray-500 uppercase tracking-wide">Balance</div>
             <div className="text-xs font-mono font-bold">
-              {e.mode === "live" ? `KSh ${realBalance?.toLocaleString() ?? "—"}` : money(e.equity)}
+              {mode === "real" ? `KSh ${realBalance?.toLocaleString() ?? "—"}` : money(e.equity)}
             </div>
           </div>
           <div className="flex gap-1">
-            <button className={`text-xs font-bold px-2 py-1 rounded ${e.mode === "live" ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`} onClick={() => e.setMode(e.mode === "live" ? "demo" : "live")}>
-              {e.mode === "live" ? "LIVE" : "DEMO"}
+            <button className={`text-xs font-bold px-2 py-1 rounded ${mode === "real" ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`} onClick={() => e.setMode(e.mode === "live" ? "demo" : "live")}>
+              {mode === "real" ? "LIVE" : "DEMO"}
             </button>
-            <button className="text-xs px-2 py-1 bg-gray-100 rounded text-gray-700 font-bold" onClick={() => setDepositOpen(true)}>
+            <button className="text-xs px-2 py-1 bg-gray-100 rounded text-gray-700 font-bold" onClick={handleDeposit}>
               <Wallet size={14} />
             </button>
           </div>

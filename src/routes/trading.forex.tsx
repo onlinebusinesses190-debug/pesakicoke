@@ -1,5 +1,7 @@
-import { createFileRoute, ClientOnly } from "@tanstack/react-router";
+import { createFileRoute, ClientOnly, useNavigate } from "@tanstack/react-router";
 import { Terminal } from "@/components/terminal/Terminal";
+import { useAuth } from "@/hooks/useAuth";
+import { useEffect } from "react";
 
 export const Route = createFileRoute("/trading/forex")({
   head: () => ({
@@ -24,6 +26,37 @@ export const Route = createFileRoute("/trading/forex")({
 });
 
 function ForexPage() {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+
+  const search = Route.useSearch();
+  const mode = (search?.mode as string) === "real" ? "real" : "demo";
+
+  useEffect(() => {
+    if (mode === "real" && !loading && !user) {
+      navigate({
+        to: "/auth",
+        search: { mode: "signin", redirect: "/trading/forex?mode=real" } as never,
+      });
+    }
+  }, [mode, user, loading, navigate]);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        Loading…
+      </div>
+    );
+  }
+
+  if (mode === "real" && !user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        Redirecting to sign-in…
+      </div>
+    );
+  }
+
   return (
     <ClientOnly
       fallback={
@@ -32,7 +65,7 @@ function ForexPage() {
         </div>
       }
     >
-      <Terminal />
+      <Terminal mode={mode} />
     </ClientOnly>
   );
 }
