@@ -1,5 +1,19 @@
 import { supabase } from "./supabase/client";
 
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public statusCode: number,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+export function isApiError(err: unknown): err is ApiError {
+  return err instanceof ApiError;
+}
+
 const getApiUrl = () => {
   if (import.meta.env.VITE_PESAKI_API_URL) {
     return import.meta.env.VITE_PESAKI_API_URL;
@@ -52,7 +66,7 @@ export async function apiRequest<T = any>(path: string, options: RequestInit = {
         if (text) errorMsg = text;
       } catch (innerE) {}
     }
-    throw new Error(errorMsg);
+    throw new ApiError(errorMsg, response.status);
   }
 
   return response.json();

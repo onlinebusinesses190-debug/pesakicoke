@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { TIMEFRAMES, type TF } from "@/lib/trading/engine";
 import { money, useEngine } from "@/lib/trading/use-engine";
-import { apiRequest } from "@/utils/api";
+import { apiRequest, isApiError } from "@/utils/api";
 import { MarketWatch } from "./MarketWatch";
 import { PriceChart } from "./PriceChart";
 import { OrderDialog, type DialogState } from "./OrderDialog";
@@ -28,6 +28,7 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
   const [realBalance, setRealBalance] = useState<number | null>(null);
   const [usdKesRate, setUsdKesRate] = useState<number | null>(null);
   const [ratesLoading, setRatesLoading] = useState(true);
+  const [realTradingUnavailable, setRealTradingUnavailable] = useState(false);
 
   const s = e.spec(symbol);
   const q = e.quotes[symbol];
@@ -50,8 +51,13 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
             "/forex/account?account_type=live",
           );
           setRealBalance(res.balance ?? 0);
-        } catch {
-          setRealBalance(null);
+          setRealTradingUnavailable(false);
+        } catch (err) {
+          if (isApiError(err) && err.statusCode === 403) {
+            setRealTradingUnavailable(true);
+          } else {
+            setRealBalance(null);
+          }
         }
       };
       const fetchRates = async () => {
@@ -68,7 +74,9 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
       };
       fetchBalance();
       fetchRates();
-      const interval = setInterval(fetchBalance, 30000);
+      const interval = setInterval(() => {
+        if (!realTradingUnavailable) fetchBalance();
+      }, 30000);
       return () => clearInterval(interval);
     } else {
       setRatesLoading(false);
@@ -119,11 +127,13 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
               {mode === "real" ? (
                 ratesLoading
                   ? "—"
-                  : (() => {
-                      const kes = realBalance ?? 0;
-                      const usd = usdKesRate ? kes / usdKesRate : 0;
-                      return `KSh ${kes.toLocaleString()} (≈ $${usd.toLocaleString(undefined, { maximumFractionDigits: 2 })})`;
-                    })()
+                  : realTradingUnavailable
+                    ? "Real trading not available"
+                    : (() => {
+                        const kes = realBalance ?? 0;
+                        const usd = usdKesRate ? kes / usdKesRate : 0;
+                        return `KSh ${kes.toLocaleString()} (≈ $${usd.toLocaleString(undefined, { maximumFractionDigits: 2 })})`;
+                      })()
               ) : (
                 money(e.equity)
               )}
