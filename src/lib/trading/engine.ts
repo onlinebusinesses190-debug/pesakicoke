@@ -139,13 +139,36 @@ const STOP_OUT = 50;
 const MARGIN_CALL = 100;
 
 export const round = (v: number, d: number) => Math.round(v * Math.pow(10, d)) / Math.pow(10, d);
-const gauss = () => {
+
+/** Seeded PRNG (mulberry32) — deterministic given the same seed. */
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Create a seeded PRNG whose seed is derived from symbol name and timestamp. */
+function seededRNG(symbol: string, timestamp: number): () => number {
+  const str = symbol + ":" + timestamp;
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = (h * 31 + str.charCodeAt(i)) | 0;
+  }
+  return mulberry32((h ^ timestamp) >>> 0);
+}
+
+function gaussFrom(rng: () => number) {
   let u = 0,
     v = 0;
-  while (u === 0) u = Math.random();
-  while (v === 0) v = Math.random();
+  while (u === 0) u = rng();
+  while (v === 0) v = rng();
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
-};
+}
 export const isBuyType = (t: OrderType) => t.startsWith("buy");
 export const typeLabel = (t: OrderType) => t.replace("_", " ");
 
@@ -154,12 +177,13 @@ function genCandles(s: SymbolSpec, tfSec: number, nowSec: number, n = 400): Cand
   let p = s.start;
   const subSigma = s.vol * Math.sqrt((tfSec * 2) / 6);
   const last = Math.floor(nowSec / tfSec) * tfSec;
+  const rng = seededRNG(s.name, last);
   for (let i = 0; i < n; i++) {
     const o = p;
     let h = p,
       l = p;
     for (let k = 0; k < 6; k++) {
-      p += gauss() * subSigma;
+      p += gaussFrom(rng) * subSigma;
       h = Math.max(h, p);
       l = Math.min(l, p);
     }
@@ -546,10 +570,11 @@ export class Engine {
     const nowSec = now / 1000;
     for (const s of SYMBOLS) {
       const q = this.quotes[s.name];
-      if (Math.random() < 0.25) continue;
+      const rng = seededRNG(s.name, Math.floor(nowSec / 60) * 60);
+      if (rng() < 0.25) continue;
       const prev = q.bid;
-      const bid = round(Math.max(s.point, prev + gauss() * s.vol), s.digits);
-      const spreadPts = s.spread + Math.floor(Math.random() * (s.spread * 0.3));
+      const bid = round(Math.max(s.point, prev + gaussFrom(rng) * s.vol), s.digits);
+      const spreadPts = s.spread + Math.floor(rng() * (s.spread * 0.3));
       q.bid = bid;
       q.ask = round(bid + spreadPts * s.point, s.digits);
       q.dir = bid > prev ? 1 : bid < prev ? -1 : q.dir;

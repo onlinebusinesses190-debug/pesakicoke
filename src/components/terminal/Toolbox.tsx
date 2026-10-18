@@ -16,38 +16,36 @@ export function Toolbox({ onModify }: { onModify: (ticket: number) => void }) {
     <div className="flex h-full flex-col border border-border bg-card">
       <div className="flex-1 overflow-auto">
         {tab === "trade" && (
-          <table className="w-full border-collapse">
-            <thead>
-              <tr>
-                {[
-                  "Symbol",
-                  "Ticket",
-                  "Time",
-                  "Type",
-                  "Volume",
-                  "Price",
-                  "S / L",
-                  "T / P",
-                  "Price",
-                  "Profit",
-                  "",
-                ].map((h, i) => (
-                  <th key={i} className="mt-th">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {e.positions.map((p) => {
-                const pr = e.profitOf(p);
-                return (
-                  <tr
-                    key={p.ticket}
-                    className="hover:bg-accent"
-                    onDoubleClick={() => onModify(p.ticket)}
-                    title="Double-click to modify or close"
-                  >
+          <>
+            {e.positions.length > 0 && (
+              <div className="flex justify-between items-center px-2 py-1 border-b border-border bg-muted">
+                <span className="text-xs font-semibold">Positions ({e.positions.length})</span>
+                <button
+                  className="text-xs text-white bg-red-500 hover:bg-red-600 font-bold px-2 py-0.5 rounded"
+                  onClick={() => e.positions.forEach((p) => e.closePosition(p.ticket, "manual", p.lots))}
+                >
+                  Close All
+                </button>
+              </div>
+            )}
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  {["Symbol","Ticket","Time","Type","Volume","Price","S / L","T / P","Price","Profit",""].map((h, i) => (
+                    <th key={i} className="mt-th">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {e.positions.map((p) => {
+                  const pr = e.profitOf(p);
+                  return (
+                    <tr
+                      key={p.ticket}
+                      className="hover:bg-accent"
+                      onDoubleClick={() => onModify(p.ticket)}
+                      title="Double-click to modify or close"
+                    >
                     <td className="mt-td">{p.symbol}</td>
                     <td className="mt-td">{p.ticket}</td>
                     <td className="mt-td">{dt(p.openTime)}</td>
@@ -85,16 +83,9 @@ export function Toolbox({ onModify }: { onModify: (ticket: number) => void }) {
                 </td>
                 <td className={`mt-td text-right font-mono ${pnlCls(e.floating)}`}>
                   {money(e.floating)}
-                </td>
-                <td className="mt-td">
-                  {e.positions.length > 0 && (
-                    <button className="mt-btn" onClick={() => e.closeAll()}>
-                      Close all
-                    </button>
-                  )}
-                </td>
-              </tr>
-              {e.orders.map((o) => (
+                 </td>
+               </tr>
+               {e.orders.map((o) => (
                 <tr key={o.ticket} className="hover:bg-accent">
                   <td className="mt-td">{o.symbol}</td>
                   <td className="mt-td">{o.ticket}</td>
@@ -123,7 +114,8 @@ export function Toolbox({ onModify }: { onModify: (ticket: number) => void }) {
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+        </>
         )}
         {tab === "history" && (
           <table className="w-full border-collapse">

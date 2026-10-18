@@ -100,47 +100,59 @@ export function Terminal() {
         </div>
       </div>
 
-      {/* ─── MT5 Action Bar (SELL | Lot | BUY) ─── */}
-      <div className="flex bg-white border-b border-gray-300 select-none z-10">
-        {/* SELL Button */}
-        <button
-          onClick={() => handleTrade("sell")}
-          className="flex-1 bg-[#c62828] hover:bg-[#b71c1c] text-white py-2 flex flex-col items-center justify-center transition-colors"
-        >
-          <span className="text-[10px] font-bold tracking-wider opacity-90">SELL</span>
-          <span className="text-sm font-mono font-bold leading-tight">
-            {q?.bid.toFixed(s?.digits ?? 5) ?? "—"}
-          </span>
-        </button>
+       {/* ─── MT5 Action Bar (SELL | Lot | BUY) ─── */}
+       <div className="flex bg-white border-b border-gray-300 select-none z-10">
+         {/* SELL Button */}
+         <button
+           onClick={() => handleTrade("sell")}
+           className={`flex-1 py-2 flex flex-col items-center justify-center transition-colors ${
+             q?.dir < 0
+               ? "bg-[#c62828] hover:bg-[#b71c1c]"
+               : q?.dir > 0
+                 ? "bg-[#2e7d32] hover:bg-[#1b5e20]"
+                 : "bg-[#c62828] hover:bg-[#b71c1c]"
+           } text-white`}
+         >
+           <span className="text-[10px] font-bold tracking-wider opacity-90">SELL</span>
+           <span className="text-sm font-mono font-bold leading-tight">
+             {q?.bid.toFixed(s?.digits ?? 5) ?? "—"}
+           </span>
+         </button>
 
-        {/* Lot Size Input */}
-        <div className="w-32 flex flex-col items-center justify-center bg-white border-x border-gray-200">
-           <div className="text-[9px] text-gray-500 font-semibold mb-0.5">Volume</div>
-           <div className="flex items-center justify-between w-full px-2">
-             <button onClick={() => setLots(Math.max(0.01, lots - 0.01))} className="px-2 text-gray-500 hover:text-black font-bold text-lg leading-none">-</button>
-             <input
-               type="number"
-               step="0.01"
-               value={lots}
-               onChange={(val) => setLots(Math.max(0.01, Number(val.target.value)))}
-               className="w-10 text-center text-sm font-bold focus:outline-none bg-transparent"
-             />
-             <button onClick={() => setLots(lots + 0.01)} className="px-2 text-gray-500 hover:text-black font-bold text-lg leading-none">+</button>
-           </div>
-           <div className="text-[8px] text-gray-400 mt-0.5">1 Lot = 100k</div>
-        </div>
+         {/* Lot Size Input */}
+         <div className="w-32 flex flex-col items-center justify-center bg-white border-x border-gray-200">
+            <div className="text-[9px] text-gray-500 font-semibold mb-0.5">Volume</div>
+            <div className="flex items-center justify-between w-full px-2">
+              <button onClick={() => setLots(Math.max(0.01, lots - 0.01))} className="px-2 text-gray-500 hover:text-black font-bold text-lg leading-none">-</button>
+              <input
+                type="number"
+                step="0.01"
+                value={lots}
+                onChange={(val) => setLots(Math.max(0.01, Number(val.target.value)))}
+                className="w-10 text-center text-sm font-bold focus:outline-none bg-transparent"
+              />
+              <button onClick={() => setLots(lots + 0.01)} className="px-2 text-gray-500 hover:text-black font-bold text-lg leading-none">+</button>
+            </div>
+            <div className="text-[8px] text-gray-400 mt-0.5">1 Lot = 100k</div>
+         </div>
 
-        {/* BUY Button */}
-        <button
-          onClick={() => handleTrade("buy")}
-          className="flex-1 bg-[#1565c0] hover:bg-[#0d47a1] text-white py-2 flex flex-col items-center justify-center transition-colors"
-        >
-          <span className="text-[10px] font-bold tracking-wider opacity-90">BUY</span>
-          <span className="text-sm font-mono font-bold leading-tight">
-             {q?.ask.toFixed(s?.digits ?? 5) ?? "—"}
-          </span>
-        </button>
-      </div>
+         {/* BUY Button */}
+         <button
+           onClick={() => handleTrade("buy")}
+           className={`flex-1 py-2 flex flex-col items-center justify-center transition-colors ${
+             q?.dir > 0
+               ? "bg-[#2e7d32] hover:bg-[#1b5e20]"
+               : q?.dir < 0
+                 ? "bg-[#ef6c00] hover:bg-[#e65100]"
+                 : "bg-[#1565c0] hover:bg-[#0d47a1]"
+           } text-white`}
+         >
+           <span className="text-[10px] font-bold tracking-wider opacity-90">BUY</span>
+           <span className="text-sm font-mono font-bold leading-tight">
+              {q?.ask.toFixed(s?.digits ?? 5) ?? "—"}
+           </span>
+         </button>
+       </div>
 
       {/* ─── Mobile Tabs (Chart / Market / Positions) ─── */}
       <div className="flex border-b border-gray-300 bg-[#f1f3f4] md:hidden">
