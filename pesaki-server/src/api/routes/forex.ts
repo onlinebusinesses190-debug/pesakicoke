@@ -232,14 +232,22 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     return { success: true, instruments: rows };
   });
 
-  // ─── Market ─────────────────────────────────────────────────────────────────
-  // Engine status for the client. This is what lets the UI say MARKET OPEN /
-  // MARKET PAUSED instead of the misleading "LIVE" it used to show while the
-  // account was on demo.
-  fastify.get("/market", async () => {
-    const engine = getEngine();
-    return { success: true, market: engine.describe() };
-  });
+   // ─── Market ─────────────────────────────────────────────────────────────────
+   // Engine status for the client. This is what lets the UI say MARKET OPEN /
+   // MARKET PAUSED instead of the misleading "LIVE" it used to show while the
+   // account was on demo.
+   fastify.get("/market", async () => {
+     const engine = getEngine();
+     return { success: true, market: engine.describe() };
+   });
+
+   // ─── KES exchange rates ────────────────────────────────────────────────────
+   // Configuration rates used for KES<->USD conversion on the frontend. These are
+   // server-side configuration, not market data: they mirror kesRates.ts and are
+   // never presented as live interbank pricing.
+   fastify.get("/rates", async () => {
+     return { success: true, usdToKes: kesPerUnit("USD") };
+   });
 
   // ─── Quotes ────────────────────────────────────────────────────────────────
   fastify.get("/quotes", async (request, reply) => {

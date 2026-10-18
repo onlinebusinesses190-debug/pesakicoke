@@ -381,7 +381,7 @@ export class Engine {
     if (!s) return this.fail("Unknown symbol");
     const q = this.quotes[req.symbol];
     const lots = round(req.lots, 2);
-    if (!(lots >= 0.01 && lots <= 100)) return this.fail("Invalid volume (0.01 - 100 lots)");
+    if (!(lots >= 1 && lots <= 10000)) return this.fail("Invalid volume (1 - 10000)");
     const sl = round(req.sl || 0, s.digits),
       tp = round(req.tp || 0, s.digits);
     const side: Side = isBuyType(req.type) ? "buy" : "sell";

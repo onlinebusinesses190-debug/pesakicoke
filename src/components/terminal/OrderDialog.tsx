@@ -54,7 +54,7 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
   const [exec, setExec] = useState<"market" | "pending">("market");
   const [ptype, setPtype] = useState<OrderType>("buy_limit");
   const [lots, setLots] = useState(
-    state?.mode === "new" && state.lots ? state.lots.toString() : "0.10"
+    state?.mode === "new" && state.lots ? state.lots.toString() : "100"
   );
   const [price, setPrice] = useState("");
   
@@ -171,15 +171,16 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
         </select>
       </Row>
 
-      <Row label="Volume (Lots)">
-        <input
-          className="w-full border border-gray-300 rounded-sm px-2 py-1.5 text-sm font-mono focus:outline-none focus:border-[#1565c0]"
-          type="number"
-          step="0.01"
-          min="0.01"
-          value={lots}
-          onChange={(v) => setLots(v.target.value)}
-        />
+       <Row label="Volume (USD)">
+         <input
+           className="w-full border border-gray-300 rounded-sm px-2 py-1.5 text-sm font-mono focus:outline-none focus:border-[#1565c0]"
+           type="number"
+           step="1"
+           min="1"
+           max="10000"
+           value={lots}
+           onChange={(v) => setLots(v.target.value)}
+         />
       </Row>
 
       <div className="grid grid-cols-2 gap-2">

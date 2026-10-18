@@ -27,18 +27,19 @@ let cache: Record<string, number> | null = null;
 
 function load(): Record<string, number> {
   if (cache) return cache;
+  const rates: Record<string, number> = { ...DEFAULTS };
   const raw = process.env.PESAKI_FX_KES_RATES;
   if (raw) {
     try {
       const parsed = JSON.parse(raw) as Record<string, number>;
       for (const [code, rate] of Object.entries(parsed)) {
-        if (Number.isFinite(rate) && rate > 0) DEFAULTS[code.toUpperCase()] = rate;
+        if (Number.isFinite(rate) && rate > 0) rates[code.toUpperCase()] = rate;
       }
     } catch {
       // A malformed override must not take the market down; fall back to defaults.
     }
   }
-  cache = DEFAULTS;
+  cache = rates;
   return cache;
 }
 

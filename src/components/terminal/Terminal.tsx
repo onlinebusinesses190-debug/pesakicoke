@@ -26,6 +26,8 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
 
   const [depositOpen, setDepositOpen] = useState(false);
   const [realBalance, setRealBalance] = useState<number | null>(null);
+  const [usdKesRate, setUsdKesRate] = useState<number | null>(null);
+  const [ratesLoading, setRatesLoading] = useState(true);
 
   const s = e.spec(symbol);
   const q = e.quotes[symbol];
@@ -52,9 +54,24 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
           setRealBalance(null);
         }
       };
+      const fetchRates = async () => {
+        try {
+          const res = await apiRequest<{ success: boolean; usdToKes: number }>(
+            "/forex/rates",
+          );
+          setUsdKesRate(res.usdToKes ?? 130);
+        } catch {
+          setUsdKesRate(130);
+        } finally {
+          setRatesLoading(false);
+        }
+      };
       fetchBalance();
+      fetchRates();
       const interval = setInterval(fetchBalance, 30000);
       return () => clearInterval(interval);
+    } else {
+      setRatesLoading(false);
     }
   }, [mode]);
 
@@ -99,7 +116,17 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
           <div className="text-right">
             <div className="text-[9px] text-gray-500 uppercase tracking-wide">Balance</div>
             <div className="text-xs font-mono font-bold">
-              {mode === "real" ? `KSh ${realBalance?.toLocaleString() ?? "—"}` : money(e.equity)}
+              {mode === "real" ? (
+                ratesLoading
+                  ? "—"
+                  : (() => {
+                      const kes = realBalance ?? 0;
+                      const usd = usdKesRate ? kes / usdKesRate : 0;
+                      return `KSh ${kes.toLocaleString()} (≈ $${usd.toLocaleString(undefined, { maximumFractionDigits: 2 })})`;
+                    })()
+              ) : (
+                money(e.equity)
+              )}
             </div>
           </div>
           <div className="flex gap-1">
