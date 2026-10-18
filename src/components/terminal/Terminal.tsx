@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { TIMEFRAMES, type TF } from "@/lib/trading/engine";
 import { money, useEngine } from "@/lib/trading/use-engine";
-import { apiRequest, isApiError } from "@/utils/api";
+import { apiRequest } from "@/utils/api";
 import { MarketWatch } from "./MarketWatch";
 import { PriceChart } from "./PriceChart";
 import { OrderDialog, type DialogState } from "./OrderDialog";
@@ -21,15 +21,14 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
   const [dialog, setDialog] = useState<DialogState>(null);
   const [dlgKey, setDlgKey] = useState(0);
 
-  const [lots, setLots] = useState(0.10);
+  const [lots, setLots] = useState(100);
   const [mobileTab, setMobileTab] = useState<"chart" | "market" | "positions" | "history" | "messages">("chart");
 
   const [depositOpen, setDepositOpen] = useState(false);
   const [realBalance, setRealBalance] = useState<number | null>(null);
   const [usdKesRate, setUsdKesRate] = useState<number | null>(null);
   const [ratesLoading, setRatesLoading] = useState(true);
-  const [realTradingUnavailable, setRealTradingUnavailable] = useState(false);
-  const realTradingUnavailableRef = useRef(false);
+  const balanceFetchDoneRef = useRef(false);
 
   const s = e.spec(symbol);
   const q = e.quotes[symbol];
@@ -43,63 +42,50 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
     }
   }, [mode, e.mode]);
 
-  // Fetch real balance from backend in real mode
+  // Fetch real balance from wallet endpoint in real mode (same pattern as
+  // trading.aviator.tsx and games.binary-fx.tsx — /wallet/balance does NOT
+  // check REAL_TRADING_ENABLED, so it works without a 403).
   useEffect(() => {
-    if (mode === "real") {
-      const fetchBalance = async () => {
-        try {
-          const res = await apiRequest<{ success: boolean; balance: number }>(
-            "/forex/account?account_type=live",
-          );
-          setRealBalance(res.balance ?? 0);
-          setRealTradingUnavailable(false);
-          realTradingUnavailableRef.current = false;
-        } catch (err) {
-          if (isApiError(err) && err.statusCode === 403) {
-            realTradingUnavailableRef.current = true;
-            setRealTradingUnavailable(true);
-          } else {
-            setRealBalance(null);
-          }
-        }
-      };
-      const fetchRates = async () => {
-        try {
-          const res = await apiRequest<{ success: boolean; usdToKes: number }>(
-            "/forex/rates",
-          );
-          setUsdKesRate(res.usdToKes ?? 130);
-        } catch {
-          setUsdKesRate(130);
-        } finally {
-          setRatesLoading(false);
-        }
-      };
-      const checkAndFetch = async () => {
-        try {
-          const health = await apiRequest<{ success: boolean; realTradingEnabled: boolean }>(
-            "/forex/health",
-          );
-          if (!health.realTradingEnabled) {
-            realTradingUnavailableRef.current = true;
-            setRealTradingUnavailable(true);
-            setRatesLoading(false);
-            return;
-          }
-          fetchBalance();
-        } catch {
-          fetchBalance();
-        }
-        fetchRates();
-      };
-      checkAndFetch();
-      const interval = setInterval(() => {
-        if (!realTradingUnavailableRef.current) fetchBalance();
-      }, 30000);
-      return () => clearInterval(interval);
-    } else {
+    if (mode !== "real") {
       setRatesLoading(false);
+      return;
     }
+    // Guard against React StrictMode double-invoke on mount
+    if (balanceFetchDoneRef.current) return;
+    balanceFetchDoneRef.current = true;
+
+    let cancelled = false;
+
+    const fetchBalance = async () => {
+      try {
+        const data = await apiRequest<{ balance: number; demo_balance: number }>(
+          "/wallet/balance?mode=real",
+        );
+        if (!cancelled) setRealBalance(data.balance ?? 0);
+      } catch {
+        if (!cancelled) setRealBalance(null);
+      }
+    };
+    const fetchRates = async () => {
+      try {
+        const res = await apiRequest<{ success: boolean; usdToKes: number }>(
+          "/forex/rates",
+        );
+        if (!cancelled) setUsdKesRate(res.usdToKes ?? 130);
+      } catch {
+        if (!cancelled) setUsdKesRate(130);
+      } finally {
+        if (!cancelled) setRatesLoading(false);
+      }
+    };
+    fetchBalance();
+    fetchRates();
+    const interval = setInterval(fetchBalance, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      balanceFetchDoneRef.current = false;
+    };
   }, [mode]);
 
   const open = (d: DialogState) => {
@@ -143,19 +129,19 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
           <div className="text-right">
             <div className="text-[9px] text-gray-500 uppercase tracking-wide">Balance</div>
             <div className="text-xs font-mono font-bold">
-              {mode === "real" ? (
-                ratesLoading
-                  ? "—"
-                  : realTradingUnavailable
-                    ? "Real trading not available"
-                    : (() => {
-                        const kes = realBalance ?? 0;
-                        const usd = usdKesRate ? kes / usdKesRate : 0;
-                        return `KSh ${kes.toLocaleString()} (≈ $${usd.toLocaleString(undefined, { maximumFractionDigits: 2 })})`;
-                      })()
-              ) : (
-                money(e.equity)
-              )}
+               {mode === "real" ? (
+                 ratesLoading
+                   ? "—"
+                   : realBalance === null
+                     ? "—"
+                     : (() => {
+                         const kes = realBalance;
+                         const usd = usdKesRate ? kes / usdKesRate : 0;
+                         return `KSh ${kes.toLocaleString()} (≈ $${usd.toLocaleString(undefined, { maximumFractionDigits: 2 })})`;
+                       })()
+               ) : (
+                 money(e.equity)
+               )}
             </div>
           </div>
           <div className="flex gap-1">
@@ -180,12 +166,12 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
         </button>
 
         <div className="w-28 flex flex-col items-center justify-center bg-white border-x border-gray-200">
-           <div className="text-[9px] text-gray-500 font-semibold mb-0.5">Volume</div>
-           <div className="flex items-center justify-between w-full px-2">
-             <button onClick={() => setLots(Math.max(0.01, lots - 0.01))} className="px-1 text-gray-500 hover:text-black font-bold text-lg leading-none">-</button>
-             <input type="number" step="0.01" value={lots} onChange={(val) => setLots(Math.max(0.01, Number(val.target.value)))} className="w-10 text-center text-sm font-bold focus:outline-none bg-transparent" />
-             <button onClick={() => setLots(lots + 0.01)} className="px-1 text-gray-500 hover:text-black font-bold text-lg leading-none">+</button>
-           </div>
+            <div className="text-[9px] text-gray-500 font-semibold mb-0.5">Volume (USD)</div>
+            <div className="flex items-center justify-between w-full px-2">
+              <button onClick={() => setLots(Math.max(1, lots - 1))} className="px-1 text-gray-500 hover:text-black font-bold text-lg leading-none">-</button>
+              <input type="number" step="1" min="1" max="10000" value={lots} onChange={(val) => setLots(Math.max(1, Math.min(10000, Number(val.target.value))))} className="w-10 text-center text-sm font-bold focus:outline-none bg-transparent" />
+              <button onClick={() => setLots(Math.min(10000, lots + 1))} className="px-1 text-gray-500 hover:text-black font-bold text-lg leading-none">+</button>
+            </div>
         </div>
 
         <button

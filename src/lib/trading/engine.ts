@@ -306,25 +306,16 @@ export class Engine {
     const conv = this.quotes["USD" + q];
     return conv ? amount / conv.bid : amount;
   }
-  marginFor(symbol: string, lots: number) {
-    const s = this.spec(symbol);
-    const base = symbol.slice(0, 3);
-    const units = lots * s.contract;
-    if (base === "USD") return units / this.leverage;
-    // JPY pairs quote the inverse way round: USDJPY is USD per JPY, so the
-    // margin in USD is units / price, not units * price. Quote is USD per
-    // unit-of-base, so divide for all non-USD-base pairs.
-    const conv = this.quotes[base + "USD"];
-    return units / (conv ? conv.bid : 1) / this.leverage;
+  marginFor(symbol: string, usdAmount: number) {
+    return usdAmount / this.leverage;
   }
   closePriceOf(p: { symbol: string; side: Side }) {
     const q = this.quotes[p.symbol];
     return p.side === "buy" ? q.bid : q.ask;
   }
-  profitOf(p: Position, lots = p.lots) {
-    const s = this.spec(p.symbol);
+  profitOf(p: Position, usdAmount = p.lots) {
     const diff = (this.closePriceOf(p) - p.openPrice) * (p.side === "buy" ? 1 : -1);
-    return round(this.toUSD(p.symbol, diff * lots * s.contract), 2);
+    return round((usdAmount * diff) / p.openPrice, 2);
   }
   get floating() {
     return this.positions.reduce((a, p) => a + this.profitOf(p), 0);
@@ -458,8 +449,8 @@ export class Engine {
   closePosition(ticket: number, reason: CloseReason = "manual", lots?: number): Result {
     const p = this.positions.find((x) => x.ticket === ticket);
     if (!p) return this.fail(`Position #${ticket} not found`);
-    const closeLots = lots ? Math.min(round(lots, 2), p.lots) : p.lots;
-    if (closeLots < 0.01) return this.fail("Invalid volume");
+     const closeLots = lots ? Math.min(round(lots, 2), p.lots) : p.lots;
+     if (closeLots < 1) return this.fail("Invalid volume (min 1 USD)");
     const profit = this.profitOf(p, closeLots);
     const price = this.closePriceOf(p);
     this.balance = round(this.balance + profit, 2);
@@ -479,7 +470,7 @@ export class Engine {
     else p.lots = round(p.lots - closeLots, 2);
     const tag = reason === "manual" ? "" : ` [${reason === "stopout" ? "stop out" : reason}]`;
     this.log(
-      `position #${ticket} closed ${closeLots.toFixed(2)} ${p.symbol} at ${this.fmt(p.symbol, price)}, profit ${profit.toFixed(2)}${tag}`,
+       `position #${ticket} closed ${closeLots.toFixed(2)} ${p.symbol} at ${this.fmt(p.symbol, price)}, profit ${profit.toFixed(2)}${tag}`,
       reason === "stopout",
     );
     this.save();
