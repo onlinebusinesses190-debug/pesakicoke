@@ -318,7 +318,7 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
         <RadialMenu
           isOpen={showRadialMenu}
           onClose={() => setShowRadialMenu(false)}
-          onSelect={setTf}
+          onSelectTf={setTf}
           currentTf={tf}
         />
       )}
