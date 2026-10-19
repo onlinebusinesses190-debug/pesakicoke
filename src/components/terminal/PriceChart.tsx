@@ -86,7 +86,7 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
 
     ctx.font = "11px -apple-system, sans-serif"; ctx.textBaseline = "middle";
 
-    // ─── TIGHT Y-AXIS GRID ───
+    // ─── Y-AXIS GRID + LABELS ───
     const targetPixels = 18;
     const rawStep = (hi - lo) / (plotH / targetPixels);
     const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
@@ -100,17 +100,20 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
     for (let p = startLine; p <= hi; p += step) {
       const yy = Math.round(y(p)) + 0.5;
       ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke();
-      ctx.fillStyle = cText; ctx.fillText(p.toFixed(s.digits), plotW + 4, yy);
+      ctx.fillStyle = "#000000"; ctx.fillText(p.toFixed(s.digits), plotW + 4, yy);
     }
 
+    // X-axis time labels with date
     const every = Math.max(1, Math.round(80 / sp));
     for (let i = bars.length - 1; i >= 0; i -= every) {
       const xx = Math.round(xOf(i)) + 0.5;
       ctx.beginPath(); ctx.moveTo(xx, 0); ctx.lineTo(xx, plotH); ctx.stroke();
       const d = new Date(bars[i].t * 1000);
       const p2 = (n: number) => String(n).padStart(2, "0");
-      const lbl = TIMEFRAMES[tf] >= 3600 ? `${d.getDate()} ${d.toLocaleString("en", { month: "short" })} ${p2(d.getHours())}:00` : `${p2(d.getHours())}:${p2(d.getMinutes())}`;
-      ctx.fillStyle = cText; ctx.fillText(lbl, xx - 18, plotH + 10);
+      const day = p2(d.getDate());
+      const month = d.toLocaleString("en", { month: "short" });
+      const lbl = `${day} ${month} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+      ctx.fillStyle = cText; ctx.fillText(lbl, xx - 24, plotH + 12);
     }
 
     const bw = Math.max(1, Math.floor(sp * 0.6));
@@ -136,11 +139,7 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
       const yy = Math.round(y(p)) + 0.5;
       ctx.strokeStyle = color; ctx.setLineDash([]);
       ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke();
-      
-      ctx.fillStyle = color;
-      ctx.fillRect(plotW, yy - 8, axisW, 16);
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText(p.toFixed(s.digits), plotW + 4, yy);
+      ctx.fillStyle = "#000000"; ctx.fillText(p.toFixed(s.digits), plotW + 4, yy);
     };
 
     const drawDashedLine = (p: number, color: string, labelLeft: string) => {
@@ -155,21 +154,20 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
       ctx.fillText(p.toFixed(s.digits), plotW + 4, yy);
 
       if (labelLeft) {
-        ctx.fillStyle = color; 
-        // Use a background rect to prevent text from blending with candles
+        ctx.fillStyle = color;
         const textWidth = ctx.measureText(labelLeft).width;
         ctx.fillStyle = "#ffffff";
-        ctx.fillRect(6, yy - 18, textWidth + 4, 14);
+        ctx.fillRect(4, yy - 16, textWidth + 6, 16);
         ctx.fillStyle = color;
-        ctx.fillText(labelLeft, 8, yy - 10);
+        ctx.fillText(labelLeft, 7, yy - 6);
       }
     };
 
     // Draw positions with cleaned up text
     for (const p of symbolPositions) {
       const pnl = e.profitOf(p);
-      const pnlText = `${p.side.toUpperCase()} ${p.lots.toFixed(2)}  ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD`;
-      
+      const pnlText = `${p.side.toUpperCase()} ${p.lots.toFixed(2)} Lots  ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD`;
+
       drawDashedLine(p.openPrice, p.side === "buy" ? cBull : cBear, pnlText);
       if (p.sl) drawDashedLine(p.sl, cBear, "SL");
       if (p.tp) drawDashedLine(p.tp, cBull, "TP");
@@ -177,6 +175,25 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
 
     drawSolidLine(q.ask, cBear);
     drawSolidLine(q.bid, cBull);
+
+    // Candle countdown timer in top-right of chart (near Y-axis)
+    const tfSeconds = TIMEFRAMES[tf];
+    const now = Date.now() / 1000;
+    if (all.length > 0) {
+      const lastCandle = all[all.length - 1];
+      const candleCloseTime = lastCandle.t + tfSeconds;
+      const remaining = candleCloseTime - now;
+      if (remaining > 0 && remaining <= tfSeconds) {
+        const mins = Math.floor(remaining / 60);
+        const secs = Math.floor(remaining % 60);
+        const p2 = (n: number) => String(n).padStart(2, "0");
+        const timerText = `${p2(mins)}:${p2(secs)}`;
+        ctx.fillStyle = "#000000";
+        ctx.font = "bold 11px -apple-system, sans-serif";
+        ctx.textAlign = "right";
+        ctx.fillText(timerText, W - 4, 14);
+      }
+    }
 
     ctx.strokeStyle = cGrid; ctx.strokeRect(0.5, 0.5, plotW, plotH);
   });

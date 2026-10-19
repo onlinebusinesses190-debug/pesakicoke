@@ -7,7 +7,7 @@ import { MarketWatch } from "./MarketWatch";
 import { PriceChart } from "./PriceChart";
 import { RadialMenu } from "./RadialMenu";
 import { OrderDialog, type DialogState } from "./OrderDialog";
-import { Wallet, Menu, ArrowLeftRight, BarChart3, Clock, MessageSquare, List, ArrowLeft } from "lucide-react";
+import { Wallet, Menu, ArrowLeftRight, BarChart3, Clock, MessageSquare, List, ArrowLeft, ChevronUp, ChevronDown } from "lucide-react";
 
 interface TerminalProps {
   mode?: "demo" | "real";
@@ -169,11 +169,11 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
         </button>
 
         <div className="w-28 flex flex-col items-center justify-center bg-white border-x border-gray-200">
-            <div className="text-[9px] text-gray-500 font-semibold mb-0.5">Volume (USD)</div>
+            <div className="text-[9px] text-gray-500 font-semibold mb-0.5">Volume</div>
             <div className="flex items-center justify-between w-full px-2">
-              <button onClick={() => setLots(Math.max(1, lots - 1))} className="px-1 text-gray-500 hover:text-black font-bold text-lg leading-none">-</button>
+              <button onClick={() => setLots(Math.max(1, lots - 1))} className="px-1 text-gray-500 hover:text-black font-bold text-lg leading-none"><ChevronUp size={14} /></button>
               <input type="number" step="1" min="1" max="10000" value={lots} onChange={(val) => setLots(Math.max(1, Math.min(10000, Number(val.target.value))))} className="w-10 text-center text-sm font-bold focus:outline-none bg-transparent" />
-              <button onClick={() => setLots(Math.min(10000, lots + 1))} className="px-1 text-gray-500 hover:text-black font-bold text-lg leading-none">+</button>
+              <button onClick={() => setLots(Math.min(10000, lots + 1))} className="px-1 text-gray-500 hover:text-black font-bold text-lg leading-none"><ChevronDown size={14} /></button>
             </div>
         </div>
 
@@ -295,6 +295,9 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
         <button onClick={() => setMobileTab("chart")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "chart" ? "text-[#1565c0]" : "text-gray-500"}`}>
           <BarChart3 size={18} />
           <span className="text-[9px] font-semibold">Charts</span>
+          <span className={`text-[10px] font-mono font-bold ${e.floating >= 0 ? "text-[#089981]" : "text-[#F23645]"}`}>
+            {e.floating >= 0 ? "+" : ""}{e.floating.toFixed(2)}
+          </span>
         </button>
         <button onClick={() => setMobileTab("positions")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "positions" ? "text-[#1565c0]" : "text-gray-500"}`}>
           <List size={18} />
