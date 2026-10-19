@@ -5,6 +5,7 @@ import { money, useEngine } from "@/lib/trading/use-engine";
 import { apiRequest } from "@/utils/api";
 import { MarketWatch } from "./MarketWatch";
 import { PriceChart } from "./PriceChart";
+import { RadialMenu } from "./RadialMenu";
 import { OrderDialog, type DialogState } from "./OrderDialog";
 import { Wallet, Menu, ArrowLeftRight, BarChart3, Clock, MessageSquare, List, ArrowLeft } from "lucide-react";
 
@@ -23,6 +24,8 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
 
   const [lots, setLots] = useState(100);
   const [mobileTab, setMobileTab] = useState<"chart" | "market" | "positions" | "history" | "messages">("chart");
+  const [showRadialMenu, setShowRadialMenu] = useState(false);
+  const [radialPosition, setRadialPosition] = useState<{ x: number; y: number } | null>(null);
 
   const [depositOpen, setDepositOpen] = useState(false);
   const [realBalance, setRealBalance] = useState<number | null>(null);
@@ -209,7 +212,17 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
             </div>
           </div>
 
-          <div className="flex-1 relative bg-white w-full h-full min-h-[300px]">
+          <div
+            className="flex-1 relative bg-white w-full h-full min-h-[300px] cursor-pointer"
+            onClick={(e) => {
+              if (showRadialMenu) return;
+              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+              const x = e.clientX - rect.left - rect.width / 2;
+              const y = e.clientY - rect.top - rect.height / 2;
+              setRadialPosition({ x, y });
+              setShowRadialMenu(true);
+            }}
+          >
             <PriceChart symbol={symbol} tf={tf} zoom={zoom} />
           </div>
         </main>
@@ -298,6 +311,14 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
       </div>
 
       {dialog && <OrderDialog key={dlgKey} state={dialog} onClose={() => setDialog(null)} />}
+      {showRadialMenu && (
+        <RadialMenu
+          isOpen={showRadialMenu}
+          onClose={() => setShowRadialMenu(false)}
+          onSelect={setTf}
+          currentTf={tf}
+        />
+      )}
     </div>
   );
 }
