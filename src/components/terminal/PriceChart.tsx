@@ -108,7 +108,7 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, showIndica
       }
 
       if (view.current.offset === 0) { lo = Math.min(lo, q.bid); hi = Math.max(hi, q.ask); }
-      const pad = (hi - lo) * 0.08 || s.point * 10;
+      const pad = (hi - lo) * 0.18 || s.point * 10;
       const rawLo = lo - pad, rawHi = hi + pad;
 
       // ─── 2. SMOOTH Y-AXIS AUTO-SCALING ───
@@ -129,7 +129,7 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, showIndica
       ctx.font = "11px -apple-system, sans-serif"; ctx.textBaseline = "middle";
 
       // ─── Y-AXIS GRID + LABELS ───
-      const targetPixels = 18;
+      const targetPixels = 35;
       const rawStep = (smoothHi - smoothLo) / (plotH / targetPixels);
       const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
       const norm = rawStep / mag;
@@ -230,7 +230,8 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, showIndica
       drawSolidLine(q.ask, cBear);
       drawSolidLine(q.bid, cBull);
 
-      // Candle countdown timer
+      // ─── CANDLE COUNTDOWN TIMER ───
+      // Displayed in the right-side Y-axis, inside/near the bid price box
       const tfSeconds = TIMEFRAMES[tfRef.current];
       const now = Date.now() / 1000;
       if (all.length > 0) {
@@ -242,10 +243,11 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, showIndica
           const secs = Math.floor(remaining % 60);
           const p2 = (n: number) => String(n).padStart(2, "0");
           const timerText = `${p2(mins)}:${p2(secs)}`;
+          const bidY = Math.round(y(q.bid)) + 0.5;
           ctx.fillStyle = "#000000";
           ctx.font = "bold 11px -apple-system, sans-serif";
           ctx.textAlign = "right";
-          ctx.fillText(timerText, W - 4, 14);
+          ctx.fillText(timerText, plotW + 4, bidY - 12);
         }
       }
 

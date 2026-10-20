@@ -177,7 +177,9 @@ function genCandles(s: SymbolSpec, tfSec: number, nowSec: number, n = 400): Cand
   let p = s.start;
   const subSigma = s.vol * Math.sqrt((tfSec * 2) / 6);
   const last = Math.floor(nowSec / tfSec) * tfSec;
-  const rng = seededRNG(s.name, last);
+  // Deterministic seed: symbol name + timeframe, NOT current time,
+  // so EURUSD always loads the exact same historical chart on every refresh.
+  const rng = seededRNG(s.name, tfSec);
   for (let i = 0; i < n; i++) {
     const o = p;
     let h = p,

@@ -23,7 +23,7 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
   const [dlgKey, setDlgKey] = useState(0);
 
   const [lots, setLots] = useState(0.01);
-  const [mobileTab, setMobileTab] = useState<"chart" | "market" | "positions" | "history" | "messages">("chart");
+  const [mobileTab, setMobileTab] = useState<"chart" | "market" | "trade" | "history" | "messages">("chart");
   const [showRadialMenu, setShowRadialMenu] = useState(false);
   const [radialPosition, setRadialPosition] = useState<{ x: number; y: number } | null>(null);
   const [showCrosshair, setShowCrosshair] = useState(false);
@@ -100,9 +100,9 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
     setDialog(d);
   };
 
-  // Dynamic BUY/SELL colors based on market direction (q.dir)
-  const sellBg = q?.dir < 0 ? "bg-[#c62828] hover:bg-[#b71c1c]" : q?.dir > 0 ? "bg-[#2e7d32] hover:bg-[#1b5e20]" : "bg-[#c62828] hover:bg-[#b71c1c]";
-  const buyBg = q?.dir > 0 ? "bg-[#2e7d32] hover:bg-[#1b5e20]" : q?.dir < 0 ? "bg-[#ef6c00] hover:bg-[#e65100]" : "bg-[#1565c0] hover:bg-[#0d47a1]";
+  // Dynamic BUY/SELL colors — only red (#c62828) and blue (#1565c0), no green/orange
+  const sellBg = q?.dir < 0 ? "bg-[#b71c1c] hover:bg-[#c62828]" : "bg-[#c62828] hover:bg-[#b71c1c]";
+  const buyBg = q?.dir > 0 ? "bg-[#0d47a1] hover:bg-[#1565c0]" : "bg-[#1565c0] hover:bg-[#0d47a1]";
 
   const handleCloseAll = () => {
     if (window.confirm("Close all open positions?")) {
@@ -228,8 +228,8 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
   </div>
         </main>
 
-        <div className={`order-3 md:w-80 md:h-auto border-t md:border-t-0 md:border-l border-gray-300 bg-white overflow-y-auto ${["positions", "history", "messages"].includes(mobileTab) ? "block flex-1" : "hidden md:block"}`}>
-          
+        <div className={`order-3 md:w-80 md:h-auto border-t md:border-t-0 md:border-l border-gray-300 bg-white overflow-y-auto ${["trade", "history", "messages"].includes(mobileTab) ? "block flex-1" : "hidden md:block"}`}>
+           
           <div className="bg-[#f8f9fa] border-b border-gray-300 p-3 text-[11px] text-gray-700 space-y-1">
             <div className="flex justify-between"><span>Balance:</span> <span className="font-mono">{money(e.balance)}</span></div>
             <div className="flex justify-between"><span>Equity:</span> <span className="font-mono">{money(e.equity)}</span></div>
@@ -238,7 +238,7 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
           </div>
 
           {/* CLOSE ALL BUTTON */}
-          {mobileTab === "positions" && e.positions.length > 0 && (
+          {mobileTab === "trade" && e.positions.length > 0 && (
             <div className="p-2 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
               <h3 className="text-xs font-bold text-gray-700">Trade</h3>
               <button onClick={handleCloseAll} className="bg-red-50 text-red-600 px-2 py-1 rounded text-[10px] font-bold hover:bg-red-100">
@@ -247,7 +247,7 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
             </div>
           )}
 
-          {mobileTab === "positions" && (
+          {mobileTab === "trade" && (
             <div className="divide-y divide-gray-100">
               {e.positions.length === 0 ? (
                 <div className="p-4 text-center text-xs text-gray-500">No open positions</div>
@@ -258,7 +258,7 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
                   const quote = e.quotes[p.symbol];
                   const closePrice = p.side === "buy" ? quote.bid : quote.ask;
                   return (
-                    <div key={p.ticket} className="p-2 hover:bg-gray-50 relative group">
+                    <div key={p.ticket} className="p-2 hover:bg-gray-50">
                       <div className="flex justify-between items-center mb-1">
                         <div className="flex items-center gap-1">
                           <span className="text-xs font-bold text-gray-800">{p.symbol}</span>
@@ -271,9 +271,6 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
                       </div>
                       <div className="flex justify-between items-center text-[10px] text-gray-500 font-mono">
                         <div>{p.openPrice.toFixed(spec.digits)} → {closePrice.toFixed(spec.digits)}</div>
-                        <button onClick={() => e.closePosition(p.ticket, "manual", p.lots)} className="bg-red-50 text-red-600 px-2 py-0.5 rounded text-[10px] font-bold hover:bg-red-100">
-                          Close
-                        </button>
                       </div>
                     </div>
                   );
@@ -283,7 +280,11 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
           )}
 
           {mobileTab === "history" && <div className="p-4 text-center text-xs text-gray-500">No history</div>}
-          {mobileTab === "messages" && <div className="p-4 text-center text-xs text-gray-500">No messages</div>}
+          {mobileTab === "messages" && (
+            <div className="p-4 text-center text-xs text-gray-500">
+              <div className="mb-2">No messages</div>
+            </div>
+          )}
         </div>
 
       </div>
@@ -296,18 +297,15 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
         <button onClick={() => setMobileTab("chart")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "chart" ? "text-[#1565c0]" : "text-gray-500"}`}>
           <BarChart3 size={18} />
           <span className="text-[9px] font-semibold">Charts</span>
-          <span className={`text-[10px] font-mono font-bold ${e.floating >= 0 ? "text-[#089981]" : "text-[#F23645]"}`}>
-            {e.floating >= 0 ? "+" : ""}{e.floating.toFixed(2)}
-          </span>
         </button>
-        <button onClick={() => setMobileTab("positions")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "positions" ? "text-[#1565c0]" : "text-gray-500"}`}>
+        <button onClick={() => setMobileTab("trade")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "trade" ? "text-[#1565c0]" : "text-gray-500"}`}>
           <Activity size={14} />
           <div className="px-2 py-0.5 bg-[#F0F0F0] rounded-full">
-            <span className={`text-[13px] font-bold ${e.floating >= 0 ? "text-[#089981]" : "text-[#F23645]"}`}>
+            <span className={`text-[13px] font-bold ${e.floating >= 0 ? "text-[#1565c0]" : "text-[#c62828]"}`}>
               {e.floating >= 0 ? "+" : ""}{e.floating.toFixed(2)}
             </span>
           </div>
-          <span className="text-[9px] font-semibold">Positions</span>
+          <span className="text-[9px] font-semibold">Trade</span>
         </button>
         <button onClick={() => setMobileTab("history")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "history" ? "text-[#1565c0]" : "text-gray-500"}`}>
           <Clock size={18} />
