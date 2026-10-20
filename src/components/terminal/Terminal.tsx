@@ -7,7 +7,7 @@ import { MarketWatch } from "./MarketWatch";
 import { PriceChart } from "./PriceChart";
 import { RadialMenu } from "./RadialMenu";
 import { OrderDialog, type DialogState } from "./OrderDialog";
-import { Wallet, Menu, ArrowLeftRight, BarChart3, Clock, MessageSquare, List, ArrowLeft, ChevronUp, ChevronDown } from "lucide-react";
+import { Wallet, Menu, ArrowLeftRight, BarChart3, Clock, MessageSquare, Activity, ArrowLeft, ChevronUp, ChevronDown } from "lucide-react";
 
 interface TerminalProps {
   mode?: "demo" | "real";
@@ -22,7 +22,7 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
   const [dialog, setDialog] = useState<DialogState>(null);
   const [dlgKey, setDlgKey] = useState(0);
 
-  const [lots, setLots] = useState(100);
+  const [lots, setLots] = useState(0.01);
   const [mobileTab, setMobileTab] = useState<"chart" | "market" | "positions" | "history" | "messages">("chart");
   const [showRadialMenu, setShowRadialMenu] = useState(false);
   const [radialPosition, setRadialPosition] = useState<{ x: number; y: number } | null>(null);
@@ -175,9 +175,9 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
         <div className="w-28 flex flex-col items-center justify-center bg-white border-x border-gray-200">
             <div className="text-[9px] text-gray-500 font-semibold mb-0.5">Volume</div>
             <div className="flex items-center justify-between w-full px-2">
-              <button onClick={() => setLots(Math.max(1, lots - 1))} className="px-1 text-gray-500 hover:text-black font-bold text-lg leading-none"><ChevronUp size={14} /></button>
-              <input type="number" step="1" min="1" max="10000" value={lots} onChange={(val) => setLots(Math.max(1, Math.min(10000, Number(val.target.value))))} className="w-10 text-center text-sm font-bold focus:outline-none bg-transparent" />
-              <button onClick={() => setLots(Math.min(10000, lots + 1))} className="px-1 text-gray-500 hover:text-black font-bold text-lg leading-none"><ChevronDown size={14} /></button>
+              <button onClick={() => setLots(Math.max(0.01, lots - 0.01))} className="px-1 text-gray-500 hover:text-black font-bold text-lg leading-none"><ChevronUp size={14} /></button>
+              <input type="number" step="0.01" min="0.01" max="100" value={lots} onChange={(val) => setLots(Math.max(0.01, Math.min(100, Number(val.target.value))))} className="w-10 text-center text-sm font-bold focus:outline-none bg-transparent" />
+              <button onClick={() => setLots(Math.min(100, lots + 0.01))} className="px-1 text-gray-500 hover:text-black font-bold text-lg leading-none"><ChevronDown size={14} /></button>
             </div>
         </div>
 
@@ -196,25 +196,7 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
         </aside>
 
         <main className={`order-1 md:order-2 flex-1 flex flex-col min-w-0 h-[60vh] md:h-auto ${mobileTab === "chart" ? "flex" : "hidden md:flex"}`}>
-          <div className="flex items-center justify-between px-2 py-1 bg-white border-b border-gray-200">
-            <div className="flex items-center gap-1">
-              {(Object.keys(TIMEFRAMES) as TF[]).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTf(t)}
-                  className={`px-2 py-0.5 text-[11px] font-bold rounded-full transition-all ${
-                    tf === t ? "bg-[#1565c0] text-white" : "bg-transparent text-gray-500 hover:bg-gray-100"
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-            <div className="flex items-center gap-2 text-gray-500">
-              <button onClick={() => setZoom((z) => Math.min(3.5, z * 1.25))} className="hover:text-black font-bold">＋</button>
-              <button onClick={() => setZoom((z) => Math.max(0.3, z / 1.25))} className="hover:text-black font-bold">－</button>
-            </div>
-          </div>
+
 
   <div
     ref={chartContainerRef}
@@ -319,7 +301,12 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
           </span>
         </button>
         <button onClick={() => setMobileTab("positions")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "positions" ? "text-[#1565c0]" : "text-gray-500"}`}>
-          <List size={18} />
+          <Activity size={14} />
+          <div className="px-2 py-0.5 bg-[#F0F0F0] rounded-full">
+            <span className={`text-[13px] font-bold ${e.floating >= 0 ? "text-[#089981]" : "text-[#F23645]"}`}>
+              {e.floating >= 0 ? "+" : ""}{e.floating.toFixed(2)}
+            </span>
+          </div>
           <span className="text-[9px] font-semibold">Positions</span>
         </button>
         <button onClick={() => setMobileTab("history")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "history" ? "text-[#1565c0]" : "text-gray-500"}`}>
