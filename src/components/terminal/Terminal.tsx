@@ -327,14 +327,6 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
       </div>
 
       {dialog && <OrderDialog key={dlgKey} state={dialog} onClose={() => setDialog(null)} />}
-      {showRadialMenu && (
-        <RadialMenu
-          isOpen={showRadialMenu}
-          onClose={() => setShowRadialMenu(false)}
-          onSelectTf={setTf}
-          currentTf={tf}
-        />
-      )}
     </div>
   );
 }
