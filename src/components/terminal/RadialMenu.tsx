@@ -1,5 +1,7 @@
 import { createElement, useState, useEffect } from "react";
-import { Crosshair, Settings, BarChart2, MousePointer } from "lucide-react";
+import {
+  X, Crosshair, Sliders, BarChart2, Activity,
+} from "lucide-react";
 import type { TF } from "@/lib/trading/engine";
 
 interface RadialMenuProps {
@@ -15,14 +17,21 @@ interface RadialMenuProps {
   setChartType: (v: "candle" | "line") => void;
 }
 
-const BASE_VIEWPORT = 360;
-const BASE_OUTER = 210;
-const MAX_OUTER = 230;
-const RING_THICKNESS = 27;
-const LABEL_RADIUS_FACTOR = 91 / 105;
-const TOUCH_TARGET = 36;
-const BUBBLE_SIZE = 42;
-const TOOL_ICON_SIZE = 21;
+const OUTER_R = 165;
+const INNER_R = 92;
+const DIAMETER = OUTER_R * 2;
+const RING = OUTER_R - INNER_R;
+const SLOT_COUNT = 13;
+const START_ANGLE = -130;
+
+const slotAngle = (i: number) => START_ANGLE + i * (360 / SLOT_COUNT);
+
+interface ToolSlot {
+  icon: React.ComponentType<any>;
+  label: string;
+  angle: number;
+  onClick: () => void;
+}
 
 export function RadialMenu({
   isOpen, onClose, currentTf, onSelectTf,
@@ -33,7 +42,7 @@ export function RadialMenu({
   if (!isOpen) return null;
 
   const [viewportWidth, setViewportWidth] = useState(
-    typeof window !== "undefined" ? window.innerWidth : BASE_VIEWPORT
+    typeof window !== "undefined" ? window.innerWidth : 360
   );
 
   useEffect(() => {
@@ -42,43 +51,44 @@ export function RadialMenu({
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const scale = viewportWidth / BASE_VIEWPORT;
-  const outerD = Math.min(MAX_OUTER, BASE_OUTER * scale);
-  const outerR = outerD / 2;
-  const ringThickness = RING_THICKNESS * scale;
-  const innerD = outerD - ringThickness * 2;
-  const labelR = outerR - ringThickness / 2;
-  const CENTER = outerD / 2;
+  const scale = Math.min(1.15, Math.max(0.75, viewportWidth / 360));
+  const d = DIAMETER * scale;
+  const cx = OUTER_R * scale;
+  const cy = OUTER_R * scale;
+  const outerR = OUTER_R * scale;
+  const ringThickness = RING * scale;
+  const midRingR = ((OUTER_R + INNER_R) / 2) * scale;
+  const touchSize = 40 * scale;
+  const iconSize = 20 * scale;
 
-  // 0° = right, positive = clockwise (screen coordinates, y increases downward)
-  const angleToCoord = (angle: number, radius: number) => {
+  const toCoord = (angle: number, radius: number) => {
     const rad = (angle * Math.PI) / 180;
     return {
-      x: CENTER + Math.cos(rad) * radius,
-      y: CENTER + Math.sin(rad) * radius,
+      x: cx + Math.cos(rad) * radius,
+      y: cy + Math.sin(rad) * radius,
     };
   };
 
-  // Timeframes on upper/right arc
-  const timeframes = [
-    { label: "M5" as TF, angle: -110 },
-    { label: "M15" as TF, angle: 0 },
-    { label: "M30" as TF, angle: 35 },
-    { label: "H4" as TF, angle: 65 },
-    { label: "D1" as TF, angle: 90 },
-    { label: "W1" as TF, angle: 215 },
-    { label: "M1" as TF, angle: 245 }, // adjusted from 250° to avoid M5 collision
+  const tfSlots = [
+    { label: "M1",  tf: "M1" as TF,  angle: slotAngle(0) },
+    { label: "M5",  tf: "M5" as TF,  angle: slotAngle(1) },
+    { label: "M15", tf: "M15" as TF, angle: slotAngle(2) },
+    { label: "M30", tf: "M30" as TF, angle: slotAngle(3) },
+    { label: "H1",  tf: "H1" as TF,  angle: slotAngle(4) },
+    { label: "H4",  tf: "H4" as TF, angle: slotAngle(5) },
+    { label: "D1",  tf: "D1" as TF, angle: slotAngle(6) },
+    { label: "LM",  tf: undefined as TF | undefined, angle: slotAngle(7) },
+    { label: "NW",  tf: undefined as TF | undefined, angle: slotAngle(8) },
   ];
 
-  // Chart tools on left/lower arc
-  const tools = [
-    { icon: MousePointer, label: "Object", angle: 225, onClick: () => { setShowIndicators(!showIndicators); onClose(); } },
-    { icon: Settings, label: "Settings", angle: 200, onClick: () => { setShowIndicators(!showIndicators); onClose(); } },
-    { icon: Crosshair, label: "Crosshair", angle: 155, onClick: () => { setShowCrosshair(!showCrosshair); onClose(); } },
-    { icon: BarChart2, label: "Chart", angle: 125, onClick: () => { setChartType(chartType === "candle" ? "line" : "candle"); onClose(); } },
+  const tools: ToolSlot[] = [
+    { icon: Activity,  label: "Indicators",  angle: slotAngle(9),  onClick: () => { setShowIndicators(!showIndicators); onClose(); } },
+    { icon: Crosshair, label: "Crosshair",   angle: slotAngle(10), onClick: () => { setShowCrosshair(!showCrosshair); onClose(); } },
+    { icon: Sliders,   label: "Settings",    angle: slotAngle(11), onClick: () => { setShowIndicators(!showIndicators); onClose(); } },
+    { icon: BarChart2, label: "Chart Type",  angle: slotAngle(12), onClick: () => { setChartType(chartType === "candle" ? "line" : "candle"); onClose(); } },
   ];
 
-  const selectedTf = timeframes.find(t => t.label === currentTf);
+  const selectedTf = tfSlots.find(t => t.label === currentTf);
 
   return (
     <div
@@ -86,45 +96,49 @@ export function RadialMenu({
       style={{
         left: "68%",
         top: "68%",
-        width: outerD,
-        height: outerD,
+        width: d,
+        height: d,
         transform: "translate(-50%, -50%)",
       }}
     >
-      {/* Blue ring */}
+      {/* Donut ring: blue border with transparent center shows chart behind */}
       <div
         className="absolute inset-0 rounded-full"
         style={{
-          borderWidth: ringThickness,
-          borderColor: "#0F53FF",
-          borderStyle: "solid",
           borderRadius: "50%",
+          border: `${ringThickness}px solid #2F7DF0`,
           backgroundColor: "transparent",
           boxSizing: "border-box",
+          width: d,
+          height: d,
         }}
       />
 
-      {/* Timeframe labels */}
-      {timeframes.map((tf) => {
-        const isSelected = tf.label === currentTf;
-        const pos = angleToCoord(tf.angle, labelR);
+      {/* Timeframe labels on mid-ring arc */}
+      {tfSlots.map((tf) => {
+        const pos = toCoord(tf.angle, midRingR);
+        const isM1 = tf.label === "M1";
         return (
           <button
             key={tf.label}
-            onClick={() => { onSelectTf(tf.label); onClose(); }}
-            className="absolute flex items-center justify-center font-semibold hover:opacity-80 transition-opacity"
+            onClick={tf.tf ? () => { onSelectTf(tf.tf!); onClose(); } : undefined}
+            disabled={!tf.tf}
+            className="absolute flex items-center justify-center font-bold text-white hover:opacity-80 transition-opacity"
             style={{
-              left: pos.x - TOUCH_TARGET / 2,
-              top: pos.y - TOUCH_TARGET / 2,
-              width: TOUCH_TARGET,
-              height: TOUCH_TARGET,
-              fontSize: 12 * scale,
-              fontWeight: 600,
-              color: isSelected ? "white" : "rgba(255,255,255,0.7)",
-              background: isSelected ? "#1456D9" : "transparent",
+              left: pos.x,
+              top: pos.y,
+              width: touchSize,
+              height: touchSize,
+              fontSize: 13 * scale,
+              fontWeight: 700,
+              color: "#FFFFFF",
+              background: "transparent",
               border: "none",
               borderRadius: "50%",
-              cursor: "pointer",
+              cursor: tf.tf ? "pointer" : "default",
+              transform: isM1
+                ? `translate(-50%, -50%) rotate(-45deg)`
+                : "translate(-50%, -50%)",
             }}
           >
             {tf.label}
@@ -132,25 +146,25 @@ export function RadialMenu({
         );
       })}
 
-      {/* Selected timeframe bubble - separate 42px element at anchor position */}
+      {/* Selected timeframe bubble - 42px blue bubble at anchor */}
       {selectedTf && (
         (() => {
-          const pos = angleToCoord(selectedTf.angle, labelR);
+          const pos = toCoord(selectedTf.angle, midRingR);
           return (
             <div
               className="absolute flex items-center justify-center rounded-full pointer-events-none"
               style={{
                 left: pos.x,
                 top: pos.y,
-                width: BUBBLE_SIZE,
-                height: BUBBLE_SIZE,
+                width: 42 * scale,
+                height: 42 * scale,
                 background: "#1456D9",
                 borderRadius: "50%",
                 fontSize: 14 * scale,
                 fontWeight: 700,
                 color: "white",
                 transform: "translate(-50%, -50%)",
-                zIndex: 1,
+                zIndex: 10,
               }}
               aria-hidden
             >
@@ -160,36 +174,50 @@ export function RadialMenu({
         })()
       )}
 
-      {/* Tool icons on left/lower arc */}
+      {/* Tool icons on lower-left arc */}
       {tools.map((tool) => {
-        const pos = angleToCoord(tool.angle, labelR);
+        const pos = toCoord(tool.angle, midRingR);
         return (
           <button
             key={tool.label}
             onClick={tool.onClick}
-            className="absolute flex items-center justify-center rounded-full bg-white hover:bg-gray-100 transition-colors shadow-sm"
+            className="absolute flex items-center justify-center rounded-full bg-white hover:bg-gray-100 transition-colors shadow"
             style={{
-              left: pos.x - TOUCH_TARGET / 2,
-              top: pos.y - TOUCH_TARGET / 2,
-              width: TOUCH_TARGET,
-              height: TOUCH_TARGET,
+              left: pos.x,
+              top: pos.y,
+              width: touchSize,
+              height: touchSize,
               border: "none",
               borderRadius: "50%",
               cursor: "pointer",
+              transform: "translate(-50%, -50%)",
             }}
             aria-label={tool.label}
           >
-            {createElement(tool.icon, { size: TOOL_ICON_SIZE })}
+            {createElement(tool.icon, { size: iconSize })}
           </button>
         );
       })}
 
-      {/* Small close on tap-away via backdrop */}
-      <div
+      {/* Center close button - small white X, 20px */}
+      <button
         onClick={onClose}
-        className="absolute inset-0 rounded-full"
-        style={{ pointerEvents: "auto", background: "transparent" }}
-      />
+        className="absolute flex items-center justify-center text-white hover:opacity-70 transition-opacity"
+        style={{
+          left: cx,
+          top: cy,
+          width: 20 * scale,
+          height: 20 * scale,
+          transform: "translate(-50%, -50%)",
+          border: "none",
+          background: "transparent",
+          cursor: "pointer",
+          padding: 0,
+        }}
+        aria-label="Close"
+      >
+        <X size={14 * scale} />
+      </button>
     </div>
   );
 }
