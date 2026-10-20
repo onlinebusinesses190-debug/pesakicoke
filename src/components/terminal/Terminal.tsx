@@ -26,6 +26,9 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
   const [mobileTab, setMobileTab] = useState<"chart" | "market" | "positions" | "history" | "messages">("chart");
   const [showRadialMenu, setShowRadialMenu] = useState(false);
   const [radialPosition, setRadialPosition] = useState<{ x: number; y: number } | null>(null);
+  const [showCrosshair, setShowCrosshair] = useState(false);
+  const [showIndicators, setShowIndicators] = useState(false);
+  const [chartType, setChartType] = useState<"candle" | "line">("candle");
 
   const [depositOpen, setDepositOpen] = useState(false);
   const [realBalance, setRealBalance] = useState<number | null>(null);
@@ -212,19 +215,29 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
             </div>
           </div>
 
-          <div
-            className="flex-1 relative bg-white w-full h-full min-h-[300px] cursor-pointer"
-            onClick={(e) => {
-              if (showRadialMenu) return;
-              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-              const x = e.clientX - rect.left - rect.width / 2;
-              const y = e.clientY - rect.top - rect.height / 2;
-              setRadialPosition({ x, y });
-              setShowRadialMenu(true);
-            }}
-          >
-            <PriceChart symbol={symbol} tf={tf} zoom={zoom} />
-          </div>
+      <div
+        className="flex-1 relative bg-white w-full h-full min-h-[300px] cursor-pointer"
+        onClick={(e) => {
+          if (showRadialMenu) return;
+          setShowRadialMenu(true);
+        }}
+      >
+        <PriceChart symbol={symbol} tf={tf} zoom={zoom} showCrosshair={showCrosshair} showIndicators={showIndicators} chartType={chartType} />
+        {showRadialMenu && (
+          <RadialMenu
+            isOpen={showRadialMenu}
+            onClose={() => setShowRadialMenu(false)}
+            onSelectTf={setTf}
+            currentTf={tf}
+            showCrosshair={showCrosshair}
+            setShowCrosshair={setShowCrosshair}
+            showIndicators={showIndicators}
+            setShowIndicators={setShowIndicators}
+            chartType={chartType}
+            setChartType={setChartType}
+          />
+        )}
+      </div>
         </main>
 
         <div className={`order-3 md:w-80 md:h-auto border-t md:border-t-0 md:border-l border-gray-300 bg-white overflow-y-auto ${["positions", "history", "messages"].includes(mobileTab) ? "block flex-1" : "hidden md:block"}`}>

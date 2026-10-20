@@ -2,9 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import type { TF } from "@/lib/trading/engine";
 import { TIMEFRAMES } from "@/lib/trading/engine";
 import { useEngine } from "@/lib/trading/use-engine";
-import { X } from "lucide-react";
 
-export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom: number }) {
+export function PriceChart({ symbol, tf, zoom, showCrosshair = false, showIndicators = false, chartType = "candle" }: { symbol: string; tf: TF; zoom: number; showCrosshair?: boolean; showIndicators?: boolean; chartType?: "candle" | "line" }) {
   const e = useEngine();
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -12,6 +11,7 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
   
   const view = useRef({ spacing: 5, offset: 0 });
   const pinch = useRef<{ dist: number; spacing: number } | null>(null);
+  const crosshair = useRef<{ x: number; y: number } | null>(null);
   const [, setRedraw] = useState(0);
   
   const s = e.spec(symbol);
@@ -117,13 +117,26 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
     }
 
     const bw = Math.max(1, Math.floor(sp * 0.6));
-    bars.forEach((b, i) => {
-      const x = Math.round(xOf(i)); const bull = b.c >= b.o;
-      ctx.strokeStyle = ctx.fillStyle = bull ? cBull : cBear;
-      ctx.beginPath(); ctx.moveTo(x + 0.5, y(b.h)); ctx.lineTo(x + 0.5, y(b.l)); ctx.stroke();
-      const top = y(Math.max(b.o, b.c)); const bh = Math.max(1, Math.abs(y(b.o) - y(b.c)));
-      if (bw > 2) ctx.fillRect(x - bw / 2, top, bw, bh);
-    });
+    if (chartType === "line") {
+      ctx.strokeStyle = "#1565c0";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i < bars.length; i++) {
+        const xx = xOf(i);
+        const yy = y(bars[i].c);
+        if (i === 0) ctx.moveTo(xx, yy);
+        else ctx.lineTo(xx, yy);
+      }
+      ctx.stroke();
+    } else {
+      bars.forEach((b, i) => {
+        const x = Math.round(xOf(i)); const bull = b.c >= b.o;
+        ctx.strokeStyle = ctx.fillStyle = bull ? cBull : cBear;
+        ctx.beginPath(); ctx.moveTo(x + 0.5, y(b.h)); ctx.lineTo(x + 0.5, y(b.l)); ctx.stroke();
+        const top = y(Math.max(b.o, b.c)); const bh = Math.max(1, Math.abs(y(b.o) - y(b.c)));
+        if (bw > 2) ctx.fillRect(x - bw / 2, top, bw, bh);
+      });
+    }
 
     // Top-left label
     ctx.fillStyle = "#1565c0";
@@ -196,6 +209,28 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
     }
 
     ctx.strokeStyle = cGrid; ctx.strokeRect(0.5, 0.5, plotW, plotH);
+
+    // Crosshair
+    if (showCrosshair && crosshair.current) {
+      const { x, y: cy } = crosshair.current;
+      ctx.strokeStyle = "#1565c0";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, plotH); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(plotW, cy); ctx.stroke();
+      ctx.setLineDash([]);
+      const priceAtY = lo + (plotH - cy) / plotH * (hi - lo);
+      ctx.fillStyle = "#1565c0";
+      ctx.font = "11px -apple-system, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText(priceAtY.toFixed(s.digits), x + 4, cy - 4);
+      const timeAtX = bars[Math.round((plotW - x) / sp)]?.t;
+      if (timeAtX) {
+        const d = new Date(timeAtX * 1000);
+        ctx.textAlign = "right";
+        ctx.fillText(`${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`, x - 4, cy + 12);
+      }
+    }
   });
 
   useEffect(() => {
@@ -216,11 +251,18 @@ export function PriceChart({ symbol, tf, zoom }: { symbol: string; tf: TF; zoom:
     return () => el.removeEventListener("touchmove", handler);
   }, []);
 
-  return (
+   return (
     <div
       ref={wrapRef}
       className="absolute inset-0 touch-none overflow-hidden bg-white"
       onWheel={(ev) => { view.current.spacing = Math.min(30, Math.max(2, view.current.spacing * (ev.deltaY < 0 ? 1.15 : 0.87))); setRedraw((x) => x + 1); }}
+      onMouseMove={(ev) => {
+        if (!showCrosshair) return;
+        const rect = ev.currentTarget.getBoundingClientRect();
+        crosshair.current = { x: ev.clientX - rect.left, y: ev.clientY - rect.top };
+        setRedraw((x) => x + 1);
+      }}
+      onMouseLeave={() => { crosshair.current = null; if (showCrosshair) setRedraw((x) => x + 1); }}
       onTouchStart={(ev) => { if (ev.touches.length === 2) { const dx = ev.touches[0].clientX - ev.touches[1].clientX; const dy = ev.touches[0].clientY - ev.touches[1].clientY; pinch.current = { dist: Math.sqrt(dx * dx + dy * dy), spacing: view.current.spacing }; } }}
       onTouchEnd={() => { pinch.current = null; }}
     >
