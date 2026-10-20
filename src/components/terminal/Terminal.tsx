@@ -35,6 +35,7 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
   const [usdKesRate, setUsdKesRate] = useState<number | null>(null);
   const [ratesLoading, setRatesLoading] = useState(true);
   const balanceFetchDoneRef = useRef(false);
+  const chartContainerRef = useRef<HTMLDivElement>(null);
 
   const s = e.spec(symbol);
   const q = e.quotes[symbol];
@@ -215,27 +216,34 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
             </div>
           </div>
 
-      <div
-        className="flex-1 relative bg-white w-full h-full min-h-[300px] cursor-pointer"
-        onClick={(e) => {
-          if (showRadialMenu) return;
-          setShowRadialMenu(true);
-        }}
-      >
-        <PriceChart symbol={symbol} tf={tf} zoom={zoom} showCrosshair={showCrosshair} showIndicators={showIndicators} chartType={chartType} />
-        {showRadialMenu && (
-          <RadialMenu
-            isOpen={showRadialMenu}
-            onClose={() => setShowRadialMenu(false)}
-            onSelectTf={setTf}
-            currentTf={tf}
-            showCrosshair={showCrosshair}
-            setShowCrosshair={setShowCrosshair}
-            showIndicators={showIndicators}
-            setShowIndicators={setShowIndicators}
-          />
-        )}
-      </div>
+  <div
+    ref={chartContainerRef}
+    className="flex-1 relative bg-white w-full h-full min-h-[300px] cursor-pointer"
+    onClick={(e) => {
+      if (showRadialMenu) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      setRadialPosition({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      });
+      setShowRadialMenu(true);
+    }}
+  >
+    <PriceChart symbol={symbol} tf={tf} zoom={zoom} showCrosshair={showCrosshair} showIndicators={showIndicators} chartType={chartType} />
+    {showRadialMenu && radialPosition && (
+      <RadialMenu
+        isOpen={showRadialMenu}
+        onClose={() => setShowRadialMenu(false)}
+        onSelectTf={setTf}
+        currentTf={tf}
+        showCrosshair={showCrosshair}
+        setShowCrosshair={setShowCrosshair}
+        showIndicators={showIndicators}
+        setShowIndicators={setShowIndicators}
+        position={radialPosition}
+      />
+    )}
+  </div>
         </main>
 
         <div className={`order-3 md:w-80 md:h-auto border-t md:border-t-0 md:border-l border-gray-300 bg-white overflow-y-auto ${["positions", "history", "messages"].includes(mobileTab) ? "block flex-1" : "hidden md:block"}`}>

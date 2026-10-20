@@ -13,6 +13,7 @@ interface RadialMenuProps {
   setShowCrosshair: (v: boolean) => void;
   showIndicators: boolean;
   setShowIndicators: (v: boolean) => void;
+  position: { x: number; y: number };
 }
 
 const OUTER_R = 110;
@@ -35,6 +36,7 @@ export function RadialMenu({
   isOpen, onClose, currentTf, onSelectTf,
   showCrosshair, setShowCrosshair,
   showIndicators, setShowIndicators,
+  position,
 }: RadialMenuProps) {
   if (!isOpen) return null;
 
@@ -89,8 +91,8 @@ export function RadialMenu({
     <div
       className="absolute z-[100] pointer-events-auto"
       style={{
-        left: "68%",
-        top: "68%",
+        left: position.x,
+        top: position.y,
         width: d,
         height: d,
         transform: "translate(-50%, -50%)",
