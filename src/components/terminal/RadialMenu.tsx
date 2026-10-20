@@ -1,3 +1,4 @@
+import { createElement } from "react";
 import {
   X, Crosshair, Settings, BarChart2, MousePointer, Sliders,
 } from "lucide-react";
@@ -107,7 +108,7 @@ export function RadialMenu({
                 cursor: "pointer",
               }}
             >
-              {item.type === "icon" ? item.icon : item.label}
+              {item.type === "icon" ? createElement(item.icon, { size: 20 }) : item.label}
             </button>
           );
         })}
