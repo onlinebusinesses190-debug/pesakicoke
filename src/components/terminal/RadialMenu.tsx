@@ -1,6 +1,6 @@
 import { createElement, useState, useEffect } from "react";
 import {
-  X, Crosshair, Sliders, BarChart2, Activity,
+  X, Crosshair, Sliders, Activity, Search, Copy,
 } from "lucide-react";
 import type { TF } from "@/lib/trading/engine";
 
@@ -13,15 +13,13 @@ interface RadialMenuProps {
   setShowCrosshair: (v: boolean) => void;
   showIndicators: boolean;
   setShowIndicators: (v: boolean) => void;
-  chartType: "candle" | "line";
-  setChartType: (v: "candle" | "line") => void;
 }
 
-const OUTER_R = 165;
-const INNER_R = 92;
+const OUTER_R = 110;
+const INNER_R = 65;
 const DIAMETER = OUTER_R * 2;
 const RING = OUTER_R - INNER_R;
-const SLOT_COUNT = 13;
+const SLOT_COUNT = 14;
 const START_ANGLE = -130;
 
 const slotAngle = (i: number) => START_ANGLE + i * (360 / SLOT_COUNT);
@@ -37,7 +35,6 @@ export function RadialMenu({
   isOpen, onClose, currentTf, onSelectTf,
   showCrosshair, setShowCrosshair,
   showIndicators, setShowIndicators,
-  chartType, setChartType,
 }: RadialMenuProps) {
   if (!isOpen) return null;
 
@@ -59,7 +56,6 @@ export function RadialMenu({
   const ringThickness = RING * scale;
   const midRingR = ((OUTER_R + INNER_R) / 2) * scale;
   const touchSize = 40 * scale;
-  const iconSize = 20 * scale;
 
   const toCoord = (angle: number, radius: number) => {
     const rad = (angle * Math.PI) / 180;
@@ -85,10 +81,9 @@ export function RadialMenu({
     { icon: Activity,  label: "Indicators",  angle: slotAngle(9),  onClick: () => { setShowIndicators(!showIndicators); onClose(); } },
     { icon: Crosshair, label: "Crosshair",   angle: slotAngle(10), onClick: () => { setShowCrosshair(!showCrosshair); onClose(); } },
     { icon: Sliders,   label: "Settings",    angle: slotAngle(11), onClick: () => { setShowIndicators(!showIndicators); onClose(); } },
-    { icon: BarChart2, label: "Chart Type",  angle: slotAngle(12), onClick: () => { setChartType(chartType === "candle" ? "line" : "candle"); onClose(); } },
+    { icon: Search,    label: "Finder",      angle: slotAngle(12), onClick: onClose },
+    { icon: Copy,      label: "Duplicate",   angle: slotAngle(13), onClick: onClose },
   ];
-
-  const selectedTf = tfSlots.find(t => t.label === currentTf);
 
   return (
     <div
@@ -106,7 +101,7 @@ export function RadialMenu({
         className="absolute inset-0 rounded-full"
         style={{
           borderRadius: "50%",
-          border: `${ringThickness}px solid #2F7DF0`,
+          border: `${ringThickness}px solid #3A86FF`,
           backgroundColor: "transparent",
           boxSizing: "border-box",
           width: d,
@@ -117,7 +112,11 @@ export function RadialMenu({
       {/* Timeframe labels on mid-ring arc */}
       {tfSlots.map((tf) => {
         const pos = toCoord(tf.angle, midRingR);
-        const isM1 = tf.label === "M1";
+        const rotations: Record<string, string> = {
+          M1: "rotate(-40deg)", M5: "rotate(-20deg)", M15: "rotate(0deg)",
+          M30: "rotate(20deg)", H1: "rotate(45deg)", H4: "rotate(70deg)",
+          D1: "rotate(75deg)", LM: "rotate(60deg)", NW: "rotate(30deg)",
+        };
         return (
           <button
             key={tf.label}
@@ -129,16 +128,16 @@ export function RadialMenu({
               top: pos.y,
               width: touchSize,
               height: touchSize,
-              fontSize: 13 * scale,
+              fontSize: 12 * scale,
               fontWeight: 700,
               color: "#FFFFFF",
               background: "transparent",
               border: "none",
               borderRadius: "50%",
               cursor: tf.tf ? "pointer" : "default",
-              transform: isM1
-                ? `translate(-50%, -50%) rotate(-45deg)`
-                : "translate(-50%, -50%)",
+              transform: `translate(-50%, -50%) ${rotations[tf.label] || "rotate(0deg)"}`,
+              WebkitTextStroke: "2.5px black",
+              paintOrder: "stroke",
             }}
           >
             {tf.label}
@@ -146,42 +145,14 @@ export function RadialMenu({
         );
       })}
 
-      {/* Selected timeframe bubble - 42px blue bubble at anchor */}
-      {selectedTf && (
-        (() => {
-          const pos = toCoord(selectedTf.angle, midRingR);
-          return (
-            <div
-              className="absolute flex items-center justify-center rounded-full pointer-events-none"
-              style={{
-                left: pos.x,
-                top: pos.y,
-                width: 42 * scale,
-                height: 42 * scale,
-                background: "#1456D9",
-                borderRadius: "50%",
-                fontSize: 14 * scale,
-                fontWeight: 700,
-                color: "white",
-                transform: "translate(-50%, -50%)",
-                zIndex: 10,
-              }}
-              aria-hidden
-            >
-              {selectedTf.label}
-            </div>
-          );
-        })()
-      )}
-
-      {/* Tool icons on lower-left arc */}
+      {/* Tool icons on lower-left arc - white line strokes only, no background circles */}
       {tools.map((tool) => {
         const pos = toCoord(tool.angle, midRingR);
         return (
           <button
             key={tool.label}
             onClick={tool.onClick}
-            className="absolute flex items-center justify-center rounded-full bg-white hover:bg-gray-100 transition-colors shadow"
+            className="absolute flex items-center justify-center transition-opacity hover:opacity-80"
             style={{
               left: pos.x,
               top: pos.y,
@@ -190,11 +161,12 @@ export function RadialMenu({
               border: "none",
               borderRadius: "50%",
               cursor: "pointer",
+              background: "transparent",
               transform: "translate(-50%, -50%)",
             }}
             aria-label={tool.label}
           >
-            {createElement(tool.icon, { size: iconSize })}
+            {createElement(tool.icon, { size: 18 * scale, color: "#ffffff", strokeWidth: 1.6 })}
           </button>
         );
       })}
