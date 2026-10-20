@@ -1,7 +1,5 @@
-import { createElement } from "react";
-import {
-  X, Crosshair, Settings, BarChart2, MousePointer, Sliders,
-} from "lucide-react";
+import { createElement, useState, useEffect } from "react";
+import { Crosshair, Settings, BarChart2, MousePointer } from "lucide-react";
 import type { TF } from "@/lib/trading/engine";
 
 interface RadialMenuProps {
@@ -13,106 +11,185 @@ interface RadialMenuProps {
   setShowCrosshair: (v: boolean) => void;
   showIndicators: boolean;
   setShowIndicators: (v: boolean) => void;
+  chartType: "candle" | "line";
+  setChartType: (v: "candle" | "line") => void;
 }
 
-const CENTER = 140;
-const RADIUS = 116;
-
-function angleToCoord(angleDeg: number) {
-  const rad = (angleDeg * Math.PI) / 180;
-  return {
-    x: CENTER + Math.cos(rad) * RADIUS,
-    y: CENTER + Math.sin(rad) * RADIUS,
-  };
-}
+const BASE_VIEWPORT = 360;
+const BASE_OUTER = 210;
+const MAX_OUTER = 230;
+const RING_THICKNESS = 27;
+const LABEL_RADIUS_FACTOR = 91 / 105;
+const TOUCH_TARGET = 36;
+const BUBBLE_SIZE = 42;
+const TOOL_ICON_SIZE = 21;
 
 export function RadialMenu({
   isOpen, onClose, currentTf, onSelectTf,
   showCrosshair, setShowCrosshair,
   showIndicators, setShowIndicators,
+  chartType, setChartType,
 }: RadialMenuProps) {
   if (!isOpen) return null;
 
-  const items = [
-    { type: "text" as const, label: "M5" as TF,  angle: 0 },
-    { type: "text" as const, label: "M15" as TF, angle: 1 },
-    { type: "text" as const, label: "M30" as TF, angle: 2 },
-    { type: "text" as const, label: "H1" as TF,  angle: 3 },
-    { type: "text" as const, label: "H4" as TF,  angle: 4 },
-    { type: "text" as const, label: "D1" as TF,  angle: 5 },
-    { type: "icon" as const, icon: BarChart2,    label: "Chart Settings", angle: 6, onClick: () => onClose() },
-    { type: "icon" as const, icon: MousePointer,  label: "Object Properties", angle: 7, onClick: () => onClose() },
-    { type: "icon" as const, icon: Sliders,       label: "Indicators", angle: 8, onClick: () => { setShowIndicators(!showIndicators); onClose(); } },
-    { type: "icon" as const, icon: Crosshair,    label: "Magnet / Crosshair", angle: 9, onClick: () => { setShowCrosshair(!showCrosshair); onClose(); } },
+  const [viewportWidth, setViewportWidth] = useState(
+    typeof window !== "undefined" ? window.innerWidth : BASE_VIEWPORT
+  );
+
+  useEffect(() => {
+    const handleResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const scale = viewportWidth / BASE_VIEWPORT;
+  const outerD = Math.min(MAX_OUTER, BASE_OUTER * scale);
+  const outerR = outerD / 2;
+  const ringThickness = RING_THICKNESS * scale;
+  const innerD = outerD - ringThickness * 2;
+  const labelR = outerR - ringThickness / 2;
+  const CENTER = outerD / 2;
+
+  // 0° = right, positive = clockwise (screen coordinates, y increases downward)
+  const angleToCoord = (angle: number, radius: number) => {
+    const rad = (angle * Math.PI) / 180;
+    return {
+      x: CENTER + Math.cos(rad) * radius,
+      y: CENTER + Math.sin(rad) * radius,
+    };
+  };
+
+  // Timeframes on upper/right arc
+  const timeframes = [
+    { label: "M5" as TF, angle: -110 },
+    { label: "M15" as TF, angle: 0 },
+    { label: "M30" as TF, angle: 35 },
+    { label: "H4" as TF, angle: 65 },
+    { label: "D1" as TF, angle: 90 },
+    { label: "W1" as TF, angle: 215 },
+    { label: "M1" as TF, angle: 245 }, // adjusted from 250° to avoid M5 collision
   ];
 
-  const angleFor = (index: number) => -90 + index * 36;
+  // Chart tools on left/lower arc
+  const tools = [
+    { icon: MousePointer, label: "Object", angle: 225, onClick: () => { setShowIndicators(!showIndicators); onClose(); } },
+    { icon: Settings, label: "Settings", angle: 200, onClick: () => { setShowIndicators(!showIndicators); onClose(); } },
+    { icon: Crosshair, label: "Crosshair", angle: 155, onClick: () => { setShowCrosshair(!showCrosshair); onClose(); } },
+    { icon: BarChart2, label: "Chart", angle: 125, onClick: () => { setChartType(chartType === "candle" ? "line" : "candle"); onClose(); } },
+  ];
+
+  const selectedTf = timeframes.find(t => t.label === currentTf);
 
   return (
-    <div className="absolute inset-0 z-[100] flex items-center justify-center">
+    <div
+      className="absolute z-[100] pointer-events-auto"
+      style={{
+        left: "68%",
+        top: "68%",
+        width: outerD,
+        height: outerD,
+        transform: "translate(-50%, -50%)",
+      }}
+    >
+      {/* Blue ring */}
       <div
-        className="relative flex items-center justify-center rounded-full"
+        className="absolute inset-0 rounded-full"
         style={{
-          width: 280,
-          height: 280,
-          left: "50%",
-          top: "55%",
-          transform: "translate(-50%, -50%)",
-          borderWidth: 22,
+          borderWidth: ringThickness,
           borderColor: "#0F53FF",
           borderStyle: "solid",
           borderRadius: "50%",
           backgroundColor: "transparent",
           boxSizing: "border-box",
-          boxShadow: "none",
         }}
-      >
-        <button
-          onClick={onClose}
-          className="absolute flex items-center justify-center rounded-full transition-colors"
-          style={{
-            width: 60,
-            height: 60,
-            left: CENTER - 30,
-            top: CENTER - 30,
-            backgroundColor: "rgba(255, 255, 255, 0.9)",
-            border: "none",
-            cursor: "pointer",
-          }}
-        >
-          <X size={18} />
-        </button>
+      />
 
-        {items.map((item, index) => {
-          const angle = angleFor(item.angle);
-          const pos = angleToCoord(angle);
-          const isSelected = item.type === "text" && item.label === currentTf;
+      {/* Timeframe labels */}
+      {timeframes.map((tf) => {
+        const isSelected = tf.label === currentTf;
+        const pos = angleToCoord(tf.angle, labelR);
+        return (
+          <button
+            key={tf.label}
+            onClick={() => { onSelectTf(tf.label); onClose(); }}
+            className="absolute flex items-center justify-center font-semibold hover:opacity-80 transition-opacity"
+            style={{
+              left: pos.x - TOUCH_TARGET / 2,
+              top: pos.y - TOUCH_TARGET / 2,
+              width: TOUCH_TARGET,
+              height: TOUCH_TARGET,
+              fontSize: 12 * scale,
+              fontWeight: 600,
+              color: isSelected ? "white" : "rgba(255,255,255,0.7)",
+              background: isSelected ? "#1456D9" : "transparent",
+              border: "none",
+              borderRadius: "50%",
+              cursor: "pointer",
+            }}
+          >
+            {tf.label}
+          </button>
+        );
+      })}
+
+      {/* Selected timeframe bubble - separate 42px element at anchor position */}
+      {selectedTf && (
+        (() => {
+          const pos = angleToCoord(selectedTf.angle, labelR);
           return (
-            <button
-              key={item.label}
-              type="button"
-              onClick={item.type === "text"
-                ? () => { onSelectTf(item.label); onClose(); }
-                : item.onClick}
-              className="absolute flex items-center justify-center font-semibold text-white hover:text-blue-200 transition-colors"
+            <div
+              className="absolute flex items-center justify-center rounded-full pointer-events-none"
               style={{
-                left: pos.x - 18,
-                top: pos.y - 18,
-                width: 36,
-                height: 36,
-                background: isSelected ? "#0d47a1" : "transparent",
-                border: "none",
+                left: pos.x,
+                top: pos.y,
+                width: BUBBLE_SIZE,
+                height: BUBBLE_SIZE,
+                background: "#1456D9",
                 borderRadius: "50%",
-                fontSize: "14px",
-                fontWeight: 600,
-                cursor: "pointer",
+                fontSize: 14 * scale,
+                fontWeight: 700,
+                color: "white",
+                transform: "translate(-50%, -50%)",
+                zIndex: 1,
               }}
+              aria-hidden
             >
-              {item.type === "icon" ? createElement(item.icon, { size: 20 }) : item.label}
-            </button>
+              {selectedTf.label}
+            </div>
           );
-        })}
-      </div>
+        })()
+      )}
+
+      {/* Tool icons on left/lower arc */}
+      {tools.map((tool) => {
+        const pos = angleToCoord(tool.angle, labelR);
+        return (
+          <button
+            key={tool.label}
+            onClick={tool.onClick}
+            className="absolute flex items-center justify-center rounded-full bg-white hover:bg-gray-100 transition-colors shadow-sm"
+            style={{
+              left: pos.x - TOUCH_TARGET / 2,
+              top: pos.y - TOUCH_TARGET / 2,
+              width: TOUCH_TARGET,
+              height: TOUCH_TARGET,
+              border: "none",
+              borderRadius: "50%",
+              cursor: "pointer",
+            }}
+            aria-label={tool.label}
+          >
+            {createElement(tool.icon, { size: TOOL_ICON_SIZE })}
+          </button>
+        );
+      })}
+
+      {/* Small close on tap-away via backdrop */}
+      <div
+        onClick={onClose}
+        className="absolute inset-0 rounded-full"
+        style={{ pointerEvents: "auto", background: "transparent" }}
+      />
     </div>
   );
 }

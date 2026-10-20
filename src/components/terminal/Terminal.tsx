@@ -233,6 +233,8 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
             setShowCrosshair={setShowCrosshair}
             showIndicators={showIndicators}
             setShowIndicators={setShowIndicators}
+            chartType={chartType}
+            setChartType={setChartType}
           />
         )}
       </div>
