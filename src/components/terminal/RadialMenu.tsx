@@ -1,5 +1,5 @@
 import {
-  X, Crosshair, Settings, BarChart2, MousePointer,
+  X, Crosshair, Settings, BarChart2,
 } from "lucide-react";
 import { useRef, useState, useEffect } from "react";
 import type { TF } from "@/lib/trading/engine";
@@ -59,7 +59,9 @@ export function RadialMenu({
   const radius = outerD / 2;
   const centerX = chartW * 0.68;
   const centerY = chartH * 0.68;
-  const bubbleSize = Math.max(44, Math.min(60, outerD * 0.22));
+  const btnSize = 40;
+  const iconBtnSize = 44;
+  const centerBtnSize = 52;
 
   const at = (angle: number, r: number) => angleToCoord(angle, r, centerX, centerY);
 
@@ -96,22 +98,25 @@ export function RadialMenu({
           const angle = TIMEFRAME_ANGLE[tf];
           const pos = at(angle, radius);
           const isSelected = tf === currentTf;
+          const scale = isSelected ? 1.3 : 1;
           return (
             <button
               key={tf}
               type="button"
               onClick={() => handleSelect(tf as TF)}
               className={`absolute flex items-center justify-center font-semibold transition-all ${
-                isSelected ? "pointer-events-none" : "text-white hover:scale-110"
+                isSelected
+                  ? "text-white bg-[#1456D9] shadow-lg pointer-events-none"
+                  : "text-blue-100 hover:text-white hover:bg-[#1456D9] hover:shadow-lg"
               }`}
               style={{
-                left: pos.x - 10,
-                top: pos.y - 10,
+                left: pos.x - btnSize / 2,
+                top: pos.y - btnSize / 2,
+                width: btnSize,
+                height: btnSize,
+                borderRadius: "50%",
                 fontSize: "14px",
-                width: "auto",
-                height: "auto",
-                padding: 0,
-                background: "none",
+                transform: `scale(${scale})`,
                 border: "none",
                 cursor: isSelected ? "default" : "pointer",
               }}
@@ -121,37 +126,19 @@ export function RadialMenu({
           );
         })}
 
-        {currentTf && TIMEFRAME_ANGLE[currentTf] !== undefined && (() => {
-          const angle = TIMEFRAME_ANGLE[currentTf];
-          const pos = at(angle, radius);
-          return (
-            <div
-              className="absolute flex items-center justify-center rounded-full text-white font-bold"
-              style={{
-                left: pos.x - bubbleSize / 2,
-                top: pos.y - bubbleSize / 2,
-                width: bubbleSize,
-                height: bubbleSize,
-                backgroundColor: "#1456D9",
-                fontSize: "16px",
-                pointerEvents: "none",
-              }}
-            >
-              {currentTf}
-            </div>
-          );
-        })()}
-
         <button
           type="button"
           onClick={() => { setShowCrosshair(!showCrosshair); onClose(); }}
-          className={`absolute flex items-center justify-center text-white hover:scale-110 transition-transform ${showCrosshair ? "scale-125 text-[#00d4ff]" : ""}`}
+          className={`absolute flex items-center justify-center transition-all ${
+            showCrosshair ? "text-[#00d4ff] scale-125" : "text-blue-100 hover:text-white hover:scale-110"
+          }`}
           style={{
-            left: at(155, radius).x - 19,
-            top: at(155, radius).y - 19,
-            width: "38px",
-            height: "38px",
-            background: "none",
+            left: at(155, radius).x - iconBtnSize / 2,
+            top: at(155, radius).y - iconBtnSize / 2,
+            width: iconBtnSize,
+            height: iconBtnSize,
+            borderRadius: "50%",
+            background: "transparent",
             border: "none",
             cursor: "pointer",
           }}
@@ -163,13 +150,16 @@ export function RadialMenu({
         <button
           type="button"
           onClick={() => { setShowIndicators(!showIndicators); onClose(); }}
-          className={`absolute flex items-center justify-center text-white hover:scale-110 transition-transform ${showIndicators ? "scale-125 text-[#00d4ff]" : ""}`}
+          className={`absolute flex items-center justify-center transition-all ${
+            showIndicators ? "text-[#00d4ff] scale-125" : "text-blue-100 hover:text-white hover:scale-110"
+          }`}
           style={{
-            left: at(125, radius).x - 19,
-            top: at(125, radius).y - 19,
-            width: "38px",
-            height: "38px",
-            background: "none",
+            left: at(125, radius).x - iconBtnSize / 2,
+            top: at(125, radius).y - iconBtnSize / 2,
+            width: iconBtnSize,
+            height: iconBtnSize,
+            borderRadius: "50%",
+            background: "transparent",
             border: "none",
             cursor: "pointer",
           }}
@@ -180,32 +170,15 @@ export function RadialMenu({
 
         <button
           type="button"
-          onClick={() => { setChartType(chartType === "candle" ? "line" : "candle"); onClose(); }}
-          className={`absolute flex items-center justify-center text-white hover:scale-110 transition-transform ${chartType === "line" ? "scale-125 text-[#00d4ff]" : ""}`}
-          style={{
-            left: at(225, radius).x - 19,
-            top: at(225, radius).y - 19,
-            width: "38px",
-            height: "38px",
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-          }}
-          title="Chart type"
-        >
-          <BarChart2 size={23} />
-        </button>
-
-        <button
-          type="button"
           onClick={() => { setShowIndicators(true); onClose(); }}
-          className="absolute flex items-center justify-center text-white hover:scale-110 transition-transform"
+          className="absolute flex items-center justify-center text-blue-100 hover:text-white hover:scale-110 transition-all"
           style={{
-            left: at(195, radius).x - 19,
-            top: at(195, radius).y - 19,
-            width: "38px",
-            height: "38px",
-            background: "none",
+            left: at(195, radius).x - iconBtnSize / 2,
+            top: at(195, radius).y - iconBtnSize / 2,
+            width: iconBtnSize,
+            height: iconBtnSize,
+            borderRadius: "50%",
+            background: "transparent",
             border: "none",
             cursor: "pointer",
           }}
@@ -216,19 +189,42 @@ export function RadialMenu({
 
         <button
           type="button"
-          onClick={onClose}
-          className="absolute flex items-center justify-center text-white hover:bg-white/20 rounded-full transition-colors"
+          onClick={() => { setChartType(chartType === "candle" ? "line" : "candle"); onClose(); }}
+          className={`absolute flex items-center justify-center transition-all ${
+            chartType === "line" ? "text-[#00d4ff] scale-125" : "text-blue-100 hover:text-white hover:scale-110"
+          }`}
           style={{
-            left: centerX - 16,
-            top: centerY - 16,
-            width: "32px",
-            height: "32px",
+            left: at(225, radius).x - iconBtnSize / 2,
+            top: at(225, radius).y - iconBtnSize / 2,
+            width: iconBtnSize,
+            height: iconBtnSize,
+            borderRadius: "50%",
             background: "transparent",
             border: "none",
             cursor: "pointer",
           }}
+          title="Chart type"
         >
-          <X size={20} />
+          <BarChart2 size={23} />
+        </button>
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute flex items-center justify-center text-blue-100 hover:text-white hover:bg-[#1456D9] transition-all"
+          style={{
+            left: centerX - centerBtnSize / 2,
+            top: centerY - centerBtnSize / 2,
+            width: centerBtnSize,
+            height: centerBtnSize,
+            borderRadius: "50%",
+            background: "transparent",
+            border: "1px solid rgba(170, 200, 255, 0.3)",
+            cursor: "pointer",
+          }}
+          title="Close"
+        >
+          <X size={22} />
         </button>
       </div>
     </div>
