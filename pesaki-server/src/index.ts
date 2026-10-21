@@ -2,6 +2,7 @@ import 'dotenv/config';
 import fastify from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
+import { createClient } from '@supabase/supabase-js'; // 👈 Added Supabase for backend queries
 import { env } from './config/env';
 import { logger } from './utils/logger';
 import { initSocket } from './socket';
@@ -25,6 +26,65 @@ import adminRoutes from './routes/admin';
 import userRoutes from './routes/user';
 import { bfxRoutes } from './routes/binaryFx';
 
+// ─── SUPABASE BACKEND CLIENT ───
+// Make sure you have SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in your .env file
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// ─── HOUSE RISK CACHE (Prevents DB Spam) ───
+const houseRiskCache: Record<string, { netLots: number; totalProfit: number }> = {};
+
+async function updateHouseRiskCache() {
+  try {
+    // 1. Fetch all open forex trades from the database
+    const { data: openTrades, error } = await supabase
+      .from('forex_trades') // ⚠️ Change this if your table is named differently (e.g., 'positions' or 'trades')
+      .select('symbol, side, lots, entry_price')
+      .eq('status', 'open');
+
+    if (error) {
+      logger.error({ err: error.message }, "Failed to fetch open trades for risk cache");
+      return;
+    }
+
+    if (!openTrades || openTrades.length === 0) return;
+
+    // Reset cache
+    for (const symbol of Object.keys(houseRiskCache)) {
+      houseRiskCache[symbol] = { netLots: 0, totalProfit: 0 };
+    }
+
+    const engine = getEngine();
+
+    for (const trade of openTrades) {
+      const symbol = trade.symbol;
+      if (!houseRiskCache[symbol]) {
+        houseRiskCache[symbol] = { netLots: 0, totalProfit: 0 };
+      }
+
+      // 2. Calculate Net Lots (Buyers vs Sellers)
+      if (trade.side === 'buy') houseRiskCache[symbol].netLots += Number(trade.lots);
+      if (trade.side === 'sell') houseRiskCache[symbol].netLots -= Number(trade.lots);
+
+      // 3. Calculate Unrealized Profit
+      const currentPrice = engine.quote(symbol).mid;
+      const entryPrice = Number(trade.entry_price);
+      
+      const priceDiff = trade.side === 'buy' 
+        ? (currentPrice - entryPrice) 
+        : (entryPrice - currentPrice);
+      
+      // Standard lot size of 100,000
+      const pnl = priceDiff * Number(trade.lots) * 100000; 
+      houseRiskCache[symbol].totalProfit += pnl;
+    }
+  } catch (error) {
+    logger.error(error, "Failed to update House Risk Cache");
+  }
+}
+// ─────────────────────────────────────────────
+
 const startServer = async () => {
   try {
     const server = fastify({ logger: true });
@@ -38,10 +98,8 @@ const startServer = async () => {
     await server.register(multipart);
     await setupRateLimit(server);
 
-    // Register old routes from api/routes (does not include wallet now)
     registerRoutes(server);
 
-    // Register new routes explicitly (these override if there's a conflict)
     server.register(walletRoutes);
     server.register(kaziRoutes);
     server.register(mpesaRoutes);
@@ -50,10 +108,8 @@ const startServer = async () => {
     server.register(referralRoutes);
     server.register(adminRoutes);
     server.register(userRoutes);
-    // Binary FX: isolated from /games/fx and /forex. Own routes, own table.
     server.register(bfxRoutes, { prefix: '/games/bfx' });
 
-    // Add dummy endpoints for missing ones
     server.get('/user/stats', async (_request, reply) => {
       return reply.send({
         activeTrades: 0,
@@ -75,19 +131,26 @@ const startServer = async () => {
     startUpDownRounds();
     initCronJobs();
 
-    // PESAKI Forex: the market engine and the SL/TP monitor must run
-    // independently of the browser. Prices keep advancing and stops keep
-    // triggering while nobody has a tab open.
-    //
-    // Hydrate from persistence first so the price walk and candle history
-    // continue from where they left off, then attach the persistence hooks
-    // before starting so the first live tick already gets archived.
+    // ─── FOREX ENGINE SETUP ───
     const stopPersistence = await hydrateAndAttach(getEngine());
+    
+    // Inject the House Risk Logic into the Engine
+    getEngine().exposureProvider = (symbol: string) => {
+      return houseRiskCache[symbol]?.netLots || 0;
+    };
+    
+    getEngine().totalProfitProvider = (symbol: string) => {
+      return houseRiskCache[symbol]?.totalProfit || 0;
+    };
+
     getEngine().start();
     startPositionMonitor();
-    // Binary FX expiry worker: settles trades whose expires_at has passed,
-    // regardless of whether the user has the app open.
     startBinaryFxExpiryWorker();
+
+    // Update the risk cache every 2 seconds so we don't spam the DB
+    setInterval(updateHouseRiskCache, 2000);
+    updateHouseRiskCache(); // Run once immediately on startup
+    // ──────────────────────────
 
     const shutdown = () => {
       logger.info('Shutting down PESAKI Forex engine');
