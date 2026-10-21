@@ -28,6 +28,7 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
   const [radialPosition, setRadialPosition] = useState<{ x: number; y: number } | null>(null);
   const [showCrosshair, setShowCrosshair] = useState(false);
   const [showIndicators, setShowIndicators] = useState(false);
+  const [showBulkMenu, setShowBulkMenu] = useState(false);
   const [chartType, setChartType] = useState<"candle" | "line">("candle");
 
   const [depositOpen, setDepositOpen] = useState(false);
@@ -104,9 +105,18 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
   const sellBg = q?.dir < 0 ? "bg-[#b71c1c] hover:bg-[#c62828]" : "bg-[#c62828] hover:bg-[#b71c1c]";
   const buyBg = q?.dir > 0 ? "bg-[#0d47a1] hover:bg-[#1565c0]" : "bg-[#1565c0] hover:bg-[#0d47a1]";
 
-  const handleCloseAll = () => {
-    if (window.confirm("Close all open positions?")) {
-      e.positions.forEach((p) => e.closePosition(p.ticket, "manual", p.lots));
+  const handleBatchClose = (filter: "all" | "profit" | "loss") => {
+    if (filter === "all" || window.confirm("Close all open positions?")) {
+      e.positions.forEach((p) => {
+        const pnl = e.profitOf(p);
+        if (
+          filter === "all" ||
+          (filter === "profit" && pnl > 0) ||
+          (filter === "loss" && pnl < 0)
+        ) {
+          e.closePosition(p.ticket, "manual", p.lots);
+        }
+      });
     }
   };
 
@@ -241,7 +251,7 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
           {mobileTab === "trade" && e.positions.length > 0 && (
             <div className="p-2 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
               <h3 className="text-xs font-bold text-gray-700">Trade</h3>
-              <button onClick={handleCloseAll} className="bg-red-50 text-red-600 px-2 py-1 rounded text-[10px] font-bold hover:bg-red-100">
+              <button onClick={() => setShowBulkMenu(true)} className="bg-red-50 text-red-600 px-2 py-1 rounded text-[10px] font-bold hover:bg-red-100">
                 Close All
               </button>
             </div>
@@ -318,6 +328,33 @@ export function Terminal({ mode = "demo" }: TerminalProps) {
       </div>
 
       {dialog && <OrderDialog key={dlgKey} state={dialog} onClose={() => setDialog(null)} />}
+
+      {showBulkMenu && (
+        <div className="fixed inset-0 z-[100] flex flex-col justify-end bg-black/50" onClick={() => setShowBulkMenu(false)}>
+          <div
+            className="w-full bg-white rounded-t-2xl p-4 pb-8 animate-in slide-in-from-bottom duration-200"
+            onClick={(ev) => ev.stopPropagation()}
+          >
+            <div className="text-center font-bold text-lg mb-4 text-gray-800 border-b border-gray-200 pb-2">
+              Bulk Operations
+            </div>
+
+            <button onClick={() => handleBatchClose("all")} className="w-full text-left py-3 text-base text-gray-700 hover:bg-gray-50 border-b border-gray-100">
+              Close All Positions
+            </button>
+            <button onClick={() => handleBatchClose("profit")} className="w-full text-left py-3 text-base text-gray-700 hover:bg-gray-50 border-b border-gray-100">
+              Close Profitable Positions
+            </button>
+            <button onClick={() => handleBatchClose("loss")} className="w-full text-left py-3 text-base text-gray-700 hover:bg-gray-50 border-b border-gray-100">
+              Close Losing Positions
+            </button>
+
+            <button onClick={() => setShowBulkMenu(false)} className="w-full text-center py-3 mt-4 text-base font-bold text-[#1565c0]">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
