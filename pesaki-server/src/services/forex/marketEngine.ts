@@ -1,4 +1,4 @@
-﻿/**
+/**
  * PESAKI Forex — internal market engine.
  *
  * This is PESAKI's own price source. It is deliberately NOT a feed of real
@@ -100,7 +100,7 @@ export function loadConfig(): EngineConfig {
 
   return {
     seed: num("PESAKI_FX_SEED", 20260101),
-    tickIntervalMs: Math.max(250, num("PESAKI_FX_TICK_MS", 1000)),
+    tickIntervalMs: Math.max(250, num("PESAKI_FX_TICK_MS", 300)),
     volatility: num("PESAKI_FX_VOLATILITY", 0.00004),
     spreadPipsMin: num("PESAKI_FX_SPREAD_MIN_PIPS", 0.4),
     spreadPipsMax: num("PESAKI_FX_SPREAD_MAX_PIPS", 1.6),
@@ -112,6 +112,18 @@ export function loadConfig(): EngineConfig {
 
 export function getInstrumentSpec(symbol: string): InstrumentSpec | undefined {
   return INSTRUMENTS[symbol.toUpperCase()];
+}
+
+/**
+ * Box-Muller Gaussian random generator — returns a standard normal (mean 0, std 1).
+ * Uses the provided PRNG (rng) for determinism: same seed => same series.
+ * Gives the natural bell-curve price movement MT5 uses, not uniform steps.
+ */
+function gaussianRandom(rng: () => number): number {
+  let u = 0, v = 0;
+  while (u === 0) u = rng();
+  while (v === 0) v = rng();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
 }
 
 /**
@@ -180,6 +192,9 @@ export class MarketEngine {
   /** Per-symbol walk state. */
   private mid: Record<string, number> = {};
   private counter: Record<string, number> = {};
+  /** Per-symbol drift that changes every 30s, range ±0.00002 (in price units). */
+  private drift: Record<string, number> = {};
+  private lastDriftChange: Record<string, number> = {};
   /** Closed candles per symbol per interval. */
   private candles: Record<string, Partial<Record<Interval, Candle[]>>> = {};
   private startedAt: number;
@@ -247,19 +262,45 @@ export class MarketEngine {
     const n = this.counter[key]++;
     const rng = mulberry32(tickSeed(this.config.seed, key, n));
 
-    // Mean-reverting random walk: drift is damped so a long-running process
-    // cannot drift to an absurd price, and the step is scaled by price so
-    // 151.42 JPY and 1.12 EUR behave comparably in relative terms.
+    // Drift changes every 30 seconds, range ±0.00002 (in price units).
+    // Gives the random walk a slow directional bias like real market sentiment.
+    if (atMs - (this.lastDriftChange[key] ?? atMs) > 30_000) {
+      this.drift[key] = (rng() - 0.5) * 0.00004;
+      this.lastDriftChange[key] = atMs;
+    }
+
     const current = this.mid[key];
-    const shock = (rng() - 0.5) * 2 * this.config.volatility;
+
+    // Gaussian random component for natural MT5-style price movement.
+    const random = gaussianRandom(rng) * this.config.volatility * 0.5;
+
+    // Mean reversion: pull back toward the seed price so prices don't run away.
     const pull = (DEFAULT_INITIAL_PRICES[key] - current) / DEFAULT_INITIAL_PRICES[key];
-    const next = roundToDigits(current * (1 + shock + pull * 0.02), spec.digits);
+
+    // Compute candidate price with drift, mean reversion, and Gaussian random.
+    const candidate = current + (this.drift[key] ?? 0) + pull * current * 0.02 + random;
+
+    // ─── ANTI-SPIKE FILTER ────────────────────────────────────────────────
+    // Cap max jump per tick to prevent long needles.
+    // M1: 15 pips, M5: 25 pips, H4: 100 pips per tick max.
+    // Since the tick interval is 300ms, each tick represents a short slice.
+    const maxJump = spec.pipSize * 15; // 15 pips per tick max
+    const delta = candidate - current;
+    let next: number;
+    if (Math.abs(delta) > maxJump) {
+      next = roundToDigits(current + Math.sign(delta) * maxJump, spec.digits);
+    } else {
+      next = roundToDigits(candidate, spec.digits);
+    }
+
     this.mid[key] = next;
 
     // Spread drawn per tick within the configured band. Applied to every fill.
-    const pipRange = this.config.spreadPipsMax - this.config.spreadPipsMin;
-    const spreadPips = roundToDigits(this.config.spreadPipsMin + rng() * pipRange, 2);
-    const halfSpread = (spreadPips * spec.pipSize) / 2;
+    const spreadPips = roundToDigits(this.config.spreadPipsMin + rng() * (this.config.spreadPipsMax - this.config.spreadPipsMin), 2);
+    // Ensure the spread is always at least half a pip unit after rounding, so bid
+    // and ask never collapse to the same displayed price (e.g. KES/USD where the
+    // pip size equals the display precision).
+    const halfSpread = Math.max((spreadPips * spec.pipSize) / 2, 0.5 / Math.pow(10, spec.digits));
 
     this.recordTick(key, next, atMs);
 
@@ -355,9 +396,17 @@ export class MarketEngine {
 
       for (let i = 0; i < steps; i++) {
         const at = startMs + i * this.config.tickIntervalMs;
-        const shock = (rng() - 0.5) * 2 * this.config.volatility;
+        const random = gaussianRandom(rng) * this.config.volatility * 0.5;
         const pull = (DEFAULT_INITIAL_PRICES[symbol] - price) / DEFAULT_INITIAL_PRICES[symbol];
-        price = roundToDigits(price * (1 + shock + pull * 0.02), spec.digits);
+        // Spike cap for history generation too.
+        const candidate = price + pull * price * 0.02 + random;
+        const maxJump = spec.pipSize * 15;
+        const delta = candidate - price;
+        if (Math.abs(delta) > maxJump) {
+          price = roundToDigits(price + Math.sign(delta) * maxJump, spec.digits);
+        } else {
+          price = roundToDigits(candidate, spec.digits);
+        }
         const bucketMs = INTERVALS["1m"] * 1000;
         const bucket = Math.floor(at / bucketMs) * bucketMs;
         const last = series[series.length - 1];
@@ -378,6 +427,9 @@ export class MarketEngine {
         }
       }
       this.candles[symbol]["1m"] = series;
+      // Sync the current mid to the last generated historical price so that
+      // getCandles' extension and the live quote agree.
+      this.mid[symbol] = series.length ? series[series.length - 1].close : this.mid[symbol];
 
       // Aggregate the 1m series into the coarser intervals so timeframe
       // switching works immediately without waiting for real ticks to fill.
@@ -423,6 +475,52 @@ export class MarketEngine {
     }
 
     return series.slice(-Math.max(1, count));
+  }
+
+  /**
+   * Return the latest (possibly open) candle for a symbol+interval.
+   * Used by WebSocket broadcast to push real-time updates.
+   */
+  getLatestCandle(symbol: string, interval: Interval): Candle | null {
+    const key = symbol.toUpperCase();
+    const series = this.candles[key]?.[interval];
+    if (!series || series.length === 0) return null;
+
+    const seconds = INTERVALS[interval];
+    const bucketMs = seconds * 1000;
+    const now = Date.now();
+    const currentBucket = Math.floor(now / bucketMs) * bucketMs;
+
+    const last = series[series.length - 1];
+    if (last.timestamp < currentBucket) {
+      // Current bucket is still open — create a flat candle from last close
+      const mid = this.mid[key];
+      return {
+        timestamp: currentBucket,
+        open: last.close,
+        high: Math.max(last.close, mid),
+        low: Math.min(last.close, mid),
+        close: mid,
+        tickVolume: 0,
+      };
+    }
+    return last;
+  }
+
+  /**
+   * Return candles older than `beforeTs` for scroll-back history.
+   * Returns { candles, hasMore } so the frontend knows when to stop requesting.
+   */
+  getCandlesBefore(symbol: string, interval: Interval, beforeTs: number, count: number): { candles: Candle[]; hasMore: boolean } {
+    const key = symbol.toUpperCase();
+    const series = this.candles[key]?.[interval] ?? [];
+    // Filter to candles with timestamp < beforeTs
+    const filtered = series.filter((c) => c.timestamp < beforeTs);
+    const hasMore = filtered.length >= count + 1;
+    return {
+      candles: filtered.slice(-count),
+      hasMore,
+    };
   }
 
   /** Daily change in pips and percent, for the market watch list. */
