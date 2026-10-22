@@ -117,26 +117,15 @@ export function Terminal({ mode = "demo" }: { mode?: "demo" | "real" }) {
             </div>
             
             {mode === "real" ? (
-              <>
-                <div className="text-xs font-mono font-bold text-gray-900">
-                  KSh {money(e.liveKesBalance)}
-                </div>
-                <div className="text-[10px] font-mono text-green-600 font-bold">
-                  ≈ ${money(e.liveBalance)}
-                </div>
-              </>
+              <div className="text-xs font-mono font-bold text-green-600">
+                KSh {money(e.liveKesBalance)}
+              </div>
             ) : (
               <div className="text-xs font-mono font-bold text-gray-900">${money(e.demoBalance)}</div>
             )}
           </div>
           
-          <button 
-            onClick={() => {
-              if (mode === "real") window.location.href = "/wallet"; 
-              else setDepositOpen(true);
-            }} 
-            className="p-1.5 bg-gray-100 rounded text-gray-700 hover:bg-gray-200"
-          >
+          <button onClick={() => { if (mode === "real") window.location.href = "/wallet"; else setDepositOpen(true); }} className="p-1.5 bg-gray-100 rounded text-gray-700 hover:bg-gray-200">
             <Wallet size={16} />
           </button>
         </div>
