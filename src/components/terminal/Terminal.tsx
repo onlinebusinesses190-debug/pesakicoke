@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { TIMEFRAMES, type TF } from "@/lib/trading/engine";
 import { money, useEngine } from "@/lib/trading/use-engine";
 import { MarketWatch } from "./MarketWatch";
@@ -76,6 +76,23 @@ export function Terminal() {
   const s = e.spec(symbol);
   const q = e.quotes[symbol];
 
+  // ─── FLASH ANIMATION STATE ───
+  const [flash, setFlash] = useState<"up" | "down" | "none">("none");
+  const prevBid = useRef(q?.bid);
+
+  useEffect(() => {
+    if (!q) return;
+    if (prevBid.current !== undefined && prevBid.current !== null) {
+      if (q.bid > prevBid.current) setFlash("up");
+      else if (q.bid < prevBid.current) setFlash("down");
+    }
+    prevBid.current = q.bid;
+    
+    // Revert to normal colors after 300ms
+    const timer = setTimeout(() => setFlash("none"), 300);
+    return () => clearTimeout(timer);
+  }, [q?.bid]);
+
   const open = (d: DialogState) => { setDlgKey(k => k + 1); setDialog(d); };
   const handleTrade = (direction: "buy" | "sell") => open({ mode: "new", symbol, type: direction, lots }); 
   
@@ -102,17 +119,15 @@ export function Terminal() {
     );
   };
 
-  // ─── DYNAMIC FULL COLOR SWAP ───
+  // ─── DYNAMIC FLASH COLORS ───
   let sellBg = "bg-[#c62828]"; // Default Red
   let buyBg = "bg-[#1565c0]";  // Default Blue
 
-  if (q?.dir === 1) {
-    // Market ticked UP -> Both Blue
-    sellBg = "bg-[#1565c0]";
+  if (flash === "up") {
+    sellBg = "bg-[#1565c0]"; // Both Blue
     buyBg = "bg-[#1565c0]";
-  } else if (q?.dir === -1) {
-    // Market ticked DOWN -> Both Red
-    sellBg = "bg-[#c62828]";
+  } else if (flash === "down") {
+    sellBg = "bg-[#c62828]"; // Both Red
     buyBg = "bg-[#c62828]";
   }
 
@@ -151,7 +166,7 @@ export function Terminal() {
       <div className="flex bg-white border-b border-gray-300 select-none z-10">
         <button
           onClick={() => handleTrade("sell")}
-          className={`flex-1 ${sellBg} text-white py-1 flex flex-col items-center justify-center transition-colors duration-300`}
+          className={`flex-1 ${sellBg} text-white py-1 flex flex-col items-center justify-center transition-colors duration-150`}
         >
           <span className="text-[9px] font-bold tracking-wider opacity-90">SELL</span>
           <span className="text-lg font-bold">{renderPrice(q?.bid, s?.digits || 5)}</span>
@@ -170,7 +185,7 @@ export function Terminal() {
 
         <button
           onClick={() => handleTrade("buy")}
-          className={`flex-1 ${buyBg} text-white py-1 flex flex-col items-center justify-center transition-colors duration-300`}
+          className={`flex-1 ${buyBg} text-white py-1 flex flex-col items-center justify-center transition-colors duration-150`}
         >
           <span className="text-[9px] font-bold tracking-wider opacity-90">BUY</span>
           <span className="text-lg font-bold">{renderPrice(q?.ask, s?.digits || 5)}</span>
