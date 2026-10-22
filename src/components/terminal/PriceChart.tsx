@@ -7,17 +7,24 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
 
+  // View state for zoom and scroll
   const view = useRef({ spacing: 5, offset: 0 });
-  const pinch = useRef<{ dist: number; spacing: number } | null>(null);
+  
+  // Interaction Refs
+  const dragRef = useRef<{ startX: number; startOffset: number } | null>(null);
+  const pinchRef = useRef<{ startDist: number; startSpacing: number } | null>(null);
+  
   const loRef = useRef<number>(0);
   const hiRef = useRef<number>(0);
   const displayBid = useRef<number | null>(null);
   const displayAsk = useRef<number | null>(null);
 
+  // Sync zoom with parent state
   useEffect(() => {
     view.current.spacing = Math.min(30, Math.max(2, 5 * zoom));
   }, [zoom]);
 
+  // Reset on symbol/tf change
   useEffect(() => {
     view.current.offset = 0;
     loRef.current = 0; hiRef.current = 0;
@@ -38,6 +45,63 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
     return () => { ro.disconnect(); clearTimeout(t1); };
   }, []);
 
+  // ─── INTERACTION HANDLERS ───
+  const handlePointerDown = (e: React.PointerEvent) => {
+    // Only start drag if it's a primary button (left click) or touch
+    if (e.button !== 0 && e.pointerType === "mouse") return;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    dragRef.current = { startX: e.clientX, startOffset: view.current.offset };
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!dragRef.current) return;
+    const dx = e.clientX - dragRef.current.startX;
+    // Calculate how many candles to shift based on drag distance
+    const candleShift = Math.round(-dx / view.current.spacing);
+    
+    const all = engine?.candles?.[symbol]?.[tf] || [];
+    const maxOffset = Math.max(0, all.length - 10); // Keep at least 10 candles visible
+    
+    // Clamp the offset so we don't scroll into the void
+    view.current.offset = Math.max(0, Math.min(maxOffset, dragRef.current.startOffset + candleShift));
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    dragRef.current = null;
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    // Zoom in/out with mouse wheel
+    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+    view.current.spacing = Math.min(30, Math.max(2, view.current.spacing * zoomFactor));
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      pinchRef.current = { startDist: dist, startSpacing: view.current.spacing };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && pinchRef.current) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const scale = dist / pinchRef.current.startDist;
+      view.current.spacing = Math.min(30, Math.max(2, pinchRef.current.startSpacing * scale));
+    }
+  };
+
+  const handleTouchEnd = () => {
+    pinchRef.current = null;
+  };
+
+  // ─── DRAWING LOOP ───
   useEffect(() => {
     const cv = canvasRef.current;
     if (!cv || size.w === 0 || size.h === 0) return;
@@ -58,7 +122,7 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       cv.height = Math.floor(size.h * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       
-      const cBg = "#ffffff", cGrid = "#e5e5e5", cText = "#000000", cBull = "#089981", cBear = "#F23645", cAxisBg = "#f8f9fa";
+      const cBg = "#ffffff", cGrid = "#f0f3fa", cText = "#000000", cBull = "#089981", cBear = "#F23645", cAxisBg = "#f8f9fa";
       const W = size.w, H = size.h, axisW = 64, axisH = 22;
       const plotW = W - axisW, plotH = H - axisH;
 
@@ -67,6 +131,7 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
 
       if (!q || !spec || all.length === 0) return;
 
+      // Smooth live price
       if (displayBid.current === null) {
         displayBid.current = q.bid;
         displayAsk.current = q.ask;
@@ -83,7 +148,8 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       const end = all.length - view.current.offset;
       let bars = all.slice(Math.max(0, end - count), end);
 
-      if (view.current.offset === 0) {
+      // Update live candle ONLY if we are at the live edge (offset === 0)
+      if (view.current.offset === 0 && bars.length > 0) {
         const last = bars[bars.length - 1];
         bars = [...bars];
         bars[bars.length - 1] = { ...last, c: smoothMid, h: Math.max(last.h, smoothMid, smoothAsk), l: Math.min(last.l, smoothMid, smoothBid) };
@@ -98,6 +164,7 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         if (p.tp) { lo = Math.min(lo, p.tp); hi = Math.max(hi, p.tp); }
       }
 
+      // Include Bid/Ask in scale ONLY if we are at the live edge
       if (view.current.offset === 0) { lo = Math.min(lo, smoothBid); hi = Math.max(hi, smoothAsk); }
       
       const pad = (hi - lo) * 0.15 || spec.point * 10;
@@ -114,7 +181,7 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       const y = (p: number) => plotH - ((p - smoothLo) / (smoothHi - smoothLo)) * plotH;
       const xOf = (i: number) => plotW - 12 - (bars.length - i - 0.5) * sp;
 
-      // ─── Y-AXIS (Forced 11px Font) ───
+      // ─── Y-AXIS ───
       ctx.font = "11px Arial, sans-serif"; 
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
@@ -167,7 +234,7 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         if (bw > 2) ctx.fillRect(x - bw / 2, top, bw, bh);
       });
 
-      // ─── CHART TOP-LEFT TEXT OVERLAY ───
+      // ─── TOP-LEFT TEXT OVERLAY ───
       ctx.fillStyle = "#1565c0";
       ctx.font = "bold 12px Arial, sans-serif";
       ctx.fillText(`${symbol} ▼ ${tf}`, 8, 15);
@@ -175,7 +242,7 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       ctx.font = "11px Arial, sans-serif";
       ctx.fillText(spec.desc || "", 8, 30);
 
-      // ─── POSITION LINES (Dashed with white bg) ───
+      // ─── POSITION LINES ───
       symbolPositions.forEach((p: any) => {
         if (p.openPrice < smoothLo || p.openPrice > smoothHi) return;
         const yy = Math.round(y(p.openPrice)) + 0.5;
@@ -189,7 +256,6 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         const txt = `${p.side.toUpperCase()} ${p.lots.toFixed(2)}   ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD`;
         const txtWidth = ctx.measureText(txt).width;
         
-        // White bg for text
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(4, yy - 16, txtWidth + 8, 16);
         
@@ -221,7 +287,7 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       const tfSeconds = TIMEFRAMES[tf];
       const now = Date.now() / 1000;
       let timerStr = "";
-      if (all.length > 0) {
+      if (all.length > 0 && view.current.offset === 0) {
         const lastCandle = all[all.length - 1];
         const candleCloseTime = lastCandle.t + tfSeconds;
         const remaining = candleCloseTime - now;
@@ -230,8 +296,11 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         }
       }
 
-      drawBox(smoothAsk, cBear);
-      drawBox(smoothBid, cBull, timerStr);
+      // Only draw the live price lines if we are at the live edge (or close to it)
+      if (view.current.offset === 0) {
+        drawBox(smoothAsk, cBear);
+        drawBox(smoothBid, cBull, timerStr);
+      }
     };
 
     frameId = requestAnimationFrame(draw);
@@ -239,8 +308,19 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
   }, [size.w, size.h, engine, symbol, tf]);
 
   return (
-    <div ref={wrapRef} className="absolute inset-0 touch-none overflow-hidden bg-white">
-      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full block" style={{ width: size.w, height: size.h }} />
+    <div 
+      ref={wrapRef} 
+      className="absolute inset-0 touch-none overflow-hidden bg-white overscroll-none"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerUp}
+      onWheel={handleWheel}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full block cursor-crosshair" style={{ width: size.w, height: size.h }} />
     </div>
   );
 }
