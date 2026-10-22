@@ -4,7 +4,7 @@ import { money, useEngine } from "@/lib/trading/use-engine";
 import { MarketWatch } from "./MarketWatch";
 import { PriceChart } from "./PriceChart";
 import { OrderDialog, type DialogState } from "./OrderDialog";
-import { Wallet, Menu, ArrowLeftRight, BarChart3, Clock, MessageSquare, List, X, Crosshair, Settings, ChevronUp, ChevronDown } from "lucide-react";
+import { Wallet, Menu, ArrowLeftRight, BarChart3, Clock, MessageSquare, List, ChevronUp, ChevronDown, X, Crosshair, Settings } from "lucide-react";
 
 export function Terminal() {
   const e = useEngine();
@@ -16,7 +16,11 @@ export function Terminal() {
   
   const [lots, setLots] = useState(0.01); 
   const [mobileTab, setMobileTab] = useState<"chart" | "market" | "positions" | "history" | "messages">("chart");
+  
+  // Radial Menu State
   const [showRadial, setShowRadial] = useState(false);
+
+  // Bulk Menu State
   const [showBulkMenu, setShowBulkMenu] = useState(false);
   
   // Deposit State
@@ -115,7 +119,10 @@ export function Terminal() {
 
         {/* Main Chart Area */}
         <main className={`order-1 md:order-2 flex-1 flex flex-col min-w-0 h-[65vh] md:h-auto ${mobileTab === "chart" ? "flex" : "hidden md:flex"}`}>
-          <div className="flex-1 relative bg-white w-full h-full min-h-[300px]" onClick={() => setShowRadial(true)}>
+          <div 
+            className="flex-1 relative bg-white w-full h-full min-h-[300px]" 
+            onClick={() => setShowRadial(true)}
+          >
             <PriceChart engine={e} symbol={symbol} tf={tf} zoom={zoom} />
           </div>
         </main>
@@ -123,7 +130,6 @@ export function Terminal() {
         {/* Positions / History / Messages View */}
         <div className={`order-3 md:w-80 md:h-auto border-t md:border-t-0 md:border-l border-gray-300 bg-white overflow-y-auto ${["positions", "history", "messages"].includes(mobileTab) ? "block flex-1" : "hidden md:block"}`}>
           
-          {/* Account Summary Header */}
           <div className="bg-[#f8f9fa] border-b border-gray-300 p-3 text-[11px] text-gray-700 space-y-1">
             <div className="flex justify-between"><span>Balance:</span> <span className="font-mono">{money(e.balance)}</span></div>
             <div className="flex justify-between"><span>Equity:</span> <span className="font-mono">{money(e.equity)}</span></div>
@@ -131,7 +137,6 @@ export function Terminal() {
             <div className="flex justify-between"><span>Free Margin:</span> <span className="font-mono">{money(e.freeMargin)}</span></div>
           </div>
 
-          {/* POSITIONS TAB */}
           {mobileTab === "positions" && (
             <div>
               <div className="p-2 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
@@ -175,7 +180,6 @@ export function Terminal() {
             </div>
           )}
 
-          {/* HISTORY TAB */}
           {mobileTab === "history" && (
             <div>
               <div className="p-2 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
@@ -207,7 +211,6 @@ export function Terminal() {
             </div>
           )}
 
-          {/* MESSAGES TAB */}
           {mobileTab === "messages" && (
             <div className="p-4 text-center text-xs text-gray-500">
               No new messages from the server.
@@ -286,13 +289,49 @@ export function Terminal() {
         </div>
       )}
 
-      {/* Radial Menu (Highly Polished MT5 Version) */}
-      <RadialMenu 
-        isOpen={showRadial} 
-        onClose={() => setShowRadial(false)} 
-        currentTf={tf} 
-        onSelectTf={(newTf: TF) => { setTf(newTf); setShowRadial(false); }} 
-      />
+      {/* RADIAL MENU - CLEAN PROFESSIONAL VERSION */}
+      {showRadial && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-[2px]" onClick={() => setShowRadial(false)}>
+          <div 
+            className="relative w-[280px] h-[280px] rounded-full border-[28px] border-[#1565c0]/90 shadow-2xl flex items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Center Close Area */}
+            <button onClick={() => setShowRadial(false)} className="absolute inset-0 m-auto w-12 h-12 rounded-full bg-transparent hover:bg-black/10 flex items-center justify-center">
+               <X className="text-white/60" size={24} />
+            </button>
+
+            {/* Timeframes */}
+            {["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1"].map((t, i) => {
+              const total = 8;
+              const angle = (i / total) * 2 * Math.PI - Math.PI / 2;
+              const radius = 140; 
+              const x = Math.cos(angle) * radius;
+              const y = Math.sin(angle) * radius;
+
+              return (
+                <button
+                  key={t}
+                  onClick={() => { setTf(t as TF); setShowRadial(false); }}
+                  className={`absolute w-8 h-8 flex items-center justify-center text-[11px] font-bold rounded-full transition-transform hover:scale-125 ${
+                    tf === t ? "text-white bg-[#0d47a1] shadow-md" : "text-blue-100 hover:text-white"
+                  }`}
+                  style={{ transform: `translate(${x}px, ${y}px)` }}
+                >
+                  {t}
+                </button>
+              );
+            })}
+
+            {/* Inner Tools */}
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 flex flex-col gap-6 text-blue-100/80">
+              <Crosshair size={18} className="hover:text-white cursor-pointer hover:scale-110 transition-transform" />
+              <BarChart3 size={18} className="hover:text-white cursor-pointer hover:scale-110 transition-transform" />
+              <Settings size={18} className="hover:text-white cursor-pointer hover:scale-110 transition-transform" />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bulk Operations Bottom Sheet */}
       {showBulkMenu && (
@@ -306,59 +345,6 @@ export function Terminal() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-// ─── HIGHLY POLISHED RADIAL MENU COMPONENT ───
-function RadialMenu({ isOpen, onClose, currentTf, onSelectTf }: any) {
-  if (!isOpen) return null;
-  const timeframes = ["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1"];
-
-  return (
-    <div 
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" 
-      onClick={onClose}
-    >
-      <div 
-        className="relative w-[280px] h-[280px] rounded-full border-[32px] border-[#1565c0]/90 shadow-2xl flex items-center justify-center bg-transparent"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button 
-          onClick={onClose}
-          className="w-12 h-12 bg-black/20 rounded-full flex items-center justify-center text-white/70 hover:bg-black/40 hover:text-white transition-colors"
-        >
-          <X size={24} />
-        </button>
-
-        {timeframes.map((tfStr, i) => {
-          const angle = (i / timeframes.length) * 2 * Math.PI - Math.PI / 2;
-          const radius = 140; 
-          const x = Math.cos(angle) * radius;
-          const y = Math.sin(angle) * radius;
-
-          return (
-            <button
-              key={tfStr}
-              onClick={() => onSelectTf(tfStr)}
-              className={`absolute w-9 h-9 flex items-center justify-center text-xs font-bold rounded-full transition-all ${
-                currentTf === tfStr 
-                  ? "text-white bg-[#0d47a1] shadow-lg scale-125" 
-                  : "text-blue-100 hover:text-white hover:scale-110"
-              }`}
-              style={{ transform: `translate(${x}px, ${y}px)` }}
-            >
-              {tfStr}
-            </button>
-          );
-        })}
-
-        <div className="absolute left-[-16px] top-1/2 -translate-y-1/2 flex flex-col gap-5 text-blue-100/80">
-          <Crosshair size={16} className="hover:text-white cursor-pointer" />
-          <BarChart3 size={16} className="hover:text-white cursor-pointer" />
-          <Settings size={16} className="hover:text-white cursor-pointer" />
-        </div>
-      </div>
     </div>
   );
 }
