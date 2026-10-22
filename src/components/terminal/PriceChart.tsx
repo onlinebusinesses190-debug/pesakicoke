@@ -9,14 +9,19 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
 
   const view = useRef({ spacing: 5, offset: 0 });
   const pinch = useRef<{ dist: number; spacing: number } | null>(null);
-  const crosshair = useRef<{ x: number; y: number } | null>(null);
-  
+  const loRef = useRef<number>(0);
+  const hiRef = useRef<number>(0);
+  const displayBid = useRef<number | null>(null);
+  const displayAsk = useRef<number | null>(null);
+
   useEffect(() => {
     view.current.spacing = Math.min(30, Math.max(2, 5 * zoom));
   }, [zoom]);
 
   useEffect(() => {
     view.current.offset = 0;
+    loRef.current = 0; hiRef.current = 0;
+    displayBid.current = null; displayAsk.current = null;
   }, [symbol, tf]);
 
   useEffect(() => {
@@ -40,269 +45,206 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
     if (!ctx) return;
 
     let frameId: number;
-    const loRef = { current: 0 };
-    const hiRef = { current: 0 };
-    let displayBid: number | null = null;
-    let displayAsk: number | null = null;
 
     const draw = () => {
       frameId = requestAnimationFrame(draw);
       
-      try {
-        const dpr = window.devicePixelRatio || 1;
-        cv.width = Math.floor(size.w * dpr);
-        cv.height = Math.floor(size.h * dpr);
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        ctx.textAlign = "left";
-        ctx.textBaseline = "middle";
+      const q = engine?.quotes?.[symbol];
+      const spec = engine?.spec(symbol);
+      const all = engine?.candles?.[symbol]?.[tf] || [];
 
-        const cBg = "#ffffff", cGrid = "#f0f3fa", cText = "#000000", cBull = "#089981", cBear = "#F23645", cAxisBg = "#f8f9fa";
-        const W = size.w, H = size.h, axisW = 64, axisH = 20;
-        const plotW = W - axisW, plotH = H - axisH;
+      const dpr = window.devicePixelRatio || 1;
+      cv.width = Math.floor(size.w * dpr);
+      cv.height = Math.floor(size.h * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
 
-        // Draw background immediately
-        ctx.fillStyle = cBg; ctx.fillRect(0, 0, W, H);
-        ctx.fillStyle = cAxisBg; ctx.fillRect(plotW, 0, axisW, H);
+      const cBg = "#ffffff", cGrid = "#f0f3fa", cText = "#000000", cBull = "#089981", cBear = "#F23645", cAxisBg = "#f8f9fa";
+      const W = size.w, H = size.h, axisW = 64, axisH = 20;
+      const plotW = W - axisW, plotH = H - axisH;
 
-        if (!engine) throw new Error("Engine prop is missing.");
-        
-        const q = engine.quotes?.[symbol];
-        const spec = engine.spec(symbol);
-        const all = engine.candles?.[symbol]?.[tf] || [];
+      ctx.fillStyle = cBg; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = cAxisBg; ctx.fillRect(plotW, 0, axisW, H);
 
-        if (!q || !spec || all.length === 0) {
-          ctx.fillStyle = "#666";
-          ctx.font = "14px -apple-system, sans-serif";
-          ctx.textAlign = "center";
-          ctx.fillText("Waiting for engine data...", W / 2, H / 2);
-          return;
-        }
+      if (!q || !spec || all.length === 0) return;
 
-        if (displayBid === null) {
-          displayBid = q.bid;
-          displayAsk = q.ask;
-        } else {
-          displayBid += (q.bid - displayBid) * 0.15;
-          displayAsk += (q.ask - displayAsk) * 0.15;
-        }
-        const smoothBid = displayBid;
-        const smoothAsk = displayAsk;
-        const smoothMid = (smoothBid + smoothAsk) / 2;
-
-        const sp = view.current.spacing;
-        const count = Math.max(5, Math.floor((plotW - 12) / sp));
-        const end = all.length - view.current.offset;
-        let bars = all.slice(Math.max(0, end - count), end);
-
-        if (bars.length === 0) {
-           ctx.fillStyle = "#666";
-           ctx.fillText("No candles visible...", W/2, H/2);
-           return;
-        }
-
-        // EMERGENCY SPIKE FILTER
-        const MAX_ALLOWED_WICK = spec.point * 250; 
-        bars = bars.map((b: any) => ({
-          ...b,
-          h: Math.min(b.h, Math.max(b.o, b.c) + MAX_ALLOWED_WICK),
-          l: Math.max(b.l, Math.min(b.o, b.c) - MAX_ALLOWED_WICK),
-        }));
-
-        if (view.current.offset === 0) {
-          const last = bars[bars.length - 1];
-          bars = [...bars];
-          bars[bars.length - 1] = {
-            ...last,
-            c: smoothMid,
-            h: Math.min(Math.max(last.h, smoothMid, smoothAsk), Math.max(last.o, smoothMid) + MAX_ALLOWED_WICK),
-            l: Math.max(Math.min(last.l, smoothMid, smoothBid), Math.min(last.o, smoothMid) - MAX_ALLOWED_WICK),
-          };
-        }
-
-        let lo = Infinity, hi = -Infinity;
-        for (const b of bars) { lo = Math.min(lo, b.l); hi = Math.max(hi, b.h); }
-
-        const symbolPositions = engine.positions?.filter((x: any) => x.symbol === symbol) || [];
-        for (const p of symbolPositions) {
-          if (p.sl) { lo = Math.min(lo, p.sl); hi = Math.max(hi, p.sl); }
-          if (p.tp) { lo = Math.min(lo, p.tp); hi = Math.max(hi, p.tp); }
-        }
-
-        if (view.current.offset === 0) { lo = Math.min(lo, smoothBid); hi = Math.max(hi, smoothAsk); }
-        
-        if (lo === Infinity || hi === -Infinity || isNaN(lo) || isNaN(hi)) {
-          throw new Error("Invalid Y-Axis bounds (NaN or Infinity).");
-        }
-
-        const pad = (hi - lo) * 0.15 || spec.point * 10;
-        const rawLo = lo - pad, rawHi = hi + pad;
-
-        if (loRef.current === 0 && hiRef.current === 0) {
-          loRef.current = rawLo; hiRef.current = rawHi;
-        }
-        loRef.current += (rawLo - loRef.current) * 0.15;
-        hiRef.current += (rawHi - hiRef.current) * 0.15;
-
-        const smoothLo = loRef.current;
-        const smoothHi = hiRef.current;
-        const y = (p: number) => plotH - ((p - smoothLo) / (smoothHi - smoothLo)) * plotH;
-        const xOf = (i: number) => plotW - 12 - (bars.length - i - 0.5) * sp;
-
-        ctx.font = "11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"; 
-
-        const targetPixels = 22; 
-        const rawStep = (smoothHi - smoothLo) / (plotH / targetPixels);
-        const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
-        const norm = rawStep / mag;
-        let niceNorm = 1;
-        if (norm > 5) niceNorm = 10; else if (norm > 2) niceNorm = 5; else if (norm > 1) niceNorm = 2;
-        const step = niceNorm * mag;
-
-        ctx.strokeStyle = cGrid; ctx.lineWidth = 1; ctx.setLineDash([]);
-        const startLine = Math.ceil(smoothLo / step) * step;
-        for (let p = startLine; p <= smoothHi; p += step) {
-          const yy = Math.round(y(p)) + 0.5;
-          ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke();
-          ctx.fillStyle = cText; 
-          ctx.fillText(p.toFixed(spec.digits), plotW + 4, yy);
-        }
-
-        const every = Math.max(1, Math.round(80 / sp));
-        let lastLabelX = -100;
-        for (let i = bars.length - 1; i >= 0; i -= every) {
-          const xx = Math.round(xOf(i)) + 0.5;
-          ctx.beginPath(); ctx.moveTo(xx, 0); ctx.lineTo(xx, plotH); ctx.stroke();
-          
-          if (lastLabelX - xx > 60) {
-            const d = new Date(bars[i].t * 1000);
-            const p2 = (n: number) => String(n).padStart(2, "0");
-            const day = p2(d.getDate());
-            const month = d.toLocaleString("en", { month: "short" });
-            const lbl = `${day} ${month} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
-            ctx.fillStyle = cText; 
-            ctx.fillText(lbl, xx - 24, plotH + 12);
-            lastLabelX = xx;
-          }
-        }
-
-        const bw = Math.max(1, Math.floor(sp * 0.6));
-        bars.forEach((b: any, i: number) => {
-          const x = Math.round(xOf(i)); const bull = b.c >= b.o;
-          ctx.strokeStyle = ctx.fillStyle = bull ? cBull : cBear;
-          ctx.beginPath(); ctx.moveTo(x + 0.5, y(b.h)); ctx.lineTo(x + 0.5, y(b.l)); ctx.stroke();
-          const top = y(Math.max(b.o, b.c)); const bh = Math.max(1, Math.abs(y(b.o) - y(b.c)));
-          if (bw > 2) ctx.fillRect(x - bw / 2, top, bw, bh);
-        });
-
-        // Top-left label
-        ctx.fillStyle = "#1565c0";
-        ctx.font = "bold 12px -apple-system, sans-serif";
-        ctx.fillText(`${symbol} ▼ ${tf}`, 8, 15);
-        ctx.fillStyle = "#666";
-        ctx.font = "10px -apple-system, sans-serif";
-        ctx.fillText(spec.desc || "", 8, 28);
-
-        const drawSolidPriceBox = (p: number, color: string, timerText: string = "") => {
-          if (p < smoothLo || p > smoothHi) return;
-          const yy = Math.round(y(p)) + 0.5;
-          ctx.strokeStyle = color; ctx.setLineDash([]);
-          ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke();
-          
-          ctx.fillStyle = color;
-          ctx.fillRect(plotW, yy - 10, axisW, 20);
-          
-          ctx.fillStyle = "#ffffff"; 
-          ctx.font = "11px -apple-system, sans-serif"; 
-          ctx.fillText(p.toFixed(spec.digits), plotW + 4, yy - (timerText ? 4 : 0));
-          
-          if (timerText) {
-            ctx.font = "10px -apple-system, sans-serif"; 
-            ctx.fillText(timerText, plotW + 4, yy + 6);
-          }
-        };
-
-        const drawDashedLine = (p: number, color: string, labelLeft: string) => {
-          if (p < smoothLo || p > smoothHi) return;
-          const yy = Math.round(y(p)) + 0.5;
-          ctx.strokeStyle = color; ctx.setLineDash([2, 3]);
-          ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke();
-          ctx.setLineDash([]);
-
-          ctx.strokeStyle = color; ctx.strokeRect(plotW, yy - 8, axisW, 16);
-          ctx.fillStyle = "#333";
-          ctx.fillText(p.toFixed(spec.digits), plotW + 4, yy);
-
-          if (labelLeft) {
-            const textWidth = ctx.measureText(labelLeft).width;
-            ctx.fillStyle = "#ffffff";
-            ctx.fillRect(4, yy - 16, textWidth + 8, 16);
-            ctx.fillStyle = color;
-            ctx.fillText(labelLeft, 8, yy - 8);
-          }
-        };
-
-        for (const p of symbolPositions) {
-          const pnl = engine.profitOf(p);
-          const pnlText = `${p.side.toUpperCase()} ${p.lots.toFixed(2)}   ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD`;
-          drawDashedLine(p.openPrice, p.side === "buy" ? cBull : cBear, pnlText);
-          if (p.sl) drawDashedLine(p.sl, cBear, "SL");
-          if (p.tp) drawDashedLine(p.tp, cBull, "TP");
-        }
-
-        const tfSeconds = TIMEFRAMES[tf];
-        const now = Date.now() / 1000;
-        let timerStr = "";
-        if (all.length > 0) {
-          const lastCandle = all[all.length - 1];
-          const candleCloseTime = lastCandle.t + tfSeconds;
-          const remaining = candleCloseTime - now;
-          if (remaining > 0 && remaining <= tfSeconds) {
-            const mins = Math.floor(remaining / 60);
-            const secs = Math.floor(remaining % 60);
-            timerStr = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-          }
-        }
-
-        drawSolidPriceBox(smoothAsk, cBear);
-        drawSolidPriceBox(smoothBid, cBull, timerStr);
-
-        ctx.strokeStyle = cGrid; ctx.strokeRect(0.5, 0.5, plotW, plotH);
-      } catch (err: any) {
-        ctx.fillStyle = "#ff0000";
-        ctx.font = "14px monospace";
-        ctx.textAlign = "left";
-        ctx.fillText(`CHART ERROR: ${err.message}`, 20, 100);
-        console.error("Chart Error:", err);
+      if (displayBid.current === null) {
+        displayBid.current = q.bid;
+        displayAsk.current = q.ask;
+      } else {
+        displayBid.current += (q.bid - displayBid.current) * 0.15;
+        displayAsk.current += (q.ask - displayAsk.current) * 0.15;
       }
+      const smoothBid = displayBid.current;
+      const smoothAsk = displayAsk.current;
+      const smoothMid = (smoothBid + smoothAsk) / 2;
+
+      const sp = view.current.spacing;
+      const count = Math.max(5, Math.floor((plotW - 12) / sp));
+      const end = all.length - view.current.offset;
+      let bars = all.slice(Math.max(0, end - count), end);
+
+      if (view.current.offset === 0) {
+        const last = bars[bars.length - 1];
+        bars = [...bars];
+        bars[bars.length - 1] = { ...last, c: smoothMid, h: Math.max(last.h, smoothMid, smoothAsk), l: Math.min(last.l, smoothMid, smoothBid) };
+      }
+
+      let lo = Infinity, hi = -Infinity;
+      for (const b of bars) { lo = Math.min(lo, b.l); hi = Math.max(hi, b.h); }
+
+      const symbolPositions = engine.positions?.filter((x: any) => x.symbol === symbol) || [];
+      for (const p of symbolPositions) {
+        if (p.sl) { lo = Math.min(lo, p.sl); hi = Math.max(hi, p.sl); }
+        if (p.tp) { lo = Math.min(lo, p.tp); hi = Math.max(hi, p.tp); }
+      }
+
+      if (view.current.offset === 0) { lo = Math.min(lo, smoothBid); hi = Math.max(hi, smoothAsk); }
+      
+      const pad = (hi - lo) * 0.15 || spec.point * 10;
+      const rawLo = lo - pad, rawHi = hi + pad;
+
+      if (loRef.current === 0 && hiRef.current === 0) {
+        loRef.current = rawLo; hiRef.current = rawHi;
+      }
+      loRef.current += (rawLo - loRef.current) * 0.15;
+      hiRef.current += (rawHi - hiRef.current) * 0.15;
+
+      const smoothLo = loRef.current;
+      const smoothHi = hiRef.current;
+      const y = (p: number) => plotH - ((p - smoothLo) / (smoothHi - smoothLo)) * plotH;
+      const xOf = (i: number) => plotW - 12 - (bars.length - i - 0.5) * sp;
+
+      // FORCE NORMAL FONT SIZE (Fixes the massive text bug)
+      ctx.font = "11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"; 
+
+      // Y-AXIS
+      const targetPixels = 22; 
+      const rawStep = (smoothHi - smoothLo) / (plotH / targetPixels);
+      const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
+      const norm = rawStep / mag;
+      let niceNorm = 1;
+      if (norm > 5) niceNorm = 10; else if (norm > 2) niceNorm = 5; else if (norm > 1) niceNorm = 2;
+      const step = niceNorm * mag;
+
+      ctx.strokeStyle = cGrid; ctx.lineWidth = 1; ctx.setLineDash([]);
+      const startLine = Math.ceil(smoothLo / step) * step;
+      for (let p = startLine; p <= smoothHi; p += step) {
+        const yy = Math.round(y(p)) + 0.5;
+        ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke();
+        ctx.fillStyle = cText; 
+        ctx.fillText(p.toFixed(spec.digits), plotW + 4, yy);
+      }
+
+      // X-AXIS
+      const every = Math.max(1, Math.round(80 / sp));
+      let lastLabelX = -100;
+      for (let i = bars.length - 1; i >= 0; i -= every) {
+        const xx = Math.round(xOf(i)) + 0.5;
+        ctx.beginPath(); ctx.moveTo(xx, 0); ctx.lineTo(xx, plotH); ctx.stroke();
+        if (lastLabelX - xx > 60) {
+          const d = new Date(bars[i].t * 1000);
+          const p2 = (n: number) => String(n).padStart(2, "0");
+          const lbl = `${p2(d.getDate())} Oct ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+          ctx.fillStyle = cText; 
+          ctx.fillText(lbl, xx - 30, plotH + 12);
+          lastLabelX = xx;
+        }
+      }
+
+      // CANDLES
+      const bw = Math.max(1, Math.floor(sp * 0.6));
+      bars.forEach((b: any, i: number) => {
+        const x = Math.round(xOf(i)); const bull = b.c >= b.o;
+        ctx.strokeStyle = ctx.fillStyle = bull ? cBull : cBear;
+        ctx.beginPath(); ctx.moveTo(x + 0.5, y(b.h)); ctx.lineTo(x + 0.5, y(b.l)); ctx.stroke();
+        const top = y(Math.max(b.o, b.c)); const bh = Math.max(1, Math.abs(y(b.o) - y(b.c)));
+        if (bw > 2) ctx.fillRect(x - bw / 2, top, bw, bh);
+      });
+
+      // TEXT OVERLAY
+      ctx.fillStyle = "#1565c0";
+      ctx.font = "bold 12px -apple-system, sans-serif";
+      ctx.fillText(`${symbol} ▼ ${tf}`, 8, 15);
+      ctx.fillStyle = "#666";
+      ctx.font = "10px -apple-system, sans-serif";
+      ctx.fillText(spec.desc || "", 8, 28);
+
+      // CHART LINES & PRICE BOXES
+      const drawSolidPriceBox = (p: number, color: string, timerText: string = "") => {
+        if (p < smoothLo || p > smoothHi) return;
+        const yy = Math.round(y(p)) + 0.5;
+        
+        // Solid Line
+        ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.setLineDash([]);
+        ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke();
+        ctx.lineWidth = 1;
+        
+        // Price Box
+        ctx.fillStyle = color;
+        ctx.fillRect(plotW, yy - 10, axisW, timerText ? 20 : 16);
+        
+        // Text
+        ctx.fillStyle = "#ffffff"; 
+        ctx.font = "11px -apple-system, sans-serif"; 
+        ctx.fillText(p.toFixed(spec.digits), plotW + 4, yy - (timerText ? 4 : 0));
+        
+        if (timerText) {
+          ctx.font = "10px -apple-system, sans-serif"; 
+          ctx.fillText(timerText, plotW + 4, yy + 6);
+        }
+      };
+
+      const drawPositionLine = (p: any) => {
+        if (p.openPrice < smoothLo || p.openPrice > smoothHi) return;
+        const yy = Math.round(y(p.openPrice)) + 0.5;
+        const pnl = engine.profitOf(p);
+        const pnlStr = pnl >= 0 ? `+${pnl.toFixed(2)}` : `${pnl.toFixed(2)}`;
+        
+        ctx.strokeStyle = p.side === "buy" ? "#1565c0" : "#c62828";
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = p.side === "buy" ? "#1565c0" : "#c62828";
+        ctx.font = "11px -apple-system, sans-serif";
+        
+        // White background for text
+        const txt = `${p.side.toUpperCase()} ${p.lots.toFixed(2)} ${pnlStr} USD`;
+        const txtWidth = ctx.measureText(txt).width;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(4, yy - 14, txtWidth + 8, 14);
+        
+        ctx.fillStyle = p.side === "buy" ? "#1565c0" : "#c62828";
+        ctx.fillText(txt, 8, yy - 6);
+      };
+
+      symbolPositions.forEach(drawPositionLine);
+
+      // TIMER
+      const tfSeconds = TIMEFRAMES[tf];
+      const now = Date.now() / 1000;
+      let timerStr = "";
+      if (all.length > 0) {
+        const lastCandle = all[all.length - 1];
+        const candleCloseTime = lastCandle.t + tfSeconds;
+        const remaining = candleCloseTime - now;
+        if (remaining > 0 && remaining <= tfSeconds) {
+          timerStr = `${String(Math.floor(remaining / 60)).padStart(2, "0")}:${String(Math.floor(remaining % 60)).padStart(2, "0")}`;
+        }
+      }
+
+      drawSolidPriceBox(smoothAsk, cBear);
+      drawSolidPriceBox(smoothBid, cBull, timerStr);
     };
 
     frameId = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frameId);
-  }, [size.w, size.h, chartType, showCrosshair, engine, symbol, tf]);
+  }, [size.w, size.h, engine, symbol, tf]);
 
   return (
-    <div
-      ref={wrapRef}
-      className="absolute inset-0 touch-none overflow-hidden bg-white"
-      onWheel={(ev) => { view.current.spacing = Math.min(30, Math.max(2, view.current.spacing * (ev.deltaY < 0 ? 1.15 : 0.87))); }}
-      onMouseMove={(ev) => {
-        if (!showCrosshair) return;
-        const rect = ev.currentTarget.getBoundingClientRect();
-        crosshair.current = { x: ev.clientX - rect.left, y: ev.clientY - rect.top };
-      }}
-      onMouseLeave={() => { crosshair.current = null; }}
-      onTouchStart={(ev) => { if (ev.touches.length === 2) { const dx = ev.touches[0].clientX - ev.touches[1].clientX; const dy = ev.touches[0].clientY - ev.touches[1].clientY; pinch.current = { dist: Math.sqrt(dx * dx + dy * dy), spacing: view.current.spacing }; } }}
-      onTouchMove={(ev) => {
-        if (ev.touches.length === 2 && pinch.current) {
-          ev.preventDefault();
-          const dx = ev.touches[0].clientX - ev.touches[1].clientX;
-          const dy = ev.touches[0].clientY - ev.touches[1].clientY;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          view.current.spacing = Math.min(30, Math.max(2, pinch.current.spacing * (dist / pinch.current.dist)));
-        }
-      }}
-      onTouchEnd={() => { pinch.current = null; }}
-    >
+    <div ref={wrapRef} className="absolute inset-0 touch-none overflow-hidden bg-white">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full block" style={{ width: size.w, height: size.h }} />
     </div>
   );
