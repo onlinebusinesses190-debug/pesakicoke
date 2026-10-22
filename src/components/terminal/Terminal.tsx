@@ -4,7 +4,11 @@ import { money, useEngine } from "@/lib/trading/use-engine";
 import { MarketWatch } from "./MarketWatch";
 import { PriceChart } from "./PriceChart";
 import { OrderDialog, type DialogState } from "./OrderDialog";
-import { Wallet, Menu, ArrowLeftRight, BarChart3, Clock, MessageSquare, List, ChevronUp, ChevronDown } from "lucide-react";
+import { 
+  Menu, Crosshair, Activity, ArrowLeftRight, BarChart3, 
+  Clock, MessageSquare, List, ChevronUp, ChevronDown, 
+  Layers, User, Wallet 
+} from "lucide-react";
 
 export function Terminal() {
   const e = useEngine();
@@ -15,15 +19,12 @@ export function Terminal() {
   const [dlgKey, setDlgKey] = useState(0);
   
   const [lots, setLots] = useState(0.01); 
-  const [mobileTab, setMobileTab] = useState<"chart" | "market" | "positions" | "history" | "messages">("chart");
+  // "Trade" is the equivalent of Positions in MT5
+  const [mobileTab, setMobileTab] = useState<"chart" | "market" | "trade" | "history" | "messages">("chart");
   
-  // Radial Menu State
   const [showRadial, setShowRadial] = useState(false);
-
-  // Bulk Menu State
   const [showBulkMenu, setShowBulkMenu] = useState(false);
   
-  // Deposit State
   const [depositOpen, setDepositOpen] = useState(false);
   const [depositAmount, setDepositAmount] = useState("");
   const [depositErr, setDepositErr] = useState("");
@@ -46,57 +47,56 @@ export function Terminal() {
     setShowBulkMenu(false);
   };
 
+  // MT5 Superscript Price Formatter
+  const renderPrice = (price: number | undefined, digits: number) => {
+    if (!price) return "—";
+    const str = price.toFixed(digits);
+    return (
+      <span className="flex items-start justify-center leading-none">
+        <span>{str.slice(0, -1)}</span>
+        <span className="text-[10px] font-bold mt-0.5">{str.slice(-1)}</span>
+      </span>
+    );
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-[#f8f9fa] text-[#1e293b] font-sans pb-14 md:pb-0">
       
-      {/* Top toolbar */}
+      {/* ─── TOP TOOLBAR (EXACT MT5) ─── */}
       <div className="flex items-center justify-between px-3 py-2 bg-white border-b border-gray-300">
-        <Menu size={20} className="text-gray-700 cursor-pointer" onClick={() => setMobileTab(mobileTab === "market" ? "chart" : "market")} />
+        <Menu size={22} className="text-gray-700 cursor-pointer" onClick={() => setMobileTab(mobileTab === "market" ? "chart" : "market")} />
         <div className="flex items-center gap-4 text-gray-600">
-          <span className="font-bold text-sm text-gray-900">{tf}</span>
+          <Crosshair size={20} className="cursor-pointer" />
+          <Activity size={20} className="cursor-pointer" />
+          <span className="font-bold text-sm text-black">{tf}</span>
+          <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center border border-red-400 relative overflow-hidden">
+            <div className="absolute inset-0 bg-red-400 transform translate-x-1/2 translate-y-1/2"></div>
+          </div>
+          <Layers size={20} className="cursor-pointer" onClick={() => setShowRadial(true)} />
         </div>
       </div>
 
-      {/* Account header */}
-      <div className="flex items-center justify-between px-3 py-2 bg-white border-b border-gray-300 shadow-sm z-20">
-        <div className="flex items-center gap-3">
-          <ArrowLeftRight size={20} className="text-gray-600 cursor-pointer rotate-180" onClick={() => window.history.back()} />
-          <div>
-            <div className="text-sm font-bold text-gray-900 flex items-center gap-2">
-              {symbol} <span className="text-[10px] font-normal text-gray-500 uppercase">{s?.desc}</span>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="text-right">
-            <div className="text-[9px] text-gray-500 uppercase tracking-wide">Balance</div>
-            <div className="text-xs font-mono font-bold">{money(e.equity)}</div>
-          </div>
-          <button onClick={() => setDepositOpen(true)} className="p-1.5 bg-gray-100 rounded text-gray-700 hover:bg-gray-200">
-            <Wallet size={16} />
-          </button>
-        </div>
-      </div>
-
-      {/* Action bar */}
+      {/* ─── ACTION BAR (SELL | LOTS | BUY) ─── */}
       <div className="flex bg-white border-b border-gray-300 select-none z-10">
         <button
           onClick={() => handleTrade("sell")}
           className="flex-1 bg-[#c62828] text-white py-1 flex flex-col items-center justify-center"
         >
           <span className="text-[9px] font-bold tracking-wider opacity-90">SELL</span>
-          <span className="text-lg font-mono font-bold leading-tight">{q?.bid.toFixed(5) ?? "—"}</span>
+          <span className="text-lg font-mono font-bold">
+            {renderPrice(q?.bid, s?.digits || 5)}
+          </span>
         </button>
 
-        <div className="w-24 flex flex-col items-center justify-center bg-white border-x border-gray-200 py-1">
-           <ChevronUp size={12} className="text-gray-400 cursor-pointer" onClick={() => setLots(Math.max(0.01, lots + 0.01))} />
+        <div className="w-24 flex flex-col items-center justify-center bg-white border-x border-gray-200 py-0.5">
+           <ChevronUp size={14} className="text-gray-500 cursor-pointer" onClick={() => setLots(Math.max(0.01, lots + 0.01))} />
            <input 
              type="number" 
              value={lots} 
              onChange={(val) => setLots(Number(val.target.value))} 
              className="w-full text-center text-sm font-bold focus:outline-none bg-transparent py-0.5" 
            />
-           <ChevronDown size={12} className="text-gray-400 cursor-pointer" onClick={() => setLots(Math.max(0.01, lots - 0.01))} />
+           <ChevronDown size={14} className="text-gray-500 cursor-pointer" onClick={() => setLots(Math.max(0.01, lots - 0.01))} />
         </div>
 
         <button
@@ -104,24 +104,30 @@ export function Terminal() {
           className="flex-1 bg-[#1565c0] text-white py-1 flex flex-col items-center justify-center"
         >
           <span className="text-[9px] font-bold tracking-wider opacity-90">BUY</span>
-          <span className="text-lg font-mono font-bold leading-tight">{q?.ask.toFixed(5) ?? "—"}</span>
+          <span className="text-lg font-mono font-bold">
+            {renderPrice(q?.ask, s?.digits || 5)}
+          </span>
         </button>
       </div>
 
-      {/* Main Layout */}
+      {/* ─── MAIN LAYOUT ─── */}
       <div className="flex flex-col md:flex-row flex-1 min-h-0 mb-12 md:mb-0">
         
+        {/* Sidebar (Market Watch) */}
         <aside className={`order-2 md:order-1 md:w-64 border-r border-gray-300 bg-white ${mobileTab === "market" ? "block flex-1" : "hidden md:block"}`}>
           <MarketWatch selected={symbol} onSelect={(s) => { setSymbol(s); setMobileTab("chart"); }} onTrade={(s) => open({ mode: "new", symbol: s })} />
         </aside>
 
+        {/* Main Chart Area */}
         <main className={`order-1 md:order-2 flex-1 flex flex-col min-w-0 h-[65vh] md:h-auto ${mobileTab === "chart" ? "flex" : "hidden md:flex"}`}>
-          <div className="flex-1 relative bg-white w-full h-full min-h-[300px]" onClick={() => setShowRadial(true)}>
+          <div className="flex-1 relative bg-white w-full h-full min-h-[300px]">
             <PriceChart engine={e} symbol={symbol} tf={tf} zoom={zoom} />
           </div>
         </main>
 
-        <div className={`order-3 md:w-80 md:h-auto border-t md:border-t-0 md:border-l border-gray-300 bg-white overflow-y-auto ${["positions", "history", "messages"].includes(mobileTab) ? "block flex-1" : "hidden md:block"}`}>
+        {/* TRADE / POSITIONS VIEW */}
+        <div className={`order-3 md:w-80 md:h-auto border-t md:border-t-0 md:border-l border-gray-300 bg-white overflow-y-auto ${["trade", "history", "messages"].includes(mobileTab) ? "block flex-1" : "hidden md:block"}`}>
+          
           <div className="bg-[#f8f9fa] border-b border-gray-300 p-3 text-[11px] text-gray-700 space-y-1">
             <div className="flex justify-between"><span>Balance:</span> <span className="font-mono">{money(e.balance)}</span></div>
             <div className="flex justify-between"><span>Equity:</span> <span className="font-mono">{money(e.equity)}</span></div>
@@ -129,7 +135,7 @@ export function Terminal() {
             <div className="flex justify-between"><span>Free Margin:</span> <span className="font-mono">{money(e.freeMargin)}</span></div>
           </div>
 
-          {mobileTab === "positions" && (
+          {mobileTab === "trade" && (
             <div>
               <div className="p-2 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
                 <h3 className="text-xs font-bold text-gray-700">Open Positions</h3>
@@ -208,38 +214,41 @@ export function Terminal() {
               No new messages from the server.
             </div>
           )}
-
         </div>
       </div>
 
-      {/* Bottom Navigation */}
+      {/* ─── BOTTOM NAVIGATION (EXACT MT5) ─── */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 flex justify-around py-1 md:hidden z-50">
         <button onClick={() => setMobileTab("market")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "market" ? "text-[#1565c0]" : "text-gray-500"}`}>
           <ArrowLeftRight size={18} />
           <span className="text-[9px] font-semibold">Quotes</span>
         </button>
+        
         <button onClick={() => setMobileTab("chart")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "chart" ? "text-[#1565c0]" : "text-gray-500"}`}>
           <BarChart3 size={18} />
           <span className="text-[9px] font-semibold">Charts</span>
         </button>
-        <button onClick={() => setMobileTab("positions")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "positions" ? "text-[#1565c0]" : "text-gray-500"}`}>
-          <List size={18} />
-          <span className="text-[9px] font-semibold">Positions</span>
+        
+        <button onClick={() => setMobileTab("trade")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "trade" ? "text-[#1565c0]" : "text-gray-500"}`}>
+          <Activity size={18} />
+          <span className="text-[9px] font-semibold">Trade</span>
           <span className={`text-[9px] font-bold mt-[-2px] ${totalFloatingPnl >= 0 ? "text-[#1565c0]" : "text-[#c62828]"}`}>
             {totalFloatingPnl >= 0 ? "+" : ""}{totalFloatingPnl.toFixed(2)}
           </span>
         </button>
+        
         <button onClick={() => setMobileTab("history")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "history" ? "text-[#1565c0]" : "text-gray-500"}`}>
           <Clock size={18} />
           <span className="text-[9px] font-semibold">History</span>
         </button>
+        
         <button onClick={() => setMobileTab("messages")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "messages" ? "text-[#1565c0]" : "text-gray-500"}`}>
           <MessageSquare size={18} />
           <span className="text-[9px] font-semibold">Messages</span>
         </button>
       </div>
 
-      {/* Modals */}
+      {/* Modals & Menus */}
       {dialog && <OrderDialog key={dlgKey} state={dialog} onClose={() => setDialog(null)} />}
       
       {/* Deposit Modal */}
@@ -282,10 +291,7 @@ export function Terminal() {
         <div className="fixed inset-0 z-[100] bg-transparent" onClick={() => setShowRadial(false)}>
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
             <svg width="260" height="260" viewBox="0 0 260 260" className="overflow-visible">
-              {/* The exact blue donut ring */}
               <circle cx="130" cy="130" r="90" fill="none" stroke="#2979FF" strokeWidth="52" />
-
-              {/* 14 Items mapped mathematically around the circle */}
               {[
                 { label: "M15", type: "tf" }, { label: "M30", type: "tf" },
                 { label: "H1", type: "tf" }, { label: "H4", type: "tf" },
@@ -296,70 +302,32 @@ export function Terminal() {
                 { label: "M1", type: "tf" }, { label: "M5", type: "tf" }
               ].map((item, i) => {
                 const total = 14;
-                // Start at top (-90 deg) and go clockwise
                 const angle = -90 + i * (360 / total);
                 const rad = angle * (Math.PI / 180);
-                const radius = 90; // Center of the ring thickness
+                const radius = 90; 
                 const x = 130 + radius * Math.cos(rad);
                 const y = 130 + radius * Math.sin(rad);
-                // Rotate text tangent to the circle
                 const rotation = angle + 90; 
 
                 return (
                   <g
                     key={i}
                     transform={`translate(${x}, ${y}) rotate(${rotation})`}
-                    onClick={() => item.type === "tf" && setTf(item.label as TF)}
+                    onClick={(e) => { e.stopPropagation(); if(item.type === "tf") { setTf(item.label as TF); setShowRadial(false); } }}
                     className={`transition-transform hover:scale-125 cursor-pointer ${item.type === "tf" && tf === item.label ? "opacity-100" : "opacity-90 hover:opacity-100"}`}
                     style={{ transformOrigin: "center", transformBox: "fill-box" }}
                   >
                     {item.type === "tf" ? (
-                      <text
-                        textAnchor="middle"
-                        dominantBaseline="middle"
-                        fontFamily="system-ui, -apple-system, sans-serif"
-                        fontWeight="700"
-                        fontSize="11"
-                        fill="#FFFFFF"
-                        stroke="#000000"
-                        strokeWidth="2.5"
-                        paintOrder="stroke"
-                      >
+                      <text textAnchor="middle" dominantBaseline="middle" fontFamily="system-ui, sans-serif" fontWeight="700" fontSize="11" fill="#FFFFFF" stroke="#000000" strokeWidth="2.5" paintOrder="stroke">
                         {item.label}
                       </text>
                     ) : (
                       <g stroke="#FFFFFF" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round">
-                        {item.label === "pulse" && (
-                          <path d="M-8 0 H-4 L-2 -5 L2 5 L4 0 H8" />
-                        )}
-                        {item.label === "crosshair" && (
-                          <>
-                            <line x1="-6" y1="0" x2="6" y2="0" />
-                            <line x1="0" y1="-6" x2="0" y2="6" />
-                            <path d="M-2 -6 L0 -8 L2 -6 M-2 6 L0 8 L2 6 M-6 -2 L-8 0 L-6 2 M6 -2 L8 0 L6 2" />
-                          </>
-                        )}
-                        {item.label === "sliders" && (
-                          <>
-                            <line x1="-4" y1="-7" x2="-4" y2="7" />
-                            <circle cx="-4" cy="-2" r="2" fill="#FFFFFF" />
-                            <line x1="2" y1="-7" x2="2" y2="7" />
-                            <circle cx="2" cy="4" r="2" fill="#FFFFFF" />
-                          </>
-                        )}
-                        {item.label === "magnifier" && (
-                          <>
-                            <circle cx="-2" cy="-2" r="4" />
-                            <line x1="1" y1="1" x2="6" y2="6" />
-                            <circle cx="-2" cy="-2" r="1.5" fill="#FFFFFF" />
-                          </>
-                        )}
-                        {item.label === "duplicate" && (
-                          <>
-                            <rect x="-5" y="-5" width="7" height="7" />
-                            <rect x="-1" y="-1" width="7" height="7" />
-                          </>
-                        )}
+                        {item.label === "pulse" && <path d="M-8 0 H-4 L-2 -5 L2 5 L4 0 H8" />}
+                        {item.label === "crosshair" && <><line x1="-6" y1="0" x2="6" y2="0" /><line x1="0" y1="-6" x2="0" y2="6" /><path d="M-2 -6 L0 -8 L2 -6 M-2 6 L0 8 L2 6 M-6 -2 L-8 0 L-6 2 M6 -2 L8 0 L6 2" /></>}
+                        {item.label === "sliders" && <><line x1="-4" y1="-7" x2="-4" y2="7" /><circle cx="-4" cy="-2" r="2" fill="#FFFFFF" /><line x1="2" y1="-7" x2="2" y2="7" /><circle cx="2" cy="4" r="2" fill="#FFFFFF" /></>}
+                        {item.label === "magnifier" && <><circle cx="-2" cy="-2" r="4" /><line x1="1" y1="1" x2="6" y2="6" /><circle cx="-2" cy="-2" r="1.5" fill="#FFFFFF" /></>}
+                        {item.label === "duplicate" && <><rect x="-5" y="-5" width="7" height="7" /><rect x="-1" y="-1" width="7" height="7" /></>}
                       </g>
                     )}
                   </g>
