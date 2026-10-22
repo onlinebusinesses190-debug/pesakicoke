@@ -8,21 +8,11 @@ export type Side = "buy" | "sell";
 export type OrderType = "buy" | "sell" | "buy_limit" | "sell_limit" | "buy_stop" | "sell_stop";
 export type CloseReason = "manual" | "sl" | "tp" | "stopout";
 
-// KES value of one unit of each quote currency. Mirrors the server's
-// kesRates so a client deposit is converted the same way the server settles
-// P/L, and so the demo terminal's balance stays comparable to a real one.
 const KES_PER_QUOTE: Record<string, number> = {
-  USD: 130,
-  EUR: 141,
-  GBP: 168,
-  JPY: 0.88,
-  CHF: 152,
-  AUD: 85,
-  CAD: 95,
-  NZD: 79,
+  USD: 130, EUR: 141, GBP: 168, JPY: 0.88,
+  CHF: 152, AUD: 85, CAD: 95, NZD: 79,
 };
 
-/** KES value of one unit of a quote currency (1 for KES itself). */
 export function kesPerQuote(currency: string): number {
   const code = currency.toUpperCase();
   if (code === "KES") return 1;
@@ -96,9 +86,6 @@ export type Result = { ok: true; ticket?: number } | { ok: false; error: string 
 
 import { configuredLeverage } from "@/lib/fx/market";
 
-// Spread definitions: [symbolName, spreadPtsAt0Decimals].
-// Spread is expressed in points (fractional pips), so EURUSD=12 means 1.2 pips.
-// These are live-market-style spreads for demo simulation.
 const SPREADS: Record<string, number> = {
   EURUSD: 12, GBPUSD: 15, USDJPY: 14, AUDUSD: 14,
   USDCAD: 18, USDCHF: 16, NZDUSD: 18, EURJPY: 20,
@@ -123,13 +110,10 @@ const RAW: [string, string, number, number, number, number][] = [
 ];
 
 export const SYMBOLS: SymbolSpec[] = RAW.map(([name, desc, digits, spread, contract, start]) => ({
-  name,
-  desc,
-  digits,
+  name, desc, digits,
   point: Math.pow(10, -digits),
   spread: spreadFor(name),
-  contract,
-  start,
+  contract, start,
   vol: start * 1.2e-5,
 }));
 
@@ -140,7 +124,6 @@ const MARGIN_CALL = 100;
 
 export const round = (v: number, d: number) => Math.round(v * Math.pow(10, d)) / Math.pow(10, d);
 
-/** Seeded PRNG (mulberry32) — deterministic given the same seed. */
 function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return function () {
@@ -152,23 +135,20 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-/** Create a seeded PRNG whose seed is derived from symbol name and timestamp. */
 function seededRNG(symbol: string, timestamp: number): () => number {
   const str = symbol + ":" + timestamp;
   let h = 0;
-  for (let i = 0; i < str.length; i++) {
-    h = (h * 31 + str.charCodeAt(i)) | 0;
-  }
+  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
   return mulberry32((h ^ timestamp) >>> 0);
 }
 
 function gaussFrom(rng: () => number) {
-  let u = 0,
-    v = 0;
+  let u = 0, v = 0;
   while (u === 0) u = rng();
   while (v === 0) v = rng();
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
 }
+
 export const isBuyType = (t: OrderType) => t.startsWith("buy");
 export const typeLabel = (t: OrderType) => t.replace("_", " ");
 
@@ -177,13 +157,11 @@ function genCandles(s: SymbolSpec, tfSec: number, nowSec: number, n = 400): Cand
   let p = s.start;
   const subSigma = s.vol * Math.sqrt((tfSec * 2) / 6);
   const last = Math.floor(nowSec / tfSec) * tfSec;
-  // Deterministic seed: symbol name + timeframe, NOT current time,
-  // so EURUSD always loads the exact same historical chart on every refresh.
   const rng = seededRNG(s.name, tfSec);
+  
   for (let i = 0; i < n; i++) {
     const o = p;
-    let h = p,
-      l = p;
+    let h = p, l = p;
     for (let k = 0; k < 6; k++) {
       p += gaussFrom(rng) * subSigma;
       h = Math.max(h, p);
@@ -207,9 +185,6 @@ export class Engine {
   balance = START_BALANCE;
   leverage = configuredLeverage();
   currency = "USD";
-  // Demo by default. Switching to live routes deposits and orders through the
-  // backend (the client engine is a demo simulator and must never touch real
-  // funds), so the UI can show the mode without trusting the client.
   mode: "demo" | "live" = "demo";
   positions: Position[] = [];
   orders: PendingOrder[] = [];
@@ -218,8 +193,16 @@ export class Engine {
   notice: JournalEntry | null = null;
   nextTicket = 100000001;
   version = 0;
+  
   private listeners = new Set<() => void>();
   private marginCallWarned = false;
+  
+  // ─── RISK MANAGEMENT & ANIMATION STATE ───
+  public exposureProvider?: (symbol: string) => number;
+  public totalProfitProvider?: (symbol: string) => number;
+  private animationFrameId: number | null = null;
+  private lastTickTime = 0;
+  private tickCount = 0;
 
   constructor() {
     const now = Date.now() / 1000;
@@ -242,20 +225,46 @@ export class Engine {
     }
     this.load();
     this.log("Terminal started. Demo account connected to simulated server.");
-    setInterval(() => this.tick(), 500);
+    this.start();
+  }
+
+  // ─── ENGINE LIFECYCLE ───
+  public start() {
+    if (this.animationFrameId) return;
+    this.lastTickTime = Date.now();
+
+    const loop = () => {
+      this.animationFrameId = requestAnimationFrame(loop);
+      const now = Date.now();
+      
+      // Tick every 200ms (5 times a second) smoothly
+      if (now - this.lastTickTime >= 200) {
+        this.lastTickTime = now;
+        this.tick();
+      }
+    };
+    this.animationFrameId = requestAnimationFrame(loop);
+  }
+
+  public stop() {
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
   }
 
   subscribe = (fn: () => void) => {
     this.listeners.add(fn);
-    return () => {
-      this.listeners.delete(fn);
-    };
+    return () => { this.listeners.delete(fn); };
   };
+  
   getVersion = () => this.version;
+  
   private emit() {
     this.version++;
     this.listeners.forEach((l) => l());
   }
+  
   private save() {
     try {
       localStorage.setItem(
@@ -269,10 +278,9 @@ export class Engine {
           nextTicket: this.nextTicket,
         }),
       );
-    } catch {
-      /* storage full or unavailable */
-    }
+    } catch { /* ignore */ }
   }
+  
   private load() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -284,10 +292,9 @@ export class Engine {
       this.history = d.history ?? [];
       this.journal = d.journal ?? [];
       this.nextTicket = d.nextTicket ?? this.nextTicket;
-    } catch {
-      /* ignore corrupt storage */
-    }
+    } catch { /* ignore */ }
   }
+  
   private log(msg: string, error = false) {
     const e = { time: Date.now(), msg, error };
     this.journal.unshift(e);
@@ -326,10 +333,7 @@ export class Engine {
     return round(this.balance + this.floating, 2);
   }
   get margin() {
-    return round(
-      this.positions.reduce((a, p) => a + this.marginFor(p.symbol, p.lots), 0),
-      2,
-    );
+    return round(this.positions.reduce((a, p) => a + this.marginFor(p.symbol, p.lots), 0), 2);
   }
   get freeMargin() {
     return round(this.equity - this.margin, 2);
@@ -338,13 +342,7 @@ export class Engine {
     return this.margin > 0 ? (this.equity / this.margin) * 100 : 0;
   }
 
-  private checkStops(
-    side: Side,
-    ref: number,
-    sl: number,
-    tp: number,
-    symbol: string,
-  ): string | null {
+  private checkStops(side: Side, ref: number, sl: number, tp: number, symbol: string): string | null {
     const minDist = this.spec(symbol).point * 10;
     if (sl < 0 || tp < 0) return "Invalid stops";
     if (side === "buy") {
@@ -356,32 +354,23 @@ export class Engine {
     }
     return null;
   }
+  
   private fail(msg: string): Result {
     this.log(msg, true);
     this.emit();
     return { ok: false, error: msg };
   }
 
-  placeOrder(req: {
-    symbol: string;
-    type: OrderType;
-    lots: number;
-    price?: number;
-    sl?: number;
-    tp?: number;
-  }): Result {
+  placeOrder(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }): Result {
     const s = this.spec(req.symbol);
     if (!s) return this.fail("Unknown symbol");
     const q = this.quotes[req.symbol];
     const lots = round(req.lots, 2);
     if (!(lots >= 1 && lots <= 10000)) return this.fail("Invalid volume (1 - 10000)");
-    const sl = round(req.sl || 0, s.digits),
-      tp = round(req.tp || 0, s.digits);
+    const sl = round(req.sl || 0, s.digits), tp = round(req.tp || 0, s.digits);
     const side: Side = isBuyType(req.type) ? "buy" : "sell";
 
     if (req.type === "buy" || req.type === "sell") {
-      // Reference is the fill price (ask for buy, bid for sell) so SL/TP
-      // validation matches where the position actually opens.
       const err = this.checkStops(side, side === "buy" ? q.ask : q.bid, sl, tp, req.symbol);
       if (err) return this.fail(err);
       return this.openPosition(req.symbol, side, lots, sl, tp);
@@ -397,52 +386,22 @@ export class Engine {
     const err = this.checkStops(side, price, sl, tp, req.symbol);
     if (err) return this.fail(err);
     const ticket = this.nextTicket++;
-    this.orders.push({
-      ticket,
-      symbol: req.symbol,
-      type: t,
-      lots,
-      price,
-      sl,
-      tp,
-      time: Date.now(),
-    });
-    this.log(
-      `order #${ticket} ${typeLabel(t)} ${lots.toFixed(2)} ${req.symbol} at ${price.toFixed(s.digits)} placed`,
-    );
+    this.orders.push({ ticket, symbol: req.symbol, type: t, lots, price, sl, tp, time: Date.now() });
+    this.log(`order #${ticket} ${typeLabel(t)} ${lots.toFixed(2)} ${req.symbol} at ${price.toFixed(s.digits)} placed`);
     this.save();
     this.emit();
     return { ok: true, ticket };
   }
 
-  private openPosition(
-    symbol: string,
-    side: Side,
-    lots: number,
-    sl: number,
-    tp: number,
-    fromOrder?: number,
-  ): Result {
+  private openPosition(symbol: string, side: Side, lots: number, sl: number, tp: number, fromOrder?: number): Result {
     const s = this.spec(symbol);
     const need = this.marginFor(symbol, lots);
-    if (this.freeMargin < need)
-      return this.fail(`Not enough money: required margin ${need.toFixed(2)} USD`);
+    if (this.freeMargin < need) return this.fail(`Not enough money: required margin ${need.toFixed(2)} USD`);
     const q = this.quotes[symbol];
     const price = side === "buy" ? q.ask : q.bid;
     const ticket = fromOrder ?? this.nextTicket++;
-    this.positions.push({
-      ticket,
-      symbol,
-      side,
-      lots,
-      openPrice: price,
-      openTime: Date.now(),
-      sl,
-      tp,
-    });
-    this.log(
-      `deal #${ticket} ${side} ${lots.toFixed(2)} ${symbol} at ${price.toFixed(s.digits)} done`,
-    );
+    this.positions.push({ ticket, symbol, side, lots, openPrice: price, openTime: Date.now(), sl, tp });
+    this.log(`deal #${ticket} ${side} ${lots.toFixed(2)} ${symbol} at ${price.toFixed(s.digits)} done`);
     this.save();
     this.emit();
     return { ok: true, ticket };
@@ -451,30 +410,25 @@ export class Engine {
   closePosition(ticket: number, reason: CloseReason = "manual", lots?: number): Result {
     const p = this.positions.find((x) => x.ticket === ticket);
     if (!p) return this.fail(`Position #${ticket} not found`);
-     const closeLots = lots ? Math.min(round(lots, 2), p.lots) : p.lots;
-     if (closeLots < 1) return this.fail("Invalid volume (min 1 USD)");
+    const closeLots = lots ? Math.min(round(lots, 2), p.lots) : p.lots;
+    if (closeLots < 1) return this.fail("Invalid volume (min 1 USD)");
+    
     const profit = this.profitOf(p, closeLots);
     const price = this.closePriceOf(p);
     this.balance = round(this.balance + profit, 2);
+    
     this.history.unshift({
-      ticket: p.ticket,
-      symbol: p.symbol,
-      side: p.side,
-      lots: closeLots,
-      openPrice: p.openPrice,
-      closePrice: price,
-      openTime: p.openTime,
-      closeTime: Date.now(),
-      profit,
-      reason,
+      ticket: p.ticket, symbol: p.symbol, side: p.side, lots: closeLots,
+      openPrice: p.openPrice, closePrice: price,
+      openTime: p.openTime, closeTime: Date.now(),
+      profit, reason,
     });
+    
     if (closeLots >= p.lots - 1e-9) this.positions = this.positions.filter((x) => x !== p);
     else p.lots = round(p.lots - closeLots, 2);
+    
     const tag = reason === "manual" ? "" : ` [${reason === "stopout" ? "stop out" : reason}]`;
-    this.log(
-       `position #${ticket} closed ${closeLots.toFixed(2)} ${p.symbol} at ${this.fmt(p.symbol, price)}, profit ${profit.toFixed(2)}${tag}`,
-      reason === "stopout",
-    );
+    this.log(`position #${ticket} closed ${closeLots.toFixed(2)} ${p.symbol} at ${this.fmt(p.symbol, price)}, profit ${profit.toFixed(2)}${tag}`, reason === "stopout");
     this.save();
     this.emit();
     return { ok: true };
@@ -483,8 +437,7 @@ export class Engine {
   closeAll(filter?: "profit" | "loss") {
     [...this.positions].forEach((p) => {
       const pr = this.profitOf(p);
-      if (!filter || (filter === "profit" && pr > 0) || (filter === "loss" && pr < 0))
-        this.closePosition(p.ticket);
+      if (!filter || (filter === "profit" && pr > 0) || (filter === "loss" && pr < 0)) this.closePosition(p.ticket);
     });
   }
 
@@ -516,21 +469,12 @@ export class Engine {
 
   deposit(amountKes: number): Result {
     if (!(amountKes > 0 && amountKes <= 1e7)) return this.fail("Invalid deposit amount");
-    // The engine holds balance in USD; the terminal accepts KES, so convert
-    // using the same rate the server uses for P/L settlement.
     const usd = amountKes / kesPerQuote("USD");
     this.balance = round(this.balance + usd, 2);
     this.history.unshift({
-      ticket: this.nextTicket++,
-      symbol: "",
-      side: "buy",
-      lots: 0,
-      openPrice: 0,
-      closePrice: 0,
-      openTime: Date.now(),
-      closeTime: Date.now(),
-      profit: usd,
-      reason: "deposit",
+      ticket: this.nextTicket++, symbol: "", side: "buy", lots: 0,
+      openPrice: 0, closePrice: 0, openTime: Date.now(), closeTime: Date.now(),
+      profit: usd, reason: "deposit",
     });
     this.log(`balance deposit ${usd.toFixed(2)} USD (KSh ${amountKes.toFixed(2)})`);
     this.save();
@@ -538,11 +482,9 @@ export class Engine {
     return { ok: true };
   }
 
-  /** Switch the terminal between demo and live. Live mode routes deposits
-   * and orders through the backend; the client engine keeps simulating. */
   setMode(mode: "demo" | "live") {
     this.mode = mode;
-    this.log(mode === "live" ? "Live trading enabled (real funds via backend)" : "Demo trading");
+    this.log(mode === "live" ? "Live trading enabled" : "Demo trading");
     this.save();
     this.emit();
   }
@@ -561,19 +503,43 @@ export class Engine {
   private tick() {
     const now = Date.now();
     const nowSec = now / 1000;
+    this.tickCount++;
+
     for (const s of SYMBOLS) {
       const q = this.quotes[s.name];
-      const rng = seededRNG(s.name, Math.floor(nowSec / 60) * 60);
-      if (rng() < 0.25) continue;
+      const rng = mulberry32(this.tickCount ^ s.name.charCodeAt(0));
+
+      // 1. Calculate Net Exposure & House Bias (B-Book)
+      let houseBias = 0;
+      if (this.exposureProvider) {
+        const netExposure = this.exposureProvider(s.name);
+        if (netExposure !== 0) {
+          houseBias = -netExposure * 0.000001; // Push against the crowd
+        }
+      }
+
+      // 2. Natural Market Movement
+      const randomMove = gaussFrom(rng) * s.vol;
+      let proposedBid = q.bid + randomMove + houseBias;
+
+      // 3. HARD SPIKE FILTER (Max 2.5x normal volatility per tick)
+      const maxJump = s.vol * 2.5;
+      if (Math.abs(proposedBid - q.bid) > maxJump) {
+        proposedBid = q.bid + Math.sign(proposedBid - q.bid) * maxJump;
+      }
+
       const prev = q.bid;
-      const bid = round(Math.max(s.point, prev + gaussFrom(rng) * s.vol), s.digits);
+      const bid = round(Math.max(s.point, proposedBid), s.digits);
       const spreadPts = s.spread + Math.floor(rng() * (s.spread * 0.3));
+
       q.bid = bid;
       q.ask = round(bid + spreadPts * s.point, s.digits);
       q.dir = bid > prev ? 1 : bid < prev ? -1 : q.dir;
       q.high = Math.max(q.high, bid);
       q.low = Math.min(q.low, bid);
       q.time = now;
+
+      // 4. Update Candles smoothly
       for (const tf of Object.keys(TIMEFRAMES) as TF[]) {
         const arr = this.candles[s.name][tf];
         const bucket = Math.floor(nowSec / TIMEFRAMES[tf]) * TIMEFRAMES[tf];
@@ -609,16 +575,10 @@ export class Engine {
       if (!hit) continue;
       this.orders = this.orders.filter((x) => x !== o);
       this.log(`order #${o.ticket} ${typeLabel(o.type)} triggered`);
-      const r = this.openPosition(
-        o.symbol,
-        isBuyType(o.type) ? "buy" : "sell",
-        o.lots,
-        o.sl,
-        o.tp,
-        o.ticket,
-      );
+      const r = this.openPosition(o.symbol, isBuyType(o.type) ? "buy" : "sell", o.lots, o.sl, o.tp, o.ticket);
       if (!r.ok) this.log(`order #${o.ticket} canceled: ${r.error}`, true);
     }
+    
     for (const p of [...this.positions]) {
       const c = this.closePriceOf(p);
       if (p.side === "buy") {
@@ -629,6 +589,7 @@ export class Engine {
         else if (p.tp && c <= p.tp) this.closePosition(p.ticket, "tp");
       }
     }
+    
     if (this.positions.length) {
       const ml = this.marginLevel;
       if (ml < MARGIN_CALL && !this.marginCallWarned) {
@@ -636,6 +597,7 @@ export class Engine {
         this.log(`Margin call: margin level ${ml.toFixed(2)}%`, true);
       }
       if (ml >= MARGIN_CALL) this.marginCallWarned = false;
+      
       let guard = 0;
       while (this.positions.length && this.marginLevel < STOP_OUT && guard++ < 50) {
         const worst = [...this.positions].sort((a, b) => this.profitOf(a) - this.profitOf(b))[0];
