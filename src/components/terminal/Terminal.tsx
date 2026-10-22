@@ -82,30 +82,56 @@ export function Terminal() {
         </button>
       </div>
 
-      {/* Main chart area */}
-      <div className="flex flex-col flex-1 min-h-0 mb-12">
-        <main className={`flex-1 flex flex-col min-w-0 h-[65vh] ${mobileTab === "chart" ? "flex" : "hidden"}`}>
-          <div className="flex items-center justify-between px-2 py-1 bg-white border-b border-gray-200">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-[#1565c0]">{symbol} ▼ {tf}</span>
-              <span className="text-[10px] text-gray-500">{s?.desc}</span>
-            </div>
-          </div>
+      {/* Main Layout */}
+      <div className="flex flex-col md:flex-row flex-1 min-h-0 mb-12 md:mb-0">
+        
+        {/* Sidebar (Market Watch) */}
+        <aside className={`order-2 md:order-1 md:w-64 border-r border-gray-300 bg-white ${mobileTab === "market" ? "block flex-1" : "hidden md:block"}`}>
+          <MarketWatch selected={symbol} onSelect={(s) => { setSymbol(s); setMobileTab("chart"); }} onTrade={(s) => open({ mode: "new", symbol: s })} />
+        </aside>
+
+        {/* Main Chart Area */}
+        <main className={`order-1 md:order-2 flex-1 flex flex-col min-w-0 h-[65vh] md:h-auto ${mobileTab === "chart" ? "flex" : "hidden md:flex"}`}>
           <div className="flex-1 relative bg-white w-full h-full min-h-[300px]">
-            {/* CRITICAL FIX: Pass engine={e} */}
             <PriceChart engine={e} symbol={symbol} tf={tf} zoom={zoom} />
           </div>
         </main>
+
+        {/* Positions / History View */}
+        <div className={`order-3 md:w-80 md:h-auto border-t md:border-t-0 md:border-l border-gray-300 bg-white overflow-y-auto ${["positions", "history", "messages"].includes(mobileTab) ? "block flex-1" : "hidden md:block"}`}>
+          <div className="bg-[#f8f9fa] border-b border-gray-300 p-3 text-[11px] text-gray-700 space-y-1">
+            <div className="flex justify-between"><span>Balance:</span> <span className="font-mono">{money(e.balance)}</span></div>
+            <div className="flex justify-between"><span>Equity:</span> <span className="font-mono">{money(e.equity)}</span></div>
+            <div className="flex justify-between"><span>Margin:</span> <span className="font-mono">{money(e.margin)}</span></div>
+          </div>
+          <div className="p-4 text-center text-xs text-gray-500">Positions list here</div>
+        </div>
       </div>
 
-      {/* Bottom navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 flex justify-around py-1 z-50">
+      {/* Bottom Navigation */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 flex justify-around py-1 md:hidden z-50">
+        <button onClick={() => setMobileTab("market")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "market" ? "text-[#1565c0]" : "text-gray-500"}`}>
+          <ArrowLeftRight size={18} />
+          <span className="text-[9px] font-semibold">Quotes</span>
+        </button>
         <button onClick={() => setMobileTab("chart")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "chart" ? "text-[#1565c0]" : "text-gray-500"}`}>
           <BarChart3 size={18} />
           <span className="text-[9px] font-semibold">Charts</span>
           <span className={`text-[9px] font-bold mt-[-2px] ${totalFloatingPnl >= 0 ? "text-[#1565c0]" : "text-[#c62828]"}`}>
             {totalFloatingPnl >= 0 ? "+" : ""}{totalFloatingPnl.toFixed(2)}
           </span>
+        </button>
+        <button onClick={() => setMobileTab("positions")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "positions" ? "text-[#1565c0]" : "text-gray-500"}`}>
+          <List size={18} />
+          <span className="text-[9px] font-semibold">Positions</span>
+        </button>
+        <button onClick={() => setMobileTab("history")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "history" ? "text-[#1565c0]" : "text-gray-500"}`}>
+          <Clock size={18} />
+          <span className="text-[9px] font-semibold">History</span>
+        </button>
+        <button onClick={() => setMobileTab("messages")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "messages" ? "text-[#1565c0]" : "text-gray-500"}`}>
+          <MessageSquare size={18} />
+          <span className="text-[9px] font-semibold">Messages</span>
         </button>
       </div>
 
