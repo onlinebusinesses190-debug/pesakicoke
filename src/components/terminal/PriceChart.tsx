@@ -57,11 +57,9 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       cv.width = Math.floor(size.w * dpr);
       cv.height = Math.floor(size.h * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.textAlign = "left";
-      ctx.textBaseline = "middle";
-
-      const cBg = "#ffffff", cGrid = "#f0f3fa", cText = "#000000", cBull = "#089981", cBear = "#F23645", cAxisBg = "#f8f9fa";
-      const W = size.w, H = size.h, axisW = 64, axisH = 20;
+      
+      const cBg = "#ffffff", cGrid = "#e5e5e5", cText = "#000000", cBull = "#089981", cBear = "#F23645", cAxisBg = "#f8f9fa";
+      const W = size.w, H = size.h, axisW = 64, axisH = 22;
       const plotW = W - axisW, plotH = H - axisH;
 
       ctx.fillStyle = cBg; ctx.fillRect(0, 0, W, H);
@@ -116,11 +114,12 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       const y = (p: number) => plotH - ((p - smoothLo) / (smoothHi - smoothLo)) * plotH;
       const xOf = (i: number) => plotW - 12 - (bars.length - i - 0.5) * sp;
 
-      // FORCE NORMAL FONT SIZE (Fixes the massive text bug)
-      ctx.font = "11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"; 
+      // ─── Y-AXIS (Forced 11px Font) ───
+      ctx.font = "11px Arial, sans-serif"; 
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
 
-      // Y-AXIS
-      const targetPixels = 22; 
+      const targetPixels = 24; 
       const rawStep = (smoothHi - smoothLo) / (plotH / targetPixels);
       const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
       const norm = rawStep / mag;
@@ -128,7 +127,7 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       if (norm > 5) niceNorm = 10; else if (norm > 2) niceNorm = 5; else if (norm > 1) niceNorm = 2;
       const step = niceNorm * mag;
 
-      ctx.strokeStyle = cGrid; ctx.lineWidth = 1; ctx.setLineDash([]);
+      ctx.strokeStyle = cGrid; ctx.lineWidth = 1; ctx.setLineDash([2, 3]);
       const startLine = Math.ceil(smoothLo / step) * step;
       for (let p = startLine; p <= smoothHi; p += step) {
         const yy = Math.round(y(p)) + 0.5;
@@ -137,23 +136,28 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         ctx.fillText(p.toFixed(spec.digits), plotW + 4, yy);
       }
 
-      // X-AXIS
-      const every = Math.max(1, Math.round(80 / sp));
+      // ─── X-AXIS ───
+      ctx.textAlign = "center";
+      const every = Math.max(1, Math.round(90 / sp));
       let lastLabelX = -100;
       for (let i = bars.length - 1; i >= 0; i -= every) {
         const xx = Math.round(xOf(i)) + 0.5;
         ctx.beginPath(); ctx.moveTo(xx, 0); ctx.lineTo(xx, plotH); ctx.stroke();
-        if (lastLabelX - xx > 60) {
+        if (lastLabelX - xx > 70) {
           const d = new Date(bars[i].t * 1000);
           const p2 = (n: number) => String(n).padStart(2, "0");
-          const lbl = `${p2(d.getDate())} Oct ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+          const day = p2(d.getDate());
+          const month = d.toLocaleString("en", { month: "short" });
+          const lbl = `${day} ${month} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
           ctx.fillStyle = cText; 
-          ctx.fillText(lbl, xx - 30, plotH + 12);
+          ctx.fillText(lbl, xx, plotH + 12);
           lastLabelX = xx;
         }
       }
+      ctx.textAlign = "left";
 
-      // CANDLES
+      // ─── CANDLES ───
+      ctx.setLineDash([]);
       const bw = Math.max(1, Math.floor(sp * 0.6));
       bars.forEach((b: any, i: number) => {
         const x = Math.round(xOf(i)); const bull = b.c >= b.o;
@@ -163,66 +167,57 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         if (bw > 2) ctx.fillRect(x - bw / 2, top, bw, bh);
       });
 
-      // TEXT OVERLAY
+      // ─── CHART TOP-LEFT TEXT OVERLAY ───
       ctx.fillStyle = "#1565c0";
-      ctx.font = "bold 12px -apple-system, sans-serif";
+      ctx.font = "bold 12px Arial, sans-serif";
       ctx.fillText(`${symbol} ▼ ${tf}`, 8, 15);
       ctx.fillStyle = "#666";
-      ctx.font = "10px -apple-system, sans-serif";
-      ctx.fillText(spec.desc || "", 8, 28);
+      ctx.font = "11px Arial, sans-serif";
+      ctx.fillText(spec.desc || "", 8, 30);
 
-      // CHART LINES & PRICE BOXES
-      const drawSolidPriceBox = (p: number, color: string, timerText: string = "") => {
-        if (p < smoothLo || p > smoothHi) return;
-        const yy = Math.round(y(p)) + 0.5;
-        
-        // Solid Line
-        ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.setLineDash([]);
-        ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke();
-        ctx.lineWidth = 1;
-        
-        // Price Box
-        ctx.fillStyle = color;
-        ctx.fillRect(plotW, yy - 10, axisW, timerText ? 20 : 16);
-        
-        // Text
-        ctx.fillStyle = "#ffffff"; 
-        ctx.font = "11px -apple-system, sans-serif"; 
-        ctx.fillText(p.toFixed(spec.digits), plotW + 4, yy - (timerText ? 4 : 0));
-        
-        if (timerText) {
-          ctx.font = "10px -apple-system, sans-serif"; 
-          ctx.fillText(timerText, plotW + 4, yy + 6);
-        }
-      };
-
-      const drawPositionLine = (p: any) => {
+      // ─── POSITION LINES (Dashed with white bg) ───
+      symbolPositions.forEach((p: any) => {
         if (p.openPrice < smoothLo || p.openPrice > smoothHi) return;
         const yy = Math.round(y(p.openPrice)) + 0.5;
         const pnl = engine.profitOf(p);
-        const pnlStr = pnl >= 0 ? `+${pnl.toFixed(2)}` : `${pnl.toFixed(2)}`;
         
         ctx.strokeStyle = p.side === "buy" ? "#1565c0" : "#c62828";
         ctx.setLineDash([3, 3]);
         ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke();
         ctx.setLineDash([]);
 
-        ctx.fillStyle = p.side === "buy" ? "#1565c0" : "#c62828";
-        ctx.font = "11px -apple-system, sans-serif";
-        
-        // White background for text
-        const txt = `${p.side.toUpperCase()} ${p.lots.toFixed(2)} ${pnlStr} USD`;
+        const txt = `${p.side.toUpperCase()} ${p.lots.toFixed(2)}   ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD`;
         const txtWidth = ctx.measureText(txt).width;
+        
+        // White bg for text
         ctx.fillStyle = "#ffffff";
-        ctx.fillRect(4, yy - 14, txtWidth + 8, 14);
+        ctx.fillRect(4, yy - 16, txtWidth + 8, 16);
         
         ctx.fillStyle = p.side === "buy" ? "#1565c0" : "#c62828";
-        ctx.fillText(txt, 8, yy - 6);
+        ctx.fillText(txt, 8, yy - 8);
+      });
+
+      // ─── BID / ASK BOXES ───
+      const drawBox = (p: number, color: string, timerText: string = "") => {
+        if (p < smoothLo || p > smoothHi) return;
+        const yy = Math.round(y(p)) + 0.5;
+        
+        ctx.strokeStyle = color; ctx.setLineDash([]);
+        ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke();
+        
+        ctx.fillStyle = color;
+        ctx.fillRect(plotW, yy - (timerText ? 10 : 8), axisW, timerText ? 20 : 16);
+        
+        ctx.fillStyle = "#ffffff"; 
+        ctx.font = "11px Arial, sans-serif"; 
+        ctx.fillText(p.toFixed(spec.digits), plotW + 4, yy - (timerText ? 4 : 0));
+        
+        if (timerText) {
+          ctx.font = "10px Arial, sans-serif"; 
+          ctx.fillText(timerText, plotW + 4, yy + 6);
+        }
       };
 
-      symbolPositions.forEach(drawPositionLine);
-
-      // TIMER
       const tfSeconds = TIMEFRAMES[tf];
       const now = Date.now() / 1000;
       let timerStr = "";
@@ -235,8 +230,8 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         }
       }
 
-      drawSolidPriceBox(smoothAsk, cBear);
-      drawSolidPriceBox(smoothBid, cBull, timerStr);
+      drawBox(smoothAsk, cBear);
+      drawBox(smoothBid, cBull, timerStr);
     };
 
     frameId = requestAnimationFrame(draw);
