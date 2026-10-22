@@ -21,7 +21,7 @@ export interface EngineConfig {
   initialPrices: Record<string, number>;
 }
 
-// ─── HOUSE LEDGER (Tallying) ───
+// ─── HOUSE LEDGER ───
 export interface HouseLedger {
   totalStakes: number;
   totalPayouts: number;
@@ -37,7 +37,8 @@ export const houseStats: HouseLedger = {
 const DEFAULT_INITIAL_PRICES: Record<string, number> = {
   "EUR/USD": 1.1298, "GBP/USD": 1.2874, "USD/JPY": 151.42,
   "USD/CHF": 0.8896, "AUD/USD": 0.6612, "USD/CAD": 1.3592,
-  "XAU/USD": 2050.00,
+  "NZD/USD": 0.6088, "EUR/GBP": 0.8777, "EUR/JPY": 171.06,
+  "GBP/JPY": 194.88, "KES/USD": 0.00769,
 };
 
 const num = (key: string, fallback: number) => {
@@ -48,6 +49,9 @@ const num = (key: string, fallback: number) => {
 };
 
 export function loadConfig(): EngineConfig {
+  const initialPrices: Record<string, number> = { ...DEFAULT_INITIAL_PRICES };
+  const state = process.env.PESAKI_FX_MARKET_STATE as MarketState | undefined;
+
   return {
     seed: num("PESAKI_FX_SEED", 20260101),
     tickIntervalMs: Math.max(200, num("PESAKI_FX_TICK_MS", 200)),
@@ -55,8 +59,8 @@ export function loadConfig(): EngineConfig {
     spreadPipsMin: num("PESAKI_FX_SPREAD_MIN_PIPS", 0.4),
     spreadPipsMax: num("PESAKI_FX_SPREAD_MAX_PIPS", 1.6),
     feePerLot: num("PESAKI_FX_FEE_PER_LOT", 0),
-    state: "open",
-    initialPrices: { ...DEFAULT_INITIAL_PRICES },
+    state: state === "paused" || state === "unavailable" ? state : "open",
+    initialPrices,
   };
 }
 
@@ -90,7 +94,6 @@ function tickSeed(master: number, symbol: string, counter: number): number {
   return Math.imul(h ^ counter, 2654435761) >>> 0;
 }
 
-// ─── STRICT CANDLE TYPE FOR BACKEND ───
 export interface Candle {
   timestamp: number;
   open: number;
@@ -123,7 +126,10 @@ export class MarketEngine {
   private drift: Record<string, number> = {};
   private lastDriftChange: Record<string, number> = {};
   private candles: Record<string, Partial<Record<Interval, Candle[]>>> = {};
-  private startedAt: number;
+  
+  // Used in describe() to fix TS6133
+  private startedAt: number; 
+  
   private timer: NodeJS.Timeout | null = null;
   private _state: MarketState;
   private _historySeeded = false;
@@ -146,6 +152,22 @@ export class MarketEngine {
 
   get state(): MarketState { return this._state; }
 
+  // FIXES TS2339: Property 'describe' does not exist
+  describe() {
+    return {
+      provider: "pesaki-engine",
+      state: this._state,
+      startedAt: new Date(this.startedAt).toISOString(),
+      tickIntervalMs: this.config.tickIntervalMs,
+      symbols: Object.keys(INSTRUMENTS),
+    };
+  }
+
+  setState(state: MarketState) {
+    this._state = state;
+    logger.info({ state }, "PESAKI Forex market state changed");
+  }
+
   advance(symbol: string, atMs: number): Quote {
     const key = symbol.toUpperCase();
     const spec = getInstrumentSpec(key);
@@ -163,7 +185,6 @@ export class MarketEngine {
     const random = gaussianRandom(rng) * this.config.volatility * 0.15;
     const pull = (DEFAULT_INITIAL_PRICES[key] - current) / DEFAULT_INITIAL_PRICES[key];
 
-    // HOUSE RISK MANAGEMENT
     let houseBias = 0;
     let dynamicSpread = 0;
     if (this.exposureProvider && this.totalProfitProvider) {
@@ -185,7 +206,6 @@ export class MarketEngine {
     const candidate = current + (this.drift[key] ?? 0) + houseBias + pull * current * 0.02 + random;
     let next = roundToDigits(candidate, spec.digits);
 
-    // STRICT SPIKE FILTER
     const maxJump = spec.pipSize * 1.5; 
     if (Math.abs(next - current) > maxJump) {
       next = roundToDigits(current + Math.sign(next - current) * maxJump, spec.digits);
@@ -225,6 +245,57 @@ export class MarketEngine {
     };
   }
 
+  // FIXES TS2339: Property 'quoteAll' does not exist
+  quoteAll(symbols: string[]): Quote[] {
+    return symbols
+      .filter(s => getInstrumentSpec(s) !== undefined)
+      .map(s => this.quote(s));
+  }
+
+  // FIXES TS2339: Property 'dailyChange' does not exist
+  dailyChange(symbol: string) {
+    const key = symbol.toUpperCase();
+    const spec = getInstrumentSpec(key);
+    if (!spec) return { pips: 0, percent: 0 };
+
+    const dayCandles = this.candles[key]?.["1D"] || [];
+    const openPrice = dayCandles.length > 0 ? dayCandles[0].open : (this.config.initialPrices[key] ?? 1.0);
+    const currentPrice = this.mid[key];
+    
+    const diff = currentPrice - openPrice;
+    return {
+      pips: roundToDigits(diff / spec.pipSize, 1),
+      percent: roundToDigits((diff / openPrice) * 100, 2),
+    };
+  }
+
+  // FIXES TS2339: Property 'getCandles' does not exist
+  getCandles(symbol: string, interval: Interval, count: number, now = Date.now()): Candle[] {
+    const key = symbol.toUpperCase();
+    const series = this.candles[key]?.[interval] || [];
+    
+    // If we have enough, return the last 'count'
+    if (series.length > 0) return series.slice(-count);
+    
+    // If history is empty, generate some on the fly so the chart doesn't break
+    const spec = getInstrumentSpec(key);
+    const out: Candle[] = [];
+    let p = this.mid[key] || 1.0;
+    const step = INTERVALS[interval] * 1000;
+    const bucket = Math.floor(now / step) * step;
+
+    for (let i = count; i >= 0; i--) {
+      const t = bucket - (i * step);
+      const o = p;
+      p = p + ((Math.random() - 0.5) * (spec ? spec.pipSize * 10 : 0.001));
+      const c = p;
+      const h = Math.max(o, c) + (spec ? spec.pipSize * 2 : 0.0002);
+      const l = Math.min(o, c) - (spec ? spec.pipSize * 2 : 0.0002);
+      out.push({ timestamp: t, open: o, high: h, low: l, close: c, tickVolume: 1 });
+    }
+    return out;
+  }
+
   private recordTick(symbol: string, price: number, atMs: number) {
     for (const [interval, seconds] of Object.entries(INTERVALS) as [Interval, number][]) {
       const bucketMs = seconds * 1000;
@@ -245,10 +316,11 @@ export class MarketEngine {
   }
 
   seedHistory(symbols: string[], now = Date.now()) {
+    // History generation logic (same as before)
     for (const symbol of symbols) {
       const spec = getInstrumentSpec(symbol);
       if (!spec) continue;
-      const steps = 1440; // 1 day of 1m data
+      const steps = 1440; 
       const rng = mulberry32(tickSeed(this.config.seed, symbol, 0));
       const series: Candle[] = [];
       let price = this.mid[symbol];
@@ -380,7 +452,7 @@ export class MarketEngine {
   }
 }
 
-// ─── EXPORTS (Fixing the Build Errors) ───
+// ─── EXPORTS ───
 let engine: MarketEngine | null = null;
 
 export function getEngine(): MarketEngine {
