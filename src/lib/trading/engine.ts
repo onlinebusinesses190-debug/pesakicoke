@@ -61,7 +61,6 @@ export class Engine {
   
   demoBalance = DEMO_START_BALANCE;
   liveKesBalance = 0;
-  exchangeRate = 130;
   liveBalance = 0; 
   
   leverage = configuredLeverage();
@@ -96,16 +95,20 @@ export class Engine {
 
   get balance() { return this.mode === "live" ? this.liveBalance : this.demoBalance; }
 
+  // ─── EXACT ORIGINAL FIX FOR BALANCE FETCHING ───
   async fetchLiveBalance() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const res = await apiRequest<{ success: boolean; balance: number; exchange_rate?: number }>("/wallet/balance");
+      const res = await apiRequest<any>("/forex/account?account_type=live");
+      console.log("Live Forex API Response:", res);
+
       if (res && res.success) {
-        this.liveKesBalance = res.balance;
-        this.exchangeRate = res.exchange_rate || 130; 
-        this.liveBalance = this.liveKesBalance / this.exchangeRate;
+        // Fallback to res.balance (original) OR res.account.walletBalance (new backend format)
+        const kesBalance = Number(res.balance ?? res.account?.walletBalance ?? 0);
+        this.liveKesBalance = kesBalance;
+        this.liveBalance = kesBalance; 
         this.emit();
       }
     } catch (err: any) {
@@ -218,7 +221,6 @@ export class Engine {
     
     if (this.mode === "live") {
       try {
-        // FIXED: Endpoint changed to /forex/orders, symbol formatted with slash, payload matched.
         const payloadSymbol = req.symbol.replace(/(...)(...)/, "$1/$2"); // EURUSD -> EUR/USD
         
         const res = await apiRequest<any>("/forex/orders", {
@@ -285,7 +287,6 @@ export class Engine {
   closePosition(ticket: number | string, reason: CloseReason = "manual", lots?: number): Result {
     // LIVE CLOSING
     if (this.mode === "live") {
-      // Fire API call in background to avoid blocking UI
       apiRequest<any>(`/forex/positions/${ticket}/close`, { method: "POST" })
         .then((res) => {
           if (res.success) {
@@ -297,7 +298,7 @@ export class Engine {
         })
         .catch((err) => this.log(err.message, true));
         
-      return { ok: true }; // Optimistic return
+      return { ok: true }; 
     }
 
     // DEMO CLOSING
