@@ -12,11 +12,11 @@ export function kesPerQuote(currency: string): number { const code = currency.to
 export interface SymbolSpec { name: string; desc: string; digits: number; point: number; spread: number; contract: number; start: number; vol: number; }
 export interface Quote { bid: number; ask: number; high: number; low: number; open: number; dir: -1 | 0 | 1; time: number; }
 export interface Candle { t: number; o: number; h: number; l: number; c: number; }
-export interface Position { ticket: number; symbol: string; side: Side; lots: number; openPrice: number; openTime: number; sl: number; tp: number; }
-export interface PendingOrder { ticket: number; symbol: string; type: Exclude<OrderType, "buy" | "sell">; lots: number; price: number; sl: number; tp: number; time: number; }
-export interface Deal { ticket: number; symbol: string; side: Side; lots: number; openPrice: number; closePrice: number; openTime: number; closeTime: number; profit: number; reason: CloseReason | "deposit" | "cancel"; }
+export interface Position { ticket: number | string; symbol: string; side: Side; lots: number; openPrice: number; openTime: number; sl: number; tp: number; }
+export interface PendingOrder { ticket: number | string; symbol: string; type: Exclude<OrderType, "buy" | "sell">; lots: number; price: number; sl: number; tp: number; time: number; }
+export interface Deal { ticket: number | string; symbol: string; side: Side; lots: number; openPrice: number; closePrice: number; openTime: number; closeTime: number; profit: number; reason: CloseReason | "deposit" | "cancel"; }
 export interface JournalEntry { time: number; msg: string; error?: boolean; }
-export type Result = { ok: true; ticket?: number } | { ok: false; error: string };
+export type Result = { ok: true; ticket?: number | string } | { ok: false; error: string };
 
 import { configuredLeverage } from "@/lib/fx/market";
 import { apiRequest } from "@/utils/api"; 
@@ -218,25 +218,32 @@ export class Engine {
     
     if (this.mode === "live") {
       try {
-        const res = await apiRequest<any>("/forex/trade", {
+        // FIXED: Endpoint changed to /forex/orders, symbol formatted with slash, payload matched.
+        const payloadSymbol = req.symbol.replace(/(...)(...)/, "$1/$2"); // EURUSD -> EUR/USD
+        
+        const res = await apiRequest<any>("/forex/orders", {
           method: "POST",
           body: JSON.stringify({
-            symbol: req.symbol, side: isBuyType(req.type) ? "buy" : "sell", 
-            lots: lots, sl: req.sl, tp: req.tp, mode: "live"
+            symbol: payloadSymbol,
+            side: isBuyType(req.type) ? "buy" : "sell", 
+            lots: lots, 
+            stop_loss: req.sl || null, 
+            take_profit: req.tp || null, 
+            account_type: "live"
           })
         });
+        
         if (!res.success) return this.fail(res.error || "Backend rejected trade");
         
-        this.liveKesBalance = res.new_kes_balance || this.liveKesBalance;
-        this.liveBalance = this.liveKesBalance / this.exchangeRate;
-        this.log(`LIVE order #${res.ticket} executed`);
-        this.emit();
-        return { ok: true, ticket: res.ticket };
+        this.fetchLiveBalance(); // Update KES balance immediately
+        this.log(`LIVE order #${res.order?.id} executed`);
+        return { ok: true, ticket: res.order?.id };
       } catch (err: any) {
         return this.fail(err.message || "Network error placing live trade");
       }
     }
 
+    // ─── DEMO TRADING (Local) ───
     if (!(lots >= 0.01 && lots <= 10000)) return this.fail("Invalid volume (0.01 - 10000)");
     const sl = round(req.sl || 0, s.digits), tp = round(req.tp || 0, s.digits);
     const side: Side = isBuyType(req.type) ? "buy" : "sell";
@@ -275,7 +282,25 @@ export class Engine {
     return { ok: true, ticket };
   }
 
-  closePosition(ticket: number, reason: CloseReason = "manual", lots?: number): Result {
+  closePosition(ticket: number | string, reason: CloseReason = "manual", lots?: number): Result {
+    // LIVE CLOSING
+    if (this.mode === "live") {
+      // Fire API call in background to avoid blocking UI
+      apiRequest<any>(`/forex/positions/${ticket}/close`, { method: "POST" })
+        .then((res) => {
+          if (res.success) {
+            this.fetchLiveBalance();
+            this.log(`LIVE position #${ticket} closed. Profit: ${res.realizedPnl}`);
+          } else {
+            this.log(`Failed to close position: ${res.error}`, true);
+          }
+        })
+        .catch((err) => this.log(err.message, true));
+        
+      return { ok: true }; // Optimistic return
+    }
+
+    // DEMO CLOSING
     const p = this.positions.find((x) => x.ticket === ticket);
     if (!p) return this.fail(`Position #${ticket} not found`);
     const closeLots = lots ? Math.min(round(lots, 2), p.lots) : p.lots;
@@ -303,7 +328,7 @@ export class Engine {
     });
   }
 
-  modifyPosition(ticket: number, sl: number, tp: number): Result {
+  modifyPosition(ticket: number | string, sl: number, tp: number): Result {
     const p = this.positions.find((x) => x.ticket === ticket);
     if (!p) return this.fail(`Position #${ticket} not found`);
     const d = this.spec(p.symbol).digits;
@@ -316,7 +341,7 @@ export class Engine {
     return { ok: true };
   }
 
-  cancelOrder(ticket: number): Result {
+  cancelOrder(ticket: number | string): Result {
     const o = this.orders.find((x) => x.ticket === ticket);
     if (!o) return this.fail(`Order #${ticket} not found`);
     this.orders = this.orders.filter((x) => x !== o);
