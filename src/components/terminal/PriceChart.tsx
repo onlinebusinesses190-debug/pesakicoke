@@ -32,6 +32,8 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, showIndica
 
   useEffect(() => {
     view.current.offset = 0;
+    loRef.current = 0; // Reset smoothing when switching timeframe
+    hiRef.current = 0;
     needsRedrawRef.current = true;
   }, [symbol, tf]);
 
@@ -52,7 +54,6 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, showIndica
   useEffect(() => {
     const cv = canvasRef.current;
     if (!cv) return;
-
     const ctx = cv.getContext("2d");
     if (!ctx) return;
 
@@ -60,7 +61,6 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, showIndica
 
     const draw = () => {
       frameId = requestAnimationFrame(draw);
-
       if (!cv || size.w === 0 || size.h === 0) return;
 
       const all = e.candles?.[symbolRef.current]?.[tfRef.current] || [];
@@ -71,7 +71,11 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, showIndica
       cv.height = Math.floor(size.h * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      const cBg = "#ffffff", cGrid = "#f0f3fa", cText = "#333333", cBull = "#089981", cBear = "#F23645", cAxisBg = "#f8f9fa";
+      // Reset Context State (Fixes the alignment bug)
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+
+      const cBg = "#ffffff", cGrid = "#f0f3fa", cText = "#000000", cBull = "#089981", cBear = "#F23645", cAxisBg = "#f8f9fa";
       const W = size.w, H = size.h, axisW = 64, axisH = 20;
       const plotW = W - axisW, plotH = H - axisH;
       const sp = view.current.spacing;
@@ -79,8 +83,7 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, showIndica
       const end = all.length - view.current.offset;
       let bars = all.slice(Math.max(0, end - count), end);
 
-      // ─── 1. LIVE CANDLE UPDATE ───
-      // Update the right-most candle's O,H,L,C from the live quote on every frame
+      // 1. LIVE CANDLE UPDATE
       if (bars.length > 0 && view.current.offset === 0 && q) {
         const last = bars[bars.length - 1];
         const mid = (q.bid + q.ask) / 2;
@@ -101,23 +104,24 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, showIndica
       let lo = Infinity, hi = -Infinity;
       for (const b of bars) { lo = Math.min(lo, b.l); hi = Math.max(hi, b.h); }
 
-      const symbolPositions = e.positions.filter((x) => x.symbol === symbol);
+      const symbolPositions = e.positions.filter((x) => x.symbol === symbolRef.current);
       for (const p of symbolPositions) {
         if (p.sl) { lo = Math.min(lo, p.sl); hi = Math.max(hi, p.sl); }
         if (p.tp) { lo = Math.min(lo, p.tp); hi = Math.max(hi, p.tp); }
       }
 
       if (view.current.offset === 0) { lo = Math.min(lo, q.bid); hi = Math.max(hi, q.ask); }
-      const pad = (hi - lo) * 0.18 || s.point * 10;
+      
+      // Increased padding for MT5 9/10 height feel
+      const pad = (hi - lo) * 0.15 || s.point * 10;
       const rawLo = lo - pad, rawHi = hi + pad;
 
-      // ─── 2. SMOOTH Y-AXIS AUTO-SCALING ───
-      // Linear interpolation toward target bounds
+      // 2. SMOOTH Y-AXIS AUTO-SCALING
       if (loRef.current === 0 && hiRef.current === 0) {
         loRef.current = rawLo;
         hiRef.current = rawHi;
       }
-      const smoothFactor = 0.15;
+      const smoothFactor = 0.1; // Slightly slower for smoother feel
       loRef.current += (rawLo - loRef.current) * smoothFactor;
       hiRef.current += (rawHi - hiRef.current) * smoothFactor;
 
@@ -126,9 +130,9 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, showIndica
       const y = (p: number) => plotH - ((p - smoothLo) / (smoothHi - smoothLo)) * plotH;
       const xOf = (i: number) => plotW - 12 - (bars.length - i - 0.5) * sp;
 
-      ctx.font = "11px -apple-system, sans-serif"; ctx.textBaseline = "middle";
+      ctx.font = "11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"; 
 
-      // ─── Y-AXIS GRID + LABELS ───
+      // 3. Y-AXIS GRID + LABELS (MT5 "Nice Numbers")
       const targetPixels = 35;
       const rawStep = (smoothHi - smoothLo) / (plotH / targetPixels);
       const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
@@ -142,22 +146,30 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, showIndica
       for (let p = startLine; p <= smoothHi; p += step) {
         const yy = Math.round(y(p)) + 0.5;
         ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke();
-        ctx.fillStyle = "#000000"; ctx.fillText(p.toFixed(s.digits), plotW + 4, yy);
+        ctx.fillStyle = cText; 
+        ctx.fillText(p.toFixed(s.digits), plotW + 4, yy);
       }
 
-      // X-axis time labels with date
+      // 4. X-AXIS DATE LABELS
       const every = Math.max(1, Math.round(80 / sp));
+      let lastLabelX = -100;
       for (let i = bars.length - 1; i >= 0; i -= every) {
         const xx = Math.round(xOf(i)) + 0.5;
         ctx.beginPath(); ctx.moveTo(xx, 0); ctx.lineTo(xx, plotH); ctx.stroke();
-        const d = new Date(bars[i].t * 1000);
-        const p2 = (n: number) => String(n).padStart(2, "0");
-        const day = p2(d.getDate());
-        const month = d.toLocaleString("en", { month: "short" });
-        const lbl = `${day} ${month} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
-        ctx.fillStyle = cText; ctx.fillText(lbl, xx - 24, plotH + 12);
+        
+        if (lastLabelX - xx > 60) {
+          const d = new Date(bars[i].t * 1000);
+          const p2 = (n: number) => String(n).padStart(2, "0");
+          const day = p2(d.getDate());
+          const month = d.toLocaleString("en", { month: "short" });
+          const lbl = `${day} ${month} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+          ctx.fillStyle = cText; 
+          ctx.fillText(lbl, xx - 24, plotH + 12);
+          lastLabelX = xx;
+        }
       }
 
+      // 5. DRAW CANDLES OR LINE
       const bw = Math.max(1, Math.floor(sp * 0.6));
       if (chartType === "line") {
         ctx.strokeStyle = "#1565c0";
@@ -188,13 +200,28 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, showIndica
       ctx.font = "10px -apple-system, sans-serif";
       ctx.fillText(s.desc || "", 8, 28);
 
-      // Overlays
-      const drawSolidLine = (p: number, color: string) => {
+      // Overlays (Bid/Ask with Boxes)
+      const drawSolidPriceBox = (p: number, color: string, timerText: string = "") => {
         if (p < smoothLo || p > smoothHi) return;
         const yy = Math.round(y(p)) + 0.5;
+        
+        // Line
         ctx.strokeStyle = color; ctx.setLineDash([]);
         ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke();
-        ctx.fillStyle = "#000000"; ctx.fillText(p.toFixed(s.digits), plotW + 4, yy);
+        
+        // Box
+        ctx.fillStyle = color;
+        ctx.fillRect(plotW, yy - 10, axisW, 20);
+        
+        // Text
+        ctx.fillStyle = "#ffffff"; 
+        ctx.font = "11px -apple-system, sans-serif"; 
+        ctx.fillText(p.toFixed(s.digits), plotW + 4, yy - (timerText ? 4 : 0));
+        
+        if (timerText) {
+          ctx.font = "10px -apple-system, sans-serif"; 
+          ctx.fillText(timerText, plotW + 4, yy + 6);
+        }
       };
 
       const drawDashedLine = (p: number, color: string, labelLeft: string) => {
@@ -209,31 +236,27 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, showIndica
         ctx.fillText(p.toFixed(s.digits), plotW + 4, yy);
 
         if (labelLeft) {
-          ctx.fillStyle = color;
           const textWidth = ctx.measureText(labelLeft).width;
           ctx.fillStyle = "#ffffff";
-          ctx.fillRect(4, yy - 16, textWidth + 6, 16);
+          ctx.fillRect(4, yy - 16, textWidth + 8, 16);
           ctx.fillStyle = color;
-          ctx.fillText(labelLeft, 7, yy - 6);
+          ctx.fillText(labelLeft, 8, yy - 8);
         }
       };
 
-      // Draw positions
+      // Draw Positions
       for (const p of symbolPositions) {
         const pnl = e.profitOf(p);
-        const pnlText = `${p.side.toUpperCase()} ${p.lots.toFixed(2)} Lots  ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD`;
+        const pnlText = `${p.side.toUpperCase()} ${p.lots.toFixed(2)}   ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD`;
         drawDashedLine(p.openPrice, p.side === "buy" ? cBull : cBear, pnlText);
         if (p.sl) drawDashedLine(p.sl, cBear, "SL");
         if (p.tp) drawDashedLine(p.tp, cBull, "TP");
       }
 
-      drawSolidLine(q.ask, cBear);
-      drawSolidLine(q.bid, cBull);
-
-      // ─── CANDLE COUNTDOWN TIMER ───
-      // Displayed in the right-side Y-axis, inside/near the bid price box
+      // Live Candle Timer
       const tfSeconds = TIMEFRAMES[tfRef.current];
       const now = Date.now() / 1000;
+      let timerStr = "";
       if (all.length > 0) {
         const lastCandle = all[all.length - 1];
         const candleCloseTime = lastCandle.t + tfSeconds;
@@ -241,15 +264,12 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, showIndica
         if (remaining > 0 && remaining <= tfSeconds) {
           const mins = Math.floor(remaining / 60);
           const secs = Math.floor(remaining % 60);
-          const p2 = (n: number) => String(n).padStart(2, "0");
-          const timerText = `${p2(mins)}:${p2(secs)}`;
-          const bidY = Math.round(y(q.bid)) + 0.5;
-          ctx.fillStyle = "#000000";
-          ctx.font = "bold 11px -apple-system, sans-serif";
-          ctx.textAlign = "right";
-          ctx.fillText(timerText, plotW + 4, bidY - 12);
+          timerStr = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
         }
       }
+
+      drawSolidPriceBox(q.ask, cBear);
+      drawSolidPriceBox(q.bid, cBull, timerStr);
 
       ctx.strokeStyle = cGrid; ctx.strokeRect(0.5, 0.5, plotW, plotH);
 
@@ -262,16 +282,24 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, showIndica
         ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, plotH); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(plotW, cy); ctx.stroke();
         ctx.setLineDash([]);
+        
+        // Crosshair Price Box
         const priceAtY = smoothLo + (plotH - cy) / plotH * (smoothHi - smoothLo);
         ctx.fillStyle = "#1565c0";
-        ctx.font = "11px -apple-system, sans-serif";
-        ctx.textAlign = "left";
-        ctx.fillText(priceAtY.toFixed(s.digits), x + 4, cy - 4);
+        ctx.fillRect(plotW, cy - 8, axisW, 16);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(priceAtY.toFixed(s.digits), plotW + 4, cy);
+
+        // Crosshair Time Box
         const timeAtX = bars[Math.round((plotW - x) / sp)]?.t;
         if (timeAtX) {
           const d = new Date(timeAtX * 1000);
-          ctx.textAlign = "right";
-          ctx.fillText(`${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`, x - 4, cy + 12);
+          ctx.fillStyle = "#1565c0";
+          ctx.fillRect(x - 25, plotH, 50, 20);
+          ctx.fillStyle = "#ffffff";
+          ctx.textAlign = "center";
+          ctx.fillText(`${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`, x, plotH + 10);
+          ctx.textAlign = "left"; // reset
         }
       }
 
@@ -279,7 +307,6 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, showIndica
     };
 
     const loop = () => {
-      // Continuous 60fps draw for live candle + crosshair smoothness
       draw();
       frameId = requestAnimationFrame(loop);
     };
@@ -289,7 +316,7 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, showIndica
     return () => {
       cancelAnimationFrame(frameId);
     };
-  }, [size.w, size.h]);
+  }, [size.w, size.h, showCrosshair, chartType]);
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -309,7 +336,7 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, showIndica
     return () => el.removeEventListener("touchmove", handler);
   }, []);
 
-   return (
+  return (
     <div
       ref={wrapRef}
       className="absolute inset-0 touch-none overflow-hidden bg-white"
