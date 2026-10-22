@@ -1,6 +1,6 @@
 /**
  * PESAKI Forex — internal market engine.
- * Aggressive House Edge (B-Book) configuration.
+ * Optimized for continuous, smooth, MT5-style "live" heartbeat movement.
  */
 
 import { INSTRUMENTS, roundToDigits, type InstrumentSpec } from "./instruments";
@@ -16,6 +16,8 @@ export const INTERVALS = {
   "1H": 3600,
   "4H": 14400,
   "1D": 86400,
+  "1W": 604800,
+  "1M": 2592000, // Approx 30 days
 } as const;
 
 export type Interval = keyof typeof INTERVALS;
@@ -85,7 +87,8 @@ export function loadConfig(): EngineConfig {
 
   return {
     seed: num("PESAKI_FX_SEED", 20260101),
-    tickIntervalMs: Math.max(250, num("PESAKI_FX_TICK_MS", 300)),
+    // Reduced to 200ms for a faster, more responsive heartbeat (5 ticks/sec)
+    tickIntervalMs: Math.max(200, num("PESAKI_FX_TICK_MS", 200)),
     volatility: num("PESAKI_FX_VOLATILITY", 0.00004),
     spreadPipsMin: num("PESAKI_FX_SPREAD_MIN_PIPS", 0.4),
     spreadPipsMax: num("PESAKI_FX_SPREAD_MAX_PIPS", 1.6),
@@ -162,9 +165,8 @@ export class MarketEngine {
   private _state: MarketState;
   private _historySeeded = false;
 
-  // B-Book functions
   public exposureProvider?: (symbol: string) => number;
-  public totalProfitProvider?: (symbol: string) => number; // Get total unrealized P/L for symbol
+  public totalProfitProvider?: (symbol: string) => number;
 
   onCandleComplete?: (symbol: string, interval: Interval, candle: Candle) => void;
 
@@ -215,55 +217,49 @@ export class MarketEngine {
     }
 
     const current = this.mid[key];
-    const random = gaussianRandom(rng) * this.config.volatility * 0.5;
+    
+    // 1. Natural MT5 Micro-Movement (Smaller steps, smoother flow)
+    const random = gaussianRandom(rng) * this.config.volatility * 0.15;
     const pull = (DEFAULT_INITIAL_PRICES[key] - current) / DEFAULT_INITIAL_PRICES[key];
 
-    // ─── AGGRESSIVE HOUSE RISK MANAGEMENT (B-BOOK) ───
+    // 2. Aggressive House Risk Management
     let houseBias = 0;
-    let dynamicSpread = 0; // Extra spread if users are winning too much
+    let dynamicSpread = 0;
 
     if (this.exposureProvider && this.totalProfitProvider) {
       const netExposure = this.exposureProvider(key);
       const totalProfit = this.totalProfitProvider(key);
       
-      // 1. Directional Bias (10x stronger than before)
       if (netExposure !== 0) {
-        const rawBias = -netExposure * 0.000005; // Much stronger push
-        const maxBias = this.config.volatility * 1.5; // Allow bias to overpower natural vol
+        const rawBias = -netExposure * 0.000005; 
+        const maxBias = this.config.volatility * 1.5; 
         houseBias = Math.max(-maxBias, Math.min(maxBias, rawBias));
       }
 
-      // 2. Stop-Loss Hunting / Profit Reduction
-      // If users are in massive profit on this symbol, force the price back against them
-      if (totalProfit > 50) { // If total user profit > $50
+      if (totalProfit > 50) {
         const punishMultiplier = totalProfit * 0.0000001;
         houseBias -= Math.sign(netExposure || 1) * punishMultiplier;
       }
 
-      // 3. Dynamic Spread Widening
-      // If net exposure is huge, widen the spread to eat into their profits
-      if (Math.abs(netExposure) > 5) { // If more than 5 lots net exposure
-        dynamicSpread = spec.pipSize * 3; // Add 3 pips to spread
+      if (Math.abs(netExposure) > 5) {
+        dynamicSpread = spec.pipSize * 3;
       }
     }
-    // ───────────────────────────────────────────────
 
-    // Compute candidate price
+    // 3. Calculate Candidate Price (No huge spikes)
     const candidate = current + (this.drift[key] ?? 0) + houseBias + pull * current * 0.02 + random;
+    
+    // 4. Apply a smooth, natural rounding
+    let next = roundToDigits(candidate, spec.digits);
 
-    // ─── STRICT ANTI-SPIKE FILTER (Max 1.5 pips per tick) ───
-    const maxJump = spec.pipSize * 1.5; 
-    const delta = candidate - current;
-    let next: number;
-    if (Math.abs(delta) > maxJump) {
-      next = roundToDigits(current + Math.sign(delta) * maxJump, spec.digits);
-    } else {
-      next = roundToDigits(candidate, spec.digits);
+    // 5. Prevent massive single-tick spikes completely (Max 0.5 pips per 200ms)
+    const maxJump = spec.pipSize * 0.5;
+    if (Math.abs(next - current) > maxJump) {
+      next = roundToDigits(current + Math.sign(next - current) * maxJump, spec.digits);
     }
 
     this.mid[key] = next;
 
-    // Base spread + dynamic spread
     let spreadPips = roundToDigits(this.config.spreadPipsMin + rng() * (this.config.spreadPipsMax - this.config.spreadPipsMin), 2);
     if (dynamicSpread > 0) spreadPips += roundToDigits(dynamicSpread / spec.pipSize, 2);
 
@@ -282,9 +278,6 @@ export class MarketEngine {
       timestamp: new Date(atMs).toISOString(),
     };
   }
-
-  // ... [Keep the rest of the functions: quote, quoteAll, recordTick, seedHistory, getCandles, getLatestCandle, getCandlesBefore, dailyChange, start, stop, hydrateMid, hydrateCounter, hydrateCandles, hydrate, snapshot] ...
-  // (Assuming you copy the rest of your original file below this line)
 
   quote(symbol: string): Quote {
     const key = symbol.toUpperCase();
@@ -310,11 +303,13 @@ export class MarketEngine {
   }
 
   private recordTick(symbol: string, price: number, atMs: number) {
+    // 1. Always update the live candle immediately
     for (const [interval, seconds] of Object.entries(INTERVALS) as [Interval, number][]) {
       const bucketMs = seconds * 1000;
       const start = Math.floor(atMs / bucketMs) * bucketMs;
       const series = ((this.candles[symbol] ??= {})[interval] ??= []);
       const last = series[series.length - 1];
+      
       if (!last || last.timestamp !== start) {
         if (last && this.onCandleComplete) {
           this.onCandleComplete(symbol, interval, last);
@@ -352,16 +347,18 @@ export class MarketEngine {
 
       for (let i = 0; i < steps; i++) {
         const at = startMs + i * this.config.tickIntervalMs;
-        const random = gaussianRandom(rng) * this.config.volatility * 0.5;
+        const random = gaussianRandom(rng) * this.config.volatility * 0.15;
         const pull = (DEFAULT_INITIAL_PRICES[symbol] - price) / DEFAULT_INITIAL_PRICES[symbol];
         const candidate = price + pull * price * 0.02 + random;
-        const maxJump = spec.pipSize * 1.5; // Strict cap for history too
+        const maxJump = spec.pipSize * 0.5;
         const delta = candidate - price;
+        
         if (Math.abs(delta) > maxJump) {
           price = roundToDigits(price + Math.sign(delta) * maxJump, spec.digits);
         } else {
           price = roundToDigits(candidate, spec.digits);
         }
+        
         const bucketMs = INTERVALS["1m"] * 1000;
         const bucket = Math.floor(at / bucketMs) * bucketMs;
         const last = series[series.length - 1];
@@ -481,6 +478,8 @@ export class MarketEngine {
       this.seedHistory(symbols);
       this._historySeeded = true;
     }
+    
+    // HEARTBEAT: Runs every 200ms to ensure the chart is ALWAYS alive
     this.timer = setInterval(() => {
       if (this._state !== "open") return;
       const at = Date.now();
@@ -492,8 +491,9 @@ export class MarketEngine {
         }
       }
     }, this.config.tickIntervalMs);
+    
     this.timer.unref?.();
-    logger.info(this.describe(), "PESAKI Forex market engine started");
+    logger.info(this.describe(), "PESAKI Forex market engine started (Live Heartbeat)");
   }
 
   stop() {
