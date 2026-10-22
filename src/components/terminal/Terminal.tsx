@@ -6,12 +6,10 @@ import { PriceChart } from "./PriceChart";
 import { OrderDialog, type DialogState } from "./OrderDialog";
 import { Menu, ChevronUp, ChevronDown, Wallet, ChevronLeft } from "lucide-react";
 
-// ─── EXACT MT5 TOP ICONS ───
 const TopCrosshair = () => (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="6" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></svg>);
 const TopActivity = () => (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 14h4l3-8 4 16 3-8h4" /></svg>);
 const TopLayers = () => (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 12 12 17 22 12" /><polyline points="2 17 12 22 22 17" /></svg>);
 
-// ─── EXACT MT5 BOTTOM ICONS ───
 const BottomQuotes = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10L3 14L7 18" /><path d="M17 14L21 10L17 6" /><path d="M3 14H12" /><path d="M12 10H21" /></svg>);
 const BottomCharts = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="15" x2="5" y2="21" /><rect x="3" y="9" width="4" height="6" /><line x1="12" y1="9" x2="12" y2="21" /><rect x="10" y="3" width="4" height="6" /><line x1="19" y1="17" x2="19" y2="21" /><rect x="17" y="11" width="4" height="6" /></svg>);
 const BottomTrade = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 14h4l3-8 4 16 3-8h4" /></svg>);
@@ -29,7 +27,6 @@ export function Terminal({ mode = "demo" }: { mode?: "demo" | "real" }) {
   const [lots, setLots] = useState(0.01); 
   const [mobileTab, setMobileTab] = useState<"chart" | "market" | "trade" | "history" | "messages">("chart");
   
-  // RADIAL MENU STATE
   const [showRadial, setShowRadial] = useState(false);
   const [showBulkMenu, setShowBulkMenu] = useState(false);
   
@@ -40,7 +37,6 @@ export function Terminal({ mode = "demo" }: { mode?: "demo" | "real" }) {
   const s = e.spec(symbol);
   const q = e.quotes[symbol];
 
-  // ─── SYNC MODE FROM URL PROP ───
   useEffect(() => {
     const engineMode = mode === "real" ? "live" : "demo";
     e.setMode(engineMode);
@@ -49,7 +45,6 @@ export function Terminal({ mode = "demo" }: { mode?: "demo" | "real" }) {
     }
   }, [mode]);
 
-  // ─── FLASH ANIMATION STATE ───
   const [flash, setFlash] = useState<"up" | "down" | "none">("none");
   const prevBid = useRef(q?.bid);
 
@@ -122,10 +117,10 @@ export function Terminal({ mode = "demo" }: { mode?: "demo" | "real" }) {
             </div>
             
             {mode === "real" ? (
-              <>
-                <div className="text-xs font-mono font-bold text-gray-900">KSh {money(e.liveKesBalance)}</div>
-                <div className="text-[10px] font-mono text-green-600 font-bold">≈ ${money(e.liveBalance)}</div>
-              </>
+              // Displays KES as expected
+              <div className="text-xs font-mono font-bold text-green-600">
+                KSh {money(e.liveKesBalance)}
+              </div>
             ) : (
               <div className="text-xs font-mono font-bold text-gray-900">${money(e.demoBalance)}</div>
             )}
