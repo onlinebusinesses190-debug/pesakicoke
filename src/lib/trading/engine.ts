@@ -21,7 +21,6 @@ export type Result = { ok: true; ticket?: number } | { ok: false; error: string 
 import { configuredLeverage } from "@/lib/fx/market";
 import { apiRequest } from "@/utils/api"; 
 import { supabase } from "@/utils/supabase/client";
-import { toast } from "sonner";
 
 const SPREADS: Record<string, number> = { EURUSD: 1, GBPUSD: 2, USDJPY: 1, AUDUSD: 1, USDCAD: 2, USDCHF: 2, NZDUSD: 2, EURJPY: 2, GBPJPY: 3, XAUUSD: 2 };
 function spreadFor(symbol: string): number { return SPREADS[symbol] ?? 2; }
@@ -100,24 +99,14 @@ export class Engine {
   async fetchLiveBalance() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        console.warn("No active session. Cannot fetch live balance.");
-        this.liveKesBalance = 0;
-        this.liveBalance = 0;
-        this.emit();
-        return;
-      }
+      if (!session) return;
 
       const res = await apiRequest<{ success: boolean; balance: number; exchange_rate?: number }>("/wallet/balance");
-      console.log("Live Balance API Response:", res);
-
       if (res && res.success) {
         this.liveKesBalance = res.balance;
         this.exchangeRate = res.exchange_rate || 130; 
         this.liveBalance = this.liveKesBalance / this.exchangeRate;
         this.emit();
-      } else {
-        console.error("Backend rejected balance fetch:", res);
       }
     } catch (err: any) {
       console.error("Failed to fetch live balance", err);
@@ -149,9 +138,7 @@ export class Engine {
     this.animationFrameId = requestAnimationFrame(loop);
   }
 
-  stop() {
-    if (this.animationFrameId) { cancelAnimationFrame(this.animationFrameId); this.animationFrameId = null; }
-  }
+  stop() { if (this.animationFrameId) { cancelAnimationFrame(this.animationFrameId); this.animationFrameId = null; } }
 
   subscribe = (fn: () => void) => { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; };
   getVersion = () => this.version;
