@@ -61,6 +61,7 @@ export class Engine {
   
   demoBalance = DEMO_START_BALANCE;
   liveKesBalance = 0;
+  exchangeRate = 130; // Default
   liveBalance = 0; 
   
   leverage = configuredLeverage();
@@ -95,20 +96,34 @@ export class Engine {
 
   get balance() { return this.mode === "live" ? this.liveBalance : this.demoBalance; }
 
-  // ─── EXACT ORIGINAL FIX FOR BALANCE FETCHING ───
+  // ─── FIXED: Fetch Rate and Convert to USD ───
   async fetchLiveBalance() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
+      // 1. Fetch the live exchange rate from the backend
+      try {
+        const rateRes = await apiRequest<any>("/forex/rates");
+        if (rateRes && rateRes.success && rateRes.usdToKes) {
+          this.exchangeRate = rateRes.usdToKes;
+        }
+      } catch (err) {
+        console.warn("Could not fetch live rate, using default.", err);
+      }
+
+      // 2. Fetch the KES wallet balance
       const res = await apiRequest<any>("/forex/account?account_type=live");
       console.log("Live Forex API Response:", res);
 
       if (res && res.success) {
-        // Fallback to res.balance (original) OR res.account.walletBalance (new backend format)
+        // Handle both backend formats just in case
         const kesBalance = Number(res.balance ?? res.account?.walletBalance ?? 0);
+        
         this.liveKesBalance = kesBalance;
-        this.liveBalance = kesBalance; 
+        // 3. Convert KES to USD for the engine's math
+        this.liveBalance = kesBalance / this.exchangeRate; 
+        
         this.emit();
       }
     } catch (err: any) {
@@ -221,7 +236,7 @@ export class Engine {
     
     if (this.mode === "live") {
       try {
-        const payloadSymbol = req.symbol.replace(/(...)(...)/, "$1/$2"); // EURUSD -> EUR/USD
+        const payloadSymbol = req.symbol.replace(/(...)(...)/, "$1/$2"); 
         
         const res = await apiRequest<any>("/forex/orders", {
           method: "POST",
@@ -237,7 +252,7 @@ export class Engine {
         
         if (!res.success) return this.fail(res.error || "Backend rejected trade");
         
-        this.fetchLiveBalance(); // Update KES balance immediately
+        this.fetchLiveBalance(); 
         this.log(`LIVE order #${res.order?.id} executed`);
         return { ok: true, ticket: res.order?.id };
       } catch (err: any) {
