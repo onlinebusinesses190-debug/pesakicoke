@@ -4,7 +4,7 @@ import { money, useEngine } from "@/lib/trading/use-engine";
 import { MarketWatch } from "./MarketWatch";
 import { PriceChart } from "./PriceChart";
 import { OrderDialog, type DialogState } from "./OrderDialog";
-import { Wallet, Menu, ArrowLeftRight, BarChart3, Clock, MessageSquare, List, ChevronUp, ChevronDown, X, Crosshair, Settings } from "lucide-react";
+import { Wallet, Menu, ArrowLeftRight, BarChart3, Clock, MessageSquare, List, ChevronUp, ChevronDown } from "lucide-react";
 
 export function Terminal() {
   const e = useEngine();
@@ -36,7 +36,6 @@ export function Terminal() {
   
   const totalFloatingPnl = e.positions.reduce((acc, p) => acc + e.profitOf(p), 0);
 
-  // Bulk Close Logic
   const handleBulkClose = (type: 'all' | 'profit' | 'loss') => {
     e.positions.forEach((p) => {
       const pnl = e.profitOf(p);
@@ -112,24 +111,17 @@ export function Terminal() {
       {/* Main Layout */}
       <div className="flex flex-col md:flex-row flex-1 min-h-0 mb-12 md:mb-0">
         
-        {/* Sidebar (Market Watch) */}
         <aside className={`order-2 md:order-1 md:w-64 border-r border-gray-300 bg-white ${mobileTab === "market" ? "block flex-1" : "hidden md:block"}`}>
           <MarketWatch selected={symbol} onSelect={(s) => { setSymbol(s); setMobileTab("chart"); }} onTrade={(s) => open({ mode: "new", symbol: s })} />
         </aside>
 
-        {/* Main Chart Area */}
         <main className={`order-1 md:order-2 flex-1 flex flex-col min-w-0 h-[65vh] md:h-auto ${mobileTab === "chart" ? "flex" : "hidden md:flex"}`}>
-          <div 
-            className="flex-1 relative bg-white w-full h-full min-h-[300px]" 
-            onClick={() => setShowRadial(true)}
-          >
+          <div className="flex-1 relative bg-white w-full h-full min-h-[300px]" onClick={() => setShowRadial(true)}>
             <PriceChart engine={e} symbol={symbol} tf={tf} zoom={zoom} />
           </div>
         </main>
 
-        {/* Positions / History / Messages View */}
         <div className={`order-3 md:w-80 md:h-auto border-t md:border-t-0 md:border-l border-gray-300 bg-white overflow-y-auto ${["positions", "history", "messages"].includes(mobileTab) ? "block flex-1" : "hidden md:block"}`}>
-          
           <div className="bg-[#f8f9fa] border-b border-gray-300 p-3 text-[11px] text-gray-700 space-y-1">
             <div className="flex justify-between"><span>Balance:</span> <span className="font-mono">{money(e.balance)}</span></div>
             <div className="flex justify-between"><span>Equity:</span> <span className="font-mono">{money(e.equity)}</span></div>
@@ -273,12 +265,8 @@ export function Terminal() {
                   className="flex-1 bg-[#1565c0] text-white font-bold py-2 rounded-sm"
                   onClick={() => {
                     const n = Number(depositAmount);
-                    if (n > 0) {
-                      e.deposit(n);
-                      setDepositOpen(false);
-                    } else {
-                      setDepositErr("Enter a valid amount");
-                    }
+                    if (n > 0) { e.deposit(n); setDepositOpen(false); }
+                    else { setDepositErr("Enter a valid amount"); }
                   }}
                 >
                   Deposit
@@ -289,46 +277,95 @@ export function Terminal() {
         </div>
       )}
 
-      {/* RADIAL MENU - CLEAN PROFESSIONAL VERSION */}
+      {/* EXACT MT5 RADIAL MENU (SVG) */}
       {showRadial && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-[2px]" onClick={() => setShowRadial(false)}>
-          <div 
-            className="relative w-[280px] h-[280px] rounded-full border-[28px] border-[#1565c0]/90 shadow-2xl flex items-center justify-center"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Center Close Area */}
-            <button onClick={() => setShowRadial(false)} className="absolute inset-0 m-auto w-12 h-12 rounded-full bg-transparent hover:bg-black/10 flex items-center justify-center">
-               <X className="text-white/60" size={24} />
-            </button>
+        <div className="fixed inset-0 z-[100] bg-transparent" onClick={() => setShowRadial(false)}>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+            <svg width="260" height="260" viewBox="0 0 260 260" className="overflow-visible">
+              {/* The exact blue donut ring */}
+              <circle cx="130" cy="130" r="90" fill="none" stroke="#2979FF" strokeWidth="52" />
 
-            {/* Timeframes */}
-            {["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1"].map((t, i) => {
-              const total = 8;
-              const angle = (i / total) * 2 * Math.PI - Math.PI / 2;
-              const radius = 140; 
-              const x = Math.cos(angle) * radius;
-              const y = Math.sin(angle) * radius;
+              {/* 14 Items mapped mathematically around the circle */}
+              {[
+                { label: "M15", type: "tf" }, { label: "M30", type: "tf" },
+                { label: "H1", type: "tf" }, { label: "H4", type: "tf" },
+                { label: "D1", type: "tf" }, { label: "W1", type: "tf" },
+                { label: "MN", type: "tf" }, { label: "pulse", type: "icon" },
+                { label: "crosshair", type: "icon" }, { label: "sliders", type: "icon" },
+                { label: "magnifier", type: "icon" }, { label: "duplicate", type: "icon" },
+                { label: "M1", type: "tf" }, { label: "M5", type: "tf" }
+              ].map((item, i) => {
+                const total = 14;
+                // Start at top (-90 deg) and go clockwise
+                const angle = -90 + i * (360 / total);
+                const rad = angle * (Math.PI / 180);
+                const radius = 90; // Center of the ring thickness
+                const x = 130 + radius * Math.cos(rad);
+                const y = 130 + radius * Math.sin(rad);
+                // Rotate text tangent to the circle
+                const rotation = angle + 90; 
 
-              return (
-                <button
-                  key={t}
-                  onClick={() => { setTf(t as TF); setShowRadial(false); }}
-                  className={`absolute w-8 h-8 flex items-center justify-center text-[11px] font-bold rounded-full transition-transform hover:scale-125 ${
-                    tf === t ? "text-white bg-[#0d47a1] shadow-md" : "text-blue-100 hover:text-white"
-                  }`}
-                  style={{ transform: `translate(${x}px, ${y}px)` }}
-                >
-                  {t}
-                </button>
-              );
-            })}
-
-            {/* Inner Tools */}
-            <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 flex flex-col gap-6 text-blue-100/80">
-              <Crosshair size={18} className="hover:text-white cursor-pointer hover:scale-110 transition-transform" />
-              <BarChart3 size={18} className="hover:text-white cursor-pointer hover:scale-110 transition-transform" />
-              <Settings size={18} className="hover:text-white cursor-pointer hover:scale-110 transition-transform" />
-            </div>
+                return (
+                  <g
+                    key={i}
+                    transform={`translate(${x}, ${y}) rotate(${rotation})`}
+                    onClick={() => item.type === "tf" && setTf(item.label as TF)}
+                    className={`transition-transform hover:scale-125 cursor-pointer ${item.type === "tf" && tf === item.label ? "opacity-100" : "opacity-90 hover:opacity-100"}`}
+                    style={{ transformOrigin: "center", transformBox: "fill-box" }}
+                  >
+                    {item.type === "tf" ? (
+                      <text
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                        fontFamily="system-ui, -apple-system, sans-serif"
+                        fontWeight="700"
+                        fontSize="11"
+                        fill="#FFFFFF"
+                        stroke="#000000"
+                        strokeWidth="2.5"
+                        paintOrder="stroke"
+                      >
+                        {item.label}
+                      </text>
+                    ) : (
+                      <g stroke="#FFFFFF" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                        {item.label === "pulse" && (
+                          <path d="M-8 0 H-4 L-2 -5 L2 5 L4 0 H8" />
+                        )}
+                        {item.label === "crosshair" && (
+                          <>
+                            <line x1="-6" y1="0" x2="6" y2="0" />
+                            <line x1="0" y1="-6" x2="0" y2="6" />
+                            <path d="M-2 -6 L0 -8 L2 -6 M-2 6 L0 8 L2 6 M-6 -2 L-8 0 L-6 2 M6 -2 L8 0 L6 2" />
+                          </>
+                        )}
+                        {item.label === "sliders" && (
+                          <>
+                            <line x1="-4" y1="-7" x2="-4" y2="7" />
+                            <circle cx="-4" cy="-2" r="2" fill="#FFFFFF" />
+                            <line x1="2" y1="-7" x2="2" y2="7" />
+                            <circle cx="2" cy="4" r="2" fill="#FFFFFF" />
+                          </>
+                        )}
+                        {item.label === "magnifier" && (
+                          <>
+                            <circle cx="-2" cy="-2" r="4" />
+                            <line x1="1" y1="1" x2="6" y2="6" />
+                            <circle cx="-2" cy="-2" r="1.5" fill="#FFFFFF" />
+                          </>
+                        )}
+                        {item.label === "duplicate" && (
+                          <>
+                            <rect x="-5" y="-5" width="7" height="7" />
+                            <rect x="-1" y="-1" width="7" height="7" />
+                          </>
+                        )}
+                      </g>
+                    )}
+                  </g>
+                );
+              })}
+            </svg>
           </div>
         </div>
       )}
