@@ -58,7 +58,7 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
     setErr("");
     setLoading(true);
     try {
-      // We send the PESAKI lots to the engine, which converts it to $ Margin for the backend
+      // e.placeOrder expects 'lots', which we will map to Margin in the engine
       const res = await e.placeOrder({ 
         symbol, type: direction, lots: num(pesakiLots), sl: num(sl), tp: num(tp) 
       });
@@ -71,54 +71,87 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
     }
   };
 
+  const handleModify = () => {
+    if (!pos) return;
+    setErr("");
+    const res = e.modifyPosition(pos.ticket, num(sl), num(tp));
+    if (res.ok) onClose();
+    else setErr(res.error || "Modify failed");
+  };
+
+  const handleClosePos = () => {
+    if (!pos) return;
+    setErr("");
+    const res = e.closePosition(pos.ticket, "manual", num(closeLots));
+    if (res.ok) onClose();
+    else setErr(res.error || "Close failed");
+  };
+
+  if (state.mode === "modify") {
+    if (!pos) return <div className="fixed inset-0 flex items-center justify-center">Position is closed.</div>;
+    const s = e.spec(pos.symbol);
+    
+    return (
+      <Shell title={`#${pos.ticket} ${pos.side.toUpperCase()} ${pos.lots.toFixed(2)} ${pos.symbol}`} onClose={onClose}>
+        <div className="flex justify-between items-center bg-gray-50 border border-gray-200 p-2 rounded-sm font-mono text-sm">
+          <span className="text-[#c62828] font-bold">Bid: {e.quotes[pos.symbol].bid.toFixed(s.digits)}</span>
+          <span className="text-gray-400">|</span>
+          <span className="text-[#1565c0] font-bold">Ask: {e.quotes[pos.symbol].ask.toFixed(s.digits)}</span>
+        </div>
+        <div className="text-xs text-gray-600 flex justify-between">
+          <span>Open: <b className="font-mono text-black">{pos.openPrice.toFixed(s.digits)}</b></span>
+          <span>Profit: <b className={`font-mono ${e.profitOf(pos) >= 0 ? "text-[#2e7d32]" : "text-[#c62828]"}`}>{e.profitOf(pos).toFixed(2)} USD</b></span>
+        </div>
+        <div className="space-y-3 pt-2 border-t border-gray-200">
+          <Row label="Stop Loss"><input className="w-full border border-gray-300 rounded-sm px-2 py-1.5 text-sm font-mono" value={sl} onChange={(v) => setSl(v.target.value)} placeholder="0.00000" /></Row>
+          <Row label="Take Profit"><input className="w-full border border-gray-300 rounded-sm px-2 py-1.5 text-sm font-mono" value={tp} onChange={(v) => setTp(v.target.value)} placeholder="0.00000" /></Row>
+          <button className="w-full bg-[#1565c0] hover:bg-[#0d47a1] text-white py-2 text-sm font-bold rounded-sm" onClick={handleModify} disabled={loading}>Modify Position</button>
+        </div>
+        <div className="space-y-3 pt-4 border-t border-gray-200 mt-4">
+          <Row label="Close Volume"><input className="w-full border border-gray-300 rounded-sm px-2 py-1.5 text-sm font-mono" value={closeLots} onChange={(v) => setCloseLots(v.target.value)} /></Row>
+          <button className="w-full bg-[#c62828] hover:bg-[#b71c1c] text-white py-2 text-sm font-bold rounded-sm" onClick={handleClosePos} disabled={loading}>Close at {e.closePriceOf(pos).toFixed(s.digits)}</button>
+        </div>
+        {err && <p className="text-[#c62828] text-xs font-bold text-center mt-2">{err}</p>}
+      </Shell>
+    );
+  }
+
   const s = e.spec(symbol);
   const q = e.quotes[symbol];
   
-  // ─── PESAKI MARGIN & LEVERAGE MATH ───
-  const MARGIN_PER_LOT = 100; // $100 margin per 1.0 PESAKI lot
+  // PESAKI MARGIN & LEVERAGE MATH
+  const MARGIN_PER_LOT = 100; 
   const LEVERAGE = 100;
   
   const marginUsd = num(pesakiLots) * MARGIN_PER_LOT;
   const exposureUsd = marginUsd * LEVERAGE;
-  
-  const openFeeUsd = marginUsd * 0.005; // 0.5% of Margin
-  const closeFeeUsd = marginUsd * 0.005; // 0.5% of Margin
-  
+  const openFeeUsd = marginUsd * 0.005;
+  const closeFeeUsd = marginUsd * 0.005;
   const totalRequiredUsd = marginUsd + openFeeUsd;
 
   return (
     <Shell title="PESAKI FX Order" onClose={onClose}>
       <Row label="Symbol">
-        <select className="w-full border border-gray-300 rounded-sm px-2 py-1.5 text-sm focus:outline-none focus:border-[#1565c0]" value={symbol} onChange={(v) => setSymbol(v.target.value)}>
-          {SYMBOLS.map((x) => (
-            <option key={x.name} value={x.name}>{x.name}, {x.desc}</option>
-          ))}
+        <select className="w-full border border-gray-300 rounded-sm px-2 py-1.5 text-sm focus:outline-none" value={symbol} onChange={(v) => setSymbol(v.target.value)}>
+          {SYMBOLS.map((x) => <option key={x.name} value={x.name}>{x.name}, {x.desc}</option>)}
         </select>
       </Row>
 
-       <Row label="PESAKI Lots">
-         <input
-           className="w-full border border-gray-300 rounded-sm px-2 py-1.5 text-sm font-mono focus:outline-none focus:border-[#1565c0]"
-           type="number"
-           step="0.01"
-           min="0.01"
-           value={pesakiLots}
-           onChange={(v) => setPesakiLots(v.target.value)}
-         />
+      <Row label="PESAKI Lots">
+        <input className="w-full border border-gray-300 rounded-sm px-2 py-1.5 text-sm font-mono focus:outline-none" type="number" step="0.01" min="0.01" value={pesakiLots} onChange={(v) => setPesakiLots(v.target.value)} />
       </Row>
 
       <div className="grid grid-cols-2 gap-2">
         <div>
           <span className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Stop Loss</span>
-          <input className="w-full border border-gray-300 rounded-sm px-2 py-1.5 text-sm font-mono focus:outline-none focus:border-[#c62828]" value={sl} onChange={(v) => setSl(v.target.value)} placeholder="0.00000" inputMode="decimal" />
+          <input className="w-full border border-gray-300 rounded-sm px-2 py-1.5 text-sm font-mono" value={sl} onChange={(v) => setSl(v.target.value)} placeholder="0.00000" />
         </div>
         <div>
           <span className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Take Profit</span>
-          <input className="w-full border border-gray-300 rounded-sm px-2 py-1.5 text-sm font-mono focus:outline-none focus:border-[#2e7d32]" value={tp} onChange={(v) => setTp(v.target.value)} placeholder="0.00000" inputMode="decimal" />
+          <input className="w-full border border-gray-300 rounded-sm px-2 py-1.5 text-sm font-mono" value={tp} onChange={(v) => setTp(v.target.value)} placeholder="0.00000" />
         </div>
       </div>
 
-      {/* PESAKI FEE SUMMARY */}
       <div className="bg-[#f8f9fa] border border-gray-200 rounded-sm p-3 flex flex-col gap-2 mt-2">
         <div className="flex justify-between items-center font-mono text-base border-b border-gray-300 pb-2">
           <span className="text-[#c62828] font-bold">{q.bid.toFixed(s.digits)}</span>
@@ -149,14 +182,13 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
         </div>
       </div>
 
-      {/* Action Buttons */}
       {exec === "market" ? (
         <div className="grid grid-cols-2 gap-2 mt-2">
-          <button className="bg-[#c62828] hover:bg-[#b71c1c] py-3 text-white text-sm font-bold uppercase rounded-sm transition-colors flex flex-col items-center disabled:opacity-50" onClick={() => handleTrade("sell")} disabled={loading || marginUsd < 1}>
+          <button className="bg-[#c62828] hover:bg-[#b71c1c] py-3 text-white text-sm font-bold uppercase rounded-sm flex flex-col items-center disabled:opacity-50" onClick={() => handleTrade("sell")} disabled={loading || marginUsd < 1}>
             <span>{loading ? "..." : "SELL"}</span>
             <span className="text-xs font-mono opacity-90">{q.bid.toFixed(s.digits)}</span>
           </button>
-          <button className="bg-[#1565c0] hover:bg-[#0d47a1] py-3 text-white text-sm font-bold uppercase rounded-sm transition-colors flex flex-col items-center disabled:opacity-50" onClick={() => handleTrade("buy")} disabled={loading || marginUsd < 1}>
+          <button className="bg-[#1565c0] hover:bg-[#0d47a1] py-3 text-white text-sm font-bold uppercase rounded-sm flex flex-col items-center disabled:opacity-50" onClick={() => handleTrade("buy")} disabled={loading || marginUsd < 1}>
             <span>{loading ? "..." : "BUY"}</span>
             <span className="text-xs font-mono opacity-90">{q.ask.toFixed(s.digits)}</span>
           </button>
