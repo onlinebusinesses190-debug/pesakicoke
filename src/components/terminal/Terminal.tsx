@@ -4,7 +4,7 @@ import { money, useEngine } from "@/lib/trading/use-engine";
 import { MarketWatch } from "./MarketWatch";
 import { PriceChart } from "./PriceChart";
 import { OrderDialog, type DialogState } from "./OrderDialog";
-import { Menu, ChevronUp, ChevronDown, Wallet, X } from "lucide-react";
+import { Menu, ChevronUp, ChevronDown, Wallet, ChevronLeft } from "lucide-react";
 
 // ─── EXACT MT5 TOP ICONS ───
 const TopCrosshair = () => (
@@ -102,12 +102,22 @@ export function Terminal() {
     );
   };
 
+  // ─── DYNAMIC COLORS ───
+  // If q.dir is 1 (up), we add a subtle blue tint. If -1 (down), a red tint.
+  const marketDirection = q?.dir || 0;
+  const sellBg = marketDirection === 1 ? "bg-[#c62828]" : marketDirection === -1 ? "bg-[#b71c1c]" : "bg-[#c62828]";
+  const buyBg = marketDirection === 1 ? "bg-[#1565c0]" : marketDirection === -1 ? "bg-[#0d47a1]" : "bg-[#1565c0]";
+
   return (
     <div className="flex min-h-screen flex-col bg-[#f8f9fa] text-[#1e293b] font-sans pb-14 md:pb-0">
       
-      {/* TOP TOOLBAR */}
+      {/* TOP TOOLBAR (With Back Arrow & Balance) */}
       <div className="flex items-center justify-between px-3 py-2 bg-white border-b border-gray-300">
-        <Menu size={22} className="text-gray-700 cursor-pointer" onClick={() => setMobileTab(mobileTab === "market" ? "chart" : "market")} />
+        <div className="flex items-center gap-2">
+          <ChevronLeft size={24} className="text-gray-700 cursor-pointer" onClick={() => window.history.back()} />
+          <Menu size={22} className="text-gray-700 cursor-pointer" onClick={() => setMobileTab(mobileTab === "market" ? "chart" : "market")} />
+        </div>
+        
         <div className="flex items-center gap-5 text-gray-700">
           <TopCrosshair />
           <TopActivity />
@@ -117,13 +127,24 @@ export function Terminal() {
           </div>
           <TopLayers />
         </div>
+
+        {/* Balance & Wallet */}
+        <div className="flex items-center gap-2">
+          <div className="text-right">
+            <div className="text-[9px] text-gray-500 uppercase tracking-wide">Balance</div>
+            <div className="text-xs font-mono font-bold">{money(e.balance)}</div>
+          </div>
+          <button onClick={() => setDepositOpen(true)} className="p-1.5 bg-gray-100 rounded text-gray-700 hover:bg-gray-200">
+            <Wallet size={16} />
+          </button>
+        </div>
       </div>
 
-      {/* ACTION BAR */}
-      <div className="flex bg-white border-b border-gray-300 select-none z-10">
+      {/* ACTION BAR (Dynamic Colors) */}
+      <div className="flex bg-white border-b border-gray-300 select-none z-10 transition-colors duration-300">
         <button
           onClick={() => handleTrade("sell")}
-          className="flex-1 bg-[#c62828] text-white py-1 flex flex-col items-center justify-center"
+          className={`flex-1 ${sellBg} text-white py-1 flex flex-col items-center justify-center transition-colors duration-300`}
         >
           <span className="text-[9px] font-bold tracking-wider opacity-90">SELL</span>
           <span className="text-lg font-bold">{renderPrice(q?.bid, s?.digits || 5)}</span>
@@ -142,7 +163,7 @@ export function Terminal() {
 
         <button
           onClick={() => handleTrade("buy")}
-          className="flex-1 bg-[#1565c0] text-white py-1 flex flex-col items-center justify-center"
+          className={`flex-1 ${buyBg} text-white py-1 flex flex-col items-center justify-center transition-colors duration-300`}
         >
           <span className="text-[9px] font-bold tracking-wider opacity-90">BUY</span>
           <span className="text-lg font-bold">{renderPrice(q?.ask, s?.digits || 5)}</span>
@@ -277,6 +298,7 @@ export function Terminal() {
         </button>
       </div>
 
+      {/* MODALS & MENUS (Kept from previous step) */}
       {dialog && <OrderDialog key={dlgKey} state={dialog} onClose={() => setDialog(null)} />}
       
       {depositOpen && (
@@ -298,7 +320,6 @@ export function Terminal() {
         </div>
       )}
 
-      {/* EXACT MT5 RADIAL MENU (SVG) */}
       {showRadial && (
         <div className="fixed inset-0 z-[100] bg-transparent" onClick={() => setShowRadial(false)}>
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
