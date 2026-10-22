@@ -29,6 +29,7 @@ export function Terminal({ mode = "demo" }: { mode?: "demo" | "real" }) {
   const [lots, setLots] = useState(0.01); 
   const [mobileTab, setMobileTab] = useState<"chart" | "market" | "trade" | "history" | "messages">("chart");
   
+  // RADIAL MENU STATE
   const [showRadial, setShowRadial] = useState(false);
   const [showBulkMenu, setShowBulkMenu] = useState(false);
   
@@ -39,7 +40,7 @@ export function Terminal({ mode = "demo" }: { mode?: "demo" | "real" }) {
   const s = e.spec(symbol);
   const q = e.quotes[symbol];
 
-  // ─── SET MODE FROM PROP ───
+  // ─── SYNC MODE FROM URL PROP ───
   useEffect(() => {
     const engineMode = mode === "real" ? "live" : "demo";
     e.setMode(engineMode);
@@ -111,7 +112,7 @@ export function Terminal({ mode = "demo" }: { mode?: "demo" | "real" }) {
           <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center border border-red-400 relative overflow-hidden">
             <div className="absolute inset-0 bg-red-400 transform translate-x-1/2 translate-y-1/2"></div>
           </div>
-          <TopLayers />
+          <TopLayers onClick={() => setShowRadial(true)} className="cursor-pointer" />
         </div>
 
         <div className="flex items-center gap-2">
@@ -168,8 +169,8 @@ export function Terminal({ mode = "demo" }: { mode?: "demo" | "real" }) {
         </aside>
 
         <main className={`order-1 md:order-2 flex-1 flex flex-col min-w-0 ${mobileTab === "chart" ? "flex" : "hidden md:flex"}`}>
-          <div className="flex-1 relative bg-white w-full h-full">
-            <PriceChart engine={e} symbol={symbol} tf={tf} zoom={zoom} onChartClick={() => setShowRadial(true)} />
+          <div className="flex-1 relative bg-white w-full h-full" onClick={() => setShowRadial(true)}>
+            <PriceChart engine={e} symbol={symbol} tf={tf} zoom={zoom} />
           </div>
         </main>
 
@@ -304,6 +305,7 @@ export function Terminal({ mode = "demo" }: { mode?: "demo" | "real" }) {
         </div>
       )}
 
+      {/* RADIAL MENU */}
       {showRadial && (
         <div className="fixed inset-0 z-[100] bg-transparent" onClick={() => setShowRadial(false)}>
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
@@ -344,6 +346,7 @@ export function Terminal({ mode = "demo" }: { mode?: "demo" | "real" }) {
         </div>
       )}
 
+      {/* BULK OPERATIONS */}
       {showBulkMenu && (
         <div className="fixed inset-0 z-[100] flex flex-col justify-end bg-black/50" onClick={() => setShowBulkMenu(false)}>
           <div className="w-full bg-white rounded-t-2xl p-4 pb-8" onClick={(ev) => ev.stopPropagation()}>
