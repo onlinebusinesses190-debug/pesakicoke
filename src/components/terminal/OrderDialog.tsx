@@ -2,7 +2,6 @@ import { useState } from "react";
 import { SYMBOLS, type OrderType } from "@/lib/trading/engine";
 import { useEngine } from "@/lib/trading/use-engine";
 
-// Updated to accept type and lots from the top action bar
 export type DialogState =
   | { mode: "new"; symbol: string; type?: "buy" | "sell"; lots?: number }
   | { mode: "modify"; ticket: number }
@@ -53,8 +52,9 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
   const [symbol, setSymbol] = useState(state?.mode === "new" ? state.symbol : "EURUSD");
   const [exec, setExec] = useState<"market" | "pending">("market");
   const [ptype, setPtype] = useState<OrderType>("buy_limit");
+  // Default to 0.01 lots, not USD
   const [lots, setLots] = useState(
-    state?.mode === "new" && state.lots ? state.lots.toString() : "100"
+    state?.mode === "new" && state.lots ? state.lots.toString() : "0.01"
   );
   const [price, setPrice] = useState("");
   
@@ -64,13 +64,58 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
   const [sl, setSl] = useState(pos?.sl ? String(pos.sl) : "");
   const [tp, setTp] = useState(pos?.tp ? String(pos.tp) : "");
   const [closeLots, setCloseLots] = useState(pos ? pos.lots.toFixed(2) : "");
+  
   const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false); // Prevent double clicks
   
   if (!state) return null;
 
   const num = (v: string) => parseFloat(v) || 0;
-  const done = (r: { ok: boolean; error?: string }) =>
-    r.ok ? onClose() : setErr(r.error || "Error");
+
+  // ─── ASYNC HANDLERS (Fixes the "Error" bug) ───
+  const handleTrade = async (direction: "buy" | "sell") => {
+    setErr("");
+    setLoading(true);
+    try {
+      const res = await e.placeOrder({ symbol, type: direction, lots: num(lots), sl: num(sl), tp: num(tp) });
+      if (res.ok) onClose();
+      else setErr(res.error || "Execution failed");
+    } catch (error: any) {
+      setErr(error.message || "Network error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePending = async () => {
+    setErr("");
+    setLoading(true);
+    try {
+      const res = await e.placeOrder({ symbol, type: ptype, lots: num(lots), price: num(price), sl: num(sl), tp: num(tp) });
+      if (res.ok) onClose();
+      else setErr(res.error || "Execution failed");
+    } catch (error: any) {
+      setErr(error.message || "Network error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleModify = () => {
+    if (!pos) return;
+    setErr("");
+    const res = e.modifyPosition(pos.ticket, num(sl), num(tp));
+    if (res.ok) onClose();
+    else setErr(res.error || "Modify failed");
+  };
+
+  const handleClosePosition = () => {
+    if (!pos) return;
+    setErr("");
+    const res = e.closePosition(pos.ticket, "manual", num(closeLots));
+    if (res.ok) onClose();
+    else setErr(res.error || "Close failed");
+  };
 
   // ─── MODIFY POSITION MODE ───
   if (state.mode === "modify") {
@@ -121,8 +166,9 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
             />
           </Row>
           <button
-            className="w-full bg-[#1565c0] hover:bg-[#0d47a1] text-white py-2 text-sm font-bold rounded-sm transition-colors"
-            onClick={() => done(e.modifyPosition(pos.ticket, num(sl), num(tp)))}
+            className="w-full bg-[#1565c0] hover:bg-[#0d47a1] text-white py-2 text-sm font-bold rounded-sm transition-colors disabled:opacity-50"
+            onClick={handleModify}
+            disabled={loading}
           >
             Modify Position
           </button>
@@ -138,8 +184,9 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
             />
           </Row>
           <button
-            className="w-full bg-[#c62828] hover:bg-[#b71c1c] text-white py-2 text-sm font-bold rounded-sm transition-colors"
-            onClick={() => done(e.closePosition(pos.ticket, "manual", num(closeLots)))}
+            className="w-full bg-[#c62828] hover:bg-[#b71c1c] text-white py-2 text-sm font-bold rounded-sm transition-colors disabled:opacity-50"
+            onClick={handleClosePosition}
+            disabled={loading}
           >
             Close at {e.closePriceOf(pos).toFixed(s.digits)}
           </button>
@@ -171,13 +218,13 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
         </select>
       </Row>
 
-       <Row label="Volume (USD)">
+       <Row label="Volume (Lots)">
          <input
            className="w-full border border-gray-300 rounded-sm px-2 py-1.5 text-sm font-mono focus:outline-none focus:border-[#1565c0]"
            type="number"
-           step="1"
-           min="1"
-           max="10000"
+           step="0.01"
+           min="0.01"
+           max="100"
            value={lots}
            onChange={(v) => setLots(v.target.value)}
          />
@@ -265,43 +312,29 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
       {exec === "market" ? (
         <div className="grid grid-cols-2 gap-2 mt-2">
           <button
-            className="bg-[#c62828] hover:bg-[#b71c1c] py-3 text-white text-sm font-bold uppercase rounded-sm transition-colors flex flex-col items-center"
-            onClick={() =>
-              done(
-                e.placeOrder({ symbol, type: "sell", lots: num(lots), sl: num(sl), tp: num(tp) }),
-              )
-            }
+            className="bg-[#c62828] hover:bg-[#b71c1c] py-3 text-white text-sm font-bold uppercase rounded-sm transition-colors flex flex-col items-center disabled:opacity-50"
+            onClick={() => handleTrade("sell")}
+            disabled={loading}
           >
-            <span>Sell</span>
+            <span>{loading ? "..." : "SELL"}</span>
             <span className="text-xs font-mono opacity-90">{q.bid.toFixed(s.digits)}</span>
           </button>
           <button
-            className="bg-[#1565c0] hover:bg-[#0d47a1] py-3 text-white text-sm font-bold uppercase rounded-sm transition-colors flex flex-col items-center"
-            onClick={() =>
-              done(e.placeOrder({ symbol, type: "buy", lots: num(lots), sl: num(sl), tp: num(tp) }))
-            }
+            className="bg-[#1565c0] hover:bg-[#0d47a1] py-3 text-white text-sm font-bold uppercase rounded-sm transition-colors flex flex-col items-center disabled:opacity-50"
+            onClick={() => handleTrade("buy")}
+            disabled={loading}
           >
-            <span>Buy</span>
+            <span>{loading ? "..." : "BUY"}</span>
             <span className="text-xs font-mono opacity-90">{q.ask.toFixed(s.digits)}</span>
           </button>
         </div>
       ) : (
         <button
-          className="w-full bg-[#1565c0] hover:bg-[#0d47a1] text-white py-3 text-sm font-bold uppercase rounded-sm mt-2 transition-colors"
-          onClick={() =>
-            done(
-              e.placeOrder({
-                symbol,
-                type: ptype,
-                lots: num(lots),
-                price: num(price),
-                sl: num(sl),
-                tp: num(tp),
-              }),
-            )
-          }
+          className="w-full bg-[#1565c0] hover:bg-[#0d47a1] text-white py-3 text-sm font-bold uppercase rounded-sm mt-2 transition-colors disabled:opacity-50"
+          onClick={handlePending}
+          disabled={loading}
         >
-          Place Pending Order
+          {loading ? "Processing..." : "Place Pending Order"}
         </button>
       )}
       {err && <p className="text-[#c62828] text-xs font-bold text-center mt-2">{err}</p>}
