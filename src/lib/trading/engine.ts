@@ -86,27 +86,28 @@ export type Result = { ok: true; ticket?: number } | { ok: false; error: string 
 
 import { configuredLeverage } from "@/lib/fx/market";
 
+// ─── TIGHT MT5-STYLE SPREADS ───
 const SPREADS: Record<string, number> = {
-  EURUSD: 12, GBPUSD: 15, USDJPY: 14, AUDUSD: 14,
-  USDCAD: 18, USDCHF: 16, NZDUSD: 18, EURJPY: 20,
-  GBPJPY: 28, XAUUSD: 30,
+  EURUSD: 1, GBPUSD: 2, USDJPY: 1, AUDUSD: 1,
+  USDCAD: 2, USDCHF: 2, NZDUSD: 2, EURJPY: 2,
+  GBPJPY: 3, XAUUSD: 2, // Gold spread is usually very tight (0.02)
 };
 
 function spreadFor(symbol: string): number {
-  return SPREADS[symbol] ?? 15;
+  return SPREADS[symbol] ?? 2;
 }
 
 const RAW: [string, string, number, number, number, number][] = [
-  ["EURUSD", "Euro vs US Dollar", 5, 12, 100000, 1.0852],
-  ["GBPUSD", "Great Britain Pound vs US Dollar", 5, 15, 100000, 1.2648],
-  ["USDJPY", "US Dollar vs Japanese Yen", 3, 14, 100000, 149.52],
-  ["AUDUSD", "Australian Dollar vs US Dollar", 5, 14, 100000, 0.6551],
-  ["USDCAD", "US Dollar vs Canadian Dollar", 5, 18, 100000, 1.3602],
-  ["USDCHF", "US Dollar vs Swiss Franc", 5, 16, 100000, 0.8803],
-  ["NZDUSD", "New Zealand Dollar vs US Dollar", 5, 18, 100000, 0.6004],
-  ["EURJPY", "Euro vs Japanese Yen", 3, 20, 100000, 162.24],
-  ["GBPJPY", "Great Britain Pound vs Japanese Yen", 3, 28, 100000, 189.11],
-  ["XAUUSD", "Gold vs US Dollar", 2, 30, 100, 2351.4],
+  ["EURUSD", "Euro vs US Dollar", 5, 1, 100000, 1.0852],
+  ["GBPUSD", "Great Britain Pound vs US Dollar", 5, 2, 100000, 1.2648],
+  ["USDJPY", "US Dollar vs Japanese Yen", 3, 1, 100000, 149.52],
+  ["AUDUSD", "Australian Dollar vs US Dollar", 5, 1, 100000, 0.6551],
+  ["USDCAD", "US Dollar vs Canadian Dollar", 5, 2, 100000, 1.3602],
+  ["USDCHF", "US Dollar vs Swiss Franc", 5, 2, 100000, 0.8803],
+  ["NZDUSD", "New Zealand Dollar vs US Dollar", 5, 2, 100000, 0.6004],
+  ["EURJPY", "Euro vs Japanese Yen", 3, 2, 100000, 162.24],
+  ["GBPJPY", "Great Britain Pound vs Japanese Yen", 3, 3, 100000, 189.11],
+  ["XAUUSD", "Gold vs US Dollar", 2, 2, 100, 2351.4],
 ];
 
 export const SYMBOLS: SymbolSpec[] = RAW.map(([name, desc, digits, spread, contract, start]) => ({
@@ -197,7 +198,6 @@ export class Engine {
   private listeners = new Set<() => void>();
   private marginCallWarned = false;
   
-  // ─── RISK MANAGEMENT & ANIMATION STATE ───
   public exposureProvider?: (symbol: string) => number;
   public totalProfitProvider?: (symbol: string) => number;
   private animationFrameId: number | null = null;
@@ -228,7 +228,6 @@ export class Engine {
     this.start();
   }
 
-  // ─── ENGINE LIFECYCLE ───
   public start() {
     if (this.animationFrameId) return;
     this.lastTickTime = Date.now();
@@ -237,7 +236,6 @@ export class Engine {
       this.animationFrameId = requestAnimationFrame(loop);
       const now = Date.now();
       
-      // Tick every 200ms (5 times a second) smoothly
       if (now - this.lastTickTime >= 200) {
         this.lastTickTime = now;
         this.tick();
@@ -530,16 +528,19 @@ export class Engine {
 
       const prev = q.bid;
       const bid = round(Math.max(s.point, proposedBid), s.digits);
-      const spreadPts = s.spread + Math.floor(rng() * (s.spread * 0.3));
+      
+      // 4. TIGHT SPREAD (No dynamic spreading)
+      const spreadPts = s.spread; 
+      const ask = round(bid + spreadPts * s.point, s.digits);
 
       q.bid = bid;
-      q.ask = round(bid + spreadPts * s.point, s.digits);
+      q.ask = ask;
       q.dir = bid > prev ? 1 : bid < prev ? -1 : q.dir;
       q.high = Math.max(q.high, bid);
       q.low = Math.min(q.low, bid);
       q.time = now;
 
-      // 4. Update Candles smoothly
+      // 5. Update Candles smoothly
       for (const tf of Object.keys(TIMEFRAMES) as TF[]) {
         const arr = this.candles[s.name][tf];
         const bucket = Math.floor(nowSec / TIMEFRAMES[tf]) * TIMEFRAMES[tf];
