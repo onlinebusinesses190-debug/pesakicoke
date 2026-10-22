@@ -1,6 +1,4 @@
-// Simulated MetaTrader-style trading engine (demo account).
-// Runs entirely in the browser: live price feed, order execution, margin, SL/TP, stop-out.
-
+// Simulated MetaTrader-style trading engine.
 export const TIMEFRAMES = { M1: 60, M5: 300, M15: 900, M30: 1800, H1: 3600, H4: 14400 } as const;
 export type TF = keyof typeof TIMEFRAMES;
 
@@ -8,185 +6,65 @@ export type Side = "buy" | "sell";
 export type OrderType = "buy" | "sell" | "buy_limit" | "sell_limit" | "buy_stop" | "sell_stop";
 export type CloseReason = "manual" | "sl" | "tp" | "stopout";
 
-const KES_PER_QUOTE: Record<string, number> = {
-  USD: 130, EUR: 141, GBP: 168, JPY: 0.88,
-  CHF: 152, AUD: 85, CAD: 95, NZD: 79,
-};
+const KES_PER_QUOTE: Record<string, number> = { USD: 130, EUR: 141, GBP: 168, JPY: 0.88, CHF: 152, AUD: 85, CAD: 95, NZD: 79 };
+export function kesPerQuote(currency: string): number { const code = currency.toUpperCase(); if (code === "KES") return 1; return KES_PER_QUOTE[code] ?? 1; }
 
-export function kesPerQuote(currency: string): number {
-  const code = currency.toUpperCase();
-  if (code === "KES") return 1;
-  return KES_PER_QUOTE[code] ?? 1;
-}
-
-export interface SymbolSpec {
-  name: string;
-  desc: string;
-  digits: number;
-  point: number;
-  spread: number;
-  contract: number;
-  start: number;
-  vol: number;
-}
-export interface Quote {
-  bid: number;
-  ask: number;
-  high: number;
-  low: number;
-  open: number;
-  dir: -1 | 0 | 1;
-  time: number;
-}
-export interface Candle {
-  t: number;
-  o: number;
-  h: number;
-  l: number;
-  c: number;
-}
-export interface Position {
-  ticket: number;
-  symbol: string;
-  side: Side;
-  lots: number;
-  openPrice: number;
-  openTime: number;
-  sl: number;
-  tp: number;
-}
-export interface PendingOrder {
-  ticket: number;
-  symbol: string;
-  type: Exclude<OrderType, "buy" | "sell">;
-  lots: number;
-  price: number;
-  sl: number;
-  tp: number;
-  time: number;
-}
-export interface Deal {
-  ticket: number;
-  symbol: string;
-  side: Side;
-  lots: number;
-  openPrice: number;
-  closePrice: number;
-  openTime: number;
-  closeTime: number;
-  profit: number;
-  reason: CloseReason | "deposit" | "cancel";
-}
-export interface JournalEntry {
-  time: number;
-  msg: string;
-  error?: boolean;
-}
+export interface SymbolSpec { name: string; desc: string; digits: number; point: number; spread: number; contract: number; start: number; vol: number; }
+export interface Quote { bid: number; ask: number; high: number; low: number; open: number; dir: -1 | 0 | 1; time: number; }
+export interface Candle { t: number; o: number; h: number; l: number; c: number; }
+export interface Position { ticket: number; symbol: string; side: Side; lots: number; openPrice: number; openTime: number; sl: number; tp: number; }
+export interface PendingOrder { ticket: number; symbol: string; type: Exclude<OrderType, "buy" | "sell">; lots: number; price: number; sl: number; tp: number; time: number; }
+export interface Deal { ticket: number; symbol: string; side: Side; lots: number; openPrice: number; closePrice: number; openTime: number; closeTime: number; profit: number; reason: CloseReason | "deposit" | "cancel"; }
+export interface JournalEntry { time: number; msg: string; error?: boolean; }
 export type Result = { ok: true; ticket?: number } | { ok: false; error: string };
 
 import { configuredLeverage } from "@/lib/fx/market";
+import { apiRequest } from "@/utils/api"; 
 
-// ─── TIGHT MT5-STYLE SPREADS ───
-const SPREADS: Record<string, number> = {
-  EURUSD: 1, GBPUSD: 2, USDJPY: 1, AUDUSD: 1,
-  USDCAD: 2, USDCHF: 2, NZDUSD: 2, EURJPY: 2,
-  GBPJPY: 3, XAUUSD: 2, // Gold spread is usually very tight (0.02)
-};
-
-function spreadFor(symbol: string): number {
-  return SPREADS[symbol] ?? 2;
-}
+const SPREADS: Record<string, number> = { EURUSD: 1, GBPUSD: 2, USDJPY: 1, AUDUSD: 1, USDCAD: 2, USDCHF: 2, NZDUSD: 2, EURJPY: 2, GBPJPY: 3, XAUUSD: 2 };
+function spreadFor(symbol: string): number { return SPREADS[symbol] ?? 2; }
 
 const RAW: [string, string, number, number, number, number][] = [
-  ["EURUSD", "Euro vs US Dollar", 5, 1, 100000, 1.0852],
-  ["GBPUSD", "Great Britain Pound vs US Dollar", 5, 2, 100000, 1.2648],
-  ["USDJPY", "US Dollar vs Japanese Yen", 3, 1, 100000, 149.52],
-  ["AUDUSD", "Australian Dollar vs US Dollar", 5, 1, 100000, 0.6551],
-  ["USDCAD", "US Dollar vs Canadian Dollar", 5, 2, 100000, 1.3602],
-  ["USDCHF", "US Dollar vs Swiss Franc", 5, 2, 100000, 0.8803],
-  ["NZDUSD", "New Zealand Dollar vs US Dollar", 5, 2, 100000, 0.6004],
-  ["EURJPY", "Euro vs Japanese Yen", 3, 2, 100000, 162.24],
-  ["GBPJPY", "Great Britain Pound vs Japanese Yen", 3, 3, 100000, 189.11],
-  ["XAUUSD", "Gold vs US Dollar", 2, 2, 100, 2351.4],
+  ["EURUSD", "Euro vs US Dollar", 5, 1, 100000, 1.0852], ["GBPUSD", "Great Britain Pound vs US Dollar", 5, 2, 100000, 1.2648],
+  ["USDJPY", "US Dollar vs Japanese Yen", 3, 1, 100000, 149.52], ["AUDUSD", "Australian Dollar vs US Dollar", 5, 1, 100000, 0.6551],
+  ["USDCAD", "US Dollar vs Canadian Dollar", 5, 2, 100000, 1.3602], ["USDCHF", "US Dollar vs Swiss Franc", 5, 2, 100000, 0.8803],
+  ["NZDUSD", "New Zealand Dollar vs US Dollar", 5, 2, 100000, 0.6004], ["EURJPY", "Euro vs Japanese Yen", 3, 2, 100000, 162.24],
+  ["GBPJPY", "Great Britain Pound vs Japanese Yen", 3, 3, 100000, 189.11], ["XAUUSD", "Gold vs US Dollar", 2, 2, 100, 2351.4],
 ];
 
-export const SYMBOLS: SymbolSpec[] = RAW.map(([name, desc, digits, spread, contract, start]) => ({
-  name, desc, digits,
-  point: Math.pow(10, -digits),
-  spread: spreadFor(name),
-  contract, start,
-  vol: start * 1.2e-5,
-}));
+export const SYMBOLS: SymbolSpec[] = RAW.map(([name, desc, digits, spread, contract, start]) => ({ name, desc, digits, point: Math.pow(10, -digits), spread: spreadFor(name), contract, start, vol: start * 1.2e-5 }));
 
-const STORAGE_KEY = "mt-terminal-v1";
-const START_BALANCE = 10000;
+const STORAGE_KEY = "mt-terminal-v3"; 
+const DEMO_START_BALANCE = 10000;
 const STOP_OUT = 50;
 const MARGIN_CALL = 100;
 
 export const round = (v: number, d: number) => Math.round(v * Math.pow(10, d)) / Math.pow(10, d);
 
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return function () {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function seededRNG(symbol: string, timestamp: number): () => number {
-  const str = symbol + ":" + timestamp;
-  let h = 0;
-  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
-  return mulberry32((h ^ timestamp) >>> 0);
-}
-
-function gaussFrom(rng: () => number) {
-  let u = 0, v = 0;
-  while (u === 0) u = rng();
-  while (v === 0) v = rng();
-  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
-}
-
+function mulberry32(seed: number): () => number { let a = seed >>> 0; return function () { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function seededRNG(symbol: string, timestamp: number): () => number { const str = symbol + ":" + timestamp; let h = 0; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0; return mulberry32((h ^ timestamp) >>> 0); }
+function gaussFrom(rng: () => number) { let u = 0, v = 0; while (u === 0) u = rng(); while (v === 0) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
 export const isBuyType = (t: OrderType) => t.startsWith("buy");
 export const typeLabel = (t: OrderType) => t.replace("_", " ");
 
 function genCandles(s: SymbolSpec, tfSec: number, nowSec: number, n = 400): Candle[] {
-  const out: Candle[] = [];
-  let p = s.start;
-  const subSigma = s.vol * Math.sqrt((tfSec * 2) / 6);
-  const last = Math.floor(nowSec / tfSec) * tfSec;
-  const rng = seededRNG(s.name, tfSec);
-  
-  for (let i = 0; i < n; i++) {
-    const o = p;
-    let h = p, l = p;
-    for (let k = 0; k < 6; k++) {
-      p += gaussFrom(rng) * subSigma;
-      h = Math.max(h, p);
-      l = Math.min(l, p);
-    }
-    out.push({ t: last - (n - 1 - i) * tfSec, o, h, l, c: p });
-  }
-  const shift = s.start - p;
-  return out.map((c) => ({
-    t: c.t,
-    o: round(c.o + shift, s.digits),
-    h: round(c.h + shift, s.digits),
-    l: round(c.l + shift, s.digits),
-    c: round(c.c + shift, s.digits),
-  }));
+  const out: Candle[] = []; let p = s.start; const subSigma = s.vol * Math.sqrt((tfSec * 2) / 6); const last = Math.floor(nowSec / tfSec) * tfSec; const rng = seededRNG(s.name, tfSec);
+  for (let i = 0; i < n; i++) { const o = p; let h = p, l = p; for (let k = 0; k < 6; k++) { p += gaussFrom(rng) * subSigma; h = Math.max(h, p); l = Math.min(l, p); } out.push({ t: last - (n - 1 - i) * tfSec, o, h, l, c: p }); }
+  const shift = s.start - p; return out.map((c) => ({ t: c.t, o: round(c.o + shift, s.digits), h: round(c.h + shift, s.digits), l: round(c.l + shift, s.digits), c: round(c.c + shift, s.digits) }));
 }
 
 export class Engine {
   quotes: Record<string, Quote> = {};
   candles: Record<string, Record<TF, Candle[]>> = {};
-  balance = START_BALANCE;
+  mode: "demo" | "live" = "demo";
+  
+  demoBalance = DEMO_START_BALANCE;
+  liveKesBalance = 0;
+  exchangeRate = 130;
+  liveBalance = 0; 
+  
   leverage = configuredLeverage();
   currency = "USD";
-  mode: "demo" | "live" = "demo";
   positions: Position[] = [];
   orders: PendingOrder[] = [];
   history: Deal[] = [];
@@ -197,9 +75,6 @@ export class Engine {
   
   private listeners = new Set<() => void>();
   private marginCallWarned = false;
-  
-  public exposureProvider?: (symbol: string) => number;
-  public totalProfitProvider?: (symbol: string) => number;
   private animationFrameId: number | null = null;
   private lastTickTime = 0;
   private tickCount = 0;
@@ -208,34 +83,51 @@ export class Engine {
     const now = Date.now() / 1000;
     for (const s of SYMBOLS) {
       const tfs = {} as Record<TF, Candle[]>;
-      (Object.keys(TIMEFRAMES) as TF[]).forEach(
-        (tf) => (tfs[tf] = genCandles(s, TIMEFRAMES[tf], now)),
-      );
+      (Object.keys(TIMEFRAMES) as TF[]).forEach((tf) => (tfs[tf] = genCandles(s, TIMEFRAMES[tf], now)));
       this.candles[s.name] = tfs;
       const day = tfs.H1.slice(-24);
-      this.quotes[s.name] = {
-        bid: s.start,
-        ask: round(s.start + s.spread * s.point, s.digits),
-        high: Math.max(...day.map((c) => c.h)),
-        low: Math.min(...day.map((c) => c.l)),
-        open: day[0].o,
-        dir: 0,
-        time: Date.now(),
-      };
+      this.quotes[s.name] = { bid: s.start, ask: round(s.start + s.spread * s.point, s.digits), high: Math.max(...day.map((c) => c.h)), low: Math.min(...day.map((c) => c.l)), open: day[0].o, dir: 0, time: Date.now() };
     }
     this.load();
-    this.log("Terminal started. Demo account connected to simulated server.");
+    this.log("Terminal started. Demo account connected.");
     this.start();
   }
 
-  public start() {
+  get balance() {
+    return this.mode === "live" ? this.liveBalance : this.demoBalance;
+  }
+
+  async fetchLiveBalance() {
+    try {
+      const res = await apiRequest<{ success: boolean; balance: number; exchange_rate?: number }>("/wallet/balance");
+      if (res.success) {
+        this.liveKesBalance = res.balance;
+        this.exchangeRate = res.exchange_rate || 130; 
+        this.liveBalance = this.liveKesBalance / this.exchangeRate;
+        this.emit();
+      }
+    } catch (err) {
+      console.error("Failed to fetch live balance", err);
+    }
+  }
+
+  setMode(mode: "demo" | "live") {
+    this.mode = mode;
+    if (mode === "live") {
+      this.fetchLiveBalance();
+      this.log("Switched to LIVE trading. Real funds active.");
+    } else {
+      this.log("Switched to DEMO trading.");
+    }
+    this.emit();
+  }
+
+  start() {
     if (this.animationFrameId) return;
     this.lastTickTime = Date.now();
-
     const loop = () => {
       this.animationFrameId = requestAnimationFrame(loop);
       const now = Date.now();
-      
       if (now - this.lastTickTime >= 200) {
         this.lastTickTime = now;
         this.tick();
@@ -244,7 +136,7 @@ export class Engine {
     this.animationFrameId = requestAnimationFrame(loop);
   }
 
-  public stop() {
+  stop() {
     if (this.animationFrameId) {
       cancelAnimationFrame(this.animationFrameId);
       this.animationFrameId = null;
@@ -265,17 +157,10 @@ export class Engine {
   
   private save() {
     try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({
-          balance: this.balance,
-          positions: this.positions,
-          orders: this.orders,
-          history: this.history.slice(0, 500),
-          journal: this.journal.slice(0, 300),
-          nextTicket: this.nextTicket,
-        }),
-      );
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        demoBalance: this.demoBalance, positions: this.positions, orders: this.orders,
+        history: this.history.slice(0, 500), journal: this.journal.slice(0, 300), nextTicket: this.nextTicket,
+      }));
     } catch { /* ignore */ }
   }
   
@@ -284,7 +169,7 @@ export class Engine {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
       const d = JSON.parse(raw);
-      this.balance = d.balance ?? START_BALANCE;
+      this.demoBalance = d.demoBalance ?? DEMO_START_BALANCE;
       this.positions = d.positions ?? [];
       this.orders = d.orders ?? [];
       this.history = d.history ?? [];
@@ -359,12 +244,35 @@ export class Engine {
     return { ok: false, error: msg };
   }
 
-  placeOrder(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }): Result {
+  async placeOrder(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }): Promise<Result> {
     const s = this.spec(req.symbol);
     if (!s) return this.fail("Unknown symbol");
     const q = this.quotes[req.symbol];
     const lots = round(req.lots, 2);
-    if (!(lots >= 1 && lots <= 10000)) return this.fail("Invalid volume (1 - 10000)");
+    
+    if (this.mode === "live") {
+      try {
+        const res = await apiRequest<any>("/forex/trade", {
+          method: "POST",
+          body: JSON.stringify({
+            symbol: req.symbol, side: isBuyType(req.type) ? "buy" : "sell", 
+            lots: lots, sl: req.sl, tp: req.tp, mode: "live"
+          })
+        });
+        if (!res.success) return this.fail(res.error || "Backend rejected trade");
+        
+        this.liveKesBalance = res.new_kes_balance; // Backend should return new wallet balance
+        this.liveBalance = this.liveKesBalance / this.exchangeRate;
+        this.log(`LIVE order #${res.ticket} executed`);
+        this.emit();
+        return { ok: true, ticket: res.ticket };
+      } catch (err: any) {
+        return this.fail(err.message || "Network error placing live trade");
+      }
+    }
+
+    // ─── DEMO TRADING ───
+    if (!(lots >= 0.01 && lots <= 10000)) return this.fail("Invalid volume (0.01 - 10000)");
     const sl = round(req.sl || 0, s.digits), tp = round(req.tp || 0, s.digits);
     const side: Side = isBuyType(req.type) ? "buy" : "sell";
 
@@ -392,14 +300,13 @@ export class Engine {
   }
 
   private openPosition(symbol: string, side: Side, lots: number, sl: number, tp: number, fromOrder?: number): Result {
-    const s = this.spec(symbol);
     const need = this.marginFor(symbol, lots);
-    if (this.freeMargin < need) return this.fail(`Not enough money: required margin ${need.toFixed(2)} USD`);
+    if (this.freeMargin < need) return this.fail(`Not enough money: required margin $${need.toFixed(2)}`);
     const q = this.quotes[symbol];
     const price = side === "buy" ? q.ask : q.bid;
     const ticket = fromOrder ?? this.nextTicket++;
     this.positions.push({ ticket, symbol, side, lots, openPrice: price, openTime: Date.now(), sl, tp });
-    this.log(`deal #${ticket} ${side} ${lots.toFixed(2)} ${symbol} at ${price.toFixed(s.digits)} done`);
+    this.log(`deal #${ticket} ${side} ${lots.toFixed(2)} ${symbol} at ${price.toFixed(this.spec(symbol).digits)} done`);
     this.save();
     this.emit();
     return { ok: true, ticket };
@@ -409,11 +316,11 @@ export class Engine {
     const p = this.positions.find((x) => x.ticket === ticket);
     if (!p) return this.fail(`Position #${ticket} not found`);
     const closeLots = lots ? Math.min(round(lots, 2), p.lots) : p.lots;
-    if (closeLots < 1) return this.fail("Invalid volume (min 1 USD)");
+    if (closeLots < 0.01) return this.fail("Invalid volume");
     
     const profit = this.profitOf(p, closeLots);
     const price = this.closePriceOf(p);
-    this.balance = round(this.balance + profit, 2);
+    this.demoBalance = round(this.demoBalance + profit, 2);
     
     this.history.unshift({
       ticket: p.ticket, symbol: p.symbol, side: p.side, lots: closeLots,
@@ -465,35 +372,27 @@ export class Engine {
     return { ok: true };
   }
 
-  deposit(amountKes: number): Result {
-    if (!(amountKes > 0 && amountKes <= 1e7)) return this.fail("Invalid deposit amount");
-    const usd = amountKes / kesPerQuote("USD");
-    this.balance = round(this.balance + usd, 2);
+  deposit(amountUsd: number): Result {
+    if (!(amountUsd > 0 && amountUsd <= 1e7)) return this.fail("Invalid deposit amount");
+    this.demoBalance = round(this.demoBalance + amountUsd, 2);
     this.history.unshift({
       ticket: this.nextTicket++, symbol: "", side: "buy", lots: 0,
       openPrice: 0, closePrice: 0, openTime: Date.now(), closeTime: Date.now(),
-      profit: usd, reason: "deposit",
+      profit: amountUsd, reason: "deposit",
     });
-    this.log(`balance deposit ${usd.toFixed(2)} USD (KSh ${amountKes.toFixed(2)})`);
+    this.log(`Demo balance deposit $${amountUsd.toFixed(2)}`);
     this.save();
     this.emit();
     return { ok: true };
   }
 
-  setMode(mode: "demo" | "live") {
-    this.mode = mode;
-    this.log(mode === "live" ? "Live trading enabled" : "Demo trading");
-    this.save();
-    this.emit();
-  }
-
   resetAccount() {
-    this.balance = START_BALANCE;
+    this.demoBalance = DEMO_START_BALANCE;
     this.positions = [];
     this.orders = [];
     this.history = [];
     this.journal = [];
-    this.log(`Demo account reset to ${START_BALANCE.toFixed(2)} USD`);
+    this.log(`Demo account reset to $${DEMO_START_BALANCE.toFixed(2)}`);
     this.save();
     this.emit();
   }
@@ -506,21 +405,10 @@ export class Engine {
     for (const s of SYMBOLS) {
       const q = this.quotes[s.name];
       const rng = mulberry32(this.tickCount ^ s.name.charCodeAt(0));
-
-      // 1. Calculate Net Exposure & House Bias (B-Book)
-      let houseBias = 0;
-      if (this.exposureProvider) {
-        const netExposure = this.exposureProvider(s.name);
-        if (netExposure !== 0) {
-          houseBias = -netExposure * 0.000001; // Push against the crowd
-        }
-      }
-
-      // 2. Natural Market Movement
+      
       const randomMove = gaussFrom(rng) * s.vol;
-      let proposedBid = q.bid + randomMove + houseBias;
-
-      // 3. HARD SPIKE FILTER (Max 2.5x normal volatility per tick)
+      let proposedBid = q.bid + randomMove;
+      
       const maxJump = s.vol * 2.5;
       if (Math.abs(proposedBid - q.bid) > maxJump) {
         proposedBid = q.bid + Math.sign(proposedBid - q.bid) * maxJump;
@@ -528,8 +416,6 @@ export class Engine {
 
       const prev = q.bid;
       const bid = round(Math.max(s.point, proposedBid), s.digits);
-      
-      // 4. TIGHT SPREAD (No dynamic spreading)
       const spreadPts = s.spread; 
       const ask = round(bid + spreadPts * s.point, s.digits);
 
@@ -540,7 +426,6 @@ export class Engine {
       q.low = Math.min(q.low, bid);
       q.time = now;
 
-      // 5. Update Candles smoothly
       for (const tf of Object.keys(TIMEFRAMES) as TF[]) {
         const arr = this.candles[s.name][tf];
         const bucket = Math.floor(nowSec / TIMEFRAMES[tf]) * TIMEFRAMES[tf];
@@ -550,13 +435,7 @@ export class Engine {
           last.l = Math.min(last.l, bid);
           last.c = bid;
         } else {
-          arr.push({
-            t: bucket,
-            o: last.c,
-            h: Math.max(last.c, bid),
-            l: Math.min(last.c, bid),
-            c: bid,
-          });
+          arr.push({ t: bucket, o: last.c, h: Math.max(last.c, bid), l: Math.min(last.c, bid), c: bid });
           if (arr.length > 1500) arr.shift();
         }
       }
@@ -568,11 +447,7 @@ export class Engine {
   private processTriggers() {
     for (const o of [...this.orders]) {
       const q = this.quotes[o.symbol];
-      const hit =
-        (o.type === "buy_limit" && q.ask <= o.price) ||
-        (o.type === "sell_limit" && q.bid >= o.price) ||
-        (o.type === "buy_stop" && q.ask >= o.price) ||
-        (o.type === "sell_stop" && q.bid <= o.price);
+      const hit = (o.type === "buy_limit" && q.ask <= o.price) || (o.type === "sell_limit" && q.bid >= o.price) || (o.type === "buy_stop" && q.ask >= o.price) || (o.type === "sell_stop" && q.bid <= o.price);
       if (!hit) continue;
       this.orders = this.orders.filter((x) => x !== o);
       this.log(`order #${o.ticket} ${typeLabel(o.type)} triggered`);
