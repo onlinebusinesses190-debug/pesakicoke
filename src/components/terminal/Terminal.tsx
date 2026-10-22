@@ -9,8 +9,7 @@ import { Menu, ChevronUp, ChevronDown, Wallet, ChevronLeft } from "lucide-react"
 // ─── EXACT MT5 TOP ICONS ───
 const TopCrosshair = () => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <circle cx="12" cy="12" r="6" />
-    <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+    <circle cx="12" cy="12" r="6" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
   </svg>
 );
 const TopActivity = () => (
@@ -20,9 +19,7 @@ const TopActivity = () => (
 );
 const TopLayers = () => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <polygon points="12 2 2 7 12 12 22 7 12 2" />
-    <polyline points="2 12 12 17 22 12" />
-    <polyline points="2 17 12 22 22 17" />
+    <polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 12 12 17 22 12" /><polyline points="2 17 12 22 22 17" />
   </svg>
 );
 
@@ -87,8 +84,6 @@ export function Terminal() {
       else if (q.bid < prevBid.current) setFlash("down");
     }
     prevBid.current = q.bid;
-    
-    // Revert to normal colors after 300ms
     const timer = setTimeout(() => setFlash("none"), 300);
     return () => clearTimeout(timer);
   }, [q?.bid]);
@@ -152,11 +147,46 @@ export function Terminal() {
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="text-right">
-            <div className="text-[9px] text-gray-500 uppercase tracking-wide">Balance</div>
-            <div className="text-xs font-mono font-bold">{money(e.balance)}</div>
+          <div className="text-right flex flex-col items-end">
+            <div className="text-[9px] text-gray-500 uppercase tracking-wide">
+              {e.mode === "live" ? "LIVE WALLET" : "DEMO BAL"}
+            </div>
+            
+            {e.mode === "live" ? (
+              <>
+                <div className="text-xs font-mono font-bold text-gray-900">
+                  KSh {money(e.liveKesBalance)}
+                </div>
+                <div className="text-[10px] font-mono text-green-600 font-bold">
+                  ≈ ${money(e.liveBalance)}
+                </div>
+              </>
+            ) : (
+              <div className="text-xs font-mono font-bold text-gray-900">
+                ${money(e.demoBalance)}
+              </div>
+            )}
           </div>
-          <button onClick={() => setDepositOpen(true)} className="p-1.5 bg-gray-100 rounded text-gray-700 hover:bg-gray-200">
+          
+          <button 
+            onClick={() => e.setMode(e.mode === "live" ? "demo" : "live")}
+            className={`px-2 py-1 text-[10px] font-bold rounded shadow-sm ${
+              e.mode === "live" ? "bg-red-600 text-white" : "bg-green-600 text-white"
+            }`}
+          >
+            {e.mode === "live" ? "LIVE" : "DEMO"}
+          </button>
+
+          <button 
+            onClick={() => {
+              if (e.mode === "live") {
+                window.location.href = "/wallet"; 
+              } else {
+                setDepositOpen(true);
+              }
+            }} 
+            className="p-1.5 bg-gray-100 rounded text-gray-700 hover:bg-gray-200"
+          >
             <Wallet size={16} />
           </button>
         </div>
@@ -327,7 +357,7 @@ export function Terminal() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-sm border border-gray-300 bg-white shadow-2xl rounded-sm overflow-hidden flex flex-col">
             <div className="flex items-center justify-between bg-[#1565c0] px-3 py-2 text-white">
-              <span className="text-sm font-bold">Deposit Funds</span>
+              <span className="text-sm font-bold">Deposit Demo Funds</span>
               <button onClick={() => setDepositOpen(false)} className="text-lg leading-none font-bold">✕</button>
             </div>
             <div className="p-4 space-y-4">
