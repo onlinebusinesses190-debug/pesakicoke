@@ -102,16 +102,24 @@ export function Terminal() {
     );
   };
 
-  // ─── DYNAMIC COLORS ───
-  // If q.dir is 1 (up), we add a subtle blue tint. If -1 (down), a red tint.
-  const marketDirection = q?.dir || 0;
-  const sellBg = marketDirection === 1 ? "bg-[#c62828]" : marketDirection === -1 ? "bg-[#b71c1c]" : "bg-[#c62828]";
-  const buyBg = marketDirection === 1 ? "bg-[#1565c0]" : marketDirection === -1 ? "bg-[#0d47a1]" : "bg-[#1565c0]";
+  // ─── DYNAMIC FULL COLOR SWAP ───
+  let sellBg = "bg-[#c62828]"; // Default Red
+  let buyBg = "bg-[#1565c0]";  // Default Blue
+
+  if (q?.dir === 1) {
+    // Market ticked UP -> Both Blue
+    sellBg = "bg-[#1565c0]";
+    buyBg = "bg-[#1565c0]";
+  } else if (q?.dir === -1) {
+    // Market ticked DOWN -> Both Red
+    sellBg = "bg-[#c62828]";
+    buyBg = "bg-[#c62828]";
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-[#f8f9fa] text-[#1e293b] font-sans pb-14 md:pb-0">
       
-      {/* TOP TOOLBAR (With Back Arrow & Balance) */}
+      {/* TOP TOOLBAR */}
       <div className="flex items-center justify-between px-3 py-2 bg-white border-b border-gray-300">
         <div className="flex items-center gap-2">
           <ChevronLeft size={24} className="text-gray-700 cursor-pointer" onClick={() => window.history.back()} />
@@ -128,7 +136,6 @@ export function Terminal() {
           <TopLayers />
         </div>
 
-        {/* Balance & Wallet */}
         <div className="flex items-center gap-2">
           <div className="text-right">
             <div className="text-[9px] text-gray-500 uppercase tracking-wide">Balance</div>
@@ -140,8 +147,8 @@ export function Terminal() {
         </div>
       </div>
 
-      {/* ACTION BAR (Dynamic Colors) */}
-      <div className="flex bg-white border-b border-gray-300 select-none z-10 transition-colors duration-300">
+      {/* ACTION BAR */}
+      <div className="flex bg-white border-b border-gray-300 select-none z-10">
         <button
           onClick={() => handleTrade("sell")}
           className={`flex-1 ${sellBg} text-white py-1 flex flex-col items-center justify-center transition-colors duration-300`}
@@ -298,7 +305,7 @@ export function Terminal() {
         </button>
       </div>
 
-      {/* MODALS & MENUS (Kept from previous step) */}
+      {/* MODALS & MENUS */}
       {dialog && <OrderDialog key={dlgKey} state={dialog} onClose={() => setDialog(null)} />}
       
       {depositOpen && (
