@@ -2,31 +2,14 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
-import {
-  TrendingUp,
-  Zap,
-  Plane,
-  BarChart3,
-  RefreshCw,
-  Play,
-  DollarSign,
-  X,
-  ChevronRight,
-} from "lucide-react";
+import { TrendingUp, Zap, Plane, BarChart3, RefreshCw, Play, DollarSign } from "lucide-react";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Badge } from "@/components/ui-bits";
 import { tradingProducts } from "@/lib/mock";
 
 export const Route = createFileRoute("/trading/")({
   head: () => ({
-    meta: [
-      { title: "Trading — PESAKI" },
-      {
-        name: "description",
-        content:
-          "Forex, Binary FX, Up & Down, Avimarket, Invest Prediction and Market Spin — all PESAKI trading products in one place.",
-      },
-    ],
+    meta: [{ title: "Trading — PESAKI" }],
   }),
   component: TradingPage,
 });
@@ -39,10 +22,7 @@ const icons: Record<string, React.ComponentType<{ className?: string }>> = {
   spin: RefreshCw,
 };
 
-const routeFor: Record<
-  string,
-  "/games/binary-fx" | "/trading/up-down" | "/trading/aviator" | "/trading/invest" | "/trading/spin"
-> = {
+const routeFor: Record<string, "/games/binary-fx" | "/trading/up-down" | "/trading/aviator" | "/trading/invest" | "/trading/spin"> = {
   binary: "/games/binary-fx",
   updown: "/trading/up-down",
   avi: "/trading/aviator",
@@ -68,12 +48,7 @@ function TradingPage() {
 
   return (
     <AppShell>
-      <PageHeader
-        title="Trading Floor"
-        subtitle="Predict. Trade. Earn."
-        right={<Badge tone="success">Live</Badge>}
-      />
-
+      <PageHeader title="Trading Floor" subtitle="Predict. Trade. Earn." right={<Badge tone="success">Live</Badge>} />
       <section className="px-5 pt-5">
         <div className="gradient-primary rounded-2xl p-5 text-primary-foreground">
           <p className="text-xs uppercase tracking-widest opacity-80">Today's P&L</p>
@@ -83,7 +58,6 @@ function TradingPage() {
       </section>
 
       <section className="mt-6 space-y-3 px-5">
-        {/* Forex — live spot currency trading, demo available now */}
         <Card className="!p-4">
           <div className="flex items-start gap-3">
             <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl gradient-gold text-gold-foreground">
@@ -98,16 +72,10 @@ function TradingPage() {
                 Trade major currency pairs with real-time quotes and full position management.
               </p>
               <div className="mt-3 flex gap-2">
-                <button
-                  onClick={() => openGame("/trading/forex", "demo")}
-                  className="inline-flex flex-1 items-center justify-center gap-1 rounded-full border border-border bg-background px-3 py-2 text-xs font-semibold"
-                >
+                <button onClick={() => openGame("/trading/forex", "demo")} className="inline-flex flex-1 items-center justify-center gap-1 rounded-full border border-border bg-background px-3 py-2 text-xs font-semibold">
                   <Play className="h-3 w-3" /> Demo
                 </button>
-                <button
-                  onClick={() => openGame("/trading/forex", "real")}
-                  className="inline-flex flex-1 items-center justify-center gap-1 rounded-full gradient-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
-                >
+                <button onClick={() => openGame("/trading/forex", "real")} className="inline-flex flex-1 items-center justify-center gap-1 rounded-full gradient-primary px-3 py-2 text-xs font-semibold text-primary-foreground">
                   Real Mode
                 </button>
               </div>
@@ -121,15 +89,7 @@ function TradingPage() {
           return (
             <Card key={p.key} className="!p-4">
               <div className="flex items-start gap-3">
-                <span
-                  className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl ${
-                    tone === "gold"
-                      ? "gradient-gold text-gold-foreground"
-                      : tone === "success"
-                        ? "bg-success/15 text-success"
-                        : "gradient-primary text-primary-foreground"
-                  }`}
-                >
+                <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl ${tone === "gold" ? "gradient-gold text-gold-foreground" : tone === "success" ? "bg-success/15 text-success" : "gradient-primary text-primary-foreground"}`}>
                   <Icon className="h-6 w-6" />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -139,16 +99,10 @@ function TradingPage() {
                   </div>
                   <p className="mt-0.5 text-xs text-muted-foreground">{p.desc}</p>
                   <div className="mt-3 flex gap-2">
-                    <button
-                      onClick={() => openGame(routeFor[p.key], "demo")}
-                      className="inline-flex flex-1 items-center justify-center gap-1 rounded-full border border-border bg-background px-3 py-2 text-xs font-semibold"
-                    >
+                    <button onClick={() => openGame(routeFor[p.key], "demo")} className="inline-flex flex-1 items-center justify-center gap-1 rounded-full border border-border bg-background px-3 py-2 text-xs font-semibold">
                       <Play className="h-3 w-3" /> Demo
                     </button>
-                    <button
-                      onClick={() => openGame(routeFor[p.key], "real")}
-                      className="inline-flex flex-1 items-center justify-center gap-1 rounded-full gradient-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
-                    >
+                    <button onClick={() => openGame(routeFor[p.key], "real")} className="inline-flex flex-1 items-center justify-center gap-1 rounded-full gradient-primary px-3 py-2 text-xs font-semibold text-primary-foreground">
                       Real Mode
                     </button>
                   </div>
@@ -158,10 +112,6 @@ function TradingPage() {
           );
         })}
       </section>
-
-      <p className="mt-6 px-5 text-center text-[10px] text-muted-foreground">
-        Trading involves risk. Trade responsibly.
-      </p>
     </AppShell>
   );
 }
