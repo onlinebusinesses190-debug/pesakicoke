@@ -1,616 +1,314 @@
-/**
- * PESAKI Forex — internal market engine.
- * Optimized for continuous, smooth, MT5-style "live" heartbeat movement.
- */
+import { useEffect, useState, useRef, useCallback } from "react";
 
-import { INSTRUMENTS, roundToDigits, type InstrumentSpec } from "./instruments";
-import { logger } from "../../utils/logger";
+// ─── CONFIGURATION ───
+export type TF = "M1" | "M5" | "M15" | "M30" | "H1" | "H4" | "D1";
 
-export type MarketState = "open" | "paused" | "unavailable";
-
-export const INTERVALS = {
-  "1m": 60,
-  "5m": 300,
-  "15m": 900,
-  "30m": 1800,
-  "1H": 3600,
-  "4H": 14400,
-  "1D": 86400,
-  "1W": 604800,
-  "1M": 2592000, // Approx 30 days
-} as const;
-
-export type Interval = keyof typeof INTERVALS;
-
-export interface EngineConfig {
-  seed: number;
-  tickIntervalMs: number;
-  volatility: number;
-  spreadPipsMin: number;
-  spreadPipsMax: number;
-  feePerLot: number;
-  state: MarketState;
-  initialPrices: Record<string, number>;
-}
-
-// ─── HOUSE LEDGER ───
-export interface HouseLedger {
-  totalStakes: number;
-  totalPayouts: number;
-  netProfit: number;
-}
-
-export const houseStats: HouseLedger = {
-  totalStakes: 0,
-  totalPayouts: 0,
-  netProfit: 0,
+export const TIMEFRAMES: Record<TF, number> = {
+  M1: 60,
+  M5: 300,
+  M15: 900,
+  M30: 1800,
+  H1: 3600,
+  H4: 14400,
+  D1: 86400,
 };
 
-const DEFAULT_INITIAL_PRICES: Record<string, number> = {
-  "EUR/USD": 1.1298,
-  "GBP/USD": 1.2874,
-  "USD/JPY": 151.42,
-  "USD/CHF": 0.8896,
-  "AUD/USD": 0.6612,
-  "USD/CAD": 1.3592,
-  "NZD/USD": 0.6088,
-  "EUR/GBP": 0.8777,
-  "EUR/JPY": 171.06,
-  "GBP/JPY": 194.88,
-  "KES/USD": 0.00769,
-};
-
-const num = (key: string, fallback: number) => {
-  const raw = process.env[key];
-  if (raw === undefined || raw === "") return fallback;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) ? parsed : fallback;
-};
-
-export function loadConfig(): EngineConfig {
-  const initialPrices: Record<string, number> = { ...DEFAULT_INITIAL_PRICES };
-  const raw = process.env.PESAKI_FX_INITIAL_PRICES;
-  if (raw) {
-    try {
-      const parsed = JSON.parse(raw) as Record<string, number>;
-      for (const [symbol, price] of Object.entries(parsed)) {
-        if (getInstrumentSpec(symbol) && Number.isFinite(price)) {
-          initialPrices[symbol] = price;
-        }
-      }
-    } catch (err) {
-      logger.warn({ err: (err as Error).message }, "PESAKI_FX_INITIAL_PRICES is not valid JSON");
-    }
-  }
-
-  const state = process.env.PESAKI_FX_MARKET_STATE as MarketState | undefined;
-
-  return {
-    seed: num("PESAKI_FX_SEED", 20260101),
-    // Reduced to 200ms for a faster, more responsive heartbeat (5 ticks/sec)
-    tickIntervalMs: Math.max(200, num("PESAKI_FX_TICK_MS", 200)),
-    volatility: num("PESAKI_FX_VOLATILITY", 0.00004),
-    spreadPipsMin: num("PESAKI_FX_SPREAD_MIN_PIPS", 0.4),
-    spreadPipsMax: num("PESAKI_FX_SPREAD_MAX_PIPS", 1.6),
-    feePerLot: num("PESAKI_FX_FEE_PER_LOT", 0),
-    state: state === "paused" || state === "unavailable" ? state : "open",
-    initialPrices,
-  };
-}
-
-export function getInstrumentSpec(symbol: string): InstrumentSpec | undefined {
-  return INSTRUMENTS[symbol.toUpperCase()];
-}
-
-function gaussianRandom(rng: () => number): number {
-  let u = 0, v = 0;
-  while (u === 0) u = rng();
-  while (v === 0) v = rng();
-  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
-}
-
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function tickSeed(master: number, symbol: string, counter: number): number {
-  let h = master >>> 0;
-  for (let i = 0; i < symbol.length; i++) {
-    h = (Math.imul(h, 31) + symbol.charCodeAt(i)) >>> 0;
-  }
-  return Math.imul(h ^ counter, 2654435761) >>> 0;
-}
+export const SYMBOLS = [
+  { symbol: "EURUSD", desc: "Euro vs US Dollar", digits: 5, pipSize: 0.0001, base: 1.0850 },
+  { symbol: "GBPUSD", desc: "Great Britain Pound vs US Dollar", digits: 5, pipSize: 0.0001, base: 1.2650 },
+  { symbol: "USDJPY", desc: "US Dollar vs Japanese Yen", digits: 3, pipSize: 0.01, base: 150.50 },
+  { symbol: "XAUUSD", desc: "Gold vs US Dollar", digits: 2, pipSize: 0.1, base: 2050.00 },
+];
 
 export interface Candle {
-  timestamp: number;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  tickVolume: number;
+  t: number;
+  o: number;
+  h: number;
+  l: number;
+  c: number;
 }
 
 export interface Quote {
-  symbol: string;
   bid: number;
   ask: number;
-  mid: number;
-  spreadPips: number;
-  provider: string;
-  state: MarketState;
-  timestamp: string;
 }
 
-export interface EnginePersistence {
-  loadSymbolState(): Promise<Record<string, { mid: number; tickCount: number }>>;
-  loadCandles(symbol: string, interval: string, count: number): Promise<Candle[]>;
+export interface Position {
+  ticket: number;
+  symbol: string;
+  side: "buy" | "sell";
+  lots: number;
+  openPrice: number;
+  sl?: number;
+  tp?: number;
 }
 
-export class MarketEngine {
-  private config: EngineConfig;
-  private mid: Record<string, number> = {};
-  private counter: Record<string, number> = {};
-  private drift: Record<string, number> = {};
-  private lastDriftChange: Record<string, number> = {};
-  private candles: Record<string, Partial<Record<Interval, Candle[]>>> = {};
-  private startedAt: number;
-  private timer: NodeJS.Timeout | null = null;
-  private _state: MarketState;
-  private _historySeeded = false;
+export function useEngine() {
+  // State for the React components to consume
+  const [quotes, setQuotes] = useState<Record<string, Quote>>({});
+  const [candles, setCandles] = useState<Record<string, Record<TF, Candle[]>>>({});
+  const [positions, setPositions] = useState<Position[]>([]);
+  
+  const [balance, setBalance] = useState(10000);
+  const [equity, setEquity] = useState(10000);
+  const [margin, setMargin] = useState(0);
+  const [freeMargin, setFreeMargin] = useState(10000);
 
-  public exposureProvider?: (symbol: string) => number;
-  public totalProfitProvider?: (symbol: string) => number;
+  // Refs to hold data inside the animation loop without triggering React re-renders
+  const quotesRef = useRef<Record<string, Quote>>({});
+  const candlesRef = useRef<Record<string, Record<TF, Candle[]>>>({});
+  const positionsRef = useRef<Position[]>([]);
+  
+  // Initialize historical data once
+  const initialized = useRef(false);
 
-  onCandleComplete?: (symbol: string, interval: Interval, candle: Candle) => void;
-
-  constructor(config: EngineConfig, now = Date.now()) {
-    this.config = config;
-    this.startedAt = now;
-    this._state = config.state;
-    for (const symbol of Object.keys(INSTRUMENTS)) {
-      this.counter[symbol] = 0;
-      this.candles[symbol] = {};
-      const price = config.initialPrices[symbol] ?? DEFAULT_INITIAL_PRICES[symbol];
-      this.mid[symbol] = roundToDigits(price, INSTRUMENTS[symbol].digits);
-    }
-  }
-
-  get state(): MarketState { return this._state; }
-  getConfig(): EngineConfig { return this.config; }
-
-  describe() {
-    return {
-      provider: "pesaki-engine",
-      state: this._state,
-      startedAt: new Date(this.startedAt).toISOString(),
-      tickIntervalMs: this.config.tickIntervalMs,
-      volatility: this.config.volatility,
-      spreadPips: { min: this.config.spreadPipsMin, max: this.config.spreadPipsMax },
-      feePerLot: this.config.feePerLot,
-      symbols: Object.keys(INSTRUMENTS),
-    };
-  }
-
-  setState(state: MarketState) {
-    this._state = state;
-    logger.info({ state }, "PESAKI Forex market state changed");
-  }
-
-  advance(symbol: string, atMs: number): Quote {
-    const key = symbol.toUpperCase();
-    const spec = getInstrumentSpec(key);
-    if (!spec) throw new Error(`Unsupported symbol ${symbol}`);
-
-    const n = this.counter[key]++;
-    const rng = mulberry32(tickSeed(this.config.seed, key, n));
-
-    if (atMs - (this.lastDriftChange[key] ?? atMs) > 30_000) {
-      this.drift[key] = (rng() - 0.5) * 0.00004;
-      this.lastDriftChange[key] = atMs;
-    }
-
-    const current = this.mid[key];
+  const initEngine = useCallback(() => {
+    if (initialized.current) return;
     
-    // 1. Natural MT5 Micro-Movement (Smaller steps, smoother flow)
-    const random = gaussianRandom(rng) * this.config.volatility * 0.15;
-    const pull = (DEFAULT_INITIAL_PRICES[key] - current) / DEFAULT_INITIAL_PRICES[key];
+    const initialQuotes: Record<string, Quote> = {};
+    const initialCandles: Record<string, Record<TF, Candle[]>> = {};
 
-    // 2. Aggressive House Risk Management
-    let houseBias = 0;
-    let dynamicSpread = 0;
-
-    if (this.exposureProvider && this.totalProfitProvider) {
-      const netExposure = this.exposureProvider(key);
-      const totalProfit = this.totalProfitProvider(key);
+    SYMBOLS.forEach((s) => {
+      const spread = s.pipSize * 1.2;
+      initialQuotes[s.symbol] = { bid: s.base, ask: s.base + spread };
       
-      if (netExposure !== 0) {
-        const rawBias = -netExposure * 0.000005; 
-        const maxBias = this.config.volatility * 1.5; 
-        houseBias = Math.max(-maxBias, Math.min(maxBias, rawBias));
-      }
+      initialCandles[s.symbol] = {} as Record<TF, Candle[]>;
+      (Object.keys(TIMEFRAMES) as TF[]).forEach((tf) => {
+        initialCandles[s.symbol][tf] = [];
+        let currentPrice = s.base;
+        const now = Math.floor(Date.now() / 1000);
+        const tfSec = TIMEFRAMES[tf];
+        const start = now - (50 * tfSec); // 50 historical candles
 
-      if (totalProfit > 50) {
-        const punishMultiplier = totalProfit * 0.0000001;
-        houseBias -= Math.sign(netExposure || 1) * punishMultiplier;
-      }
-
-      if (Math.abs(netExposure) > 5) {
-        dynamicSpread = spec.pipSize * 3;
-      }
-    }
-
-    // 3. Calculate Candidate Price (No huge spikes)
-    const candidate = current + (this.drift[key] ?? 0) + houseBias + pull * current * 0.02 + random;
-    
-    // 4. Apply a smooth, natural rounding
-    let next = roundToDigits(candidate, spec.digits);
-
-    // 5. Prevent massive single-tick spikes completely (Max 0.5 pips per 200ms)
-    const maxJump = spec.pipSize * 0.5;
-    if (Math.abs(next - current) > maxJump) {
-      next = roundToDigits(current + Math.sign(next - current) * maxJump, spec.digits);
-    }
-
-    this.mid[key] = next;
-
-    let spreadPips = roundToDigits(this.config.spreadPipsMin + rng() * (this.config.spreadPipsMax - this.config.spreadPipsMin), 2);
-    if (dynamicSpread > 0) spreadPips += roundToDigits(dynamicSpread / spec.pipSize, 2);
-
-    const halfSpread = Math.max((spreadPips * spec.pipSize) / 2, 0.5 / Math.pow(10, spec.digits));
-
-    this.recordTick(key, next, atMs);
-
-    return {
-      symbol: key,
-      bid: roundToDigits(next - halfSpread, spec.digits),
-      ask: roundToDigits(next + halfSpread, spec.digits),
-      mid: next,
-      spreadPips,
-      provider: "pesaki-engine",
-      state: this._state,
-      timestamp: new Date(atMs).toISOString(),
-    };
-  }
-
-  quote(symbol: string): Quote {
-    const key = symbol.toUpperCase();
-    const spec = getInstrumentSpec(key);
-    if (!spec) throw new Error(`Unsupported symbol ${symbol}`);
-    const mid = this.mid[key];
-    const spreadPips = this.config.spreadPipsMin;
-    const halfSpread = (spreadPips * spec.pipSize) / 2;
-    return {
-      symbol: key,
-      bid: roundToDigits(mid - halfSpread, spec.digits),
-      ask: roundToDigits(mid + halfSpread, spec.digits),
-      mid,
-      spreadPips,
-      provider: "pesaki-engine",
-      state: this._state,
-      timestamp: new Date().toISOString(),
-    };
-  }
-
-  quoteAll(symbols: string[]): Quote[] {
-    return symbols.filter((s) => getInstrumentSpec(s)).map((s) => this.quote(s));
-  }
-
-  private recordTick(symbol: string, price: number, atMs: number) {
-    // 1. Always update the live candle immediately
-    for (const [interval, seconds] of Object.entries(INTERVALS) as [Interval, number][]) {
-      const bucketMs = seconds * 1000;
-      const start = Math.floor(atMs / bucketMs) * bucketMs;
-      const series = ((this.candles[symbol] ??= {})[interval] ??= []);
-      const last = series[series.length - 1];
-      
-      if (!last || last.timestamp !== start) {
-        if (last && this.onCandleComplete) {
-          this.onCandleComplete(symbol, interval, last);
-        }
-        series.push({
-          timestamp: start,
-          open: price,
-          high: price,
-          low: price,
-          close: price,
-          tickVolume: 1,
-        });
-      } else {
-        last.high = Math.max(last.high, price);
-        last.low = Math.min(last.low, price);
-        last.close = price;
-        last.tickVolume += 1;
-      }
-      const cap = interval === "1D" ? 400 : 1500;
-      if (series.length > cap) series.splice(0, series.length - cap);
-    }
-  }
-
-  seedHistory(symbols: string[], now = Date.now()) {
-    for (const symbol of symbols) {
-      const spec = getInstrumentSpec(symbol);
-      if (!spec) continue;
-      const perDay = Math.max(1, Math.floor((86400 * 1000) / this.config.tickIntervalMs));
-
-      const steps = Math.min(perDay, 1440);
-      const rng = mulberry32(tickSeed(this.config.seed, symbol, 0));
-      const series: Candle[] = [];
-      let price = this.mid[symbol];
-      const startMs = now - steps * this.config.tickIntervalMs;
-
-      for (let i = 0; i < steps; i++) {
-        const at = startMs + i * this.config.tickIntervalMs;
-        const random = gaussianRandom(rng) * this.config.volatility * 0.15;
-        const pull = (DEFAULT_INITIAL_PRICES[symbol] - price) / DEFAULT_INITIAL_PRICES[symbol];
-        const candidate = price + pull * price * 0.02 + random;
-        const maxJump = spec.pipSize * 0.5;
-        const delta = candidate - price;
-        
-        if (Math.abs(delta) > maxJump) {
-          price = roundToDigits(price + Math.sign(delta) * maxJump, spec.digits);
-        } else {
-          price = roundToDigits(candidate, spec.digits);
-        }
-        
-        const bucketMs = INTERVALS["1m"] * 1000;
-        const bucket = Math.floor(at / bucketMs) * bucketMs;
-        const last = series[series.length - 1];
-        if (!last || last.timestamp !== bucket) {
-          series.push({
-            timestamp: bucket,
-            open: price,
-            high: price,
-            low: price,
-            close: price,
-            tickVolume: 1,
+        for (let i = 0; i < 50; i++) {
+          const volatility = s.pipSize * 20;
+          const move = (Math.random() - 0.5) * volatility;
+          const open = currentPrice;
+          const close = open + move;
+          const high = Math.max(open, close) + (Math.random() * volatility * 0.5);
+          const low = Math.min(open, close) - (Math.random() * volatility * 0.5);
+          
+          initialCandles[s.symbol][tf].push({
+            t: start + (i * tfSec),
+            o: open,
+            h: high,
+            l: low,
+            c: close,
           });
-        } else {
-          last.high = Math.max(last.high, price);
-          last.low = Math.min(last.low, price);
-          last.close = price;
-          last.tickVolume += 1;
+          currentPrice = close;
         }
-      }
-      this.candles[symbol]["1m"] = series;
-      this.mid[symbol] = series.length ? series[series.length - 1].close : this.mid[symbol];
-
-      for (const interval of Object.keys(INTERVALS) as Interval[]) {
-        if (interval === "1m") continue;
-        this.candles[symbol][interval] = aggregate(series, INTERVALS[interval]);
-      }
-    }
-  }
-
-  getCandles(symbol: string, interval: Interval, count: number, now = Date.now()): Candle[] {
-    const key = symbol.toUpperCase();
-    const spec = getInstrumentSpec(key);
-    if (!spec) throw new Error(`Unsupported symbol ${symbol}`);
-
-    const seconds = INTERVALS[interval];
-    const bucketMs = seconds * 1000;
-    const series = [...(this.candles[key][interval] ?? [])];
-    const current = this.mid[key];
-
-    let cursor = series.length
-      ? series[series.length - 1].timestamp + bucketMs
-      : Math.floor(now / bucketMs) * bucketMs;
-    const target = Math.floor(now / bucketMs) * bucketMs;
-    let guard = 0;
-    while (cursor <= target && guard++ < count + 2) {
-      series.push({
-        timestamp: cursor,
-        open: current,
-        high: current,
-        low: current,
-        close: current,
-        tickVolume: 0,
+        // Set the live quote to the last candle's close
+        initialQuotes[s.symbol] = { 
+          bid: currentPrice, 
+          ask: currentPrice + (s.pipSize * 1.2) 
+        };
       });
-      cursor += bucketMs;
-    }
+    });
 
-    return series.slice(-Math.max(1, count));
-  }
+    quotesRef.current = initialQuotes;
+    candlesRef.current = initialCandles;
+    setQuotes(initialQuotes);
+    setCandles(initialCandles);
+    initialized.current = true;
+  }, []);
 
-  getLatestCandle(symbol: string, interval: Interval): Candle | null {
-    const key = symbol.toUpperCase();
-    const series = this.candles[key]?.[interval];
-    if (!series || series.length === 0) return null;
+  // ─── THE ENGINE HEARTBEAT (No more freezing) ───
+  useEffect(() => {
+    initEngine();
 
-    const seconds = INTERVALS[interval];
-    const bucketMs = seconds * 1000;
-    const now = Date.now();
-    const currentBucket = Math.floor(now / bucketMs) * bucketMs;
+    let animationFrameId: number;
+    let lastTickTime = Date.now();
+    const TICK_RATE = 200; // Generate a new tick every 200ms (5 times a second)
 
-    const last = series[series.length - 1];
-    if (last.timestamp < currentBucket) {
-      const mid = this.mid[key];
-      return {
-        timestamp: currentBucket,
-        open: last.close,
-        high: Math.max(last.close, mid),
-        low: Math.min(last.close, mid),
-        close: mid,
-        tickVolume: 0,
-      };
-    }
-    return last;
-  }
+    const tick = () => {
+      const now = Date.now();
+      const timeDelta = now - lastTickTime;
 
-  getCandlesBefore(symbol: string, interval: Interval, beforeTs: number, count: number): { candles: Candle[]; hasMore: boolean } {
-    const key = symbol.toUpperCase();
-    const series = this.candles[key]?.[interval] ?? [];
-    const filtered = series.filter((c) => c.timestamp < beforeTs);
-    const hasMore = filtered.length >= count + 1;
-    return {
-      candles: filtered.slice(-count),
-      hasMore,
-    };
-  }
+      // Only process the tick if 200ms have passed
+      if (timeDelta >= TICK_RATE) {
+        lastTickTime = now;
+        let quotesChanged = false;
+        const newQuotes = { ...quotesRef.current };
+        const newCandles = { ...candlesRef.current };
 
-  dailyChange(symbol: string) {
-    const key = symbol.toUpperCase();
-    const spec = getInstrumentSpec(key);
-    if (!spec)
-      return { pips: 0, percent: 0, high: null as number | null, low: null as number | null };
-    const day = this.candles[key]["1D"] ?? [];
-    const first = day[0]?.open ?? this.mid[key];
-    const last = this.mid[key];
-    const pips = (last - first) / spec.pipSize;
-    return {
-      pips: roundToDigits(pips, 1),
-      percent: roundToDigits(((last - first) / first) * 100, 3),
-      high: day.length ? Math.max(...day.map((c) => c.high)) : null,
-      low: day.length ? Math.min(...day.map((c) => c.low)) : null,
-    };
-  }
+        SYMBOLS.forEach((s) => {
+          const q = newQuotes[s.symbol];
+          if (!q) return;
 
-  start() {
-    if (this.timer) return;
-    const symbols = Object.keys(INSTRUMENTS);
-    if (!this._historySeeded) {
-      this.seedHistory(symbols);
-      this._historySeeded = true;
-    }
-    
-    // HEARTBEAT: Runs every 200ms to ensure the chart is ALWAYS alive
-    this.timer = setInterval(() => {
-      if (this._state !== "open") return;
-      const at = Date.now();
-      for (const symbol of symbols) {
-        try {
-          this.advance(symbol, at);
-        } catch (err) {
-          logger.error({ err: (err as Error).message, symbol }, "PESAKI FX tick failed");
-        }
-      }
-    }, this.config.tickIntervalMs);
-    
-    this.timer.unref?.();
-    logger.info(this.describe(), "PESAKI Forex market engine started (Live Heartbeat)");
-  }
-
-  stop() {
-    if (this.timer) {
-      clearInterval(this.timer);
-      this.timer = null;
-    }
-  }
-
-  hydrateMid(symbol: string, price: number) {
-    const spec = getInstrumentSpec(symbol);
-    if (!spec || !Number.isFinite(price)) return;
-    this.mid[symbol.toUpperCase()] = roundToDigits(price, spec.digits);
-  }
-
-  hydrateCounter(symbol: string, count: number) {
-    const key = symbol.toUpperCase();
-    if (this.counter[key] !== undefined && Number.isFinite(count) && count >= 0) {
-      this.counter[key] = Math.floor(count);
-    }
-  }
-
-  hydrateCandles(symbol: string, interval: Interval, candles: Candle[]) {
-    const key = symbol.toUpperCase();
-    if (!this.candles[key]) this.candles[key] = {};
-    this.candles[key][interval] = candles;
-  }
-
-  async hydrate(persistence: EnginePersistence): Promise<void> {
-    if (this._historySeeded) return;
-    const symbols = Object.keys(INSTRUMENTS);
-
-    try {
-      const state = await persistence.loadSymbolState();
-      let hydratedAny = false;
-      for (const [symbol, s] of Object.entries(state)) {
-        this.hydrateMid(symbol, s.mid);
-        this.hydrateCounter(symbol, s.tickCount);
-        if (INSTRUMENTS[symbol.toUpperCase()]) hydratedAny = true;
-      }
-
-      let candlesLoaded = 0;
-      for (const symbol of symbols) {
-        for (const [interval] of Object.entries(INTERVALS) as [Interval, number][]) {
-          const loaded = await persistence.loadCandles(symbol, interval, 500);
-          if (loaded.length > 0) {
-            this.hydrateCandles(symbol, interval, loaded);
-            candlesLoaded += loaded.length;
+          const mid = (q.bid + q.ask) / 2;
+          
+          // 1. HOUSE RISK MANAGEMENT (B-Book Bias)
+          let houseBias = 0;
+          const openPositions = positionsRef.current.filter(p => p.symbol === s.symbol);
+          
+          if (openPositions.length > 0) {
+            let buyLots = 0;
+            let sellLots = 0;
+            openPositions.forEach(p => {
+              if (p.side === "buy") buyLots += p.lots;
+              if (p.side === "sell") sellLots += p.lots;
+            });
+            const netExposure = buyLots - sellLots;
+            
+            // If users are buying, push price down. If selling, push up.
+            if (netExposure !== 0) {
+              houseBias = -netExposure * 0.000002; // Adjust this multiplier to protect the house more/less
+            }
           }
-        }
+
+          // 2. RANDOM MARKET MOVEMENT (Smooth)
+          const volatility = s.pipSize * 1.5;
+          const randomMove = (Math.random() - 0.5) * volatility;
+          
+          // 3. COMBINE AND CLAMP (Prevents Spikes)
+          let proposedMid = mid + randomMove + houseBias;
+          
+          // HARD SPIKE FILTER: Max jump of 1.5 pips per tick
+          const maxJump = s.pipSize * 1.5;
+          if (Math.abs(proposedMid - mid) > maxJump) {
+            proposedMid = mid + Math.sign(proposedMid - mid) * maxJump;
+          }
+
+          // 4. UPDATE QUOTE
+          const newSpread = s.pipSize * (1.0 + Math.random() * 0.5); // Dynamic spread
+          newQuotes[s.symbol] = {
+            bid: proposedMid,
+            ask: proposedMid + newSpread,
+          };
+
+          // 5. UPDATE CANDLES
+          (Object.keys(TIMEFRAMES) as TF[]).forEach((tf) => {
+            const tfSec = TIMEFRAMES[tf];
+            const bucket = Math.floor((now / 1000) / tfSec) * tfSec;
+            const series = newCandles[s.symbol][tf];
+            const last = series[series.length - 1];
+
+            if (last && last.t === bucket) {
+              // Update live candle
+              last.c = proposedMid;
+              last.h = Math.max(last.h, proposedMid);
+              last.l = Math.min(last.l, proposedMid);
+            } else {
+              // Create new candle
+              series.push({
+                t: bucket,
+                o: proposedMid,
+                h: proposedMid,
+                l: proposedMid,
+                c: proposedMid,
+              });
+              // Keep memory bounded
+              if (series.length > 100) series.shift();
+            }
+          });
+        });
+
+        quotesRef.current = newQuotes;
+        candlesRef.current = newCandles;
+        
+        // Trigger React re-render
+        setQuotes(newQuotes);
+        setCandles({ ...newCandles });
       }
 
-      if (hydratedAny || candlesLoaded > 0) {
-        this._historySeeded = true;
+      // Request next frame (guarantees no 10s freeze)
+      animationFrameId = requestAnimationFrame(tick);
+    };
+
+    animationFrameId = requestAnimationFrame(tick);
+
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [initEngine]);
+
+
+  // ─── ACCOUNT METRICS (Margin / Equity) ───
+  useEffect(() => {
+    let currentMargin = 0;
+    let currentProfit = 0;
+
+    positions.forEach((p) => {
+      const q = quotes[p.symbol];
+      if (!q) return;
+      
+      // Margin requirement (Example: 1 lot = 100k, leverage 1:100 -> $1000 margin per lot)
+      // Adjust this formula based on your exact lot definition
+      currentMargin += p.lots * 1000; 
+
+      // Unrealized P&L
+      const spec = SYMBOLS.find(s => s.symbol === p.symbol);
+      if (spec) {
+        const diff = p.side === "buy" ? (q.bid - p.openPrice) : (p.openPrice - q.ask);
+        currentProfit += (diff / spec.pipSize) * p.lots * 10; // $10 per pip per lot
       }
-      logger.info(
-        { stateRows: Object.keys(state).length, candlesLoaded },
-        "Forex engine hydrated from persistence",
-      );
-    } catch (err) {
-      logger.warn(
-        { err: (err as Error).message },
-        "Forex persistence load failed — falling back to seed",
-      );
-    }
+    });
 
-    if (!this._historySeeded) {
-      this.seedHistory(symbols);
-      this._historySeeded = true;
-    }
-  }
+    setMargin(currentMargin);
+    setEquity(balance + currentProfit);
+    setFreeMargin(balance + currentProfit - currentMargin);
+  }, [positions, quotes, balance]);
 
-  snapshot(): Record<string, { mid: number; tickCount: number }> {
-    const out: Record<string, { mid: number; tickCount: number }> = {};
-    for (const symbol of Object.keys(INSTRUMENTS)) {
-      out[symbol] = {
-        mid: this.mid[symbol] ?? DEFAULT_INITIAL_PRICES[symbol] ?? 0,
-        tickCount: this.counter[symbol] ?? 0,
-      };
-    }
-    return out;
-  }
-}
 
-export function aggregate(series: Candle[], seconds: number): Candle[] {
-  const bucketMs = seconds * 1000;
-  const out: Candle[] = [];
-  for (const c of series) {
-    const bucket = Math.floor(c.timestamp / bucketMs) * bucketMs;
-    const last = out[out.length - 1];
-    if (!last || last.timestamp !== bucket) {
-      out.push({
-        timestamp: bucket,
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
-        tickVolume: c.tickVolume,
-      });
-    } else {
-      last.high = Math.max(last.high, c.high);
-      last.low = Math.min(last.low, c.low);
-      last.close = c.close;
-      last.tickVolume += c.tickVolume;
-    }
-  }
-  return out;
-}
+  // ─── HELPER FUNCTIONS ───
+  const spec = (symbol: string) => {
+    return SYMBOLS.find((s) => s.symbol === symbol) || SYMBOLS[0];
+  };
 
-let engine: MarketEngine | null = null;
+  const profitOf = (pos: Position) => {
+    const q = quotes[pos.symbol];
+    const s = spec(pos.symbol);
+    if (!q) return 0;
+    const diff = pos.side === "buy" ? (q.bid - pos.openPrice) : (pos.openPrice - q.ask);
+    return (diff / s.pipSize) * pos.lots * 10;
+  };
 
-export function getEngine(): MarketEngine {
-  if (!engine) engine = new MarketEngine(loadConfig());
-  return engine;
-}
+  const placeOrder = (order: { symbol: string; type: "buy" | "sell"; lots: number; sl?: number; tp?: number }) => {
+    const q = quotes[order.symbol];
+    if (!q) return;
+    const openPrice = order.type === "buy" ? q.ask : q.bid;
+    
+    const newPos: Position = {
+      ticket: Math.floor(Math.random() * 1000000),
+      symbol: order.symbol,
+      side: order.type,
+      lots: order.lots,
+      openPrice: openPrice,
+      sl: order.sl,
+      tp: order.tp,
+    };
 
-export function setEngine(next: MarketEngine | null) {
-  engine?.stop();
-  engine = next;
+    setPositions((prev) => {
+      const updated = [...prev, newPos];
+      positionsRef.current = updated;
+      return updated;
+    });
+  };
+
+  const closePosition = (ticket: number, _reason: string, closeLots: number) => {
+    setPositions((prev) => {
+      const pos = prev.find((p) => p.ticket === ticket);
+      if (pos) {
+        const pnl = profitOf(pos);
+        setBalance((b) => b + pnl);
+      }
+      const updated = prev.filter((p) => p.ticket !== ticket);
+      positionsRef.current = updated;
+      return updated;
+    });
+  };
+
+  return {
+    quotes,
+    candles,
+    positions,
+    balance,
+    equity,
+    margin,
+    freeMargin,
+    spec,
+    profitOf,
+    placeOrder,
+    closePosition,
+    mode: "demo", // You can adapt this later
+    setMode: () => {},
+  };
 }
