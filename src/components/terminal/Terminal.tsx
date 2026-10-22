@@ -286,7 +286,7 @@ export function Terminal() {
         </div>
       )}
 
-      {/* Radial Menu */}
+      {/* Radial Menu (Highly Polished MT5 Version) */}
       <RadialMenu 
         isOpen={showRadial} 
         onClose={() => setShowRadial(false)} 
@@ -310,30 +310,41 @@ export function Terminal() {
   );
 }
 
-// ─── RADIAL MENU COMPONENT ───
+// ─── HIGHLY POLISHED RADIAL MENU COMPONENT ───
 function RadialMenu({ isOpen, onClose, currentTf, onSelectTf }: any) {
   if (!isOpen) return null;
   const timeframes = ["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1"];
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}>
+    <div 
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" 
+      onClick={onClose}
+    >
       <div 
         className="relative w-[280px] h-[280px] rounded-full border-[32px] border-[#1565c0]/90 shadow-2xl flex items-center justify-center bg-transparent"
-        onClick={(ev) => ev.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
-        <button onClick={onClose} className="w-12 h-12 bg-black/20 rounded-full flex items-center justify-center text-white/70">
+        <button 
+          onClick={onClose}
+          className="w-12 h-12 bg-black/20 rounded-full flex items-center justify-center text-white/70 hover:bg-black/40 hover:text-white transition-colors"
+        >
           <X size={24} />
         </button>
+
         {timeframes.map((tfStr, i) => {
           const angle = (i / timeframes.length) * 2 * Math.PI - Math.PI / 2;
-          const x = Math.cos(angle) * 140;
-          const y = Math.sin(angle) * 140;
+          const radius = 140; 
+          const x = Math.cos(angle) * radius;
+          const y = Math.sin(angle) * radius;
+
           return (
             <button
               key={tfStr}
               onClick={() => onSelectTf(tfStr)}
-              className={`absolute w-9 h-9 flex items-center justify-center text-xs font-bold rounded-full ${
-                currentTf === tfStr ? "text-white bg-[#0d47a1] shadow-lg scale-125" : "text-blue-100"
+              className={`absolute w-9 h-9 flex items-center justify-center text-xs font-bold rounded-full transition-all ${
+                currentTf === tfStr 
+                  ? "text-white bg-[#0d47a1] shadow-lg scale-125" 
+                  : "text-blue-100 hover:text-white hover:scale-110"
               }`}
               style={{ transform: `translate(${x}px, ${y}px)` }}
             >
@@ -341,10 +352,11 @@ function RadialMenu({ isOpen, onClose, currentTf, onSelectTf }: any) {
             </button>
           );
         })}
+
         <div className="absolute left-[-16px] top-1/2 -translate-y-1/2 flex flex-col gap-5 text-blue-100/80">
-          <Crosshair size={16} />
-          <BarChart3 size={16} />
-          <Settings size={16} />
+          <Crosshair size={16} className="hover:text-white cursor-pointer" />
+          <BarChart3 size={16} className="hover:text-white cursor-pointer" />
+          <Settings size={16} className="hover:text-white cursor-pointer" />
         </div>
       </div>
     </div>
