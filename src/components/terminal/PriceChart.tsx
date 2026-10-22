@@ -3,7 +3,6 @@ import type { TF } from "@/lib/trading/engine";
 import { TIMEFRAMES } from "@/lib/trading/engine";
 
 export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, chartType = "candle" }: { engine: any, symbol: string; tf: TF; zoom: number; showCrosshair?: boolean; showIndicators?: boolean; chartType?: "candle" | "line" }) {
-  const e = engine; // Connects directly to Terminal's engine!
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
@@ -11,27 +10,13 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
   const view = useRef({ spacing: 5, offset: 0 });
   const pinch = useRef<{ dist: number; spacing: number } | null>(null);
   const crosshair = useRef<{ x: number; y: number } | null>(null);
-  const loRef = useRef<number>(0);
-  const hiRef = useRef<number>(0);
   
-  const symbolRef = useRef(symbol);
-  const tfRef = useRef(tf);
-  const eRef = useRef(e);
-  const qRef = useRef(e?.quotes?.[symbol]);
-  
-  const displayBid = useRef<number | null>(null);
-  const displayAsk = useRef<number | null>(null);
+  useEffect(() => {
+    view.current.spacing = Math.min(30, Math.max(2, 5 * zoom));
+  }, [zoom]);
 
-  symbolRef.current = symbol;
-  tfRef.current = tf;
-  eRef.current = e;
-  qRef.current = e?.quotes?.[symbol];
-
-  useEffect(() => { view.current.spacing = Math.min(30, Math.max(2, 5 * zoom)); }, [zoom]);
   useEffect(() => {
     view.current.offset = 0;
-    loRef.current = 0; hiRef.current = 0;
-    displayBid.current = null; displayAsk.current = null;
   }, [symbol, tf]);
 
   useEffect(() => {
@@ -55,16 +40,15 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
     if (!ctx) return;
 
     let frameId: number;
+    const loRef = { current: 0 };
+    const hiRef = { current: 0 };
+    let displayBid: number | null = null;
+    let displayAsk: number | null = null;
 
     const draw = () => {
       frameId = requestAnimationFrame(draw);
       
       try {
-        const q = qRef.current;
-        const currentEngine = eRef.current;
-        const curSymbol = symbolRef.current;
-        const curTf = tfRef.current;
-
         const dpr = window.devicePixelRatio || 1;
         cv.width = Math.floor(size.w * dpr);
         cv.height = Math.floor(size.h * dpr);
@@ -76,34 +60,33 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         const W = size.w, H = size.h, axisW = 64, axisH = 20;
         const plotW = W - axisW, plotH = H - axisH;
 
+        // Draw background immediately
         ctx.fillStyle = cBg; ctx.fillRect(0, 0, W, H);
         ctx.fillStyle = cAxisBg; ctx.fillRect(plotW, 0, axisW, H);
 
-        if (!currentEngine) throw new Error("Engine not passed properly.");
-        if (!currentEngine.spec) throw new Error("Engine spec function missing.");
+        if (!engine) throw new Error("Engine prop is missing.");
         
-        const spec = currentEngine.spec(curSymbol);
-        if (!spec) throw new Error(`Spec not found for ${curSymbol}`);
+        const q = engine.quotes?.[symbol];
+        const spec = engine.spec(symbol);
+        const all = engine.candles?.[symbol]?.[tf] || [];
 
-        const all = currentEngine.candles?.[curSymbol]?.[curTf] || [];
-        
-        if (!q || all.length === 0) {
+        if (!q || !spec || all.length === 0) {
           ctx.fillStyle = "#666";
           ctx.font = "14px -apple-system, sans-serif";
           ctx.textAlign = "center";
-          ctx.fillText("Waiting for market data...", W / 2, H / 2);
+          ctx.fillText("Waiting for engine data...", W / 2, H / 2);
           return;
         }
 
-        if (displayBid.current === null) {
-          displayBid.current = q.bid;
-          displayAsk.current = q.ask;
+        if (displayBid === null) {
+          displayBid = q.bid;
+          displayAsk = q.ask;
         } else {
-          displayBid.current += (q.bid - displayBid.current) * 0.15;
-          displayAsk.current += (q.ask - displayAsk.current) * 0.15;
+          displayBid += (q.bid - displayBid) * 0.15;
+          displayAsk += (q.ask - displayAsk) * 0.15;
         }
-        const smoothBid = displayBid.current;
-        const smoothAsk = displayAsk.current;
+        const smoothBid = displayBid;
+        const smoothAsk = displayAsk;
         const smoothMid = (smoothBid + smoothAsk) / 2;
 
         const sp = view.current.spacing;
@@ -111,19 +94,21 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         const end = all.length - view.current.offset;
         let bars = all.slice(Math.max(0, end - count), end);
 
-        // SPIKE FILTER
-        const MAX_ALLOWED_WICK = spec.pipSize * 25; 
-        bars = bars.map((b: any) => {
-          const bodyTop = Math.max(b.o, b.c);
-          const bodyBot = Math.min(b.o, b.c);
-          return {
-            ...b,
-            h: Math.min(b.h, bodyTop + MAX_ALLOWED_WICK),
-            l: Math.max(b.l, bodyBot - MAX_ALLOWED_WICK),
-          };
-        });
+        if (bars.length === 0) {
+           ctx.fillStyle = "#666";
+           ctx.fillText("No candles visible...", W/2, H/2);
+           return;
+        }
 
-        if (bars.length > 0 && view.current.offset === 0) {
+        // EMERGENCY SPIKE FILTER
+        const MAX_ALLOWED_WICK = spec.point * 250; 
+        bars = bars.map((b: any) => ({
+          ...b,
+          h: Math.min(b.h, Math.max(b.o, b.c) + MAX_ALLOWED_WICK),
+          l: Math.max(b.l, Math.min(b.o, b.c) - MAX_ALLOWED_WICK),
+        }));
+
+        if (view.current.offset === 0) {
           const last = bars[bars.length - 1];
           bars = [...bars];
           bars[bars.length - 1] = {
@@ -137,7 +122,7 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         let lo = Infinity, hi = -Infinity;
         for (const b of bars) { lo = Math.min(lo, b.l); hi = Math.max(hi, b.h); }
 
-        const symbolPositions = currentEngine.positions?.filter((x: any) => x.symbol === curSymbol) || [];
+        const symbolPositions = engine.positions?.filter((x: any) => x.symbol === symbol) || [];
         for (const p of symbolPositions) {
           if (p.sl) { lo = Math.min(lo, p.sl); hi = Math.max(hi, p.sl); }
           if (p.tp) { lo = Math.min(lo, p.tp); hi = Math.max(hi, p.tp); }
@@ -145,7 +130,11 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
 
         if (view.current.offset === 0) { lo = Math.min(lo, smoothBid); hi = Math.max(hi, smoothAsk); }
         
-        const pad = (hi - lo) * 0.15 || spec.pipSize * 10;
+        if (lo === Infinity || hi === -Infinity || isNaN(lo) || isNaN(hi)) {
+          throw new Error("Invalid Y-Axis bounds (NaN or Infinity).");
+        }
+
+        const pad = (hi - lo) * 0.15 || spec.point * 10;
         const rawLo = lo - pad, rawHi = hi + pad;
 
         if (loRef.current === 0 && hiRef.current === 0) {
@@ -161,7 +150,6 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
 
         ctx.font = "11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"; 
 
-        // Y-AXIS TARGET PIXELS = 22
         const targetPixels = 22; 
         const rawStep = (smoothHi - smoothLo) / (plotH / targetPixels);
         const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
@@ -198,30 +186,18 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         }
 
         const bw = Math.max(1, Math.floor(sp * 0.6));
-        if (chartType === "line") {
-          ctx.strokeStyle = "#1565c0";
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          for (let i = 0; i < bars.length; i++) {
-            const xx = xOf(i);
-            const yy = y(bars[i].c);
-            if (i === 0) ctx.moveTo(xx, yy);
-            else ctx.lineTo(xx, yy);
-          }
-          ctx.stroke();
-        } else {
-          bars.forEach((b: any, i: number) => {
-            const x = Math.round(xOf(i)); const bull = b.c >= b.o;
-            ctx.strokeStyle = ctx.fillStyle = bull ? cBull : cBear;
-            ctx.beginPath(); ctx.moveTo(x + 0.5, y(b.h)); ctx.lineTo(x + 0.5, y(b.l)); ctx.stroke();
-            const top = y(Math.max(b.o, b.c)); const bh = Math.max(1, Math.abs(y(b.o) - y(b.c)));
-            if (bw > 2) ctx.fillRect(x - bw / 2, top, bw, bh);
-          });
-        }
+        bars.forEach((b: any, i: number) => {
+          const x = Math.round(xOf(i)); const bull = b.c >= b.o;
+          ctx.strokeStyle = ctx.fillStyle = bull ? cBull : cBear;
+          ctx.beginPath(); ctx.moveTo(x + 0.5, y(b.h)); ctx.lineTo(x + 0.5, y(b.l)); ctx.stroke();
+          const top = y(Math.max(b.o, b.c)); const bh = Math.max(1, Math.abs(y(b.o) - y(b.c)));
+          if (bw > 2) ctx.fillRect(x - bw / 2, top, bw, bh);
+        });
 
+        // Top-left label
         ctx.fillStyle = "#1565c0";
         ctx.font = "bold 12px -apple-system, sans-serif";
-        ctx.fillText(`${curSymbol} ▼ ${curTf}`, 8, 15);
+        ctx.fillText(`${symbol} ▼ ${tf}`, 8, 15);
         ctx.fillStyle = "#666";
         ctx.font = "10px -apple-system, sans-serif";
         ctx.fillText(spec.desc || "", 8, 28);
@@ -266,14 +242,14 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         };
 
         for (const p of symbolPositions) {
-          const pnl = currentEngine.profitOf(p);
+          const pnl = engine.profitOf(p);
           const pnlText = `${p.side.toUpperCase()} ${p.lots.toFixed(2)}   ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD`;
           drawDashedLine(p.openPrice, p.side === "buy" ? cBull : cBear, pnlText);
           if (p.sl) drawDashedLine(p.sl, cBear, "SL");
           if (p.tp) drawDashedLine(p.tp, cBull, "TP");
         }
 
-        const tfSeconds = TIMEFRAMES[curTf];
+        const tfSeconds = TIMEFRAMES[tf];
         const now = Date.now() / 1000;
         let timerStr = "";
         if (all.length > 0) {
@@ -295,14 +271,14 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         ctx.fillStyle = "#ff0000";
         ctx.font = "14px monospace";
         ctx.textAlign = "left";
-        ctx.fillText(`CRASH: ${err.message}`, 20, 100);
+        ctx.fillText(`CHART ERROR: ${err.message}`, 20, 100);
         console.error("Chart Error:", err);
       }
     };
 
     frameId = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frameId);
-  }, [size.w, size.h, chartType, showCrosshair]);
+  }, [size.w, size.h, chartType, showCrosshair, engine, symbol, tf]);
 
   return (
     <div
