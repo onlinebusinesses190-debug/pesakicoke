@@ -20,7 +20,6 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, chartType 
   const eRef = useRef(e);
   const qRef = useRef(e.quotes[symbol]);
   
-  // Smooth price interpolators to eliminate visual spikes
   const displayBid = useRef<number | null>(null);
   const displayAsk = useRef<number | null>(null);
 
@@ -72,9 +71,32 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, chartType 
       const curTf = tfRef.current;
       
       const all = currentEngine.candles?.[curSymbol]?.[curTf] || [];
-      if (!q) return;
+      const spec = currentEngine.spec(curSymbol);
 
-      // Smooth the live price so it doesn't jump
+      const dpr = window.devicePixelRatio || 1;
+      cv.width = Math.floor(size.w * dpr);
+      cv.height = Math.floor(size.h * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+
+      const cBg = "#ffffff", cGrid = "#f0f3fa", cText = "#000000", cBull = "#089981", cBear = "#F23645", cAxisBg = "#f8f9fa";
+      const W = size.w, H = size.h, axisW = 64, axisH = 20;
+      const plotW = W - axisW, plotH = H - axisH;
+
+      // 1. Always draw the background and axes
+      ctx.fillStyle = cBg; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = cAxisBg; ctx.fillRect(plotW, 0, axisW, H);
+
+      // 2. If no data, draw a loading message and STOP
+      if (!q || !spec || all.length === 0) {
+        ctx.fillStyle = "#666";
+        ctx.font = "14px -apple-system, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Loading chart data...", W / 2, H / 2);
+        return;
+      }
+
       if (displayBid.current === null) {
         displayBid.current = q.bid;
         displayAsk.current = q.ask;
@@ -86,25 +108,12 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, chartType 
       const smoothAsk = displayAsk.current;
       const smoothMid = (smoothBid + smoothAsk) / 2;
 
-      const dpr = window.devicePixelRatio || 1;
-      cv.width = Math.floor(size.w * dpr);
-      cv.height = Math.floor(size.h * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-      ctx.textAlign = "left";
-      ctx.textBaseline = "middle";
-
-      const cBg = "#ffffff", cGrid = "#f0f3fa", cText = "#000000", cBull = "#089981", cBear = "#F23645", cAxisBg = "#f8f9fa";
-      const W = size.w, H = size.h, axisW = 64, axisH = 20;
-      const plotW = W - axisW, plotH = H - axisH;
       const sp = view.current.spacing;
       const count = Math.max(5, Math.floor((plotW - 12) / sp));
       const end = all.length - view.current.offset;
       let bars = all.slice(Math.max(0, end - count), end);
 
-      const spec = currentEngine.spec(curSymbol);
-
-      // ─── EMERGENCY SPIKE FILTER (Max 25 pips per candle) ───
+      // EMERGENCY SPIKE FILTER
       const MAX_ALLOWED_WICK = spec.pipSize * 25; 
       bars = bars.map((b: any) => {
         const bodyTop = Math.max(b.o, b.c);
@@ -116,7 +125,6 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, chartType 
         };
       });
 
-      // Apply live smooth price to the last candle
       if (bars.length > 0 && view.current.offset === 0) {
         const last = bars[bars.length - 1];
         bars = [...bars];
@@ -127,11 +135,6 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, chartType 
           l: Math.max(Math.min(last.l, smoothMid, smoothBid), Math.min(last.o, smoothMid) - MAX_ALLOWED_WICK),
         };
       }
-
-      ctx.fillStyle = cBg; ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = cAxisBg; ctx.fillRect(plotW, 0, axisW, H);
-
-      if (bars.length === 0) return;
 
       let lo = Infinity, hi = -Infinity;
       for (const b of bars) { lo = Math.min(lo, b.l); hi = Math.max(hi, b.h); }
@@ -161,7 +164,6 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, chartType 
 
       ctx.font = "11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"; 
 
-      // Y-Axis Grid (targetPixels = 22 for ~13 labels)
       const targetPixels = 22; 
       const rawStep = (smoothHi - smoothLo) / (plotH / targetPixels);
       const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
