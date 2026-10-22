@@ -1,360 +1,115 @@
-import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import { TIMEFRAMES, type TF } from "@/lib/trading/engine";
 import { money, useEngine } from "@/lib/trading/use-engine";
-import { apiRequest } from "@/utils/api";
 import { MarketWatch } from "./MarketWatch";
 import { PriceChart } from "./PriceChart";
-import { RadialMenu } from "./RadialMenu";
 import { OrderDialog, type DialogState } from "./OrderDialog";
-import { Wallet, Menu, ArrowLeftRight, BarChart3, Clock, MessageSquare, Activity, ArrowLeft, ChevronUp, ChevronDown } from "lucide-react";
+import { Wallet, Menu, ArrowLeftRight, BarChart3, Clock, MessageSquare, List } from "lucide-react";
 
-interface TerminalProps {
-  mode?: "demo" | "real";
-}
-
-export function Terminal({ mode = "demo" }: TerminalProps) {
+export function Terminal() {
   const e = useEngine();
-  const navigate = useNavigate();
   const [symbol, setSymbol] = useState("EURUSD");
   const [tf, setTf] = useState<TF>("M5");
   const [zoom, setZoom] = useState(1);
   const [dialog, setDialog] = useState<DialogState>(null);
   const [dlgKey, setDlgKey] = useState(0);
-
-  const [lots, setLots] = useState(0.01);
-  const [mobileTab, setMobileTab] = useState<"chart" | "market" | "trade" | "history" | "messages">("chart");
-  const [showRadialMenu, setShowRadialMenu] = useState(false);
-  const [radialPosition, setRadialPosition] = useState<{ x: number; y: number } | null>(null);
-  const [showCrosshair, setShowCrosshair] = useState(false);
-  const [showIndicators, setShowIndicators] = useState(false);
-  const [showBulkMenu, setShowBulkMenu] = useState(false);
-  const [chartType, setChartType] = useState<"candle" | "line">("candle");
-
-  const [depositOpen, setDepositOpen] = useState(false);
-  const [realBalance, setRealBalance] = useState<number | null>(null);
-  const [usdKesRate, setUsdKesRate] = useState<number | null>(null);
-  const [ratesLoading, setRatesLoading] = useState(true);
-  const balanceFetchDoneRef = useRef(false);
-  const chartContainerRef = useRef<HTMLDivElement>(null);
+  
+  const [lots, setLots] = useState(0.01); 
+  const [mobileTab, setMobileTab] = useState<"chart" | "market" | "positions" | "history" | "messages">("chart");
 
   const s = e.spec(symbol);
   const q = e.quotes[symbol];
 
-  // Sync engine mode with route mode
-  useEffect(() => {
-    if (mode === "real" && e.mode !== "live") {
-      e.setMode("live");
-    } else if (mode === "demo" && e.mode !== "demo") {
-      e.setMode("demo");
-    }
-  }, [mode, e.mode]);
-
-  // Fetch real balance from wallet endpoint in real mode (same pattern as
-  // trading.aviator.tsx and games.binary-fx.tsx — /wallet/balance does NOT
-  // check REAL_TRADING_ENABLED, so it works without a 403).
-  useEffect(() => {
-    if (mode !== "real") {
-      setRatesLoading(false);
-      return;
-    }
-    // Guard against React StrictMode double-invoke on mount
-    if (balanceFetchDoneRef.current) return;
-    balanceFetchDoneRef.current = true;
-
-    let cancelled = false;
-
-    const fetchBalance = async () => {
-      try {
-        const data = await apiRequest<{ balance: number; demo_balance: number }>(
-          "/wallet/balance?mode=real",
-        );
-        if (!cancelled) setRealBalance(data.balance ?? 0);
-      } catch {
-        if (!cancelled) setRealBalance(null);
-      }
-    };
-    const fetchRates = async () => {
-      try {
-        const res = await apiRequest<{ success: boolean; usdToKes: number }>(
-          "/forex/rates",
-        );
-        if (!cancelled) setUsdKesRate(res.usdToKes ?? 130);
-      } catch {
-        if (!cancelled) setUsdKesRate(130);
-      } finally {
-        if (!cancelled) setRatesLoading(false);
-      }
-    };
-    fetchBalance();
-    fetchRates();
-    const interval = setInterval(fetchBalance, 30000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-      balanceFetchDoneRef.current = false;
-    };
-  }, [mode]);
-
-  const open = (d: DialogState) => {
-    setDlgKey((k) => k + 1);
-    setDialog(d);
-  };
-
-  // Dynamic BUY/SELL colors — only red (#c62828) and blue (#1565c0), no green/orange
-  const sellBg = q?.dir < 0 ? "bg-[#b71c1c] hover:bg-[#c62828]" : "bg-[#c62828] hover:bg-[#b71c1c]";
-  const buyBg = q?.dir > 0 ? "bg-[#0d47a1] hover:bg-[#1565c0]" : "bg-[#1565c0] hover:bg-[#0d47a1]";
-
-  const handleBatchClose = (filter: "all" | "profit" | "loss") => {
-    if (filter === "all" || window.confirm("Close all open positions?")) {
-      e.positions.forEach((p) => {
-        const pnl = e.profitOf(p);
-        if (
-          filter === "all" ||
-          (filter === "profit" && pnl > 0) ||
-          (filter === "loss" && pnl < 0)
-        ) {
-          e.closePosition(p.ticket, "manual", p.lots);
-        }
-      });
-    }
-  };
-
-  const handleDeposit = () => {
-    if (mode === "real") {
-      navigate({ to: "/wallet" });
-    } else {
-      setDepositOpen(true);
-    }
-  };
+  const open = (d: DialogState) => { setDlgKey(k => k + 1); setDialog(d); };
+  const handleTrade = (direction: "buy" | "sell") => open({ mode: "new", symbol, type: direction, lots }); 
+  
+  const totalFloatingPnl = e.positions.reduce((acc, p) => acc + e.profitOf(p), 0);
 
   return (
     <div className="flex min-h-screen flex-col bg-[#f8f9fa] text-[#1e293b] font-sans pb-14 md:pb-0">
+      
+      {/* Top toolbar */}
+      <div className="flex items-center justify-between px-3 py-2 bg-white border-b border-gray-300">
+        <Menu size={20} className="text-gray-700" />
+        <div className="flex items-center gap-4 text-gray-600">
+          <span className="font-bold text-sm text-gray-900">{tf}</span>
+        </div>
+      </div>
 
+      {/* Account header */}
       <div className="flex items-center justify-between px-3 py-2 bg-white border-b border-gray-300 shadow-sm z-20">
         <div className="flex items-center gap-3">
-          <ArrowLeft size={20} className="text-gray-600 cursor-pointer" onClick={() => navigate({ to: "/trading" })} />
+          <ArrowLeftRight size={20} className="text-gray-600 cursor-pointer rotate-180" onClick={() => window.history.back()} />
           <div>
             <div className="text-sm font-bold text-gray-900 flex items-center gap-2">
-              {symbol} <span className="text-xs font-normal text-gray-500">{s?.desc}</span>
+              {symbol} <span className="text-[10px] font-normal text-gray-500 uppercase">{s?.desc}</span>
             </div>
-            <div className="text-[10px] text-gray-500">Forex</div>
           </div>
         </div>
-
         <div className="flex items-center gap-4">
           <div className="text-right">
             <div className="text-[9px] text-gray-500 uppercase tracking-wide">Balance</div>
-            <div className="text-xs font-mono font-bold">
-               {mode === "real" ? (
-                 ratesLoading
-                   ? "—"
-                   : realBalance === null
-                     ? "—"
-                     : (() => {
-                         const kes = realBalance;
-                         const usd = usdKesRate ? kes / usdKesRate : 0;
-                         return `KSh ${kes.toLocaleString()} (≈ $${usd.toLocaleString(undefined, { maximumFractionDigits: 2 })})`;
-                       })()
-               ) : (
-                 money(e.equity)
-               )}
-            </div>
-          </div>
-          <div className="flex gap-1">
-            <button className={`text-xs font-bold px-2 py-1 rounded ${mode === "real" ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`} onClick={() => e.setMode(e.mode === "live" ? "demo" : "live")}>
-              {mode === "real" ? "LIVE" : "DEMO"}
-            </button>
-            <button className="text-xs px-2 py-1 bg-gray-100 rounded text-gray-700 font-bold" onClick={handleDeposit}>
-              <Wallet size={14} />
-            </button>
+            <div className="text-xs font-mono font-bold">{money(e.equity)}</div>
           </div>
         </div>
       </div>
 
-      {/* DYNAMIC ACTION BAR */}
+      {/* Action bar */}
       <div className="flex bg-white border-b border-gray-300 select-none z-10">
         <button
-          onClick={() => open({ mode: "new", symbol, type: "sell", lots })}
-          className={`flex-1 ${sellBg} text-white py-2 flex flex-col items-center justify-center transition-colors duration-500`}
+          onClick={() => handleTrade("sell")}
+          className="flex-1 bg-[#c62828] text-white py-1 flex flex-col items-center justify-center"
         >
-          <span className="text-[10px] font-bold tracking-wider opacity-90">SELL</span>
-          <span className="text-sm font-mono font-bold leading-tight">{q?.bid.toFixed(s?.digits ?? 5) ?? "—"}</span>
+          <span className="text-[9px] font-bold tracking-wider opacity-90">SELL</span>
+          <span className="text-lg font-mono font-bold leading-tight">{q?.bid.toFixed(5) ?? "—"}</span>
         </button>
 
-        <div className="w-28 flex flex-col items-center justify-center bg-white border-x border-gray-200">
-            <div className="text-[9px] text-gray-500 font-semibold mb-0.5">Volume</div>
-            <div className="flex items-center justify-between w-full px-2">
-              <button onClick={() => setLots(Math.max(0.01, lots - 0.01))} className="px-1 text-gray-500 hover:text-black font-bold text-lg leading-none"><ChevronUp size={14} /></button>
-              <input type="number" step="0.01" min="0.01" max="100" value={lots} onChange={(val) => setLots(Math.max(0.01, Math.min(100, Number(val.target.value))))} className="w-10 text-center text-sm font-bold focus:outline-none bg-transparent" />
-              <button onClick={() => setLots(Math.min(100, lots + 0.01))} className="px-1 text-gray-500 hover:text-black font-bold text-lg leading-none"><ChevronDown size={14} /></button>
-            </div>
+        <div className="w-24 flex flex-col items-center justify-center bg-white border-x border-gray-200 py-1">
+           <input 
+             type="number" 
+             value={lots} 
+             onChange={(val) => setLots(Number(val.target.value))} 
+             className="w-full text-center text-sm font-bold focus:outline-none bg-transparent py-0.5" 
+           />
         </div>
 
         <button
-          onClick={() => open({ mode: "new", symbol, type: "buy", lots })}
-          className={`flex-1 ${buyBg} text-white py-2 flex flex-col items-center justify-center transition-colors duration-500`}
+          onClick={() => handleTrade("buy")}
+          className="flex-1 bg-[#1565c0] text-white py-1 flex flex-col items-center justify-center"
         >
-          <span className="text-[10px] font-bold tracking-wider opacity-90">BUY</span>
-          <span className="text-sm font-mono font-bold leading-tight">{q?.ask.toFixed(s?.digits ?? 5) ?? "—"}</span>
+          <span className="text-[9px] font-bold tracking-wider opacity-90">BUY</span>
+          <span className="text-lg font-mono font-bold leading-tight">{q?.ask.toFixed(5) ?? "—"}</span>
         </button>
       </div>
 
-      <div className="flex flex-col md:flex-row flex-1 min-h-0 mb-12 md:mb-0">
-        <aside className={`order-2 md:order-1 md:w-64 border-r border-gray-300 bg-white ${mobileTab === "market" ? "block flex-1" : "hidden md:block"}`}>
-          <MarketWatch selected={symbol} onSelect={(s) => { setSymbol(s); setMobileTab("chart"); }} onTrade={(s) => open({ mode: "new", symbol: s })} />
-        </aside>
-
-        <main className={`order-1 md:order-2 flex-1 flex flex-col min-w-0 h-[60vh] md:h-auto ${mobileTab === "chart" ? "flex" : "hidden md:flex"}`}>
-
-
-  <div
-    ref={chartContainerRef}
-    className="flex-1 relative bg-white w-full h-full min-h-[300px] cursor-pointer"
-    onClick={(e) => {
-      if (showRadialMenu) return;
-      const rect = e.currentTarget.getBoundingClientRect();
-      setRadialPosition({
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
-      });
-      setShowRadialMenu(true);
-    }}
-  >
-    <PriceChart symbol={symbol} tf={tf} zoom={zoom} showCrosshair={showCrosshair} showIndicators={showIndicators} chartType={chartType} />
-    {showRadialMenu && radialPosition && (
-      <RadialMenu
-        isOpen={showRadialMenu}
-        onClose={() => setShowRadialMenu(false)}
-        onSelectTf={setTf}
-        currentTf={tf}
-        showCrosshair={showCrosshair}
-        setShowCrosshair={setShowCrosshair}
-        showIndicators={showIndicators}
-        setShowIndicators={setShowIndicators}
-        position={radialPosition}
-      />
-    )}
-  </div>
-        </main>
-
-        <div className={`order-3 md:w-80 md:h-auto border-t md:border-t-0 md:border-l border-gray-300 bg-white overflow-y-auto ${["trade", "history", "messages"].includes(mobileTab) ? "block flex-1" : "hidden md:block"}`}>
-           
-          <div className="bg-[#f8f9fa] border-b border-gray-300 p-3 text-[11px] text-gray-700 space-y-1">
-            <div className="flex justify-between"><span>Balance:</span> <span className="font-mono">{money(e.balance)}</span></div>
-            <div className="flex justify-between"><span>Equity:</span> <span className="font-mono">{money(e.equity)}</span></div>
-            <div className="flex justify-between"><span>Margin:</span> <span className="font-mono">{money(e.margin)}</span></div>
-            <div className="flex justify-between"><span>Free margin:</span> <span className="font-mono">{money(e.freeMargin)}</span></div>
+      {/* Main chart area */}
+      <div className="flex flex-col flex-1 min-h-0 mb-12">
+        <main className={`flex-1 flex flex-col min-w-0 h-[65vh] ${mobileTab === "chart" ? "flex" : "hidden"}`}>
+          <div className="flex items-center justify-between px-2 py-1 bg-white border-b border-gray-200">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-[#1565c0]">{symbol} ▼ {tf}</span>
+              <span className="text-[10px] text-gray-500">{s?.desc}</span>
+            </div>
           </div>
-
-          {/* CLOSE ALL BUTTON */}
-          {mobileTab === "trade" && e.positions.length > 0 && (
-            <div className="p-2 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-              <h3 className="text-xs font-bold text-gray-700">Trade</h3>
-              <button onClick={() => setShowBulkMenu(true)} className="bg-red-50 text-red-600 px-2 py-1 rounded text-[10px] font-bold hover:bg-red-100">
-                Close All
-              </button>
-            </div>
-          )}
-
-          {mobileTab === "trade" && (
-            <div className="divide-y divide-gray-100">
-              {e.positions.length === 0 ? (
-                <div className="p-4 text-center text-xs text-gray-500">No open positions</div>
-              ) : (
-                e.positions.map((p) => {
-                  const pnl = e.profitOf(p);
-                  const spec = e.spec(p.symbol);
-                  const quote = e.quotes[p.symbol];
-                  const closePrice = p.side === "buy" ? quote.bid : quote.ask;
-                  return (
-                    <div key={p.ticket} className="p-2 hover:bg-gray-50">
-                      <div className="flex justify-between items-center mb-1">
-                        <div className="flex items-center gap-1">
-                          <span className="text-xs font-bold text-gray-800">{p.symbol}</span>
-                          <span className="text-[10px] text-gray-500">{p.side}</span>
-                          <span className="text-[10px] text-gray-500">{p.lots.toFixed(2)}</span>
-                        </div>
-                        <div className={`font-mono text-xs font-bold ${pnl >= 0 ? "text-[#1565c0]" : "text-[#c62828]"}`}>
-                          {pnl.toFixed(2)}
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center text-[10px] text-gray-500 font-mono">
-                        <div>{p.openPrice.toFixed(spec.digits)} → {closePrice.toFixed(spec.digits)}</div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          )}
-
-          {mobileTab === "history" && <div className="p-4 text-center text-xs text-gray-500">No history</div>}
-          {mobileTab === "messages" && (
-            <div className="p-4 text-center text-xs text-gray-500">
-              <div className="mb-2">No messages</div>
-            </div>
-          )}
-        </div>
-
+          <div className="flex-1 relative bg-white w-full h-full min-h-[300px]">
+            {/* CRITICAL FIX: Pass engine={e} */}
+            <PriceChart engine={e} symbol={symbol} tf={tf} zoom={zoom} />
+          </div>
+        </main>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 flex justify-around py-1 md:hidden z-50">
-        <button onClick={() => setMobileTab("market")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "market" ? "text-[#1565c0]" : "text-gray-500"}`}>
-          <ArrowLeftRight size={18} />
-          <span className="text-[9px] font-semibold">Quotes</span>
-        </button>
+      {/* Bottom navigation */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 flex justify-around py-1 z-50">
         <button onClick={() => setMobileTab("chart")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "chart" ? "text-[#1565c0]" : "text-gray-500"}`}>
           <BarChart3 size={18} />
           <span className="text-[9px] font-semibold">Charts</span>
-        </button>
-        <button onClick={() => setMobileTab("trade")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "trade" ? "text-[#1565c0]" : "text-gray-500"}`}>
-          <Activity size={14} />
-          <div className="px-2 py-0.5 bg-[#F0F0F0] rounded-full">
-            <span className={`text-[13px] font-bold ${e.floating >= 0 ? "text-[#1565c0]" : "text-[#c62828]"}`}>
-              {e.floating >= 0 ? "+" : ""}{e.floating.toFixed(2)}
-            </span>
-          </div>
-          <span className="text-[9px] font-semibold">Trade</span>
-        </button>
-        <button onClick={() => setMobileTab("history")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "history" ? "text-[#1565c0]" : "text-gray-500"}`}>
-          <Clock size={18} />
-          <span className="text-[9px] font-semibold">History</span>
-        </button>
-        <button onClick={() => setMobileTab("messages")} className={`flex flex-col items-center gap-0.5 w-full ${mobileTab === "messages" ? "text-[#1565c0]" : "text-gray-500"}`}>
-          <MessageSquare size={18} />
-          <span className="text-[9px] font-semibold">Messages</span>
+          <span className={`text-[9px] font-bold mt-[-2px] ${totalFloatingPnl >= 0 ? "text-[#1565c0]" : "text-[#c62828]"}`}>
+            {totalFloatingPnl >= 0 ? "+" : ""}{totalFloatingPnl.toFixed(2)}
+          </span>
         </button>
       </div>
 
       {dialog && <OrderDialog key={dlgKey} state={dialog} onClose={() => setDialog(null)} />}
-
-      {showBulkMenu && (
-        <div className="fixed inset-0 z-[100] flex flex-col justify-end bg-black/50" onClick={() => setShowBulkMenu(false)}>
-          <div
-            className="w-full bg-white rounded-t-2xl p-4 pb-8 animate-in slide-in-from-bottom duration-200"
-            onClick={(ev) => ev.stopPropagation()}
-          >
-            <div className="text-center font-bold text-lg mb-4 text-gray-800 border-b border-gray-200 pb-2">
-              Bulk Operations
-            </div>
-
-            <button onClick={() => handleBatchClose("all")} className="w-full text-left py-3 text-base text-gray-700 hover:bg-gray-50 border-b border-gray-100">
-              Close All Positions
-            </button>
-            <button onClick={() => handleBatchClose("profit")} className="w-full text-left py-3 text-base text-gray-700 hover:bg-gray-50 border-b border-gray-100">
-              Close Profitable Positions
-            </button>
-            <button onClick={() => handleBatchClose("loss")} className="w-full text-left py-3 text-base text-gray-700 hover:bg-gray-50 border-b border-gray-100">
-              Close Losing Positions
-            </button>
-
-            <button onClick={() => setShowBulkMenu(false)} className="w-full text-center py-3 mt-4 text-base font-bold text-[#1565c0]">
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
