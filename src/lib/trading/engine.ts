@@ -20,6 +20,8 @@ export type Result = { ok: true; ticket?: number } | { ok: false; error: string 
 
 import { configuredLeverage } from "@/lib/fx/market";
 import { apiRequest } from "@/utils/api"; 
+import { supabase } from "@/utils/supabase/client";
+import { toast } from "sonner";
 
 const SPREADS: Record<string, number> = { EURUSD: 1, GBPUSD: 2, USDJPY: 1, AUDUSD: 1, USDCAD: 2, USDCHF: 2, NZDUSD: 2, EURJPY: 2, GBPJPY: 3, XAUUSD: 2 };
 function spreadFor(symbol: string): number { return SPREADS[symbol] ?? 2; }
@@ -93,20 +95,31 @@ export class Engine {
     this.start();
   }
 
-  get balance() {
-    return this.mode === "live" ? this.liveBalance : this.demoBalance;
-  }
+  get balance() { return this.mode === "live" ? this.liveBalance : this.demoBalance; }
 
   async fetchLiveBalance() {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.warn("No active session. Cannot fetch live balance.");
+        this.liveKesBalance = 0;
+        this.liveBalance = 0;
+        this.emit();
+        return;
+      }
+
       const res = await apiRequest<{ success: boolean; balance: number; exchange_rate?: number }>("/wallet/balance");
-      if (res.success) {
+      console.log("Live Balance API Response:", res);
+
+      if (res && res.success) {
         this.liveKesBalance = res.balance;
         this.exchangeRate = res.exchange_rate || 130; 
         this.liveBalance = this.liveKesBalance / this.exchangeRate;
         this.emit();
+      } else {
+        console.error("Backend rejected balance fetch:", res);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to fetch live balance", err);
     }
   }
@@ -137,23 +150,12 @@ export class Engine {
   }
 
   stop() {
-    if (this.animationFrameId) {
-      cancelAnimationFrame(this.animationFrameId);
-      this.animationFrameId = null;
-    }
+    if (this.animationFrameId) { cancelAnimationFrame(this.animationFrameId); this.animationFrameId = null; }
   }
 
-  subscribe = (fn: () => void) => {
-    this.listeners.add(fn);
-    return () => { this.listeners.delete(fn); };
-  };
-  
+  subscribe = (fn: () => void) => { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; };
   getVersion = () => this.version;
-  
-  private emit() {
-    this.version++;
-    this.listeners.forEach((l) => l());
-  }
+  private emit() { this.version++; this.listeners.forEach((l) => l()); }
   
   private save() {
     try {
@@ -185,12 +187,8 @@ export class Engine {
     this.notice = e;
   }
 
-  spec(name: string) {
-    return SYMBOLS.find((s) => s.name === name)!;
-  }
-  fmt(name: string, v: number) {
-    return v.toFixed(this.spec(name).digits);
-  }
+  spec(name: string) { return SYMBOLS.find((s) => s.name === name)!; }
+  fmt(name: string, v: number) { return v.toFixed(this.spec(name).digits); }
 
   toUSD(symbol: string, amount: number) {
     const q = symbol.slice(3, 6);
@@ -198,32 +196,17 @@ export class Engine {
     const conv = this.quotes["USD" + q];
     return conv ? amount / conv.bid : amount;
   }
-  marginFor(symbol: string, usdAmount: number) {
-    return usdAmount / this.leverage;
-  }
-  closePriceOf(p: { symbol: string; side: Side }) {
-    const q = this.quotes[p.symbol];
-    return p.side === "buy" ? q.bid : q.ask;
-  }
+  marginFor(symbol: string, usdAmount: number) { return usdAmount / this.leverage; }
+  closePriceOf(p: { symbol: string; side: Side }) { const q = this.quotes[p.symbol]; return p.side === "buy" ? q.bid : q.ask; }
   profitOf(p: Position, usdAmount = p.lots) {
     const diff = (this.closePriceOf(p) - p.openPrice) * (p.side === "buy" ? 1 : -1);
     return round((usdAmount * diff) / p.openPrice, 2);
   }
-  get floating() {
-    return this.positions.reduce((a, p) => a + this.profitOf(p), 0);
-  }
-  get equity() {
-    return round(this.balance + this.floating, 2);
-  }
-  get margin() {
-    return round(this.positions.reduce((a, p) => a + this.marginFor(p.symbol, p.lots), 0), 2);
-  }
-  get freeMargin() {
-    return round(this.equity - this.margin, 2);
-  }
-  get marginLevel() {
-    return this.margin > 0 ? (this.equity / this.margin) * 100 : 0;
-  }
+  get floating() { return this.positions.reduce((a, p) => a + this.profitOf(p), 0); }
+  get equity() { return round(this.balance + this.floating, 2); }
+  get margin() { return round(this.positions.reduce((a, p) => a + this.marginFor(p.symbol, p.lots), 0), 2); }
+  get freeMargin() { return round(this.equity - this.margin, 2); }
+  get marginLevel() { return this.margin > 0 ? (this.equity / this.margin) * 100 : 0; }
 
   private checkStops(side: Side, ref: number, sl: number, tp: number, symbol: string): string | null {
     const minDist = this.spec(symbol).point * 10;
@@ -238,11 +221,7 @@ export class Engine {
     return null;
   }
   
-  private fail(msg: string): Result {
-    this.log(msg, true);
-    this.emit();
-    return { ok: false, error: msg };
-  }
+  private fail(msg: string): Result { this.log(msg, true); this.emit(); return { ok: false, error: msg }; }
 
   async placeOrder(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }): Promise<Result> {
     const s = this.spec(req.symbol);
@@ -261,7 +240,7 @@ export class Engine {
         });
         if (!res.success) return this.fail(res.error || "Backend rejected trade");
         
-        this.liveKesBalance = res.new_kes_balance; // Backend should return new wallet balance
+        this.liveKesBalance = res.new_kes_balance || this.liveKesBalance;
         this.liveBalance = this.liveKesBalance / this.exchangeRate;
         this.log(`LIVE order #${res.ticket} executed`);
         this.emit();
@@ -271,7 +250,6 @@ export class Engine {
       }
     }
 
-    // ─── DEMO TRADING ───
     if (!(lots >= 0.01 && lots <= 10000)) return this.fail("Invalid volume (0.01 - 10000)");
     const sl = round(req.sl || 0, s.digits), tp = round(req.tp || 0, s.digits);
     const side: Side = isBuyType(req.type) ? "buy" : "sell";
@@ -294,8 +272,7 @@ export class Engine {
     const ticket = this.nextTicket++;
     this.orders.push({ ticket, symbol: req.symbol, type: t, lots, price, sl, tp, time: Date.now() });
     this.log(`order #${ticket} ${typeLabel(t)} ${lots.toFixed(2)} ${req.symbol} at ${price.toFixed(s.digits)} placed`);
-    this.save();
-    this.emit();
+    this.save(); this.emit();
     return { ok: true, ticket };
   }
 
@@ -307,8 +284,7 @@ export class Engine {
     const ticket = fromOrder ?? this.nextTicket++;
     this.positions.push({ ticket, symbol, side, lots, openPrice: price, openTime: Date.now(), sl, tp });
     this.log(`deal #${ticket} ${side} ${lots.toFixed(2)} ${symbol} at ${price.toFixed(this.spec(symbol).digits)} done`);
-    this.save();
-    this.emit();
+    this.save(); this.emit();
     return { ok: true, ticket };
   }
 
@@ -322,20 +298,14 @@ export class Engine {
     const price = this.closePriceOf(p);
     this.demoBalance = round(this.demoBalance + profit, 2);
     
-    this.history.unshift({
-      ticket: p.ticket, symbol: p.symbol, side: p.side, lots: closeLots,
-      openPrice: p.openPrice, closePrice: price,
-      openTime: p.openTime, closeTime: Date.now(),
-      profit, reason,
-    });
+    this.history.unshift({ ticket: p.ticket, symbol: p.symbol, side: p.side, lots: closeLots, openPrice: p.openPrice, closePrice: price, openTime: p.openTime, closeTime: Date.now(), profit, reason });
     
     if (closeLots >= p.lots - 1e-9) this.positions = this.positions.filter((x) => x !== p);
     else p.lots = round(p.lots - closeLots, 2);
     
     const tag = reason === "manual" ? "" : ` [${reason === "stopout" ? "stop out" : reason}]`;
     this.log(`position #${ticket} closed ${closeLots.toFixed(2)} ${p.symbol} at ${this.fmt(p.symbol, price)}, profit ${profit.toFixed(2)}${tag}`, reason === "stopout");
-    this.save();
-    this.emit();
+    this.save(); this.emit();
     return { ok: true };
   }
 
@@ -350,15 +320,12 @@ export class Engine {
     const p = this.positions.find((x) => x.ticket === ticket);
     if (!p) return this.fail(`Position #${ticket} not found`);
     const d = this.spec(p.symbol).digits;
-    sl = round(sl || 0, d);
-    tp = round(tp || 0, d);
+    sl = round(sl || 0, d); tp = round(tp || 0, d);
     const err = this.checkStops(p.side, this.closePriceOf(p), sl, tp, p.symbol);
     if (err) return this.fail(err);
-    p.sl = sl;
-    p.tp = tp;
+    p.sl = sl; p.tp = tp;
     this.log(`position #${ticket} modified: sl ${sl || "-"}, tp ${tp || "-"}`);
-    this.save();
-    this.emit();
+    this.save(); this.emit();
     return { ok: true };
   }
 
@@ -367,81 +334,50 @@ export class Engine {
     if (!o) return this.fail(`Order #${ticket} not found`);
     this.orders = this.orders.filter((x) => x !== o);
     this.log(`order #${ticket} ${typeLabel(o.type)} ${o.lots.toFixed(2)} ${o.symbol} canceled`);
-    this.save();
-    this.emit();
+    this.save(); this.emit();
     return { ok: true };
   }
 
   deposit(amountUsd: number): Result {
     if (!(amountUsd > 0 && amountUsd <= 1e7)) return this.fail("Invalid deposit amount");
     this.demoBalance = round(this.demoBalance + amountUsd, 2);
-    this.history.unshift({
-      ticket: this.nextTicket++, symbol: "", side: "buy", lots: 0,
-      openPrice: 0, closePrice: 0, openTime: Date.now(), closeTime: Date.now(),
-      profit: amountUsd, reason: "deposit",
-    });
+    this.history.unshift({ ticket: this.nextTicket++, symbol: "", side: "buy", lots: 0, openPrice: 0, closePrice: 0, openTime: Date.now(), closeTime: Date.now(), profit: amountUsd, reason: "deposit" });
     this.log(`Demo balance deposit $${amountUsd.toFixed(2)}`);
-    this.save();
-    this.emit();
+    this.save(); this.emit();
     return { ok: true };
   }
 
   resetAccount() {
-    this.demoBalance = DEMO_START_BALANCE;
-    this.positions = [];
-    this.orders = [];
-    this.history = [];
-    this.journal = [];
+    this.demoBalance = DEMO_START_BALANCE; this.positions = []; this.orders = []; this.history = []; this.journal = [];
     this.log(`Demo account reset to $${DEMO_START_BALANCE.toFixed(2)}`);
-    this.save();
-    this.emit();
+    this.save(); this.emit();
   }
 
   private tick() {
-    const now = Date.now();
-    const nowSec = now / 1000;
-    this.tickCount++;
-
+    const now = Date.now(); const nowSec = now / 1000; this.tickCount++;
     for (const s of SYMBOLS) {
-      const q = this.quotes[s.name];
-      const rng = mulberry32(this.tickCount ^ s.name.charCodeAt(0));
-      
+      const q = this.quotes[s.name]; const rng = mulberry32(this.tickCount ^ s.name.charCodeAt(0));
       const randomMove = gaussFrom(rng) * s.vol;
       let proposedBid = q.bid + randomMove;
-      
       const maxJump = s.vol * 2.5;
-      if (Math.abs(proposedBid - q.bid) > maxJump) {
-        proposedBid = q.bid + Math.sign(proposedBid - q.bid) * maxJump;
-      }
-
+      if (Math.abs(proposedBid - q.bid) > maxJump) proposedBid = q.bid + Math.sign(proposedBid - q.bid) * maxJump;
+      
       const prev = q.bid;
       const bid = round(Math.max(s.point, proposedBid), s.digits);
       const spreadPts = s.spread; 
       const ask = round(bid + spreadPts * s.point, s.digits);
 
-      q.bid = bid;
-      q.ask = ask;
-      q.dir = bid > prev ? 1 : bid < prev ? -1 : q.dir;
-      q.high = Math.max(q.high, bid);
-      q.low = Math.min(q.low, bid);
-      q.time = now;
+      q.bid = bid; q.ask = ask; q.dir = bid > prev ? 1 : bid < prev ? -1 : q.dir;
+      q.high = Math.max(q.high, bid); q.low = Math.min(q.low, bid); q.time = now;
 
       for (const tf of Object.keys(TIMEFRAMES) as TF[]) {
-        const arr = this.candles[s.name][tf];
-        const bucket = Math.floor(nowSec / TIMEFRAMES[tf]) * TIMEFRAMES[tf];
+        const arr = this.candles[s.name][tf]; const bucket = Math.floor(nowSec / TIMEFRAMES[tf]) * TIMEFRAMES[tf];
         const last = arr[arr.length - 1];
-        if (last.t === bucket) {
-          last.h = Math.max(last.h, bid);
-          last.l = Math.min(last.l, bid);
-          last.c = bid;
-        } else {
-          arr.push({ t: bucket, o: last.c, h: Math.max(last.c, bid), l: Math.min(last.c, bid), c: bid });
-          if (arr.length > 1500) arr.shift();
-        }
+        if (last.t === bucket) { last.h = Math.max(last.h, bid); last.l = Math.min(last.l, bid); last.c = bid; }
+        else { arr.push({ t: bucket, o: last.c, h: Math.max(last.c, bid), l: Math.min(last.c, bid), c: bid }); if (arr.length > 1500) arr.shift(); }
       }
     }
-    this.processTriggers();
-    this.emit();
+    this.processTriggers(); this.emit();
   }
 
   private processTriggers() {
@@ -457,23 +393,14 @@ export class Engine {
     
     for (const p of [...this.positions]) {
       const c = this.closePriceOf(p);
-      if (p.side === "buy") {
-        if (p.sl && c <= p.sl) this.closePosition(p.ticket, "sl");
-        else if (p.tp && c >= p.tp) this.closePosition(p.ticket, "tp");
-      } else {
-        if (p.sl && c >= p.sl) this.closePosition(p.ticket, "sl");
-        else if (p.tp && c <= p.tp) this.closePosition(p.ticket, "tp");
-      }
+      if (p.side === "buy") { if (p.sl && c <= p.sl) this.closePosition(p.ticket, "sl"); else if (p.tp && c >= p.tp) this.closePosition(p.ticket, "tp"); } 
+      else { if (p.sl && c >= p.sl) this.closePosition(p.ticket, "sl"); else if (p.tp && c <= p.tp) this.closePosition(p.ticket, "tp"); }
     }
     
     if (this.positions.length) {
       const ml = this.marginLevel;
-      if (ml < MARGIN_CALL && !this.marginCallWarned) {
-        this.marginCallWarned = true;
-        this.log(`Margin call: margin level ${ml.toFixed(2)}%`, true);
-      }
+      if (ml < MARGIN_CALL && !this.marginCallWarned) { this.marginCallWarned = true; this.log(`Margin call: margin level ${ml.toFixed(2)}%`, true); }
       if (ml >= MARGIN_CALL) this.marginCallWarned = false;
-      
       let guard = 0;
       while (this.positions.length && this.marginLevel < STOP_OUT && guard++ < 50) {
         const worst = [...this.positions].sort((a, b) => this.profitOf(a) - this.profitOf(b))[0];
@@ -484,7 +411,4 @@ export class Engine {
 }
 
 let instance: Engine | null = null;
-export function getEngine() {
-  if (!instance) instance = new Engine();
-  return instance;
-}
+export function getEngine() { if (!instance) instance = new Engine(); return instance; }
