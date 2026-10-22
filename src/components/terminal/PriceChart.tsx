@@ -15,11 +15,14 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, chartType 
   const loRef = useRef<number>(0);
   const hiRef = useRef<number>(0);
   
-  // Use refs to hold the latest live data so the animation loop never goes stale
   const symbolRef = useRef(symbol);
   const tfRef = useRef(tf);
   const eRef = useRef(e);
   const qRef = useRef(e.quotes[symbol]);
+  
+  // Smooth price interpolators to eliminate visual spikes
+  const displayBid = useRef<number | null>(null);
+  const displayAsk = useRef<number | null>(null);
 
   symbolRef.current = symbol;
   tfRef.current = tf;
@@ -34,6 +37,8 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, chartType 
     view.current.offset = 0;
     loRef.current = 0; 
     hiRef.current = 0;
+    displayBid.current = null; 
+    displayAsk.current = null;
   }, [symbol, tf]);
 
   useEffect(() => {
@@ -50,7 +55,6 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, chartType 
     return () => { ro.disconnect(); clearTimeout(t1); };
   }, []);
 
-  // The continuous rendering loop
   useEffect(() => {
     const cv = canvasRef.current;
     if (!cv || size.w === 0 || size.h === 0) return;
@@ -70,12 +74,23 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, chartType 
       const all = currentEngine.candles?.[curSymbol]?.[curTf] || [];
       if (!q) return;
 
+      // Smooth the live price so it doesn't jump
+      if (displayBid.current === null) {
+        displayBid.current = q.bid;
+        displayAsk.current = q.ask;
+      } else {
+        displayBid.current += (q.bid - displayBid.current) * 0.15;
+        displayAsk.current += (q.ask - displayAsk.current) * 0.15;
+      }
+      const smoothBid = displayBid.current;
+      const smoothAsk = displayAsk.current;
+      const smoothMid = (smoothBid + smoothAsk) / 2;
+
       const dpr = window.devicePixelRatio || 1;
       cv.width = Math.floor(size.w * dpr);
       cv.height = Math.floor(size.h * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      // Reset Context State (Fixes the text alignment bug)
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
 
@@ -87,16 +102,29 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, chartType 
       const end = all.length - view.current.offset;
       let bars = all.slice(Math.max(0, end - count), end);
 
-      // 1. LIVE CANDLE UPDATE
-      if (bars.length > 0 && view.current.offset === 0 && q) {
+      const spec = currentEngine.spec(curSymbol);
+
+      // ─── EMERGENCY SPIKE FILTER (Max 25 pips per candle) ───
+      const MAX_ALLOWED_WICK = spec.pipSize * 25; 
+      bars = bars.map((b: any) => {
+        const bodyTop = Math.max(b.o, b.c);
+        const bodyBot = Math.min(b.o, b.c);
+        return {
+          ...b,
+          h: Math.min(b.h, bodyTop + MAX_ALLOWED_WICK),
+          l: Math.max(b.l, bodyBot - MAX_ALLOWED_WICK),
+        };
+      });
+
+      // Apply live smooth price to the last candle
+      if (bars.length > 0 && view.current.offset === 0) {
         const last = bars[bars.length - 1];
-        const mid = (q.bid + q.ask) / 2;
         bars = [...bars];
         bars[bars.length - 1] = {
           ...last,
-          c: mid,
-          h: Math.max(last.h, mid, q.ask),
-          l: Math.min(last.l, mid, q.bid),
+          c: smoothMid,
+          h: Math.min(Math.max(last.h, smoothMid, smoothAsk), Math.max(last.o, smoothMid) + MAX_ALLOWED_WICK),
+          l: Math.max(Math.min(last.l, smoothMid, smoothBid), Math.min(last.o, smoothMid) - MAX_ALLOWED_WICK),
         };
       }
 
@@ -114,19 +142,17 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, chartType 
         if (p.tp) { lo = Math.min(lo, p.tp); hi = Math.max(hi, p.tp); }
       }
 
-      if (view.current.offset === 0) { lo = Math.min(lo, q.bid); hi = Math.max(hi, q.ask); }
+      if (view.current.offset === 0) { lo = Math.min(lo, smoothBid); hi = Math.max(hi, smoothAsk); }
       
-      const pad = (hi - lo) * 0.15 || currentEngine.spec(curSymbol).point * 10;
+      const pad = (hi - lo) * 0.15 || spec.point * 10;
       const rawLo = lo - pad, rawHi = hi + pad;
 
-      // 2. SMOOTH Y-AXIS AUTO-SCALING
       if (loRef.current === 0 && hiRef.current === 0) {
         loRef.current = rawLo;
         hiRef.current = rawHi;
       }
-      const smoothFactor = 0.15;
-      loRef.current += (rawLo - loRef.current) * smoothFactor;
-      hiRef.current += (rawHi - hiRef.current) * smoothFactor;
+      loRef.current += (rawLo - loRef.current) * 0.15;
+      hiRef.current += (rawHi - hiRef.current) * 0.15;
 
       const smoothLo = loRef.current;
       const smoothHi = hiRef.current;
@@ -134,9 +160,8 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, chartType 
       const xOf = (i: number) => plotW - 12 - (bars.length - i - 0.5) * sp;
 
       ctx.font = "11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"; 
-      const spec = currentEngine.spec(curSymbol);
 
-      // 3. Y-AXIS GRID + LABELS
+      // Y-Axis Grid (targetPixels = 22 for ~13 labels)
       const targetPixels = 22; 
       const rawStep = (smoothHi - smoothLo) / (plotH / targetPixels);
       const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
@@ -154,7 +179,6 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, chartType 
         ctx.fillText(p.toFixed(spec.digits), plotW + 4, yy);
       }
 
-      // 4. X-AXIS GRID
       const every = Math.max(1, Math.round(80 / sp));
       let lastLabelX = -100;
       for (let i = bars.length - 1; i >= 0; i -= every) {
@@ -173,7 +197,6 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, chartType 
         }
       }
 
-      // 5. DRAW CANDLES
       const bw = Math.max(1, Math.floor(sp * 0.6));
       if (chartType === "line") {
         ctx.strokeStyle = "#1565c0";
@@ -196,7 +219,6 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, chartType 
         });
       }
 
-      // Top-left label
       ctx.fillStyle = "#1565c0";
       ctx.font = "bold 12px -apple-system, sans-serif";
       ctx.fillText(`${curSymbol} ▼ ${curTf}`, 8, 15);
@@ -204,7 +226,6 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, chartType 
       ctx.font = "10px -apple-system, sans-serif";
       ctx.fillText(spec.desc || "", 8, 28);
 
-      // Overlays
       const drawSolidPriceBox = (p: number, color: string, timerText: string = "") => {
         if (p < smoothLo || p > smoothHi) return;
         const yy = Math.round(y(p)) + 0.5;
@@ -252,7 +273,6 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, chartType 
         if (p.tp) drawDashedLine(p.tp, cBull, "TP");
       }
 
-      // Live timer
       const tfSeconds = TIMEFRAMES[curTf];
       const now = Date.now() / 1000;
       let timerStr = "";
@@ -267,8 +287,8 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, chartType 
         }
       }
 
-      drawSolidPriceBox(q.ask, cBear);
-      drawSolidPriceBox(q.bid, cBull, timerStr);
+      drawSolidPriceBox(smoothAsk, cBear);
+      drawSolidPriceBox(smoothBid, cBull, timerStr);
 
       ctx.strokeStyle = cGrid; ctx.strokeRect(0.5, 0.5, plotW, plotH);
     };
@@ -278,7 +298,7 @@ export function PriceChart({ symbol, tf, zoom, showCrosshair = false, chartType 
     return () => {
       cancelAnimationFrame(frameId);
     };
-  }, [size.w, size.h, chartType, showCrosshair]); // Only re-run loop if size changes
+  }, [size.w, size.h, chartType, showCrosshair]);
 
   return (
     <div
