@@ -6,51 +6,15 @@ import { PriceChart } from "./PriceChart";
 import { OrderDialog, type DialogState } from "./OrderDialog";
 import { Menu, ChevronUp, ChevronDown, Wallet, ChevronLeft } from "lucide-react";
 
-// ─── EXACT MT5 TOP ICONS ───
-const TopCrosshair = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <circle cx="12" cy="12" r="6" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
-  </svg>
-);
-const TopActivity = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 14h4l3-8 4 16 3-8h4" />
-  </svg>
-);
-const TopLayers = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 12 12 17 22 12" /><polyline points="2 17 12 22 22 17" />
-  </svg>
-);
+const TopCrosshair = () => (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="6" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></svg>);
+const TopActivity = () => (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 14h4l3-8 4 16 3-8h4" /></svg>);
+const TopLayers = () => (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 12 12 17 22 12" /><polyline points="2 17 12 22 22 17" /></svg>);
 
-// ─── EXACT MT5 BOTTOM ICONS ───
-const BottomQuotes = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M7 10L3 14L7 18" /><path d="M17 14L21 10L17 6" /><path d="M3 14H12" /><path d="M12 10H21" />
-  </svg>
-);
-const BottomCharts = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="5" y1="15" x2="5" y2="21" /><rect x="3" y="9" width="4" height="6" />
-    <line x1="12" y1="9" x2="12" y2="21" /><rect x="10" y="3" width="4" height="6" />
-    <line x1="19" y1="17" x2="19" y2="21" /><rect x="17" y="11" width="4" height="6" />
-  </svg>
-);
-const BottomTrade = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 14h4l3-8 4 16 3-8h4" />
-  </svg>
-);
-const BottomHistory = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 15" />
-  </svg>
-);
-const BottomMessages = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-  </svg>
-);
+const BottomQuotes = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10L3 14L7 18" /><path d="M17 14L21 10L17 6" /><path d="M3 14H12" /><path d="M12 10H21" /></svg>);
+const BottomCharts = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="15" x2="5" y2="21" /><rect x="3" y="9" width="4" height="6" /><line x1="12" y1="9" x2="12" y2="21" /><rect x="10" y="3" width="4" height="6" /><line x1="19" y1="17" x2="19" y2="21" /><rect x="17" y="11" width="4" height="6" /></svg>);
+const BottomTrade = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 14h4l3-8 4 16 3-8h4" /></svg>);
+const BottomHistory = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 15" /></svg>);
+const BottomMessages = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>);
 
 export function Terminal() {
   const e = useEngine();
@@ -73,7 +37,13 @@ export function Terminal() {
   const s = e.spec(symbol);
   const q = e.quotes[symbol];
 
-  // ─── FLASH ANIMATION STATE ───
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlMode = params.get("mode") === "live" ? "live" : "demo";
+    e.setMode(urlMode);
+    if (urlMode === "live") e.fetchLiveBalance();
+  }, []);
+
   const [flash, setFlash] = useState<"up" | "down" | "none">("none");
   const prevBid = useRef(q?.bid);
 
@@ -90,15 +60,12 @@ export function Terminal() {
 
   const open = (d: DialogState) => { setDlgKey(k => k + 1); setDialog(d); };
   const handleTrade = (direction: "buy" | "sell") => open({ mode: "new", symbol, type: direction, lots }); 
-  
   const totalFloatingPnl = e.positions.reduce((acc, p) => acc + e.profitOf(p), 0);
 
   const handleBulkClose = (type: 'all' | 'profit' | 'loss') => {
     e.positions.forEach((p) => {
       const pnl = e.profitOf(p);
-      if (type === 'all' || (type === 'profit' && pnl > 0) || (type === 'loss' && pnl < 0)) {
-        e.closePosition(p.ticket, "manual", p.lots);
-      }
+      if (type === 'all' || (type === 'profit' && pnl > 0) || (type === 'loss' && pnl < 0)) e.closePosition(p.ticket, "manual", p.lots);
     });
     setShowBulkMenu(false);
   };
@@ -114,23 +81,16 @@ export function Terminal() {
     );
   };
 
-  // ─── DYNAMIC FLASH COLORS ───
-  let sellBg = "bg-[#c62828]"; // Default Red
-  let buyBg = "bg-[#1565c0]";  // Default Blue
-
-  if (flash === "up") {
-    sellBg = "bg-[#1565c0]"; // Both Blue
-    buyBg = "bg-[#1565c0]";
-  } else if (flash === "down") {
-    sellBg = "bg-[#c62828]"; // Both Red
-    buyBg = "bg-[#c62828]";
-  }
+  let sellBg = "bg-[#c62828]";
+  let buyBg = "bg-[#1565c0]";
+  if (flash === "up") { sellBg = "bg-[#1565c0]"; buyBg = "bg-[#1565c0]"; } 
+  else if (flash === "down") { sellBg = "bg-[#c62828]"; buyBg = "bg-[#c62828]"; }
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#f8f9fa] text-[#1e293b] font-sans pb-14 md:pb-0">
+    <div className="flex h-[100dvh] flex-col bg-[#f8f9fa] text-[#1e293b] font-sans overflow-hidden">
       
       {/* TOP TOOLBAR */}
-      <div className="flex items-center justify-between px-3 py-2 bg-white border-b border-gray-300">
+      <div className="flex items-center justify-between px-3 py-2 bg-white border-b border-gray-300 shrink-0">
         <div className="flex items-center gap-2">
           <ChevronLeft size={24} className="text-gray-700 cursor-pointer" onClick={() => window.history.back()} />
           <Menu size={22} className="text-gray-700 cursor-pointer" onClick={() => setMobileTab(mobileTab === "market" ? "chart" : "market")} />
@@ -154,84 +114,48 @@ export function Terminal() {
             
             {e.mode === "live" ? (
               <>
-                <div className="text-xs font-mono font-bold text-gray-900">
-                  KSh {money(e.liveKesBalance)}
-                </div>
-                <div className="text-[10px] font-mono text-green-600 font-bold">
-                  ≈ ${money(e.liveBalance)}
-                </div>
+                <div className="text-xs font-mono font-bold text-gray-900">KSh {money(e.liveKesBalance)}</div>
+                <div className="text-[10px] font-mono text-green-600 font-bold">≈ ${money(e.liveBalance)}</div>
               </>
             ) : (
-              <div className="text-xs font-mono font-bold text-gray-900">
-                ${money(e.demoBalance)}
-              </div>
+              <div className="text-xs font-mono font-bold text-gray-900">${money(e.demoBalance)}</div>
             )}
           </div>
           
-          <button 
-            onClick={() => e.setMode(e.mode === "live" ? "demo" : "live")}
-            className={`px-2 py-1 text-[10px] font-bold rounded shadow-sm ${
-              e.mode === "live" ? "bg-red-600 text-white" : "bg-green-600 text-white"
-            }`}
-          >
-            {e.mode === "live" ? "LIVE" : "DEMO"}
-          </button>
-
-          <button 
-            onClick={() => {
-              if (e.mode === "live") {
-                window.location.href = "/wallet"; 
-              } else {
-                setDepositOpen(true);
-              }
-            }} 
-            className="p-1.5 bg-gray-100 rounded text-gray-700 hover:bg-gray-200"
-          >
+          <button onClick={() => { if (e.mode === "live") window.location.href = "/wallet"; else setDepositOpen(true); }} className="p-1.5 bg-gray-100 rounded text-gray-700 hover:bg-gray-200">
             <Wallet size={16} />
           </button>
         </div>
       </div>
 
       {/* ACTION BAR */}
-      <div className="flex bg-white border-b border-gray-300 select-none z-10">
-        <button
-          onClick={() => handleTrade("sell")}
-          className={`flex-1 ${sellBg} text-white py-1 flex flex-col items-center justify-center transition-colors duration-150`}
-        >
+      <div className="flex bg-white border-b border-gray-300 select-none z-10 shrink-0">
+        <button onClick={() => handleTrade("sell")} className={`flex-1 ${sellBg} text-white py-1 flex flex-col items-center justify-center transition-colors duration-150`}>
           <span className="text-[9px] font-bold tracking-wider opacity-90">SELL</span>
           <span className="text-lg font-bold">{renderPrice(q?.bid, s?.digits || 5)}</span>
         </button>
 
         <div className="w-24 flex flex-col items-center justify-center bg-white border-x border-gray-200 py-0.5">
            <ChevronUp size={16} className="text-gray-500 cursor-pointer" onClick={() => setLots(Math.max(0.01, lots + 0.01))} />
-           <input 
-             type="number" 
-             value={lots} 
-             onChange={(val) => setLots(Number(val.target.value))} 
-             className="w-full text-center text-sm font-bold focus:outline-none bg-transparent py-0.5" 
-           />
+           <input type="number" value={lots} onChange={(val) => setLots(Number(val.target.value))} className="w-full text-center text-sm font-bold focus:outline-none bg-transparent py-0.5" />
            <ChevronDown size={16} className="text-gray-500 cursor-pointer" onClick={() => setLots(Math.max(0.01, lots - 0.01))} />
         </div>
 
-        <button
-          onClick={() => handleTrade("buy")}
-          className={`flex-1 ${buyBg} text-white py-1 flex flex-col items-center justify-center transition-colors duration-150`}
-        >
+        <button onClick={() => handleTrade("buy")} className={`flex-1 ${buyBg} text-white py-1 flex flex-col items-center justify-center transition-colors duration-150`}>
           <span className="text-[9px] font-bold tracking-wider opacity-90">BUY</span>
           <span className="text-lg font-bold">{renderPrice(q?.ask, s?.digits || 5)}</span>
         </button>
       </div>
 
       {/* MAIN LAYOUT */}
-      <div className="flex flex-col md:flex-row flex-1 min-h-0 mb-12 md:mb-0">
-        
-        <aside className={`order-2 md:order-1 md:w-64 border-r border-gray-300 bg-white ${mobileTab === "market" ? "block flex-1" : "hidden md:block"}`}>
+      <div className="flex flex-col md:flex-row flex-1 overflow-hidden relative">
+        <aside className={`order-2 md:order-1 md:w-64 border-r border-gray-300 bg-white overflow-y-auto ${mobileTab === "market" ? "block flex-1" : "hidden md:block"}`}>
           <MarketWatch selected={symbol} onSelect={(s) => { setSymbol(s); setMobileTab("chart"); }} onTrade={(s) => open({ mode: "new", symbol: s })} />
         </aside>
 
-        <main className={`order-1 md:order-2 flex-1 flex flex-col min-w-0 h-[65vh] md:h-auto ${mobileTab === "chart" ? "flex" : "hidden md:flex"}`}>
-          <div className="flex-1 relative bg-white w-full h-full min-h-[300px]" onClick={() => setShowRadial(true)}>
-            <PriceChart engine={e} symbol={symbol} tf={tf} zoom={zoom} />
+        <main className={`order-1 md:order-2 flex-1 flex flex-col min-w-0 ${mobileTab === "chart" ? "flex" : "hidden md:flex"}`}>
+          <div className="flex-1 relative bg-white w-full h-full">
+            <PriceChart engine={e} symbol={symbol} tf={tf} zoom={zoom} onChartClick={() => setShowRadial(true)} />
           </div>
         </main>
 
@@ -268,15 +192,11 @@ export function Terminal() {
                             <span className={`text-[10px] font-bold uppercase ${p.side === "buy" ? "text-[#1565c0]" : "text-[#c62828]"}`}>{p.side}</span>
                             <span className="text-[10px] text-gray-500">{p.lots.toFixed(2)} lots</span>
                           </div>
-                          <div className={`font-mono text-xs font-bold ${pnl >= 0 ? "text-[#1565c0]" : "text-[#c62828]"}`}>
-                            {pnl.toFixed(2)} USD
-                          </div>
+                          <div className={`font-mono text-xs font-bold ${pnl >= 0 ? "text-[#1565c0]" : "text-[#c62828]"}`}>{pnl.toFixed(2)} USD</div>
                         </div>
                         <div className="flex justify-between items-center text-[10px] text-gray-500 font-mono">
                           <div>{p.openPrice.toFixed(spec.digits)} → {closePrice.toFixed(spec.digits)}</div>
-                          <button onClick={() => e.closePosition(p.ticket, "manual", p.lots)} className="bg-red-50 text-red-600 px-2 py-0.5 rounded text-[10px] font-bold hover:bg-red-100">
-                            Close
-                          </button>
+                          <button onClick={() => e.closePosition(p.ticket, "manual", p.lots)} className="bg-red-50 text-red-600 px-2 py-0.5 rounded text-[10px] font-bold hover:bg-red-100">Close</button>
                         </div>
                       </div>
                     );
@@ -317,14 +237,12 @@ export function Terminal() {
             </div>
           )}
 
-          {mobileTab === "messages" && (
-            <div className="p-4 text-center text-xs text-gray-500">No new messages.</div>
-          )}
+          {mobileTab === "messages" && (<div className="p-4 text-center text-xs text-gray-500">No new messages.</div>)}
         </div>
       </div>
 
       {/* BOTTOM NAVIGATION */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 flex justify-around py-1 md:hidden z-50">
+      <div className="bg-white border-t border-gray-300 flex justify-around py-1 md:hidden shrink-0 z-50">
         <button onClick={() => setMobileTab("market")} className={`flex flex-col items-center gap-1 w-full ${mobileTab === "market" ? "text-[#1565c0]" : "text-gray-500"}`}>
           <BottomQuotes />
           <span className="text-[9px] font-semibold">Quotes</span>
@@ -378,12 +296,9 @@ export function Terminal() {
             <svg width="260" height="260" viewBox="0 0 260 260" className="overflow-visible">
               <circle cx="130" cy="130" r="90" fill="none" stroke="#2979FF" strokeWidth="52" />
               {[
-                { label: "M15", type: "tf" }, { label: "M30", type: "tf" },
-                { label: "H1", type: "tf" }, { label: "H4", type: "tf" },
-                { label: "D1", type: "tf" }, { label: "W1", type: "tf" },
-                { label: "MN", type: "tf" }, { label: "pulse", type: "icon" },
-                { label: "crosshair", type: "icon" }, { label: "sliders", type: "icon" },
-                { label: "magnifier", type: "icon" }, { label: "duplicate", type: "icon" },
+                { label: "M15", type: "tf" }, { label: "M30", type: "tf" }, { label: "H1", type: "tf" }, { label: "H4", type: "tf" },
+                { label: "D1", type: "tf" }, { label: "W1", type: "tf" }, { label: "MN", type: "tf" }, { label: "pulse", type: "icon" },
+                { label: "crosshair", type: "icon" }, { label: "sliders", type: "icon" }, { label: "magnifier", type: "icon" }, { label: "duplicate", type: "icon" },
                 { label: "M1", type: "tf" }, { label: "M5", type: "tf" }
               ].map((item, i) => {
                 const total = 14;
@@ -395,17 +310,9 @@ export function Terminal() {
                 const rotation = angle + 90; 
 
                 return (
-                  <g
-                    key={i}
-                    transform={`translate(${x}, ${y}) rotate(${rotation})`}
-                    onClick={(e) => { e.stopPropagation(); if(item.type === "tf") { setTf(item.label as TF); setShowRadial(false); } }}
-                    className={`transition-transform hover:scale-125 cursor-pointer ${item.type === "tf" && tf === item.label ? "opacity-100" : "opacity-90 hover:opacity-100"}`}
-                    style={{ transformOrigin: "center", transformBox: "fill-box" }}
-                  >
+                  <g key={i} transform={`translate(${x}, ${y}) rotate(${rotation})`} onClick={(e) => { e.stopPropagation(); if(item.type === "tf") { setTf(item.label as TF); setShowRadial(false); } }} className={`transition-transform hover:scale-125 cursor-pointer ${item.type === "tf" && tf === item.label ? "opacity-100" : "opacity-90 hover:opacity-100"}`} style={{ transformOrigin: "center", transformBox: "fill-box" }}>
                     {item.type === "tf" ? (
-                      <text textAnchor="middle" dominantBaseline="middle" fontFamily="Arial, sans-serif" fontWeight="700" fontSize="11" fill="#FFFFFF" stroke="#000000" strokeWidth="2.5" paintOrder="stroke">
-                        {item.label}
-                      </text>
+                      <text textAnchor="middle" dominantBaseline="middle" fontFamily="Arial, sans-serif" fontWeight="700" fontSize="11" fill="#FFFFFF" stroke="#000000" strokeWidth="2.5" paintOrder="stroke">{item.label}</text>
                     ) : (
                       <g stroke="#FFFFFF" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round">
                         {item.label === "pulse" && <path d="M-8 0 H-4 L-2 -5 L2 5 L4 0 H8" />}
