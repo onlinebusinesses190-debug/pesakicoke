@@ -6,17 +6,19 @@ import { PriceChart } from "./PriceChart";
 import { OrderDialog, type DialogState } from "./OrderDialog";
 import { Menu, ChevronUp, ChevronDown, Wallet, ChevronLeft } from "lucide-react";
 
+// ─── EXACT MT5 TOP ICONS ───
 const TopCrosshair = () => (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="6" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></svg>);
 const TopActivity = () => (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 14h4l3-8 4 16 3-8h4" /></svg>);
 const TopLayers = () => (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 12 12 17 22 12" /><polyline points="2 17 12 22 22 17" /></svg>);
 
+// ─── EXACT MT5 BOTTOM ICONS ───
 const BottomQuotes = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10L3 14L7 18" /><path d="M17 14L21 10L17 6" /><path d="M3 14H12" /><path d="M12 10H21" /></svg>);
 const BottomCharts = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="15" x2="5" y2="21" /><rect x="3" y="9" width="4" height="6" /><line x1="12" y1="9" x2="12" y2="21" /><rect x="10" y="3" width="4" height="6" /><line x1="19" y1="17" x2="19" y2="21" /><rect x="17" y="11" width="4" height="6" /></svg>);
 const BottomTrade = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 14h4l3-8 4 16 3-8h4" /></svg>);
 const BottomHistory = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 15" /></svg>);
 const BottomMessages = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>);
 
-export function Terminal() {
+export function Terminal({ mode = "demo" }: { mode?: "demo" | "real" }) {
   const e = useEngine();
   const [symbol, setSymbol] = useState("EURUSD");
   const [tf, setTf] = useState<TF>("M5");
@@ -37,13 +39,16 @@ export function Terminal() {
   const s = e.spec(symbol);
   const q = e.quotes[symbol];
 
+  // ─── SET MODE FROM PROP ───
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const urlMode = params.get("mode") === "live" ? "live" : "demo";
-    e.setMode(urlMode);
-    if (urlMode === "live") e.fetchLiveBalance();
-  }, []);
+    const engineMode = mode === "real" ? "live" : "demo";
+    e.setMode(engineMode);
+    if (engineMode === "live") {
+      e.fetchLiveBalance();
+    }
+  }, [mode]);
 
+  // ─── FLASH ANIMATION STATE ───
   const [flash, setFlash] = useState<"up" | "down" | "none">("none");
   const prevBid = useRef(q?.bid);
 
@@ -60,12 +65,15 @@ export function Terminal() {
 
   const open = (d: DialogState) => { setDlgKey(k => k + 1); setDialog(d); };
   const handleTrade = (direction: "buy" | "sell") => open({ mode: "new", symbol, type: direction, lots }); 
+  
   const totalFloatingPnl = e.positions.reduce((acc, p) => acc + e.profitOf(p), 0);
 
   const handleBulkClose = (type: 'all' | 'profit' | 'loss') => {
     e.positions.forEach((p) => {
       const pnl = e.profitOf(p);
-      if (type === 'all' || (type === 'profit' && pnl > 0) || (type === 'loss' && pnl < 0)) e.closePosition(p.ticket, "manual", p.lots);
+      if (type === 'all' || (type === 'profit' && pnl > 0) || (type === 'loss' && pnl < 0)) {
+        e.closePosition(p.ticket, "manual", p.lots);
+      }
     });
     setShowBulkMenu(false);
   };
@@ -109,10 +117,10 @@ export function Terminal() {
         <div className="flex items-center gap-2">
           <div className="text-right flex flex-col items-end">
             <div className="text-[9px] text-gray-500 uppercase tracking-wide">
-              {e.mode === "live" ? "LIVE WALLET" : "DEMO BAL"}
+              {mode === "real" ? "LIVE WALLET" : "DEMO BAL"}
             </div>
             
-            {e.mode === "live" ? (
+            {mode === "real" ? (
               <>
                 <div className="text-xs font-mono font-bold text-gray-900">KSh {money(e.liveKesBalance)}</div>
                 <div className="text-[10px] font-mono text-green-600 font-bold">≈ ${money(e.liveBalance)}</div>
@@ -122,7 +130,13 @@ export function Terminal() {
             )}
           </div>
           
-          <button onClick={() => { if (e.mode === "live") window.location.href = "/wallet"; else setDepositOpen(true); }} className="p-1.5 bg-gray-100 rounded text-gray-700 hover:bg-gray-200">
+          <button 
+            onClick={() => {
+              if (mode === "real") window.location.href = "/wallet"; 
+              else setDepositOpen(true);
+            }} 
+            className="p-1.5 bg-gray-100 rounded text-gray-700 hover:bg-gray-200"
+          >
             <Wallet size={16} />
           </button>
         </div>
