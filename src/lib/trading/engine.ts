@@ -326,19 +326,24 @@ export class Engine {
       this.pendingCloses.add(ticket);
 
       try {
+        const p = this.positions.find((x) => x.ticket === ticket);
+        if (!p) return this.fail(`Position #${ticket} not found`);
+
         const res = await apiRequest<any>(`/forex/positions/${ticket}/close`, { 
           method: "POST",
-          // Sending a valid JSON body prevents the Fastify FST_ERR_CTP_EMPTY_JSON_BODY 400 error
-          body: JSON.stringify({ close: true }), 
+          body: JSON.stringify({ 
+            mode: "live",
+            closePrice: this.closePriceOf(p),
+            lots: lots ? Math.min(lots, p.lots) : p.lots
+          }), 
           headers: { "Content-Type": "application/json" }
         });
 
         if (res.success) {
-          // Remove from UI only after backend confirms success
           this.positions = this.positions.filter(p => p.ticket !== ticket);
           this.emit();
           await this.fetchLiveBalance();
-          this.log(`LIVE position #${ticket} closed. Profit: ${res.realizedPnl}`);
+          this.log(`LIVE position #${ticket} closed. Profit: ${res.realizedPnl ?? res.profit}`);
           return { ok: true };
         } else {
           this.log(`Failed to close position: ${res.error}`, true);
@@ -348,7 +353,6 @@ export class Engine {
         this.log(err.message, true);
         return { ok: false, error: err.message };
       } finally {
-        // Keep the lock for 5 seconds to prevent the 60fps loop from spamming failed requests
         setTimeout(() => {
           this.pendingCloses.delete(ticket);
         }, 5000); 
@@ -459,7 +463,6 @@ export class Engine {
     }
     
     for (const p of [...this.positions]) {
-      // 👈 SKIP IF ALREADY BEING CLOSED
       if (this.pendingCloses.has(p.ticket)) continue; 
 
       const c = this.closePriceOf(p);
