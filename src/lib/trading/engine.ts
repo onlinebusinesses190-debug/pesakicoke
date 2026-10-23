@@ -79,7 +79,7 @@ export class Engine {
   private animationFrameId: number | null = null;
   private lastTickTime = 0;
   private tickCount = 0;
-  private livePollInterval: NodeJS.Timeout | null = null;
+  private isFetchingLive = false; // Prevents infinite loop
 
   constructor() {
     const now = Date.now() / 1000;
@@ -97,11 +97,17 @@ export class Engine {
 
   get balance() { return this.mode === "live" ? this.liveBalance : this.demoBalance; }
 
-  // ─── FETCH ACCOUNT + POSITIONS ───
+  // ─── SAFE FETCH ACCOUNT ───
   async fetchLiveBalance() {
+    if (this.isFetchingLive) return;
+    this.isFetchingLive = true;
+
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!session) {
+        this.isFetchingLive = false;
+        return;
+      }
 
       try {
         const rateRes = await apiRequest<any>("/forex/rates");
@@ -109,7 +115,7 @@ export class Engine {
           this.exchangeRate = rateRes.usdToKes;
         }
       } catch (err) {
-        console.warn("Could not fetch live rate, using default.", err);
+        // Ignore rate error, use default 130
       }
 
       const res = await apiRequest<any>("/forex/account?account_type=live");
@@ -119,7 +125,6 @@ export class Engine {
         this.liveKesBalance = kesBalance;
         this.liveBalance = kesBalance / this.exchangeRate; 
         
-        // ─── SYNC OPEN POSITIONS FROM BACKEND ───
         if (res.positions && Array.isArray(res.positions)) {
           this.positions = res.positions.map((p: any) => ({
             ticket: p.id,
@@ -136,27 +141,19 @@ export class Engine {
         this.emit();
       }
     } catch (err: any) {
-      console.error("Failed to fetch live account", err);
+      console.warn("Failed to fetch live account", err);
+    } finally {
+      this.isFetchingLive = false;
     }
   }
 
   setMode(mode: "demo" | "live") {
     this.mode = mode;
     
-    if (this.livePollInterval) {
-      clearInterval(this.livePollInterval);
-      this.livePollInterval = null;
-    }
-
     if (mode === "live") {
       this.fetchLiveBalance();
-      // Poll backend every 3 seconds for updated positions and balance
-      this.livePollInterval = setInterval(() => {
-        if (this.mode === "live") this.fetchLiveBalance();
-      }, 3000);
       this.log("Switched to LIVE trading. Real funds active.");
     } else {
-      // Restore demo positions
       this.load();
       this.log("Switched to DEMO trading.");
     }
@@ -179,7 +176,6 @@ export class Engine {
 
   stop() { 
     if (this.animationFrameId) { cancelAnimationFrame(this.animationFrameId); this.animationFrameId = null; }
-    if (this.livePollInterval) { clearInterval(this.livePollInterval); this.livePollInterval = null; }
   }
 
   subscribe = (fn: () => void) => { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; };
@@ -187,7 +183,7 @@ export class Engine {
   private emit() { this.version++; this.listeners.forEach((l) => l()); }
   
   private save() {
-    if (this.mode === "live") return; // Don't save live positions to localStorage
+    if (this.mode === "live") return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         demoBalance: this.demoBalance, positions: this.positions, orders: this.orders,
@@ -262,7 +258,6 @@ export class Engine {
     if (this.mode === "live") {
       try {
         const payloadSymbol = req.symbol.replace(/(...)(...)/, "$1/$2"); 
-        
         const marginUsd = req.lots * 100; 
 
         const res = await apiRequest<any>("/forex/orders", {
@@ -279,9 +274,7 @@ export class Engine {
         
         if (!res.success) return this.fail(res.error || "Backend rejected trade");
         
-        // Immediately fetch the new balance AND new positions
         await this.fetchLiveBalance(); 
-        
         this.log(`LIVE order #${res.order?.id} executed`);
         return { ok: true, ticket: res.order?.id };
       } catch (err: any) {
@@ -289,7 +282,6 @@ export class Engine {
       }
     }
 
-    // ─── DEMO TRADING ───
     const lots = round(req.lots, 2);
     if (!(lots >= 0.01 && lots <= 10000)) return this.fail("Invalid volume (0.01 - 10000)");
     const sl = round(req.sl || 0, s.digits), tp = round(req.tp || 0, s.digits);
@@ -331,7 +323,6 @@ export class Engine {
 
   closePosition(ticket: number | string, reason: CloseReason = "manual", lots?: number): Result {
     if (this.mode === "live") {
-      // Optimistically remove from UI
       this.positions = this.positions.filter(p => p.ticket !== ticket);
       this.emit();
 
@@ -341,7 +332,7 @@ export class Engine {
             this.fetchLiveBalance();
             this.log(`LIVE position #${ticket} closed. Profit: ${res.realizedPnl}`);
           } else {
-            this.fetchLiveBalance(); // Re-sync if it failed
+            this.fetchLiveBalance(); 
             this.log(`Failed to close position: ${res.error}`, true);
           }
         })
