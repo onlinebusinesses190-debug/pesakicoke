@@ -113,7 +113,7 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
   // ─── SAFE MARKET ───
   fastify.get("/market", async () => ({ success: true, market: getEngine().describe() }));
 
-  // ─── SAFE RATES (Fixes 500 Error) ───
+  // ─── SAFE RATES ───
   fastify.get("/rates", async () => {
     try {
       const rate = kesPerUnit("USD");
@@ -161,7 +161,7 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     } catch { return reply.code(FX_ERRORS.MARKET_UNAVAILABLE).send({ success: false, error: "Chart data unavailable.", code: "MARKET_UNAVAILABLE" }); }
   });
 
-  // ─── SAFE ACCOUNT (Fixes 500 Error) ───
+  // ─── SAFE ACCOUNT ───
   fastify.get("/account", { preHandler: [verifyAuth] }, async (request, reply) => {
     const accountType = ((request.query as { account_type?: string }).account_type ?? "demo") as "demo" | "live";
     try {
@@ -285,7 +285,10 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     
     if (account.status !== "active") return bad(reply, "Account not active");
 
-    const { data: instrumentRow } = await supabase.from("forex_instruments").select("*").eq("symbol", body.symbol).maybeSingle();
+    // 👈 FIX: Ensure the DB lookup uses the slash format (EUR/USD)
+    const dbSymbol = body.symbol.replace(/(...)(...)/, "$1/$2"); 
+    
+    const { data: instrumentRow } = await supabase.from("forex_instruments").select("*").eq("symbol", dbSymbol).maybeSingle();
     if (!instrumentRow) return bad(reply, "Instrument not available");
     if (instrumentRow.trading_status !== "open") return bad(reply, "Instrument closed");
 
@@ -350,7 +353,6 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
       reserved = true;
     }
 
-    // 👈 FIX: Renamed 'result' to '_result' to fix TypeScript build error
     const { data: _result, error: execError } = await supabase.rpc("forex_open_market_position", {
       p_user_id: userId, p_account_id: account.id, p_instrument_id: instrumentRow.id, p_order_type: body.order_type,
       p_side: body.side, p_quantity: sizing.lots, p_requested_price: quote.mid, p_executed_price: executedPrice,
