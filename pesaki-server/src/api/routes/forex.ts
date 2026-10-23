@@ -36,8 +36,12 @@ import { ensureWalletExists, releaseLockedFunds } from "../../wallet/service";
 const DEMO_START_BALANCE = 100_000;
 const COMMISSION_RATE = 0.005; // 0.5% PESAKI Commission
 
+/**
+ * Server-side switch for real-money trading.
+ */
 const REAL_TRADING_ENABLED = process.env.PESAKI_FX_REAL_ENABLED === "true";
 
+/** Structured error codes. */
 export const FX_ERRORS = {
   INVALID_ORDER: 400,
   UNAUTHORIZED: 401,
@@ -272,6 +276,7 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     }
   });
 
+  // Legacy path form retained only so an older client gets a clear explanation
   fastify.get("/candles/*", async (_request, reply) =>
     reply.code(FX_ERRORS.INVALID_ORDER).send({
       success: false,
@@ -612,7 +617,9 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     const leverage = configuredLeverage();
     const isPending = ["limit", "stop", "stop_limit"].includes(body.order_type);
 
-    // ─── FIX: FETCH EXACT WALLET BALANCE FOR LIVE ───
+    // ─── CRITICAL FIX: SYNC WALLET TO FOREX ACCOUNT ───
+    // The database RPC checks the forex_accounts table for margin. 
+    // If we don't sync the real wallet balance here, the RPC will see 0 and reject the trade.
     let freeMargin = 0;
     if (body.account_type === "live") {
       const { data: wallet } = await supabase
@@ -620,16 +627,26 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
         .select("balance, locked")
         .eq("user_id", userId)
         .maybeSingle();
+        
       const walletBalance = Number(wallet?.balance ?? 0);
       const walletLocked = Number(wallet?.locked ?? 0);
       freeMargin = walletBalance - walletLocked;
       
-      logger.info({ userId, walletBalance, walletLocked, freeMargin }, "Forex Live Order: Wallet Check");
+      // Force the forex_accounts table to reflect the real wallet balance
+      await supabase
+        .from("forex_accounts")
+        .update({ 
+          balance: walletBalance, 
+          equity: walletBalance 
+        })
+        .eq("id", account.id);
+        
+      logger.info({ userId, walletBalance, walletLocked, freeMargin }, "Forex Live Order: Wallet Synced");
     } else {
       freeMargin = Number(account.equity ?? account.balance ?? 0) - Number(account.used_margin ?? 0);
     }
 
-    // ─── CONVERT USD TO KES FOR SIZING ───
+    // Backend expects USD from frontend
     const tradeAmountUsd = body.trade_amount || 0;
     const tradeAmountKes = tradeAmountUsd * q2k; 
 
