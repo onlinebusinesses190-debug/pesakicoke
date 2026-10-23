@@ -452,11 +452,13 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
 async function closePosition(request: FastifyRequest, reply: FastifyReply, positionId: string, lotsToClose?: number) {
   const userId = request.user!.id;
   const { data: position } = await supabase.from("forex_positions").select("*").eq("id", positionId).eq("user_id", userId).maybeSingle();
+  
   if (!position) return reply.code(404).send({ success: false, error: "Position not found" });
   if (position.closed_at) return reply.code(409).send({ success: false, error: "Position already closed" });
 
   const sym = await symbolForInstrument(position.instrument_id);
   const spec = sym ? getInstrument(sym) : undefined;
+  
   if (!spec) {
     logger.error({ positionId, instrumentId: position.instrument_id }, "Close failed: unknown instrument in DB");
     return reply.code(400).send({ success: false, error: "Unknown instrument. Please contact support.", code: "UNKNOWN_INSTRUMENT" });
@@ -482,9 +484,11 @@ async function closePosition(request: FastifyRequest, reply: FastifyReply, posit
     const quote = getEngine().quote(spec.symbol);
     exitPrice = position.side === "buy" ? quote.bid : quote.ask;
     q2k = quoteToKes(spec);
-  } catch { return reply.code(503).send({ success: false, error: "Market unavailable.", code: "MARKET_DATA_UNAVAILABLE" }); }
+  } catch { 
+    return reply.code(503).send({ success: false, error: "Market unavailable.", code: "MARKET_DATA_UNAVAILABLE" }); 
+  }
 
-  const { data: result, error: closeError } = await supabase.rpc("forex_close_position", { 
+  const { data: _result, error: closeError } = await supabase.rpc("forex_close_position", { 
     p_user_id: userId, 
     p_position_id: positionId, 
     p_close_lots: closeLots, 
@@ -525,9 +529,9 @@ async function closePosition(request: FastifyRequest, reply: FastifyReply, posit
   return { 
     success: true, 
     position: updated, 
-    realizedPnl: Number(result?.realized_pnl ?? 0), 
+    realizedPnl: Number(_result?.realized_pnl ?? 0), 
     exitPrice, 
-    balance: Number(result?.balance ?? 0), 
-    partial: !result?.closed 
+    balance: Number(_result?.balance ?? 0), 
+    partial: !_result?.closed 
   };
 }
