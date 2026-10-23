@@ -394,7 +394,9 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
 
   fastify.post("/positions/:id/close", { preHandler: [verifyAuth] }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    return closePosition(request, reply, id, 1);
+    const parsed = z.object({ lots: z.number().positive().optional() }).safeParse(request.body || {});
+    if (!parsed.success) return bad(reply, "Invalid close size");
+    return closePosition(request, reply, id, parsed.data.lots);
   });
 
   fastify.post("/positions/:id/partial-close", { preHandler: [verifyAuth] }, async (request, reply) => {
@@ -447,7 +449,7 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
   fastify.get("/health", async () => ({ success: true, market: getEngine().describe(), realTradingEnabled: REAL_TRADING_ENABLED, symbols: SYMBOLS.length }));
 };
 
-async function closePosition(request: FastifyRequest, reply: FastifyReply, positionId: string, fraction: number) {
+async function closePosition(request: FastifyRequest, reply: FastifyReply, positionId: string, lotsToClose?: number) {
   const userId = request.user!.id;
   const { data: position } = await supabase.from("forex_positions").select("*").eq("id", positionId).eq("user_id", userId).maybeSingle();
   if (!position) return reply.code(404).send({ success: false, error: "Position not found" });
@@ -455,12 +457,25 @@ async function closePosition(request: FastifyRequest, reply: FastifyReply, posit
 
   const sym = await symbolForInstrument(position.instrument_id);
   const spec = sym ? getInstrument(sym) : undefined;
-  if (!spec) return reply.code(400).send({ success: false, error: "Unknown instrument" });
+  if (!spec) {
+    logger.error({ positionId, instrumentId: position.instrument_id }, "Close failed: unknown instrument in DB");
+    return reply.code(400).send({ success: false, error: "Unknown instrument. Please contact support.", code: "UNKNOWN_INSTRUMENT" });
+  }
 
   const remaining = Number(position.quantity);
+  if (!remaining || remaining <= 0) {
+    return reply.code(400).send({ success: false, error: "Position quantity is invalid or zero.", code: "INVALID_QUANTITY" });
+  }
+
+  let fraction = 1;
+  if (lotsToClose) {
+    fraction = lotsToClose / remaining;
+    if (fraction <= 0) return bad(reply, "Close amount must be > 0");
+    if (fraction > 1) return bad(reply, "Cannot close more than open position");
+  }
+
   const closeLots = Number((remaining * fraction).toFixed(2));
   if (closeLots <= 0) return bad(reply, "Close amount must be > 0");
-  if (closeLots > remaining) return bad(reply, "Cannot close more than open position");
 
   let exitPrice: number, q2k: number;
   try {
@@ -469,22 +484,50 @@ async function closePosition(request: FastifyRequest, reply: FastifyReply, posit
     q2k = quoteToKes(spec);
   } catch { return reply.code(503).send({ success: false, error: "Market unavailable.", code: "MARKET_DATA_UNAVAILABLE" }); }
 
-  const { data: result, error: closeError } = await supabase.rpc("forex_close_position", { p_user_id: userId, p_position_id: positionId, p_close_lots: closeLots, p_exit_price: exitPrice, p_quote_to_kes: q2k });
-  if (closeError) return reply.code(500).send({ success: false, error: "Could not close position.", code: "EXECUTION_FAILED" });
+  const { data: result, error: closeError } = await supabase.rpc("forex_close_position", { 
+    p_user_id: userId, 
+    p_position_id: positionId, 
+    p_close_lots: closeLots, 
+    p_exit_price: exitPrice, 
+    p_quote_to_kes: q2k 
+  });
+
+  if (closeError) {
+    logger.error({ err: closeError, positionId }, "Forex RPC close failed");
+    return reply.code(500).send({ success: false, error: "Could not close position.", code: "EXECUTION_FAILED" });
+  }
 
   const { data: updated } = await supabase.from("forex_positions").select("*").eq("id", positionId).maybeSingle();
   const { data: accountRow } = await supabase.from("forex_accounts").select("account_type").eq("id", position.account_id).maybeSingle();
   const positionMode = (accountRow?.account_type === "live" ? "live" : "demo") as "live" | "demo";
 
   if (positionMode === "live") {
-    const closedFraction = remaining > 0 ? closeLots / remaining : 1;
+    const closedFraction = closeLots / remaining;
     const releasedMargin = Number((Number(position.margin ?? 0) * closedFraction).toFixed(4));
-    const legs = settlementLegs({ side: position.side, units: closeLots * spec.contractSize, entryPrice: Number(position.average_entry_price), exitPrice, quoteToKes: q2k, margin: releasedMargin });
+    const legs = settlementLegs({ 
+      side: position.side, 
+      units: closeLots * spec.contractSize, 
+      entryPrice: Number(position.average_entry_price), 
+      exitPrice, 
+      quoteToKes: q2k, 
+      margin: releasedMargin 
+    });
     const closingCommissionKes = releasedMargin * COMMISSION_RATE; 
     const netProfitAfterCommission = legs.profit - legs.loss - closingCommissionKes;
+    
     const settlement = await settleReal(userId, legs.marginRelease, netProfitAfterCommission, `close:${positionId}`);
-    if (!settlement.ok) return reply.code(502).send({ success: false, error: "Settlement pending.", code: "SETTLEMENT_PENDING", position: updated });
+    if (!settlement.ok) {
+      logger.error({ err: settlement.reason }, "Live settlement failed");
+      return reply.code(502).send({ success: false, error: "Settlement pending.", code: "SETTLEMENT_PENDING", position: updated });
+    }
   }
 
-  return { success: true, position: updated, realizedPnl: Number(result?.realized_pnl ?? 0), exitPrice, balance: Number(result?.balance ?? 0), partial: !result?.closed };
+  return { 
+    success: true, 
+    position: updated, 
+    realizedPnl: Number(result?.realized_pnl ?? 0), 
+    exitPrice, 
+    balance: Number(result?.balance ?? 0), 
+    partial: !result?.closed 
+  };
 }
