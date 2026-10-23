@@ -80,6 +80,7 @@ export class Engine {
   private lastTickTime = 0;
   private tickCount = 0;
   private isFetchingLive = false;
+  private pendingCloses = new Set<string | number>(); // 👈 STOPS THE INFINITE LOOP
 
   constructor() {
     const now = Date.now() / 1000;
@@ -322,12 +323,16 @@ export class Engine {
 
   closePosition(ticket: number | string, reason: CloseReason = "manual", lots?: number): Result {
     if (this.mode === "live") {
+      if (this.pendingCloses.has(ticket)) return { ok: true }; // 👈 PREVENTS SPAM
+      this.pendingCloses.add(ticket);
+
       this.positions = this.positions.filter(p => p.ticket !== ticket);
       this.emit();
 
       apiRequest<any>(`/forex/positions/${ticket}/close`, { 
         method: "POST",
-        body: JSON.stringify({}) // 👈 Fixes the FST_ERR_CTP_EMPTY_JSON_BODY error
+        body: JSON.stringify({ action: "close", ticket }), // 👈 FIXES THE FASTIFY 400 ERROR
+        headers: { "Content-Type": "application/json" }
       })
         .then((res) => {
           if (res.success) {
@@ -341,6 +346,9 @@ export class Engine {
         .catch((err) => {
           this.fetchLiveBalance();
           this.log(err.message, true);
+        })
+        .finally(() => {
+          this.pendingCloses.delete(ticket); // 👈 UNLOCK
         });
       return { ok: true }; 
     }
@@ -448,6 +456,7 @@ export class Engine {
     }
     
     for (const p of [...this.positions]) {
+      if (this.pendingCloses.has(p.ticket)) continue; // 👈 SKIP IF ALREADY CLOSING
       const c = this.closePriceOf(p);
       if (p.side === "buy") { if (p.sl && c <= p.sl) this.closePosition(p.ticket, "sl"); else if (p.tp && c >= p.tp) this.closePosition(p.ticket, "tp"); } 
       else { if (p.sl && c >= p.sl) this.closePosition(p.ticket, "sl"); else if (p.tp && c <= p.tp) this.closePosition(p.ticket, "tp"); }
@@ -460,7 +469,7 @@ export class Engine {
       let guard = 0;
       while (this.positions.length && this.marginLevel < STOP_OUT && guard++ < 50) {
         const worst = [...this.positions].sort((a, b) => this.profitOf(a) - this.profitOf(b))[0];
-        this.closePosition(worst.ticket, "stopout");
+        if (worst) this.closePosition(worst.ticket, "stopout");
       }
     }
   }
