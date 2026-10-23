@@ -62,7 +62,7 @@ export class Engine {
   demoBalance = DEMO_START_BALANCE;
   liveKesBalance = 0;
   liveBalance = 0; 
-  exchangeRate = 130; // 👈 Store the exchange rate
+  exchangeRate = 130; 
   
   leverage = configuredLeverage();
   currency = "USD";
@@ -96,13 +96,11 @@ export class Engine {
 
   get balance() { return this.mode === "live" ? this.liveBalance : this.demoBalance; }
 
-  // ─── FIXED: Fetch Rate and Convert to USD ───
   async fetchLiveBalance() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      // 1. Fetch the live exchange rate from the backend
       try {
         const rateRes = await apiRequest<any>("/forex/rates");
         if (rateRes && rateRes.success && rateRes.usdToKes) {
@@ -112,17 +110,13 @@ export class Engine {
         console.warn("Could not fetch live rate, using default.", err);
       }
 
-      // 2. Fetch the KES wallet balance
       const res = await apiRequest<any>("/forex/account?account_type=live");
       console.log("Live Forex API Response:", res);
 
       if (res && res.success) {
         const kesBalance = Number(res.balance ?? res.account?.walletBalance ?? 0);
         this.liveKesBalance = kesBalance;
-        
-        // 3. Convert KES to USD for the engine's math
         this.liveBalance = kesBalance / this.exchangeRate; 
-        
         this.emit();
       }
     } catch (err: any) {
@@ -238,14 +232,13 @@ export class Engine {
         
         // PESAKI MATH: req.lots here is the PESAKI lot size (e.g. 0.01)
         const marginUsd = req.lots * 100; // 0.01 lots = $1 margin
-        const tradeAmountKes = marginUsd * this.exchangeRate; // Convert $1 to KES (e.g. 130)
 
         const res = await apiRequest<any>("/forex/orders", {
           method: "POST",
           body: JSON.stringify({
             symbol: payloadSymbol,
             side: isBuyType(req.type) ? "buy" : "sell", 
-            trade_amount: tradeAmountKes, // 👈 Sending KES to backend
+            trade_amount: marginUsd, // 👈 Sending USD to backend
             stop_loss: req.sl || null, 
             take_profit: req.tp || null, 
             account_type: "live"
