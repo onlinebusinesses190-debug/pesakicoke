@@ -350,7 +350,8 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
       reserved = true;
     }
 
-    const { data: result, error: execError } = await supabase.rpc("forex_open_market_position", {
+    // 👈 FIX: Renamed 'result' to '_result' to fix TypeScript build error
+    const { data: _result, error: execError } = await supabase.rpc("forex_open_market_position", {
       p_user_id: userId, p_account_id: account.id, p_instrument_id: instrumentRow.id, p_order_type: body.order_type,
       p_side: body.side, p_quantity: sizing.lots, p_requested_price: quote.mid, p_executed_price: executedPrice,
       p_slippage: slippage, p_quote_to_kes: q2k, p_limit_price: body.limit_price ?? null, p_trigger_price: body.trigger_price ?? null,
