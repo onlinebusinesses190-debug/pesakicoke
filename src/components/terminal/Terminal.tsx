@@ -110,6 +110,7 @@ export function Terminal({ mode = "demo" }: { mode?: "demo" | "real" }) {
           <TopLayers onClick={() => setShowRadial(true)} className="cursor-pointer" />
         </div>
 
+        {/* ─── BALANCE DISPLAY FIXED ─── */}
         <div className="flex items-center gap-2">
           <div className="text-right flex flex-col items-end">
             <div className="text-[9px] text-gray-500 uppercase tracking-wide">
@@ -117,9 +118,14 @@ export function Terminal({ mode = "demo" }: { mode?: "demo" | "real" }) {
             </div>
             
             {mode === "real" ? (
-              <div className="text-xs font-mono font-bold text-green-600">
-                KSh {money(e.liveKesBalance)}
-              </div>
+              <>
+                <div className="text-xs font-mono font-bold text-green-600 leading-tight">
+                  KSh {money(e.liveKesBalance)}
+                </div>
+                <div className="text-[10px] font-mono text-gray-500 font-bold">
+                  ≈ ${money(e.liveBalance)}
+                </div>
+              </>
             ) : (
               <div className="text-xs font-mono font-bold text-gray-900">${money(e.demoBalance)}</div>
             )}
@@ -334,7 +340,6 @@ export function Terminal({ mode = "demo" }: { mode?: "demo" | "real" }) {
         </div>
       )}
 
-      {/* BULK OPERATIONS */}
       {showBulkMenu && (
         <div className="fixed inset-0 z-[100] flex flex-col justify-end bg-black/50" onClick={() => setShowBulkMenu(false)}>
           <div className="w-full bg-white rounded-t-2xl p-4 pb-8" onClick={(ev) => ev.stopPropagation()}>
