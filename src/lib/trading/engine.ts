@@ -114,9 +114,7 @@ export class Engine {
         if (rateRes && rateRes.success && rateRes.usdToKes) {
           this.exchangeRate = rateRes.usdToKes;
         }
-      } catch (err) {
-        // Ignore rate error
-      }
+      } catch (err) { /* ignore */ }
 
       const res = await apiRequest<any>("/forex/account?account_type=live");
       
@@ -321,37 +319,43 @@ export class Engine {
     return { ok: true, ticket };
   }
 
-  closePosition(ticket: number | string, reason: CloseReason = "manual", lots?: number): Result {
+  // 👈 FULLY FIXED: Prevents infinite loop and fixes 400 Bad Request
+  async closePosition(ticket: number | string, reason: CloseReason = "manual", lots?: number): Promise<Result> {
     if (this.mode === "live") {
       if (this.pendingCloses.has(ticket)) return { ok: true }; 
       this.pendingCloses.add(ticket);
 
-      this.positions = this.positions.filter(p => p.ticket !== ticket);
-      this.emit();
-
-      apiRequest<any>(`/forex/positions/${ticket}/close`, { 
-        method: "POST",
-        body: JSON.stringify({ close: true }), 
-      })
-        .then((res) => {
-          if (res.success) {
-            this.fetchLiveBalance();
-            this.log(`LIVE position #${ticket} closed. Profit: ${res.realizedPnl}`);
-          } else {
-            this.fetchLiveBalance(); 
-            this.log(`Failed to close position: ${res.error}`, true);
-          }
-        })
-        .catch((err) => {
-          this.fetchLiveBalance();
-          this.log(err.message, true);
-        })
-        .finally(() => {
-          this.pendingCloses.delete(ticket); 
+      try {
+        const res = await apiRequest<any>(`/forex/positions/${ticket}/close`, { 
+          method: "POST",
+          // Sending a valid JSON body prevents the Fastify FST_ERR_CTP_EMPTY_JSON_BODY 400 error
+          body: JSON.stringify({ close: true }), 
+          headers: { "Content-Type": "application/json" }
         });
-      return { ok: true }; 
+
+        if (res.success) {
+          // Remove from UI only after backend confirms success
+          this.positions = this.positions.filter(p => p.ticket !== ticket);
+          this.emit();
+          await this.fetchLiveBalance();
+          this.log(`LIVE position #${ticket} closed. Profit: ${res.realizedPnl}`);
+          return { ok: true };
+        } else {
+          this.log(`Failed to close position: ${res.error}`, true);
+          return { ok: false, error: res.error };
+        }
+      } catch (err: any) {
+        this.log(err.message, true);
+        return { ok: false, error: err.message };
+      } finally {
+        // Keep the lock for 5 seconds to prevent the 60fps loop from spamming failed requests
+        setTimeout(() => {
+          this.pendingCloses.delete(ticket);
+        }, 5000); 
+      }
     }
 
+    // DEMO TRADING CLOSE
     const p = this.positions.find((x) => x.ticket === ticket);
     if (!p) return this.fail(`Position #${ticket} not found`);
     const closeLots = lots ? Math.min(round(lots, 2), p.lots) : p.lots;
@@ -455,7 +459,9 @@ export class Engine {
     }
     
     for (const p of [...this.positions]) {
-      if (this.pendingCloses.has(p.ticket)) continue;
+      // 👈 SKIP IF ALREADY BEING CLOSED
+      if (this.pendingCloses.has(p.ticket)) continue; 
+
       const c = this.closePriceOf(p);
       if (p.side === "buy") { if (p.sl && c <= p.sl) this.closePosition(p.ticket, "sl"); else if (p.tp && c >= p.tp) this.closePosition(p.ticket, "tp"); } 
       else { if (p.sl && c >= p.sl) this.closePosition(p.ticket, "sl"); else if (p.tp && c <= p.tp) this.closePosition(p.ticket, "tp"); }
