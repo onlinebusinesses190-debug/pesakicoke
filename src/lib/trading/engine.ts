@@ -80,7 +80,7 @@ export class Engine {
   private lastTickTime = 0;
   private tickCount = 0;
   private isFetchingLive = false;
-  private pendingCloses = new Set<string | number>(); // 👈 STOPS THE INFINITE LOOP
+  private pendingCloses = new Set<string | number>(); 
 
   constructor() {
     const now = Date.now() / 1000;
@@ -115,7 +115,7 @@ export class Engine {
           this.exchangeRate = rateRes.usdToKes;
         }
       } catch (err) {
-        // Ignore rate error, use default 130
+        // Ignore rate error
       }
 
       const res = await apiRequest<any>("/forex/account?account_type=live");
@@ -323,7 +323,7 @@ export class Engine {
 
   closePosition(ticket: number | string, reason: CloseReason = "manual", lots?: number): Result {
     if (this.mode === "live") {
-      if (this.pendingCloses.has(ticket)) return { ok: true }; // 👈 PREVENTS SPAM
+      if (this.pendingCloses.has(ticket)) return { ok: true }; 
       this.pendingCloses.add(ticket);
 
       this.positions = this.positions.filter(p => p.ticket !== ticket);
@@ -331,8 +331,7 @@ export class Engine {
 
       apiRequest<any>(`/forex/positions/${ticket}/close`, { 
         method: "POST",
-        body: JSON.stringify({ action: "close", ticket }), // 👈 FIXES THE FASTIFY 400 ERROR
-        headers: { "Content-Type": "application/json" }
+        body: JSON.stringify({ close: true }), 
       })
         .then((res) => {
           if (res.success) {
@@ -348,7 +347,7 @@ export class Engine {
           this.log(err.message, true);
         })
         .finally(() => {
-          this.pendingCloses.delete(ticket); // 👈 UNLOCK
+          this.pendingCloses.delete(ticket); 
         });
       return { ok: true }; 
     }
@@ -456,7 +455,7 @@ export class Engine {
     }
     
     for (const p of [...this.positions]) {
-      if (this.pendingCloses.has(p.ticket)) continue; // 👈 SKIP IF ALREADY CLOSING
+      if (this.pendingCloses.has(p.ticket)) continue;
       const c = this.closePriceOf(p);
       if (p.side === "buy") { if (p.sl && c <= p.sl) this.closePosition(p.ticket, "sl"); else if (p.tp && c >= p.tp) this.closePosition(p.ticket, "tp"); } 
       else { if (p.sl && c >= p.sl) this.closePosition(p.ticket, "sl"); else if (p.tp && c <= p.tp) this.closePosition(p.ticket, "tp"); }
