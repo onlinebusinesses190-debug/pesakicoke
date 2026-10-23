@@ -79,7 +79,7 @@ export class Engine {
   private animationFrameId: number | null = null;
   private lastTickTime = 0;
   private tickCount = 0;
-  private isFetchingLive = false; // Prevents infinite loop
+  private isFetchingLive = false;
 
   constructor() {
     const now = Date.now() / 1000;
@@ -97,7 +97,6 @@ export class Engine {
 
   get balance() { return this.mode === "live" ? this.liveBalance : this.demoBalance; }
 
-  // ─── SAFE FETCH ACCOUNT ───
   async fetchLiveBalance() {
     if (this.isFetchingLive) return;
     this.isFetchingLive = true;
@@ -326,7 +325,10 @@ export class Engine {
       this.positions = this.positions.filter(p => p.ticket !== ticket);
       this.emit();
 
-      apiRequest<any>(`/forex/positions/${ticket}/close`, { method: "POST" })
+      apiRequest<any>(`/forex/positions/${ticket}/close`, { 
+        method: "POST",
+        body: JSON.stringify({}) // 👈 Fixes the FST_ERR_CTP_EMPTY_JSON_BODY error
+      })
         .then((res) => {
           if (res.success) {
             this.fetchLiveBalance();
