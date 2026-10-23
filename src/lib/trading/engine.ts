@@ -64,7 +64,7 @@ export class Engine {
   liveBalance = 0; 
   exchangeRate = 130; 
   
-  leverage = configuredLeverage() || 100; // 👈 SAFE FALLBACK FOR DEMO
+  leverage = configuredLeverage() || 100;
   currency = "USD";
   positions: Position[] = [];
   orders: PendingOrder[] = [];
@@ -79,6 +79,7 @@ export class Engine {
   private animationFrameId: number | null = null;
   private lastTickTime = 0;
   private tickCount = 0;
+  private livePollInterval: NodeJS.Timeout | null = null;
 
   constructor() {
     const now = Date.now() / 1000;
@@ -96,6 +97,7 @@ export class Engine {
 
   get balance() { return this.mode === "live" ? this.liveBalance : this.demoBalance; }
 
+  // ─── FETCH ACCOUNT + POSITIONS ───
   async fetchLiveBalance() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -111,23 +113,51 @@ export class Engine {
       }
 
       const res = await apiRequest<any>("/forex/account?account_type=live");
+      
       if (res && res.success) {
         const kesBalance = Number(res.balance ?? res.account?.walletBalance ?? 0);
         this.liveKesBalance = kesBalance;
         this.liveBalance = kesBalance / this.exchangeRate; 
+        
+        // ─── SYNC OPEN POSITIONS FROM BACKEND ───
+        if (res.positions && Array.isArray(res.positions)) {
+          this.positions = res.positions.map((p: any) => ({
+            ticket: p.id,
+            symbol: p.symbol ? p.symbol.replace("/", "") : "EURUSD", 
+            side: p.side as Side,
+            lots: Number(p.quantity),
+            openPrice: Number(p.average_entry_price),
+            openTime: new Date(p.opened_at).getTime(),
+            sl: Number(p.stop_loss || 0),
+            tp: Number(p.take_profit || 0)
+          }));
+        }
+
         this.emit();
       }
     } catch (err: any) {
-      console.error("Failed to fetch live balance", err);
+      console.error("Failed to fetch live account", err);
     }
   }
 
   setMode(mode: "demo" | "live") {
     this.mode = mode;
+    
+    if (this.livePollInterval) {
+      clearInterval(this.livePollInterval);
+      this.livePollInterval = null;
+    }
+
     if (mode === "live") {
       this.fetchLiveBalance();
+      // Poll backend every 3 seconds for updated positions and balance
+      this.livePollInterval = setInterval(() => {
+        if (this.mode === "live") this.fetchLiveBalance();
+      }, 3000);
       this.log("Switched to LIVE trading. Real funds active.");
     } else {
+      // Restore demo positions
+      this.load();
       this.log("Switched to DEMO trading.");
     }
     this.emit();
@@ -147,13 +177,17 @@ export class Engine {
     this.animationFrameId = requestAnimationFrame(loop);
   }
 
-  stop() { if (this.animationFrameId) { cancelAnimationFrame(this.animationFrameId); this.animationFrameId = null; } }
+  stop() { 
+    if (this.animationFrameId) { cancelAnimationFrame(this.animationFrameId); this.animationFrameId = null; }
+    if (this.livePollInterval) { clearInterval(this.livePollInterval); this.livePollInterval = null; }
+  }
 
   subscribe = (fn: () => void) => { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; };
   getVersion = () => this.version;
   private emit() { this.version++; this.listeners.forEach((l) => l()); }
   
   private save() {
+    if (this.mode === "live") return; // Don't save live positions to localStorage
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         demoBalance: this.demoBalance, positions: this.positions, orders: this.orders,
@@ -192,7 +226,7 @@ export class Engine {
     const conv = this.quotes["USD" + q];
     return conv ? amount / conv.bid : amount;
   }
-  marginFor(symbol: string, usdAmount: number) { return usdAmount / (this.leverage || 100); } // 👈 FIXED DIV BY ZERO
+  marginFor(symbol: string, usdAmount: number) { return usdAmount / (this.leverage || 100); }
   
   closePriceOf(p: { symbol: string; side: Side }) { const q = this.quotes[p.symbol]; return p.side === "buy" ? q.bid : q.ask; }
   profitOf(p: Position, usdAmount = p.lots) {
@@ -229,8 +263,6 @@ export class Engine {
       try {
         const payloadSymbol = req.symbol.replace(/(...)(...)/, "$1/$2"); 
         
-        // PESAKI MATH: req.lots is e.g. 0.01
-        // So marginUsd is 0.01 * 100 = $1.00
         const marginUsd = req.lots * 100; 
 
         const res = await apiRequest<any>("/forex/orders", {
@@ -238,7 +270,7 @@ export class Engine {
           body: JSON.stringify({
             symbol: payloadSymbol,
             side: isBuyType(req.type) ? "buy" : "sell", 
-            trade_amount: marginUsd, // 👈 Sending USD to backend (e.g., 1)
+            trade_amount: marginUsd, 
             stop_loss: req.sl || null, 
             take_profit: req.tp || null, 
             account_type: "live"
@@ -247,7 +279,9 @@ export class Engine {
         
         if (!res.success) return this.fail(res.error || "Backend rejected trade");
         
-        this.fetchLiveBalance(); 
+        // Immediately fetch the new balance AND new positions
+        await this.fetchLiveBalance(); 
+        
         this.log(`LIVE order #${res.order?.id} executed`);
         return { ok: true, ticket: res.order?.id };
       } catch (err: any) {
@@ -297,16 +331,24 @@ export class Engine {
 
   closePosition(ticket: number | string, reason: CloseReason = "manual", lots?: number): Result {
     if (this.mode === "live") {
+      // Optimistically remove from UI
+      this.positions = this.positions.filter(p => p.ticket !== ticket);
+      this.emit();
+
       apiRequest<any>(`/forex/positions/${ticket}/close`, { method: "POST" })
         .then((res) => {
           if (res.success) {
             this.fetchLiveBalance();
             this.log(`LIVE position #${ticket} closed. Profit: ${res.realizedPnl}`);
           } else {
+            this.fetchLiveBalance(); // Re-sync if it failed
             this.log(`Failed to close position: ${res.error}`, true);
           }
         })
-        .catch((err) => this.log(err.message, true));
+        .catch((err) => {
+          this.fetchLiveBalance();
+          this.log(err.message, true);
+        });
       return { ok: true }; 
     }
 
