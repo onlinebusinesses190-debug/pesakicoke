@@ -1,13 +1,5 @@
 /**
  * PESAKI Forex — HTTP API.
- *
- * Registered under /forex, deliberately separate from the binary prediction
- * game at /games/fx. This module owns its own accounts, orders, positions,
- * fills and ledger, and its own market-data engine.
- *
- * Identity always comes from the verified Supabase session (verifyAuth). The
- * user_id in a request body is never trusted; every query is scoped to the
- * authenticated user and their own account.
  */
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
@@ -44,12 +36,8 @@ import { ensureWalletExists, releaseLockedFunds } from "../../wallet/service";
 const DEMO_START_BALANCE = 100_000;
 const COMMISSION_RATE = 0.005; // 0.5% PESAKI Commission
 
-/**
- * Server-side switch for real-money trading.
- */
 const REAL_TRADING_ENABLED = process.env.PESAKI_FX_REAL_ENABLED === "true";
 
-/** Structured error codes. Predictable validation failures never surface as 500. */
 export const FX_ERRORS = {
   INVALID_ORDER: 400,
   UNAUTHORIZED: 401,
@@ -137,9 +125,6 @@ async function getOrCreateAccount(userId: string, accountType: "demo" | "live") 
   return created;
 }
 
-/**
- * Return a margin reservation to the PESAKI wallet.
- */
 async function releaseReservation(
   userId: string,
   mode: "demo" | "live",
@@ -157,7 +142,6 @@ async function releaseReservation(
 const orderSchema = z.object({
   symbol: z.enum(SYMBOLS as [string, ...string[]]),
   side: z.enum(["buy", "sell"]),
-  // Trade amount comes from the frontend in USD
   trade_amount: z.number().positive().optional(),
   lots: z.number().positive().optional(),
   order_type: z.enum(["market", "limit", "stop", "stop_limit"]).default("market"),
@@ -288,7 +272,6 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     }
   });
 
-  // Legacy path form retained only so an older client gets a clear explanation
   fastify.get("/candles/*", async (_request, reply) =>
     reply.code(FX_ERRORS.INVALID_ORDER).send({
       success: false,
@@ -629,6 +612,23 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     const leverage = configuredLeverage();
     const isPending = ["limit", "stop", "stop_limit"].includes(body.order_type);
 
+    // ─── FIX: FETCH EXACT WALLET BALANCE FOR LIVE ───
+    let freeMargin = 0;
+    if (body.account_type === "live") {
+      const { data: wallet } = await supabase
+        .from("wallets")
+        .select("balance, locked")
+        .eq("user_id", userId)
+        .maybeSingle();
+      const walletBalance = Number(wallet?.balance ?? 0);
+      const walletLocked = Number(wallet?.locked ?? 0);
+      freeMargin = walletBalance - walletLocked;
+      
+      logger.info({ userId, walletBalance, walletLocked, freeMargin }, "Forex Live Order: Wallet Check");
+    } else {
+      freeMargin = Number(account.equity ?? account.balance ?? 0) - Number(account.used_margin ?? 0);
+    }
+
     // ─── CONVERT USD TO KES FOR SIZING ───
     const tradeAmountUsd = body.trade_amount || 0;
     const tradeAmountKes = tradeAmountUsd * q2k; 
@@ -654,8 +654,6 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
       };
     })();
 
-    const freeMargin = Number(account.equity ?? account.balance ?? 0) - Number(account.used_margin ?? 0);
-
     if (body.trade_amount != null) {
       const amountCheck = validateTradeAmount(tradeAmountKes, freeMargin);
       if (!amountCheck.ok) return bad(reply, amountCheck.error!);
@@ -665,7 +663,7 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
       if (sizing.margin > freeMargin) {
         return bad(
           reply,
-          `Order rejected: insufficient free margin. You need KSh ${sizing.margin.toFixed(2)}.`,
+          `Order rejected: insufficient free margin. You have KSh ${freeMargin.toFixed(2)} available, but need KSh ${sizing.margin.toFixed(2)}.`,
         );
       }
     }
