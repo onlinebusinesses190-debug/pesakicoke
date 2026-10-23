@@ -64,7 +64,7 @@ export class Engine {
   liveBalance = 0; 
   exchangeRate = 130; 
   
-  leverage = configuredLeverage();
+  leverage = configuredLeverage() || 100; // 👈 SAFE FALLBACK FOR DEMO
   currency = "USD";
   positions: Position[] = [];
   orders: PendingOrder[] = [];
@@ -111,8 +111,6 @@ export class Engine {
       }
 
       const res = await apiRequest<any>("/forex/account?account_type=live");
-      console.log("Live Forex API Response:", res);
-
       if (res && res.success) {
         const kesBalance = Number(res.balance ?? res.account?.walletBalance ?? 0);
         this.liveKesBalance = kesBalance;
@@ -194,7 +192,8 @@ export class Engine {
     const conv = this.quotes["USD" + q];
     return conv ? amount / conv.bid : amount;
   }
-  marginFor(symbol: string, usdAmount: number) { return usdAmount / this.leverage; }
+  marginFor(symbol: string, usdAmount: number) { return usdAmount / (this.leverage || 100); } // 👈 FIXED DIV BY ZERO
+  
   closePriceOf(p: { symbol: string; side: Side }) { const q = this.quotes[p.symbol]; return p.side === "buy" ? q.bid : q.ask; }
   profitOf(p: Position, usdAmount = p.lots) {
     const diff = (this.closePriceOf(p) - p.openPrice) * (p.side === "buy" ? 1 : -1);
@@ -230,15 +229,16 @@ export class Engine {
       try {
         const payloadSymbol = req.symbol.replace(/(...)(...)/, "$1/$2"); 
         
-        // PESAKI MATH: req.lots here is the PESAKI lot size (e.g. 0.01)
-        const marginUsd = req.lots * 100; // 0.01 lots = $1 margin
+        // PESAKI MATH: req.lots is e.g. 0.01
+        // So marginUsd is 0.01 * 100 = $1.00
+        const marginUsd = req.lots * 100; 
 
         const res = await apiRequest<any>("/forex/orders", {
           method: "POST",
           body: JSON.stringify({
             symbol: payloadSymbol,
             side: isBuyType(req.type) ? "buy" : "sell", 
-            trade_amount: marginUsd, // 👈 Sending USD to backend
+            trade_amount: marginUsd, // 👈 Sending USD to backend (e.g., 1)
             stop_loss: req.sl || null, 
             take_profit: req.tp || null, 
             account_type: "live"
