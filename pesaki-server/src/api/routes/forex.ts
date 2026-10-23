@@ -44,8 +44,12 @@ import { ensureWalletExists, releaseLockedFunds } from "../../wallet/service";
 const DEMO_START_BALANCE = 100_000;
 const COMMISSION_RATE = 0.005; // 0.5% PESAKI Commission
 
+/**
+ * Server-side switch for real-money trading.
+ */
 const REAL_TRADING_ENABLED = process.env.PESAKI_FX_REAL_ENABLED === "true";
 
+/** Structured error codes. Predictable validation failures never surface as 500. */
 export const FX_ERRORS = {
   INVALID_ORDER: 400,
   UNAUTHORIZED: 401,
@@ -153,6 +157,7 @@ async function releaseReservation(
 const orderSchema = z.object({
   symbol: z.enum(SYMBOLS as [string, ...string[]]),
   side: z.enum(["buy", "sell"]),
+  // Trade amount comes from the frontend in USD
   trade_amount: z.number().positive().optional(),
   lots: z.number().positive().optional(),
   order_type: z.enum(["market", "limit", "stop", "stop_limit"]).default("market"),
@@ -283,6 +288,7 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     }
   });
 
+  // Legacy path form retained only so an older client gets a clear explanation
   fastify.get("/candles/*", async (_request, reply) =>
     reply.code(FX_ERRORS.INVALID_ORDER).send({
       success: false,
@@ -623,10 +629,14 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     const leverage = configuredLeverage();
     const isPending = ["limit", "stop", "stop_limit"].includes(body.order_type);
 
+    // ─── CONVERT USD TO KES FOR SIZING ───
+    const tradeAmountUsd = body.trade_amount || 0;
+    const tradeAmountKes = tradeAmountUsd * q2k; 
+
     const sizing = (() => {
       if (body.trade_amount != null) {
         return sizeFromTradeAmount({
-          tradeAmount: body.trade_amount,
+          tradeAmount: tradeAmountKes,
           entryPrice: entry,
           instrument: spec,
           quoteToKes: q2k,
@@ -647,7 +657,7 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     const freeMargin = Number(account.equity ?? account.balance ?? 0) - Number(account.used_margin ?? 0);
 
     if (body.trade_amount != null) {
-      const amountCheck = validateTradeAmount(body.trade_amount, freeMargin);
+      const amountCheck = validateTradeAmount(tradeAmountKes, freeMargin);
       if (!amountCheck.ok) return bad(reply, amountCheck.error!);
     } else {
       const lotsCheck = validateLots(body.lots!, spec);
@@ -661,7 +671,7 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     }
 
     if (isPending) {
-      // A pending order reserves no margin.
+      // A pending order reserves no margin, so it is not exposure yet.
     } else {
       const { data: config } = await supabase
         .from("forex_market_config")
@@ -716,10 +726,10 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     let reserved = false;
     if (!isPending) {
       
-      // DEDUCT 0.5% OPENING COMMISSION
+      // DEDUCT 0.5% OPENING COMMISSION (Calculated in USD, converted to KES)
       let commissionKes = 0;
-      if (body.account_type === "live" && body.trade_amount) {
-        const commissionUsd = body.trade_amount * COMMISSION_RATE; 
+      if (body.account_type === "live" && tradeAmountUsd > 0) {
+        const commissionUsd = tradeAmountUsd * COMMISSION_RATE; 
         commissionKes = commissionUsd * q2k; 
         
         const { error: commError } = await supabase.rpc('debit_wallet', {
@@ -739,7 +749,7 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
       const reservation = await reserveMargin(
         userId,
         body.account_type,
-        totalToReserveKes,
+        totalToReserveKes, 
         `${spec.symbol}:${body.side}:${body.idempotency_key ?? Date.now()}`,
       );
       if (!reservation.ok) {
@@ -785,11 +795,10 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
       const reason = execError.message ?? "";
       if (reserved) {
         await releaseReservation(userId, body.account_type, sizing.margin, "open failed");
-        // Also refund commission here if execution fails
-        if (body.account_type === "live" && body.trade_amount) {
+        if (body.account_type === "live" && tradeAmountUsd > 0) {
            await supabase.rpc('credit_wallet', {
             p_user_id: userId,
-            p_amount: body.trade_amount * COMMISSION_RATE * q2k,
+            p_amount: tradeAmountUsd * COMMISSION_RATE * q2k,
             p_mode: 'live',
             p_description: `Refund Commission - Execution Failed`
           });
@@ -814,10 +823,10 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     if (result?.idempotent) {
       if (reserved) {
         await releaseReservation(userId, body.account_type, sizing.margin, "idempotent replay");
-        if (body.account_type === "live" && body.trade_amount) {
+        if (body.account_type === "live" && tradeAmountUsd > 0) {
            await supabase.rpc('credit_wallet', {
             p_user_id: userId,
-            p_amount: body.trade_amount * COMMISSION_RATE * q2k,
+            p_amount: tradeAmountUsd * COMMISSION_RATE * q2k,
             p_mode: 'live',
             p_description: `Refund Commission - Idempotent`
           });
@@ -1143,11 +1152,8 @@ async function closePosition(
     });
 
     // DEDUCT 0.5% CLOSING COMMISSION
-    // Commission is based on the margin allocated to the portion being closed
-    const closingCommissionUsd = (Number(position.margin ?? 0) * closedFraction) * COMMISSION_RATE;
-    const closingCommissionKes = closingCommissionUsd * q2k;
+    const closingCommissionKes = releasedMargin * COMMISSION_RATE; 
     
-    // We subtract the commission from the gross profit (or add to the loss)
     const netProfitAfterCommission = legs.profit - legs.loss - closingCommissionKes;
 
     const settlement = await settleReal(
