@@ -184,8 +184,10 @@ function genCandles(s: SymbolSpec, tfSec: number, nowSec: number, n = 400): Cand
 // ─── Fetch real historical candles from backend ───
 async function fetchCandlesFromBackend(symbol: string, tf: TF, count = 400): Promise<Candle[] | null> {
   try {
+    // Convert symbol format: EURUSD -> EUR/USD for backend API
+    const formattedSymbol = symbol.length === 6 ? `${symbol.slice(0, 3)}/${symbol.slice(3)}` : symbol;
     const interval = TF_TO_INTERVAL[tf] || '5m';
-    const url = `/forex/candles?symbol=${encodeURIComponent(symbol)}&interval=${interval}&count=${count}`;
+    const url = `/forex/candles?symbol=${encodeURIComponent(formattedSymbol)}&interval=${interval}&count=${count}`;
     const res = await fetch(url);
     if (!res.ok) return null;
     const data = await res.json();
