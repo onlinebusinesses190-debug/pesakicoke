@@ -181,8 +181,11 @@ function genCandles(s: SymbolSpec, tfSec: number, nowSec: number, n = 400): Cand
   }));
 }
 
+let candlesApiAvailable = true;
+
 // ─── Fetch real historical candles from backend ───
 async function fetchCandlesFromBackend(symbol: string, tf: TF, count = 400): Promise<Candle[] | null> {
+  if (!candlesApiAvailable) return null;
   try {
     // Convert symbol format: EURUSD -> EUR/USD for backend API
     const formattedSymbol = symbol.length === 6 ? `${symbol.slice(0, 3)}/${symbol.slice(3)}` : symbol;
@@ -191,15 +194,15 @@ async function fetchCandlesFromBackend(symbol: string, tf: TF, count = 400): Pro
     const res = await fetch(url);
     if (!res.ok) {
       if (res.status === 404) {
-        console.debug(`[Engine] Candles endpoint not found for ${formattedSymbol} ${interval}, falling back to generated candles`);
+        candlesApiAvailable = false;
+        console.debug(`[Engine] Candles endpoint not available, disabling further fetches`);
       }
       return null;
     }
     const data = await res.json();
     if (!data.success || !data.candles || !Array.isArray(data.candles)) return null;
-    // Map backend candle format to frontend Candle format
     return data.candles.map((c: any) => ({
-      t: Math.floor(c.timestamp / 1000), // backend returns ms, we need seconds
+      t: Math.floor(c.timestamp / 1000),
       o: c.open,
       h: c.high,
       l: c.low,
