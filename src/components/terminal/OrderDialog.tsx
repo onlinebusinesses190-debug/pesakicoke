@@ -53,8 +53,9 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
   const [symbol, setSymbol] = useState(state?.mode === "new" ? state.symbol : "EURUSD");
   const [exec, setExec] = useState<"market" | "pending">("market");
   const [ptype, setPtype] = useState<OrderType>("buy_limit");
+  // Default lots to 0.01 (100 = 0.01 lots in USD terms)
   const [lots, setLots] = useState(
-    state?.mode === "new" && state.lots ? state.lots.toString() : "100"
+    state?.mode === "new" && state.lots ? state.lots.toString() : "0.01"
   );
   const [price, setPrice] = useState("");
   
@@ -153,7 +154,12 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
   // ─── NEW ORDER MODE ───
   const s = e.spec(symbol);
   const q = e.quotes[symbol];
-  const margin = e.marginFor(symbol, num(lots));
+  // For live mode: margin = lots * 100 (where 1 lot = 100 USD margin), lots in lots (e.g., 0.01)
+  // For demo: margin = lots (in USD)
+  const isLive = e.mode === "live";
+  const lotsValue = parseFloat(lots) || 0;
+  const margin = isLive ? lotsValue * 100 : e.marginFor(symbol, num(lots));
+  const fee = isLive ? lotsValue * 0.5 : 0; // $0.005 per 0.01 lot = $0.5 per lot
 
   return (
     <Shell title="New Order" onClose={onClose}>
@@ -171,16 +177,16 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
         </select>
       </Row>
 
-       <Row label="Volume (USD)">
-         <input
-           className="w-full border border-gray-300 rounded-sm px-2 py-1.5 text-sm font-mono focus:outline-none focus:border-[#1565c0]"
-           type="number"
-           step="1"
-           min="1"
-           max="10000"
-           value={lots}
-           onChange={(v) => setLots(v.target.value)}
-         />
+      <Row label="Volume (Lots)">
+        <input
+          className="w-full border border-gray-300 rounded-sm px-2 py-1.5 text-sm font-mono focus:outline-none focus:border-[#1565c0]"
+          type="number"
+          step="0.01"
+          min="0.01"
+          max="100"
+          value={lots}
+          onChange={(v) => setLots(v.target.value)}
+        />
       </Row>
 
       <div className="grid grid-cols-2 gap-2">
@@ -254,6 +260,10 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
         <div className="flex justify-between text-[11px] text-gray-600">
           <span>Required Margin:</span>
           <span className="font-mono font-bold text-black">{margin.toFixed(2)} USD</span>
+        </div>
+        <div className="flex justify-between text-[11px] text-gray-600">
+          <span>Fee:</span>
+          <span className="font-mono font-bold text-black">${fee.toFixed(3)} USD</span>
         </div>
         <div className="flex justify-between text-[11px] text-gray-600">
           <span>Free Margin:</span>

@@ -67,15 +67,15 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
 
       if (!q || !spec || all.length === 0) return;
 
-      if (displayBid.current === null) {
+      if (displayBid.current === null || displayAsk.current === null) {
         displayBid.current = q.bid;
         displayAsk.current = q.ask;
       } else {
         displayBid.current += (q.bid - displayBid.current) * 0.15;
         displayAsk.current += (q.ask - displayAsk.current) * 0.15;
       }
-      const smoothBid = displayBid.current;
-      const smoothAsk = displayAsk.current;
+      const smoothBid = displayBid.current!;
+      const smoothAsk = displayAsk.current!;
       const smoothMid = (smoothBid + smoothAsk) / 2;
 
       const sp = view.current.spacing;

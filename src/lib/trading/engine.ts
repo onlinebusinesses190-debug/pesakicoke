@@ -1,5 +1,6 @@
 // Simulated MetaTrader-style trading engine (demo account).
 // Runs entirely in the browser: live price feed, order execution, margin, SL/TP, stop-out.
+// Supports fetching real historical candles from backend for seamless refresh.
 
 export const TIMEFRAMES = { M1: 60, M5: 300, M15: 900, M30: 1800, H1: 3600, H4: 14400 } as const;
 export type TF = keyof typeof TIMEFRAMES;
@@ -180,6 +181,32 @@ function genCandles(s: SymbolSpec, tfSec: number, nowSec: number, n = 400): Cand
   }));
 }
 
+// ─── Fetch real historical candles from backend ───
+async function fetchCandlesFromBackend(symbol: string, tf: TF, count = 400): Promise<Candle[] | null> {
+  try {
+    const interval = TF_TO_INTERVAL[tf] || '5m';
+    const url = `/forex/candles?symbol=${encodeURIComponent(symbol)}&interval=${interval}&count=${count}`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data.success || !data.candles || !Array.isArray(data.candles)) return null;
+    // Map backend candle format to frontend Candle format
+    return data.candles.map((c: any) => ({
+      t: Math.floor(c.timestamp / 1000), // backend returns ms, we need seconds
+      o: c.open,
+      h: c.high,
+      l: c.low,
+      c: c.close,
+    }));
+  } catch {
+    return null;
+  }
+}
+
+const TF_TO_INTERVAL: Record<TF, string> = {
+  M1: '1m', M5: '5m', M15: '15m', M30: '30m', H1: '1h', H4: '4h',
+};
+
 export class Engine {
   quotes: Record<string, Quote> = {};
   candles: Record<string, Record<TF, Candle[]>> = {};
@@ -204,6 +231,12 @@ export class Engine {
   private lastTickTime = 0;
   private tickCount = 0;
 
+  // Live account state
+  liveKesBalance = 0;
+  liveBalance = 0;
+  exchangeRate = 130; // KES per USD
+  private liveBalanceInterval: number | null = null;
+
   constructor() {
     const now = Date.now() / 1000;
     for (const s of SYMBOLS) {
@@ -226,6 +259,21 @@ export class Engine {
     this.load();
     this.log("Terminal started. Demo account connected to simulated server.");
     this.start();
+    // Fetch real historical candles from backend for seamless refresh
+    this.fetchHistoricalCandles();
+  }
+
+  private async fetchHistoricalCandles(): Promise<void> {
+    for (const s of SYMBOLS) {
+      for (const tf of Object.keys(TIMEFRAMES) as TF[]) {
+        const backendCandles = await fetchCandlesFromBackend(s.name, tf);
+        if (backendCandles && backendCandles.length > 0) {
+          // Replace generated candles with real historical data
+          this.candles[s.name][tf] = backendCandles;
+        }
+      }
+    }
+    this.emit(); // Trigger UI update with real data
   }
 
   public start() {
@@ -605,6 +653,125 @@ export class Engine {
         this.closePosition(worst.ticket, "stopout");
       }
     }
+  }
+
+  // ─── Live Account API Integration ───
+  async fetchLiveBalance(): Promise<void> {
+    try {
+      const res = await fetch("/forex/account?account_type=live");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          this.liveKesBalance = data.account.walletBalance ?? 0;
+          this.exchangeRate = data.account.usdToKes ?? 130;
+          this.liveBalance = this.liveKesBalance / this.exchangeRate;
+          this.balance = this.liveBalance; // Update internal balance for USD math
+          this.emit();
+        }
+      }
+    } catch (e) {
+      console.error("Failed to fetch live balance:", e);
+    }
+  }
+
+  startLiveBalancePolling(): void {
+    if (this.liveBalanceInterval) return;
+    this.fetchLiveBalance();
+    this.liveBalanceInterval = window.setInterval(() => this.fetchLiveBalance(), 30000);
+  }
+
+  stopLiveBalancePolling(): void {
+    if (this.liveBalanceInterval) {
+      clearInterval(this.liveBalanceInterval);
+      this.liveBalanceInterval = null;
+    }
+  }
+
+  // Place order via backend API in live mode
+  async placeOrderLive(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }): Promise<Result> {
+    if (this.mode !== "live") return this.fail("Live trading not enabled");
+
+    try {
+      // Calculate trade_amount in KES (margin = lots * 100 * exchangeRate for 1:100 leverage)
+      const tradeAmountKes = req.lots * 100 * this.exchangeRate; // KES
+      const spec = this.spec(req.symbol);
+      const q = this.quotes[req.symbol];
+      const lots = round(req.lots, 2);
+      if (!(lots >= 0.01 && lots <= 100)) return this.fail("Invalid volume (0.01 - 100 lots)");
+      const sl = round(req.sl || 0, this.spec(req.symbol).digits);
+      const tp = round(req.tp || 0, this.spec(req.symbol).digits);
+      const side: Side = isBuyType(req.type) ? "buy" : "sell";
+      
+      const entry = side === "buy" ? this.quotes[req.symbol].ask : this.quotes[req.symbol].bid;
+      const entryPrice = round(entry, this.spec(req.symbol).digits);
+
+      const res = await fetch("/forex/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbol: req.symbol,
+          side,
+          trade_amount: tradeAmountKes, // KES margin amount
+          order_type: "market",
+          stop_loss: req.sl || undefined,
+          take_profit: req.tp || undefined,
+          account_type: "live",
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        return this.fail(data.error || "Order failed");
+      }
+
+      // Refresh balance after successful order
+      this.fetchLiveBalance();
+      return { ok: true, ticket: data.position?.ticket || data.order?.id };
+    } catch (e) {
+      return this.fail("Network error placing order");
+    }
+  }
+
+  // Override placeOrder to use live API when in live mode
+  placeOrder(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }): Result {
+    if (this.mode === "live") {
+      // For live mode, we need to call the async placeOrderLive
+      // Since placeOrder is synchronous, we'll fire and forget the async call
+      // and return a pending result. The actual result will come via fetchLiveBalance polling.
+      this.placeOrderLive(req).catch(e => this.fail(e.message));
+      return { ok: true, ticket: 0 }; // Temporary ticket, real one comes from API
+    }
+
+    // Demo mode - use existing logic
+    const s = this.spec(req.symbol);
+    if (!s) return this.fail("Unknown symbol");
+    const q = this.quotes[req.symbol];
+    const lots = round(req.lots, 2);
+    if (!(lots >= 1 && lots <= 10000)) return this.fail("Invalid volume (1 - 10000)");
+    const sl = round(req.sl || 0, s.digits), tp = round(req.tp || 0, s.digits);
+    const side: Side = isBuyType(req.type) ? "buy" : "sell";
+
+    if (req.type === "buy" || req.type === "sell") {
+      const err = this.checkStops(side, side === "buy" ? q.ask : q.bid, sl, tp, req.symbol);
+      if (err) return this.fail(err);
+      return this.openPosition(req.symbol, side, lots, sl, tp);
+    }
+
+    const price = round(req.price || 0, s.digits);
+    if (!price) return this.fail("Invalid price");
+    const t = req.type;
+    if (t === "buy_limit" && price >= q.ask) return this.fail("Buy Limit must be below Ask");
+    if (t === "sell_limit" && price <= q.bid) return this.fail("Sell Limit must be above Bid");
+    if (t === "buy_stop" && price <= q.ask) return this.fail("Buy Stop must be above Ask");
+    if (t === "sell_stop" && price >= q.bid) return this.fail("Sell Stop must be below Bid");
+    const err = this.checkStops(side, price, sl, tp, req.symbol);
+    if (err) return this.fail(err);
+    const ticket = this.nextTicket++;
+    this.orders.push({ ticket, symbol: req.symbol, type: t, lots, price, sl, tp, time: Date.now() });
+    this.log(`order #${ticket} ${typeLabel(t)} ${lots.toFixed(2)} ${req.symbol} at ${price.toFixed(s.digits)} placed`);
+    this.save();
+    this.emit();
+    return { ok: true, ticket };
   }
 }
 

@@ -739,7 +739,15 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
       };
     })();
 
-    const freeMargin = Number(account.equity ?? account.balance ?? 0) - Number(account.used_margin ?? 0);
+    const { data: wallet } = await supabase
+      .from("wallets")
+      .select("balance, locked")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    const walletBalance = Number(wallet?.balance ?? 0);
+    const walletLocked = Number(wallet?.locked ?? 0);
+    const freeMargin = walletBalance - walletLocked;
 
     if (body.trade_amount != null) {
       const amountCheck = validateTradeAmount(body.trade_amount, freeMargin);
@@ -750,7 +758,7 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
       if (sizing.margin > freeMargin) {
         return bad(
           reply,
-          `Order rejected: insufficient free margin. You need KSh ${sizing.margin.toFixed(2)}.`,
+          `Order rejected: insufficient free margin. You have KSh ${freeMargin.toFixed(2)} available, but need KSh ${sizing.margin.toFixed(2)}.`,
         );
       }
     }
