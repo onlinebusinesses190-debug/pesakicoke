@@ -214,6 +214,56 @@ const TF_TO_INTERVAL: Record<TF, string> = {
   M1: '1m', M5: '5m', M15: '15m', M30: '30m', H1: '1h', H4: '4h',
 };
 
+// Persistent cache for candle fetch failures (survives page refresh)
+const CANDLE_CACHE_KEY = 'pesaki_candle_fetch_cache';
+function getFailedCache(): Set<string> {
+  try {
+    const raw = localStorage.getItem('pesaki_candle_fetch_cache');
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch { return new Set(); }
+}
+function saveFailedCache(set: Set<string>) {
+  try { localStorage.setItem('pesaki_candle_fetch_cache', JSON.stringify([...set])); } catch {}
+}
+
+// ─── Fetch historical candles with persistent cache ───
+async function fetchHistoricalCandlesPersistent(engine: Engine): Promise<void> {
+  const failedCache = getFailedCache();
+  for (const s of SYMBOLS) {
+    for (const tf of Object.keys(TIMEFRAMES) as TF[]) {
+      const key = `${s.name}:${tf}`;
+      if (engine.historicalCandlesFetched.has(key) || engine.historicalCandlesFailed.has(key) || engine.historicalCandlesFetching.has(key)) {
+        continue;
+      }
+      if (failedCache.has(key)) {
+        engine.historicalCandlesFailed.add(key);
+        continue;
+      }
+      if (engine.historicalCandlesFetching.has(key)) continue;
+      
+      engine.historicalCandlesFetching.add(key);
+      try {
+        const backendCandles = await fetchCandlesFromBackend(s.name, tf);
+        if (backendCandles && backendCandles.length > 0) {
+          engine.candles[s.name][tf] = backendCandles;
+          engine.historicalCandlesFetched.add(key);
+        } else {
+          engine.historicalCandlesFailed.add(key);
+          failedCache.add(key);
+          saveFailedCache(failedCache);
+        }
+      } catch {
+        engine.historicalCandlesFailed.add(key);
+        failedCache.add(key);
+        saveFailedCache(failedCache);
+      } finally {
+        engine.historicalCandlesFetching.delete(key);
+      }
+    }
+  }
+  engine.emit();
+}
+
 export class Engine {
   quotes: Record<string, Quote> = {};
   candles: Record<string, Record<TF, Candle[]>> = {};
@@ -245,9 +295,9 @@ export class Engine {
   private liveBalanceInterval: number | null = null;
 
   // Cache for historical candle fetch attempts to prevent infinite retries
-  private historicalCandlesFetched = new Set<string>();
-  private historicalCandlesFetching = new Set<string>();
-  private historicalCandlesFailed = new Set<string>();
+  historicalCandlesFetched = new Set<string>();
+  historicalCandlesFetching = new Set<string>();
+  historicalCandlesFailed = new Set<string>();
 
   constructor() {
     const now = Date.now() / 1000;
@@ -271,38 +321,8 @@ export class Engine {
     this.load();
     this.log("Terminal started. Demo account connected to simulated server.");
     this.start();
-    // Fetch real historical candles from backend for seamless refresh
-    this.fetchHistoricalCandles();
-  }
-
-  private async fetchHistoricalCandles(): Promise<void> {
-    for (const s of SYMBOLS) {
-      for (const tf of Object.keys(TIMEFRAMES) as TF[]) {
-        const key = `${s.name}:${tf}`;
-        // Skip if already fetched, failed, or currently fetching
-        if (this.historicalCandlesFetched.has(key) || this.historicalCandlesFailed.has(key) || this.historicalCandlesFetching.has(key)) {
-          continue;
-        }
-        this.historicalCandlesFetching.add(key);
-        try {
-          const backendCandles = await fetchCandlesFromBackend(s.name, tf);
-          if (backendCandles && backendCandles.length > 0) {
-            // Replace generated candles with real historical data
-            this.candles[s.name][tf] = backendCandles;
-            this.historicalCandlesFetched.add(key);
-          } else {
-            // Mark as failed to prevent retries
-            this.historicalCandlesFailed.add(key);
-          }
-        } catch {
-          // Mark as failed to prevent retries
-          this.historicalCandlesFailed.add(key);
-        } finally {
-          this.historicalCandlesFetching.delete(key);
-        }
-      }
-    }
-    this.emit(); // Trigger UI update with real data
+    // Fetch real historical candles from backend for seamless refresh (with persistent cache)
+    fetchHistoricalCandlesPersistent(this);
   }
 
   public start() {
@@ -335,7 +355,7 @@ export class Engine {
   
   getVersion = () => this.version;
   
-  private emit() {
+  emit() {
     this.version++;
     this.listeners.forEach((l) => l());
   }
