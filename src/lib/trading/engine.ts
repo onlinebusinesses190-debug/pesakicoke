@@ -247,6 +247,7 @@ export class Engine {
   // Cache for historical candle fetch attempts to prevent infinite retries
   private historicalCandlesFetched = new Set<string>();
   private historicalCandlesFetching = new Set<string>();
+  private historicalCandlesFailed = new Set<string>();
 
   constructor() {
     const now = Date.now() / 1000;
@@ -278,8 +279,8 @@ export class Engine {
     for (const s of SYMBOLS) {
       for (const tf of Object.keys(TIMEFRAMES) as TF[]) {
         const key = `${s.name}:${tf}`;
-        // Skip if already fetched or currently fetching
-        if (this.historicalCandlesFetched.has(key) || this.historicalCandlesFetching.has(key)) {
+        // Skip if already fetched, failed, or currently fetching
+        if (this.historicalCandlesFetched.has(key) || this.historicalCandlesFailed.has(key) || this.historicalCandlesFetching.has(key)) {
           continue;
         }
         this.historicalCandlesFetching.add(key);
@@ -289,9 +290,13 @@ export class Engine {
             // Replace generated candles with real historical data
             this.candles[s.name][tf] = backendCandles;
             this.historicalCandlesFetched.add(key);
+          } else {
+            // Mark as failed to prevent retries
+            this.historicalCandlesFailed.add(key);
           }
         } catch {
-          // Ignore errors, keep generated candles
+          // Mark as failed to prevent retries
+          this.historicalCandlesFailed.add(key);
         } finally {
           this.historicalCandlesFetching.delete(key);
         }
