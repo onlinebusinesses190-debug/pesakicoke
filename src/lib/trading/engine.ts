@@ -189,7 +189,12 @@ async function fetchCandlesFromBackend(symbol: string, tf: TF, count = 400): Pro
     const interval = TF_TO_INTERVAL[tf] || '5m';
     const url = `/forex/candles?symbol=${encodeURIComponent(formattedSymbol)}&interval=${interval}&count=${count}`;
     const res = await fetch(url);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      if (res.status === 404) {
+        console.debug(`[Engine] Candles endpoint not found for ${formattedSymbol} ${interval}, falling back to generated candles`);
+      }
+      return null;
+    }
     const data = await res.json();
     if (!data.success || !data.candles || !Array.isArray(data.candles)) return null;
     // Map backend candle format to frontend Candle format
@@ -239,6 +244,10 @@ export class Engine {
   exchangeRate = 130; // KES per USD
   private liveBalanceInterval: number | null = null;
 
+  // Cache for historical candle fetch attempts to prevent infinite retries
+  private historicalCandlesFetched = new Set<string>();
+  private historicalCandlesFetching = new Set<string>();
+
   constructor() {
     const now = Date.now() / 1000;
     for (const s of SYMBOLS) {
@@ -268,10 +277,23 @@ export class Engine {
   private async fetchHistoricalCandles(): Promise<void> {
     for (const s of SYMBOLS) {
       for (const tf of Object.keys(TIMEFRAMES) as TF[]) {
-        const backendCandles = await fetchCandlesFromBackend(s.name, tf);
-        if (backendCandles && backendCandles.length > 0) {
-          // Replace generated candles with real historical data
-          this.candles[s.name][tf] = backendCandles;
+        const key = `${s.name}:${tf}`;
+        // Skip if already fetched or currently fetching
+        if (this.historicalCandlesFetched.has(key) || this.historicalCandlesFetching.has(key)) {
+          continue;
+        }
+        this.historicalCandlesFetching.add(key);
+        try {
+          const backendCandles = await fetchCandlesFromBackend(s.name, tf);
+          if (backendCandles && backendCandles.length > 0) {
+            // Replace generated candles with real historical data
+            this.candles[s.name][tf] = backendCandles;
+            this.historicalCandlesFetched.add(key);
+          }
+        } catch {
+          // Ignore errors, keep generated candles
+        } finally {
+          this.historicalCandlesFetching.delete(key);
         }
       }
     }
@@ -407,38 +429,6 @@ export class Engine {
     this.log(msg, true);
     this.emit();
     return { ok: false, error: msg };
-  }
-
-  placeOrder(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }): Result {
-    const s = this.spec(req.symbol);
-    if (!s) return this.fail("Unknown symbol");
-    const q = this.quotes[req.symbol];
-    const lots = round(req.lots, 2);
-    if (!(lots >= 1 && lots <= 10000)) return this.fail("Invalid volume (1 - 10000)");
-    const sl = round(req.sl || 0, s.digits), tp = round(req.tp || 0, s.digits);
-    const side: Side = isBuyType(req.type) ? "buy" : "sell";
-
-    if (req.type === "buy" || req.type === "sell") {
-      const err = this.checkStops(side, side === "buy" ? q.ask : q.bid, sl, tp, req.symbol);
-      if (err) return this.fail(err);
-      return this.openPosition(req.symbol, side, lots, sl, tp);
-    }
-
-    const price = round(req.price || 0, s.digits);
-    if (!price) return this.fail("Invalid price");
-    const t = req.type;
-    if (t === "buy_limit" && price >= q.ask) return this.fail("Buy Limit must be below Ask");
-    if (t === "sell_limit" && price <= q.bid) return this.fail("Sell Limit must be above Bid");
-    if (t === "buy_stop" && price <= q.ask) return this.fail("Buy Stop must be above Ask");
-    if (t === "sell_stop" && price >= q.bid) return this.fail("Sell Stop must be below Bid");
-    const err = this.checkStops(side, price, sl, tp, req.symbol);
-    if (err) return this.fail(err);
-    const ticket = this.nextTicket++;
-    this.orders.push({ ticket, symbol: req.symbol, type: t, lots, price, sl, tp, time: Date.now() });
-    this.log(`order #${ticket} ${typeLabel(t)} ${lots.toFixed(2)} ${req.symbol} at ${price.toFixed(s.digits)} placed`);
-    this.save();
-    this.emit();
-    return { ok: true, ticket };
   }
 
   private openPosition(symbol: string, side: Side, lots: number, sl: number, tp: number, fromOrder?: number): Result {
