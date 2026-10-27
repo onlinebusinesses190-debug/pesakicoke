@@ -1,4 +1,7 @@
-// Simulated MetaTrader-style trading engine (demo account).
+import { useSyncExternalStore } from "react";
+import { configuredLeverage } from "@/lib/fx/market";
+import { apiRequest } from "@/utils/api";
+
 export const TIMEFRAMES = { M1: 60, M5: 300, M15: 900, M30: 1800, H1: 3600, H4: 14400 } as const;
 export type TF = keyof typeof TIMEFRAMES;
 
@@ -22,8 +25,6 @@ export interface PendingOrder { ticket: number | string; symbol: string; type: E
 export interface Deal { ticket: number | string; symbol: string; side: Side; lots: number; openPrice: number; closePrice: number; openTime: number; closeTime: number; profit: number; reason: CloseReason | "deposit" | "cancel"; }
 export interface JournalEntry { time: number; msg: string; error?: boolean; }
 export type Result = { ok: true; ticket?: number | string } | { ok: false; error: string };
-
-import { configuredLeverage } from "@/lib/fx/market";
 
 const SPREADS: Record<string, number> = { EURUSD: 1, GBPUSD: 2, USDJPY: 1, AUDUSD: 1, USDCAD: 2, USDCHF: 2, NZDUSD: 2, EURJPY: 2, GBPJPY: 3, XAUUSD: 2 };
 const RAW: [string, string, number, number, number, number][] = [
@@ -59,26 +60,18 @@ function genCandles(s: SymbolSpec, tfSec: number, nowSec: number, n = 400): Cand
 
 const TF_TO_INTERVAL: Record<TF, string> = { M1: '1m', M5: '5m', M15: '15m', M30: '30m', H1: '1H', H4: '4H' };
 
-async function fetchCandlesFromBackend(symbol: string, tf: TF, count = 400): Promise<Candle[] | null> {
-  try {
-    const formattedSymbol = symbol.length === 6 ? `${symbol.slice(0, 3)}/${symbol.slice(3)}` : symbol;
-    const interval = TF_TO_INTERVAL[tf] || '5m';
-    const res = await fetch(`/forex/candles?symbol=${encodeURIComponent(formattedSymbol)}&interval=${interval}&count=${count}`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!data.success || !data.candles || !Array.isArray(data.candles)) return null;
-    return data.candles.map((c: any) => ({ t: Math.floor(c.timestamp / 1000), o: c.open, h: c.high, l: c.low, c: c.close }));
-  } catch { return null; }
-}
-
 export class Engine {
   quotes: Record<string, Quote> = {};
   candles: Record<string, Record<TF, Candle[]>> = {};
   balance = START_BALANCE;
-  leverage = configuredLeverage();
+  leverage = configuredLeverage() || 100;
   currency = "USD";
-  mode: "demo" | "live" = "demo";
-  positions: Position[] = [];
+  
+  // 👈 FIX: Separate arrays for demo and live
+  private _mode: "demo" | "live" = "demo";
+  demoPositions: Position[] = [];
+  livePositions: Position[] = [];
+
   orders: PendingOrder[] = [];
   history: Deal[] = [];
   journal: JournalEntry[] = [];
@@ -97,10 +90,7 @@ export class Engine {
   liveBalance = 0;
   exchangeRate = 130; 
   private liveBalanceInterval: number | null = null;
-
-  historicalCandlesFetched = new Set<string>();
-  historicalCandlesFetching = new Set<string>();
-  historicalCandlesFailed = new Set<string>();
+  private isFetchingLive = false;
 
   constructor() {
     const now = Date.now() / 1000;
@@ -114,38 +104,23 @@ export class Engine {
     this.load();
     this.log("Terminal started. Demo account connected to simulated server.");
     this.start();
-    this.fetchQuotesAndCandles();
+    this.fetchCandles();
   }
 
-  private async fetchQuotesAndCandles() {
-    try {
-      const res = await fetch("/forex/quotes?symbols=" + SYMBOLS.map(s => s.name).join(","));
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.quotes) {
-          for (const q of data.quotes) {
-             const sym = q.symbol.replace("/", "");
-             if (this.quotes[sym]) {
-               this.quotes[sym].bid = q.bid;
-               this.quotes[sym].ask = q.ask;
-             }
-          }
-          this.emit();
-        }
-      }
-    } catch {}
+  get mode() { return this._mode; }
+  get positions() { return this._mode === "live" ? this.livePositions : this.demoPositions; }
 
+  private async fetchCandles() {
     for (const s of SYMBOLS) {
       for (const tf of Object.keys(TIMEFRAMES) as TF[]) {
-        const key = `${s.name}:${tf}`;
-        if (this.historicalCandlesFetched.has(key)) continue;
-        this.historicalCandlesFetching.add(key);
-        const backendCandles = await fetchCandlesFromBackend(s.name, tf);
-        if (backendCandles && backendCandles.length > 0) {
-          this.candles[s.name][tf] = backendCandles;
-          this.historicalCandlesFetched.add(key);
-        }
-        this.historicalCandlesFetching.delete(key);
+        try {
+          const interval = TF_TO_INTERVAL[tf];
+          const formattedSymbol = `${s.name.slice(0, 3)}/${s.name.slice(3)}`;
+          const res = await apiRequest<any>(`/forex/candles?symbol=${encodeURIComponent(formattedSymbol)}&interval=${interval}&count=400`);
+          if (res.success && res.candles) {
+            this.candles[s.name][tf] = res.candles.map((c: any) => ({ t: Math.floor(c.timestamp / 1000), o: c.open, h: c.high, l: c.low, c: c.close }));
+          }
+        } catch {}
       }
     }
     this.emit();
@@ -168,15 +143,15 @@ export class Engine {
   emit() { this.version++; this.listeners.forEach((l) => l()); }
   
   private save() {
-    if (this.mode === "live") return;
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ balance: this.balance, positions: this.positions, orders: this.orders, history: this.history.slice(0, 500), journal: this.journal.slice(0, 300), nextTicket: this.nextTicket })); } catch {}
+    if (this._mode === "live") return;
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ balance: this.balance, positions: this.demoPositions, orders: this.orders, history: this.history.slice(0, 500), journal: this.journal.slice(0, 300), nextTicket: this.nextTicket })); } catch {}
   }
   
   private load() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY); if (!raw) return;
       const d = JSON.parse(raw);
-      this.balance = d.balance ?? START_BALANCE; this.positions = d.positions ?? []; this.orders = d.orders ?? [];
+      this.balance = d.balance ?? START_BALANCE; this.demoPositions = d.positions ?? []; this.orders = d.orders ?? [];
       this.history = d.history ?? []; this.journal = d.journal ?? []; this.nextTicket = d.nextTicket ?? this.nextTicket;
     } catch {}
   }
@@ -189,7 +164,7 @@ export class Engine {
   closePriceOf(p: { symbol: string; side: Side }) { const q = this.quotes[p.symbol]; return p.side === "buy" ? q.bid : q.ask; }
   profitOf(p: Position, usdAmount = p.lots) { const diff = (this.closePriceOf(p) - p.openPrice) * (p.side === "buy" ? 1 : -1); return round((usdAmount * diff) / p.openPrice, 2); }
   get floating() { return this.positions.reduce((a, p) => a + this.profitOf(p), 0); }
-  get equity() { return round(this.balance + this.floating, 2); }
+  get equity() { return round((this._mode === "live" ? this.liveBalance : this.balance) + this.floating, 2); }
   get margin() { return round(this.positions.reduce((a, p) => a + this.marginFor(p.symbol, p.lots), 0), 2); }
   get freeMargin() { return round(this.equity - this.margin, 2); }
   get marginLevel() { return this.margin > 0 ? (this.equity / this.margin) * 100 : 0; }
@@ -216,88 +191,133 @@ export class Engine {
     const q = this.quotes[symbol];
     const price = side === "buy" ? q.ask : q.bid;
     const ticket = fromOrder ?? this.nextTicket++;
-    this.positions.push({ ticket, symbol, side, lots, openPrice: price, openTime: Date.now(), sl, tp });
+    
+    this.demoPositions.push({ ticket, symbol, side, lots, openPrice: price, openTime: Date.now(), sl, tp });
     this.log(`deal #${ticket} ${side} ${lots.toFixed(2)} ${symbol} at ${price.toFixed(s.digits)} done`);
     this.save(); this.emit();
     return { ok: true, ticket };
   }
 
   async closePosition(ticket: number | string, reason: CloseReason = "manual", lots?: number): Promise<Result> {
-    if (this.mode === "live") {
+    if (this._mode === "live") {
       try {
-        const res = await fetch(`/forex/positions/${ticket}/close`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ close: true }) });
-        const data = await res.json();
-        if (!res.ok) return this.fail(data.error || "Failed to close position");
+        const res = await apiRequest<any>(`/forex/positions/${ticket}/close`, { 
+          method: "POST", 
+          body: JSON.stringify({ close: true }) 
+        });
+        if (!res.success) return this.fail(res.error || "Failed to close position");
         await this.fetchLiveBalance();
         return { ok: true };
       } catch { return this.fail("Network error closing position"); }
     }
-    const p = this.positions.find((x) => x.ticket === ticket);
+
+    const p = this.demoPositions.find((x) => x.ticket === ticket);
     if (!p) return this.fail(`Position #${ticket} not found`);
     const closeLots = lots ? Math.min(round(lots, 2), p.lots) : p.lots;
     if (closeLots < 0.01) return this.fail("Invalid volume (min 0.01)");
     const profit = this.profitOf(p, closeLots);
     const price = this.closePriceOf(p);
     this.balance = round(this.balance + profit, 2);
+    
     this.history.unshift({ ticket: p.ticket, symbol: p.symbol, side: p.side, lots: closeLots, openPrice: p.openPrice, closePrice: price, openTime: p.openTime, closeTime: Date.now(), profit, reason });
-    if (closeLots >= p.lots - 1e-9) this.positions = this.positions.filter((x) => x !== p);
+    
+    if (closeLots >= p.lots - 1e-9) this.demoPositions = this.demoPositions.filter((x) => x !== p);
     else p.lots = round(p.lots - closeLots, 2);
-    const tag = reason === "manual" ? "" : ` [${reason === "stopout" ? "stop out" : reason}]`;
-    this.log(`position #${ticket} closed ${closeLots.toFixed(2)} ${p.symbol} at ${this.fmt(p.symbol, price)}, profit ${profit.toFixed(2)}${tag}`, reason === "stopout");
+    
+    this.log(`position #${ticket} closed ${closeLots.toFixed(2)} ${p.symbol} at ${this.fmt(p.symbol, price)}, profit ${profit.toFixed(2)}`);
     this.save(); this.emit();
     return { ok: true };
   }
 
-  closeAll(filter?: "profit" | "loss") {
-    [...this.positions].forEach((p) => {
-      const pr = this.profitOf(p);
-      if (!filter || (filter === "profit" && pr > 0) || (filter === "loss" && pr < 0)) this.closePosition(p.ticket);
-    });
+  async fetchLiveBalance(): Promise<void> {
+    if (this.isFetchingLive) return;
+    this.isFetchingLive = true;
+
+    try {
+      try { 
+        const rateRes = await apiRequest<any>("/forex/rates"); 
+        if (rateRes?.success && rateRes.usdToKes) this.exchangeRate = rateRes.usdToKes; 
+      } catch {}
+
+      const res = await apiRequest<any>("/forex/account?account_type=live");
+      if (res.success && res.account) {
+        this.liveKesBalance = res.account.walletBalance ?? 0;
+        this.liveBalance = this.liveKesBalance / this.exchangeRate;
+        if (res.positions && Array.isArray(res.positions)) {
+          this.livePositions = res.positions.map((p: any) => ({ 
+            ticket: p.id, 
+            symbol: p.symbol ? p.symbol.replace("/", "") : "EURUSD", 
+            side: p.side as Side, 
+            lots: Number(p.quantity), 
+            openPrice: Number(p.average_entry_price), 
+            openTime: new Date(p.opened_at).getTime(), 
+            sl: Number(p.stop_loss || 0), 
+            tp: Number(p.take_profit || 0) 
+          }));
+        }
+        this.emit();
+      }
+    } catch (e) { console.error("Failed to fetch live balance:", e); }
+    finally { this.isFetchingLive = false; }
   }
 
-  modifyPosition(ticket: number | string, sl: number, tp: number): Result {
-    const p = this.positions.find((x) => x.ticket === ticket);
-    if (!p) return this.fail(`Position #${ticket} not found`);
-    const d = this.spec(p.symbol).digits;
-    sl = round(sl || 0, d); tp = round(tp || 0, d);
-    const err = this.checkStops(p.side, this.closePriceOf(p), sl, tp, p.symbol);
-    if (err) return this.fail(err);
-    p.sl = sl; p.tp = tp;
-    this.log(`position #${ticket} modified: sl ${sl || "-"}, tp ${tp || "-"}`);
-    this.save(); this.emit();
-    return { ok: true };
+  startLiveBalancePolling(): void {
+    if (this.liveBalanceInterval) return;
+    this.fetchLiveBalance();
+    this.liveBalanceInterval = window.setInterval(() => this.fetchLiveBalance(), 5000); 
   }
 
-  cancelOrder(ticket: number | string): Result {
-    const o = this.orders.find((x) => x.ticket === ticket);
-    if (!o) return this.fail(`Order #${ticket} not found`);
-    this.orders = this.orders.filter((x) => x !== o);
-    this.log(`order #${ticket} ${typeLabel(o.type)} ${o.lots.toFixed(2)} ${o.symbol} canceled`);
-    this.save(); this.emit();
-    return { ok: true };
+  stopLiveBalancePolling(): void {
+    if (this.liveBalanceInterval) { clearInterval(this.liveBalanceInterval); this.liveBalanceInterval = null; }
   }
 
-  deposit(amountKes: number): Result {
-    if (!(amountKes > 0 && amountKes <= 1e7)) return this.fail("Invalid deposit amount");
-    const usd = amountKes / kesPerQuote("USD");
-    this.balance = round(this.balance + usd, 2);
-    this.history.unshift({ ticket: this.nextTicket++, symbol: "", side: "buy", lots: 0, openPrice: 0, closePrice: 0, openTime: Date.now(), closeTime: Date.now(), profit: usd, reason: "deposit" });
-    this.log(`balance deposit ${usd.toFixed(2)} USD (KSh ${amountKes.toFixed(2)})`);
-    this.save(); this.emit();
-    return { ok: true };
+  async placeOrderLive(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }): Promise<Result> {
+    if (this._mode !== "live") return this.fail("Live trading not enabled");
+    try {
+      const marginUsd = req.lots * 100; 
+      const res = await apiRequest<any>("/forex/orders", {
+        method: "POST",
+        body: JSON.stringify({
+          symbol: req.symbol.includes("/") ? req.symbol : `${req.symbol.slice(0,3)}/${req.symbol.slice(3)}`,
+          side: isBuyType(req.type) ? "buy" : "sell",
+          trade_amount: marginUsd, 
+          order_type: "market",
+          stop_loss: req.sl || undefined,
+          take_profit: req.tp || undefined,
+          account_type: "live",
+        }),
+      });
+      if (!res.success) return this.fail(res.error || "Order failed");
+      await this.fetchLiveBalance();
+      return { ok: true, ticket: res.position?.id || res.order?.id };
+    } catch { return this.fail("Network error placing order"); }
+  }
+
+  placeOrder(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }): Result {
+    if (this._mode === "live") {
+      this.placeOrderLive(req).catch(e => this.fail(e.message));
+      return { ok: true, ticket: 0 }; 
+    }
+    const s = this.spec(req.symbol);
+    if (!s) return this.fail("Unknown symbol");
+    const q = this.quotes[req.symbol];
+    const lots = round(req.lots, 2);
+    if (!(lots >= 0.01 && lots <= 10000)) return this.fail("Invalid volume (0.01 - 10000)"); 
+    const sl = round(req.sl || 0, s.digits), tp = round(req.tp || 0, s.digits);
+    const side: Side = isBuyType(req.type) ? "buy" : "sell";
+    if (req.type === "buy" || req.type === "sell") {
+      const err = this.checkStops(side, side === "buy" ? q.ask : q.bid, sl, tp, req.symbol);
+      if (err) return this.fail(err);
+      return this.openPosition(req.symbol, side, lots, sl, tp);
+    }
+    return this.fail("Pending orders not supported in demo mode yet");
   }
 
   setMode(mode: "demo" | "live") {
-    this.mode = mode;
+    this._mode = mode;
     if (mode === "live") { this.startLiveBalancePolling(); this.log("Live trading enabled"); }
     else { this.stopLiveBalancePolling(); this.log("Demo trading enabled"); }
     this.emit();
-  }
-
-  resetAccount() {
-    this.balance = START_BALANCE; this.positions = []; this.orders = []; this.history = []; this.journal = [];
-    this.log(`Demo account reset to ${START_BALANCE.toFixed(2)} USD`);
-    this.save(); this.emit();
   }
 
   private tick() {
@@ -330,116 +350,12 @@ export class Engine {
   }
 
   private processTriggers() {
-    for (const o of [...this.orders]) {
-      const q = this.quotes[o.symbol];
-      const hit = (o.type === "buy_limit" && q.ask <= o.price) || (o.type === "sell_limit" && q.bid >= o.price) || (o.type === "buy_stop" && q.ask >= o.price) || (o.type === "sell_stop" && q.bid <= o.price);
-      if (!hit) continue;
-      this.orders = this.orders.filter((x) => x !== o);
-      this.log(`order #${o.ticket} ${typeLabel(o.type)} triggered`);
-      const r = this.openPosition(o.symbol, isBuyType(o.type) ? "buy" : "sell", o.lots, o.sl, o.tp, o.ticket);
-      if (!r.ok) this.log(`order #${o.ticket} canceled: ${r.error}`, true);
-    }
-    for (const p of [...this.positions]) {
+    if (this._mode === "live") return; // Only trigger demo logic
+    for (const p of [...this.demoPositions]) {
       const c = this.closePriceOf(p);
       if (p.side === "buy") { if (p.sl && c <= p.sl) this.closePosition(p.ticket, "sl"); else if (p.tp && c >= p.tp) this.closePosition(p.ticket, "tp"); } 
       else { if (p.sl && c >= p.sl) this.closePosition(p.ticket, "sl"); else if (p.tp && c <= p.tp) this.closePosition(p.ticket, "tp"); }
     }
-    if (this.positions.length) {
-      const ml = this.marginLevel;
-      if (ml < MARGIN_CALL && !this.marginCallWarned) { this.marginCallWarned = true; this.log(`Margin call: margin level ${ml.toFixed(2)}%`, true); }
-      if (ml >= MARGIN_CALL) this.marginCallWarned = false;
-      let guard = 0;
-      while (this.positions.length && this.marginLevel < STOP_OUT && guard++ < 50) {
-        const worst = [...this.positions].sort((a, b) => this.profitOf(a) - this.profitOf(b))[0];
-        this.closePosition(worst.ticket, "stopout");
-      }
-    }
-  }
-
-  async fetchLiveBalance(): Promise<void> {
-    try {
-      try { const rateRes = await fetch("/forex/rates"); const rateData = await rateRes.json(); if (rateData?.success && rateData.usdToKes) this.exchangeRate = rateData.usdToKes; } catch {}
-      const res = await fetch("/forex/account?account_type=live");
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.account) {
-          this.liveKesBalance = data.account.walletBalance ?? 0;
-          this.liveBalance = this.liveKesBalance / this.exchangeRate;
-          this.balance = this.liveBalance;
-          if (data.positions && Array.isArray(data.positions)) {
-            this.positions = data.positions.map((p: any) => ({ ticket: p.id, symbol: p.symbol ? p.symbol.replace("/", "") : "EURUSD", side: p.side as Side, lots: Number(p.quantity), openPrice: Number(p.average_entry_price), openTime: new Date(p.opened_at).getTime(), sl: Number(p.stop_loss || 0), tp: Number(p.take_profit || 0) }));
-          }
-          this.emit();
-        }
-      }
-    } catch (e) { console.error("Failed to fetch live balance:", e); }
-  }
-
-  startLiveBalancePolling(): void {
-    if (this.liveBalanceInterval) return;
-    this.fetchLiveBalance();
-    this.liveBalanceInterval = window.setInterval(() => this.fetchLiveBalance(), 5000); 
-  }
-
-  stopLiveBalancePolling(): void {
-    if (this.liveBalanceInterval) { clearInterval(this.liveBalanceInterval); this.liveBalanceInterval = null; }
-  }
-
-  async placeOrderLive(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }): Promise<Result> {
-    if (this.mode !== "live") return this.fail("Live trading not enabled");
-    try {
-      const marginUsd = req.lots * 100; 
-      const res = await fetch("/forex/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          symbol: req.symbol.includes("/") ? req.symbol : `${req.symbol.slice(0,3)}/${req.symbol.slice(3)}`,
-          side: isBuyType(req.type) ? "buy" : "sell",
-          trade_amount: marginUsd, 
-          order_type: "market",
-          stop_loss: req.sl || undefined,
-          take_profit: req.tp || undefined,
-          account_type: "live",
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) return this.fail(data.error || "Order failed");
-      await this.fetchLiveBalance();
-      return { ok: true, ticket: data.position?.id || data.order?.id };
-    } catch { return this.fail("Network error placing order"); }
-  }
-
-  placeOrder(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }): Result {
-    if (this.mode === "live") {
-      this.placeOrderLive(req).catch(e => this.fail(e.message));
-      return { ok: true, ticket: 0 }; 
-    }
-    const s = this.spec(req.symbol);
-    if (!s) return this.fail("Unknown symbol");
-    const q = this.quotes[req.symbol];
-    const lots = round(req.lots, 2);
-    if (!(lots >= 0.01 && lots <= 10000)) return this.fail("Invalid volume (0.01 - 10000)"); // 👈 FIXED MINIMUM LOTS
-    const sl = round(req.sl || 0, s.digits), tp = round(req.tp || 0, s.digits);
-    const side: Side = isBuyType(req.type) ? "buy" : "sell";
-    if (req.type === "buy" || req.type === "sell") {
-      const err = this.checkStops(side, side === "buy" ? q.ask : q.bid, sl, tp, req.symbol);
-      if (err) return this.fail(err);
-      return this.openPosition(req.symbol, side, lots, sl, tp);
-    }
-    const price = round(req.price || 0, s.digits);
-    if (!price) return this.fail("Invalid price");
-    const t = req.type;
-    if (t === "buy_limit" && price >= q.ask) return this.fail("Buy Limit must be below Ask");
-    if (t === "sell_limit" && price <= q.bid) return this.fail("Sell Limit must be above Bid");
-    if (t === "buy_stop" && price <= q.ask) return this.fail("Buy Stop must be above Ask");
-    if (t === "sell_stop" && price >= q.bid) return this.fail("Sell Stop must be below Bid");
-    const err = this.checkStops(side, price, sl, tp, req.symbol);
-    if (err) return this.fail(err);
-    const ticket = this.nextTicket++;
-    this.orders.push({ ticket, symbol: req.symbol, type: t, lots, price, sl, tp, time: Date.now() });
-    this.log(`order #${ticket} ${typeLabel(t)} ${lots.toFixed(2)} ${req.symbol} at ${price.toFixed(s.digits)} placed`);
-    this.save(); this.emit();
-    return { ok: true, ticket };
   }
 }
 
