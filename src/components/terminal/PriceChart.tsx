@@ -9,6 +9,8 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
 
   const view = useRef({ spacing: 5, offset: 0 });
   const pinch = useRef<{ dist: number; spacing: number } | null>(null);
+  const drag = useRef<{ x: number; offset: number } | null>(null); // Restored for panning
+  
   const loRef = useRef<number>(0);
   const hiRef = useRef<number>(0);
   const displayBid = useRef<number | null>(null);
@@ -83,7 +85,7 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       const end = all.length - view.current.offset;
       let bars = all.slice(Math.max(0, end - count), end);
 
-      if (view.current.offset === 0) {
+      if (view.current.offset === 0 && bars.length > 0) {
         const last = bars[bars.length - 1];
         bars = [...bars];
         bars[bars.length - 1] = { ...last, c: smoothMid, h: Math.max(last.h, smoothMid, smoothAsk), l: Math.min(last.l, smoothMid, smoothBid) };
@@ -114,7 +116,7 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       const y = (p: number) => plotH - ((p - smoothLo) / (smoothHi - smoothLo)) * plotH;
       const xOf = (i: number) => plotW - 12 - (bars.length - i - 0.5) * sp;
 
-      // ─── Y-AXIS (Forced 11px Font) ───
+      // ─── Y-AXIS ───
       ctx.font = "11px Arial, sans-serif"; 
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
@@ -136,11 +138,10 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         ctx.fillText(p.toFixed(spec.digits), plotW + 4, yy);
       }
 
-  // ─── X-AXIS ───
+      // ─── X-AXIS ───
       ctx.textAlign = "center";
       const every = Math.max(1, Math.round(90 / sp));
       let lastLabelX = -100;
-      let lastLabelY = null;
       for (let i = bars.length - 1; i >= 0; i -= every) {
         const xx = Math.round(xOf(i)) + 0.5;
         ctx.beginPath(); ctx.moveTo(xx, 0); ctx.lineTo(xx, plotH); ctx.stroke();
@@ -151,16 +152,7 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
           const month = d.toLocaleString("en", { month: "short" });
           const lbl = `${day} ${month} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
           ctx.fillStyle = cText; 
-          // FIX: Add 15px vertical offset if label Y is similar to previous one
-          let labelY = plotH + 12;
-          if (lastLabelY !== null) {
-            const yDiff = Math.abs(labelY - lastLabelY);
-            if (yDiff < 30) {
-              labelY += 15;
-            }
-          }
-          lastLabelY = labelY;
-          ctx.fillText(lbl, xx, labelY);
+          ctx.fillText(lbl, xx, plotH + 12);
           lastLabelX = xx;
         }
       }
@@ -180,32 +172,42 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       // ─── CHART TOP-LEFT TEXT OVERLAY ───
       ctx.fillStyle = "#1565c0";
       ctx.font = "bold 12px Arial, sans-serif";
-      // FIX: Use string concatenation to avoid arrow character corruption
       ctx.fillText(`${symbol} ▼ ${tf}`, 8, 15);
       ctx.fillStyle = "#666";
       ctx.font = "11px Arial, sans-serif";
       ctx.fillText(spec.desc || "", 8, 30);
 
-      // ─── POSITION LINES (Dashed with white bg) ───
+      // ─── POSITION LINES (Fixed Overlap) ───
+      const drawnLabelYs: number[] = []; // Track drawn labels to prevent overlap
+      
       symbolPositions.forEach((p: any) => {
         if (p.openPrice < smoothLo || p.openPrice > smoothHi) return;
         const yy = Math.round(y(p.openPrice)) + 0.5;
         const pnl = engine.profitOf(p);
         
+        // Draw dashed line at the exact price
         ctx.strokeStyle = p.side === "buy" ? "#1565c0" : "#c62828";
         ctx.setLineDash([3, 3]);
         ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke();
         ctx.setLineDash([]);
 
+        // Determine label Y, offsetting if it overlaps
+        let labelY = yy - 8;
+        while (drawnLabelYs.some((ly) => Math.abs(ly - labelY) < 16)) {
+          labelY += 16; // Push down by 16px
+        }
+        drawnLabelYs.push(labelY);
+
         const txt = `${p.side.toUpperCase()} ${p.lots.toFixed(2)}   ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD`;
         const txtWidth = ctx.measureText(txt).width;
         
-        // White bg for text
+        // Draw white background for text
         ctx.fillStyle = "#ffffff";
-        ctx.fillRect(4, yy - 16, txtWidth + 8, 16);
+        ctx.fillRect(4, labelY - 8, txtWidth + 8, 16);
         
+        // Draw text
         ctx.fillStyle = p.side === "buy" ? "#1565c0" : "#c62828";
-        ctx.fillText(txt, 8, yy - 8);
+        ctx.fillText(txt, 8, labelY);
       });
 
       // ─── BID / ASK BOXES ───
@@ -250,7 +252,59 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
   }, [size.w, size.h, engine, symbol, tf]);
 
   return (
-    <div ref={wrapRef} className="absolute inset-0 touch-none overflow-hidden bg-white">
+    <div 
+      ref={wrapRef} 
+      className="absolute inset-0 touch-none overflow-hidden bg-white cursor-crosshair"
+      onWheel={(ev) => {
+        ev.preventDefault();
+        // Zoom in/out with mouse wheel
+        const zoomFactor = ev.deltaY < 0 ? 1.15 : 0.85;
+        view.current.spacing = Math.min(30, Math.max(2, view.current.spacing * zoomFactor));
+      }}
+      onPointerDown={(ev) => {
+        if (ev.pointerType === "mouse" || ev.pointerType === "pen") {
+          drag.current = { x: ev.clientX, offset: view.current.offset };
+          (ev.target as HTMLElement).setPointerCapture(ev.pointerId);
+        }
+      }}
+      onPointerMove={(ev) => {
+        if (!drag.current) return;
+        const dx = ev.clientX - drag.current.x;
+        const candles = engine?.candles?.[symbol]?.[tf] || [];
+        const maxOffset = Math.max(0, candles.length - 10);
+        // Calculate candle shift based on drag distance
+        const candleShift = Math.round(-dx / view.current.spacing);
+        view.current.offset = Math.max(0, Math.min(maxOffset, drag.current.offset + candleShift));
+      }}
+      onPointerUp={() => { drag.current = null; }}
+      onPointerLeave={() => { drag.current = null; }}
+      onTouchStart={(ev) => {
+        if (ev.touches.length === 2) {
+          const dx = ev.touches[0].clientX - ev.touches[1].clientX;
+          const dy = ev.touches[0].clientY - ev.touches[1].clientY;
+          pinch.current = { dist: Math.sqrt(dx * dx + dy * dy), spacing: view.current.spacing };
+        } else if (ev.touches.length === 1) {
+          drag.current = { x: ev.touches[0].clientX, offset: view.current.offset };
+        }
+      }}
+      onTouchMove={(ev) => {
+        if (ev.touches.length === 2 && pinch.current) {
+          ev.preventDefault();
+          const dx = ev.touches[0].clientX - ev.touches[1].clientX;
+          const dy = ev.touches[0].clientY - ev.touches[1].clientY;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const scale = dist / pinch.current.dist;
+          view.current.spacing = Math.min(30, Math.max(2, pinch.current.spacing * scale));
+        } else if (ev.touches.length === 1 && drag.current) {
+          const dx = ev.touches[0].clientX - drag.current.x;
+          const candles = engine?.candles?.[symbol]?.[tf] || [];
+          const maxOffset = Math.max(0, candles.length - 10);
+          const candleShift = Math.round(-dx / view.current.spacing);
+          view.current.offset = Math.max(0, Math.min(maxOffset, drag.current.offset + candleShift));
+        }
+      }}
+      onTouchEnd={() => { pinch.current = null; drag.current = null; }}
+    >
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full block" style={{ width: size.w, height: size.h }} />
     </div>
   );

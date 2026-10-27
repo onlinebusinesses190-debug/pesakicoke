@@ -4,7 +4,7 @@ import { dt, money, useEngine } from "@/lib/trading/use-engine";
 
 type Tab = "trade" | "history" | "journal";
 
-export function Toolbox({ onModify }: { onModify: (ticket: number) => void }) {
+export function Toolbox({ onModify }: { onModify: (ticket: number | string) => void }) {
   const e = useEngine();
   const [tab, setTab] = useState<Tab>("trade");
   const pnlCls = (v: number) => (v > 0 ? "text-up" : v < 0 ? "text-down" : "");
