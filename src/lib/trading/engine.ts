@@ -110,21 +110,6 @@ export class Engine {
   get positions() { return this._mode === "live" ? this.livePositions : this.demoPositions; }
 
   private async fetchCandles() {
-    try {
-      const res = await apiFetch(`/forex/quotes?symbols=` + SYMBOLS.map((s) => s.name).join(","));
-      const data = await res.json().catch(() => null);
-      if (data?.success && data.quotes) {
-        for (const q of data.quotes) {
-          const sym = q.symbol.replace("/", "");
-          if (this.quotes[sym]) {
-            this.quotes[sym].bid = q.bid;
-            this.quotes[sym].ask = q.ask;
-          }
-        }
-        this.emit();
-      }
-    } catch {}
-
     for (const s of SYMBOLS) {
       for (const tf of Object.keys(TIMEFRAMES) as TF[]) {
         try {
