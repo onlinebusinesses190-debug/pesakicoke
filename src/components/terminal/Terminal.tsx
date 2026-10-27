@@ -55,9 +55,13 @@ const BottomMessages = () => (
   </svg>
 );
 
-export function Terminal() {
+export function Terminal({ mode }: { mode?: "demo" | "real" } = {}) {
   const e = useEngine();
   const [symbol, setSymbol] = useState("EURUSD");
+
+  useEffect(() => {
+    e.setMode(mode === "real" ? "live" : "demo");
+  }, [mode]);
   const [tf, setTf] = useState<TF>("M5");
   const [zoom, setZoom] = useState(1);
   const [dialog, setDialog] = useState<DialogState>(null);

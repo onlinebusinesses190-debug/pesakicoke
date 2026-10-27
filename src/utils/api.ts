@@ -22,12 +22,11 @@ const getApiUrl = () => {
 };
 const API_URL = getApiUrl();
 
-export async function apiRequest<T = any>(path: string, options: RequestInit = {}): Promise<T> {
+export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
   if (typeof window === "undefined") {
-    throw new Error("apiRequest can only be called from client components");
+    throw new Error("apiFetch can only be called from client components");
   }
 
-  // ── Use the singleton client ─────────────────────────────────────
   const {
     data: { session },
     error,
@@ -37,23 +36,40 @@ export async function apiRequest<T = any>(path: string, options: RequestInit = {
     console.error("[API] getSession error:", error);
   }
 
+  const headers = new Headers(options.headers);
+  if (session?.access_token) {
+    headers.set("Authorization", `Bearer ${session.access_token}`);
+  }
+  headers.set("Content-Type", "application/json");
+
+  const fetchUrl = path.startsWith("http") ? path : `${API_URL}${path}`;
+
+  return fetch(fetchUrl, {
+    ...options,
+    headers,
+    cache: "no-store",
+  });
+}
+
+export async function apiRequest<T = any>(path: string, options: RequestInit = {}): Promise<T> {
+  if (typeof window === "undefined") {
+    throw new Error("apiRequest can only be called from client components");
+  }
+
+  // Protected endpoints require an authenticated session. Public endpoints can
+  // still be reached via `apiFetch` directly, which sends a token only when one
+  // is available rather than rejecting the request.
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
   if (!session?.access_token) {
     const msg = "Authentication required. Please log in to continue.";
     console.warn(`[API] ${msg} (URL: ${path})`);
     throw new Error(msg);
   }
 
-  const headers = new Headers(options.headers);
-  headers.set("Authorization", `Bearer ${session.access_token}`);
-  headers.set("Content-Type", "application/json");
-
-  const fetchUrl = path.startsWith("http") ? path : `${API_URL}${path}`;
-
-  const response = await fetch(fetchUrl, {
-    ...options,
-    headers,
-    cache: "no-store",
-  });
+  const response = await apiFetch(path, options);
 
   if (!response.ok) {
     let errorMsg = `HTTP error! status: ${response.status}`;
