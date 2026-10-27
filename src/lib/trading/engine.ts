@@ -67,7 +67,6 @@ export class Engine {
   leverage = configuredLeverage() || 100;
   currency = "USD";
   
-  // 👈 FIX: Separate arrays for demo and live
   private _mode: "demo" | "live" = "demo";
   demoPositions: Position[] = [];
   livePositions: Position[] = [];
@@ -245,43 +244,6 @@ export class Engine {
     return { ok: true };
   }
 
-  modifyPosition(ticket: number | string, sl: number, tp: number): Result {
-    if (this._mode === "live") {
-      return this.fail("Position modification is not yet supported in live mode");
-    }
-    const p = this.demoPositions.find((x) => x.ticket === ticket);
-    if (!p) return this.fail(`Position #${ticket} not found`);
-    const d = this.spec(p.symbol).digits;
-    sl = round(sl || 0, d); tp = round(tp || 0, d);
-    const err = this.checkStops(p.side, this.closePriceOf(p), sl, tp, p.symbol);
-    if (err) return this.fail(err);
-    p.sl = sl; p.tp = tp;
-    this.log(`position #${ticket} modified: sl ${sl || "-"}, tp ${tp || "-"}`);
-    this.save(); this.emit();
-    return { ok: true };
-  }
-
-  cancelOrder(ticket: number | string): Result {
-    if (this._mode === "live") {
-      return this.fail("Order cancellation is not yet supported in live mode");
-    }
-    const o = this.orders.find((x) => x.ticket === ticket);
-    if (!o) return this.fail(`Order #${ticket} not found`);
-    this.orders = this.orders.filter((x) => x !== o);
-    this.log(`order #${ticket} ${typeLabel(o.type)} ${o.lots.toFixed(2)} ${o.symbol} canceled`);
-    this.save(); this.emit();
-    return { ok: true };
-  }
-
-  deposit(amountUsd: number): Result {
-    if (!(amountUsd > 0 && amountUsd <= 1e7)) return this.fail("Invalid deposit amount");
-    this.balance = round(this.balance + amountUsd, 2);
-    this.history.unshift({ ticket: this.nextTicket++, symbol: "", side: "buy", lots: 0, openPrice: 0, closePrice: 0, openTime: Date.now(), closeTime: Date.now(), profit: amountUsd, reason: "deposit" });
-    this.log(`demo deposit ${amountUsd.toFixed(2)} USD`);
-    this.save(); this.emit();
-    return { ok: true };
-  }
-
   async fetchLiveBalance(): Promise<void> {
     if (this.isFetchingLive) return;
     this.isFetchingLive = true;
@@ -327,14 +289,13 @@ export class Engine {
   async placeOrderLive(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }): Promise<Result> {
     if (this._mode !== "live") return this.fail("Live trading not enabled");
     try {
-      const marginUsd = req.lots * 100;
-      const tradeAmountKes = Math.round(marginUsd * this.exchangeRate);
+      const marginUsd = req.lots * 100; 
       const res = await apiRequest<any>("/forex/orders", {
         method: "POST",
         body: JSON.stringify({
           symbol: req.symbol.includes("/") ? req.symbol : `${req.symbol.slice(0,3)}/${req.symbol.slice(3)}`,
           side: isBuyType(req.type) ? "buy" : "sell",
-          trade_amount: tradeAmountKes,
+          trade_amount: marginUsd, 
           order_type: "market",
           stop_loss: req.sl || undefined,
           take_profit: req.tp || undefined,
@@ -404,7 +365,7 @@ export class Engine {
   }
 
   private processTriggers() {
-    if (this._mode === "live") return; // Only trigger demo logic
+    if (this._mode === "live") return; 
     for (const p of [...this.demoPositions]) {
       const c = this.closePriceOf(p);
       if (p.side === "buy") { if (p.sl && c <= p.sl) this.closePosition(p.ticket, "sl"); else if (p.tp && c >= p.tp) this.closePosition(p.ticket, "tp"); } 
