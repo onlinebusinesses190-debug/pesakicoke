@@ -694,6 +694,44 @@ export class Engine {
     }
   }
 
+  // Legacy placeOrder now forwards to placeOrderLive in live mode for correct margin calculation
+  placeOrder(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }): Result {
+    if (this.mode === "live") {
+      this.placeOrderLive(req).catch(e => this.fail(e.message));
+      return { ok: true, ticket: 0 };
+    }
+
+    const s = this.spec(req.symbol);
+    if (!s) return this.fail("Unknown symbol");
+    const q = this.quotes[req.symbol];
+    const lots = round(req.lots, 2);
+    if (!(lots >= 1 && lots <= 10000)) return this.fail("Invalid volume (1 - 10000)");
+    const sl = round(req.sl || 0, s.digits), tp = round(req.tp || 0, s.digits);
+    const side: Side = isBuyType(req.type) ? "buy" : "sell";
+
+    if (req.type === "buy" || req.type === "sell") {
+      const err = this.checkStops(side, side === "buy" ? q.ask : q.bid, sl, tp, req.symbol);
+      if (err) return this.fail(err);
+      return this.openPosition(req.symbol, side, lots, sl, tp);
+    }
+
+    const price = round(req.price || 0, s.digits);
+    if (!price) return this.fail("Invalid price");
+    const t = req.type;
+    if (t === "buy_limit" && price >= q.ask) return this.fail("Buy Limit must be below Ask");
+    if (t === "sell_limit" && price <= q.bid) return this.fail("Sell Limit must be above Bid");
+    if (t === "buy_stop" && price <= q.ask) return this.fail("Buy Stop must be above Ask");
+    if (t === "sell_stop" && price >= q.bid) return this.fail("Sell Stop must be below Bid");
+    const err = this.checkStops(side, price, sl, tp, req.symbol);
+    if (err) return this.fail(err);
+    const ticket = this.nextTicket++;
+    this.orders.push({ ticket, symbol: req.symbol, type: t, lots, price, sl, tp, time: Date.now() });
+    this.log(`order #${ticket} ${typeLabel(t)} ${lots.toFixed(2)} ${req.symbol} at ${price.toFixed(s.digits)} placed`);
+    this.save();
+    this.emit();
+    return { ok: true, ticket };
+  }
+
   startLiveBalancePolling(): void {
     if (this.liveBalanceInterval) return;
     this.fetchLiveBalance();
