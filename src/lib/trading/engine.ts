@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { configuredLeverage } from "@/lib/fx/market";
-import { apiRequest } from "@/utils/api";
+import { apiRequest, apiFetch } from "@/utils/api";
 
 export const TIMEFRAMES = { M1: 60, M5: 300, M15: 900, M30: 1800, H1: 3600, H4: 14400 } as const;
 export type TF = keyof typeof TIMEFRAMES;
@@ -111,14 +111,30 @@ export class Engine {
   get positions() { return this._mode === "live" ? this.livePositions : this.demoPositions; }
 
   private async fetchCandles() {
+    try {
+      const res = await apiFetch(`/forex/quotes?symbols=` + SYMBOLS.map((s) => s.name).join(","));
+      const data = await res.json().catch(() => null);
+      if (data?.success && data.quotes) {
+        for (const q of data.quotes) {
+          const sym = q.symbol.replace("/", "");
+          if (this.quotes[sym]) {
+            this.quotes[sym].bid = q.bid;
+            this.quotes[sym].ask = q.ask;
+          }
+        }
+        this.emit();
+      }
+    } catch {}
+
     for (const s of SYMBOLS) {
       for (const tf of Object.keys(TIMEFRAMES) as TF[]) {
         try {
           const interval = TF_TO_INTERVAL[tf];
           const formattedSymbol = `${s.name.slice(0, 3)}/${s.name.slice(3)}`;
-          const res = await apiRequest<any>(`/forex/candles?symbol=${encodeURIComponent(formattedSymbol)}&interval=${interval}&count=400`);
-          if (res.success && res.candles) {
-            this.candles[s.name][tf] = res.candles.map((c: any) => ({ t: Math.floor(c.timestamp / 1000), o: c.open, h: c.high, l: c.low, c: c.close }));
+          const res = await apiFetch(`/forex/candles?symbol=${encodeURIComponent(formattedSymbol)}&interval=${interval}&count=400`);
+          const data = await res.json().catch(() => null);
+          if (data?.success && data.candles) {
+            this.candles[s.name][tf] = data.candles.map((c: any) => ({ t: Math.floor(c.timestamp / 1000), o: c.open, h: c.high, l: c.low, c: c.close }));
           }
         } catch {}
       }
@@ -272,7 +288,7 @@ export class Engine {
 
     try {
       try { 
-        const rateRes = await apiRequest<any>("/forex/rates"); 
+        const rateRes = await apiFetch("/forex/rates").then(r => r.json()).catch(() => null); 
         if (rateRes?.success && rateRes.usdToKes) this.exchangeRate = rateRes.usdToKes; 
       } catch {}
 
