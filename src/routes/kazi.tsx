@@ -91,6 +91,9 @@ interface JobContract {
   next_payout_date: string;
   amount_released: number;
   amount_held: number;
+  job_title: string;
+  worker_accepted: boolean;
+  job_done: boolean;
 }
 
 interface ChatMessage {
@@ -107,6 +110,7 @@ function KaziPage() {
   const { user } = useAuth();
   const { requireAuth } = useRequireAuth();
   const { hireFor } = Route.useSearch();
+  const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("find");
   const [q, setQ] = useState("");
   const [applyJob, setApplyJob] = useState<Job | null>(null);
@@ -387,11 +391,11 @@ function KaziPage() {
         <EmployerView
           postedJobs={myPostedJobs}
           jobApplicants={jobApplicants}
-          onChat={(jobId, application) => {
+          onChat={(jobId: string, application: Application) => {
             const job = myPostedJobs.find(j => j.id === jobId);
             if (job) setChatApp({ application, job });
           }}
-           onHire={(app) => { if (!requireAuth()) return; setHireApp(app); }}
+           onHire={(app: Application) => { if (!requireAuth()) return; setHireApp(app); }}
           onRefresh={refreshData}
         />
       )}
@@ -401,7 +405,7 @@ function KaziPage() {
           apps={applications}
           postedJobs={myPostedJobs}
           contracts={contracts}
-          onChat={(app, job) => setChatApp({ application: app, job })}
+          onChat={(app: Application, job: Job) => setChatApp({ application: app, job })}
           onRefresh={refreshData}
           user={user}
           onOpenProfile={() => setTab("profile")}
@@ -415,7 +419,7 @@ function KaziPage() {
         <PostJobSheet
           onClose={() => {
             setPostJob(false);
-            if (hireFor) navigate({ to: "/kazi", search: {} });
+            if (hireFor) navigate({ to: "/kazi", search: { hireFor: undefined } });
           }}
           initialDescription={hireFor ? `Hiring ${hireFor}…` : undefined}
           onSuccess={refreshData}
@@ -655,7 +659,7 @@ function MyPanel({ apps, postedJobs, contracts, onChat, onRefresh, user, onOpenP
       {activeTab === "applications" && (
         <WorkerApplications
           apps={apps}
-          onChat={(app) => {
+          onChat={(app: Application) => {
             const job = app.jobs;
             if (job) onChat(app, job);
           }}
@@ -1009,7 +1013,7 @@ function ActiveContracts({ contracts, onRefresh, user }: any) {
 
   return (
     <div className="space-y-3">
-      {contracts.map((c: any) => {
+      {contracts.map((c: JobContract) => {
         const isEmployer = c.employer_id === user?.id;
         const totalDays = Math.ceil((new Date(c.end_date).getTime() - new Date(c.start_date).getTime()) / (1000 * 60 * 60 * 24));
         const daysElapsed = Math.ceil((new Date().getTime() - new Date(c.start_date).getTime()) / (1000 * 60 * 60 * 24));
@@ -1515,6 +1519,7 @@ function PostJobSheet({ onClose, onSuccess, user, initialDescription }: any) {
   const [checkoutId, setCheckoutId] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
   const attemptsRef = useRef(0);
+  let currentToken: string | null = null;
 
   const stopPolling = () => {
     if (pollRef.current) {
@@ -1534,7 +1539,7 @@ function PostJobSheet({ onClose, onSuccess, user, initialDescription }: any) {
     attemptsRef.current += 1;
     try {
       const res = await fetch(`${API_BASE}/kazi/mpesa/job-status/${checkoutRequestId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${currentToken}` },
       });
       const data = await res.json();
       const status = String(data?.status || "").toLowerCase();
@@ -1555,8 +1560,6 @@ function PostJobSheet({ onClose, onSuccess, user, initialDescription }: any) {
     }
   };
 
-  useEffect(() => () => stopPolling(), []);
-
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!requireAuth()) return;
@@ -1570,7 +1573,8 @@ function PostJobSheet({ onClose, onSuccess, user, initialDescription }: any) {
     setStep("processing");
     try {
       const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
+      const token = data.session?.access_token ?? null;
+      currentToken = token;
 
       const body: any = {
         ...form,

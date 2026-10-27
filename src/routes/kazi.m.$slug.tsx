@@ -26,7 +26,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/kazi/m/$slug")({
   getParentRoute: () => rootRouteId,
-  head: () => ({
+  head: () => (
     meta: [
       { title: "Profile — KAZI Link — PESAKI" },
       {
@@ -348,7 +348,7 @@ right={
               </div>
             </div>
             <button
-              onClick={() => navigate({ to: "/kazi/google-card-help" })}
+              onClick={() => navigate({ to: "/kazi/google-card-help", search: {} })}
               className="w-full inline-flex items-center justify-center gap-2 rounded-full gradient-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
             >
               <Search className="h-4 w-4" /> Learn how to add your People Card
