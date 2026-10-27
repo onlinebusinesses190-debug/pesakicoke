@@ -1,7 +1,4 @@
 // Simulated MetaTrader-style trading engine (demo account).
-// Runs entirely in the browser: live price feed, order execution, margin, SL/TP, stop-out.
-// Supports fetching real historical candles from backend for seamless refresh.
-
 export const TIMEFRAMES = { M1: 60, M5: 300, M15: 900, M30: 1800, H1: 3600, H4: 14400 } as const;
 export type TF = keyof typeof TIMEFRAMES;
 
@@ -9,10 +6,7 @@ export type Side = "buy" | "sell";
 export type OrderType = "buy" | "sell" | "buy_limit" | "sell_limit" | "buy_stop" | "sell_stop";
 export type CloseReason = "manual" | "sl" | "tp" | "stopout";
 
-const KES_PER_QUOTE: Record<string, number> = {
-  USD: 130, EUR: 141, GBP: 168, JPY: 0.88,
-  CHF: 152, AUD: 85, CAD: 95, NZD: 79,
-};
+const KES_PER_QUOTE: Record<string, number> = { USD: 130, EUR: 141, GBP: 168, JPY: 0.88, CHF: 152, AUD: 85, CAD: 95, NZD: 79 };
 
 export function kesPerQuote(currency: string): number {
   const code = currency.toUpperCase();
@@ -20,103 +14,28 @@ export function kesPerQuote(currency: string): number {
   return KES_PER_QUOTE[code] ?? 1;
 }
 
-export interface SymbolSpec {
-  name: string;
-  desc: string;
-  digits: number;
-  point: number;
-  spread: number;
-  contract: number;
-  start: number;
-  vol: number;
-}
-export interface Quote {
-  bid: number;
-  ask: number;
-  high: number;
-  low: number;
-  open: number;
-  dir: -1 | 0 | 1;
-  time: number;
-}
-export interface Candle {
-  t: number;
-  o: number;
-  h: number;
-  l: number;
-  c: number;
-}
-export interface Position {
-  ticket: number | string; // Can be string from live backend
-  symbol: string;
-  side: Side;
-  lots: number;
-  openPrice: number;
-  openTime: number;
-  sl: number;
-  tp: number;
-}
-export interface PendingOrder {
-  ticket: number | string;
-  symbol: string;
-  type: Exclude<OrderType, "buy" | "sell">;
-  lots: number;
-  price: number;
-  sl: number;
-  tp: number;
-  time: number;
-}
-export interface Deal {
-  ticket: number | string;
-  symbol: string;
-  side: Side;
-  lots: number;
-  openPrice: number;
-  closePrice: number;
-  openTime: number;
-  closeTime: number;
-  profit: number;
-  reason: CloseReason | "deposit" | "cancel";
-}
-export interface JournalEntry {
-  time: number;
-  msg: string;
-  error?: boolean;
-}
+export interface SymbolSpec { name: string; desc: string; digits: number; point: number; spread: number; contract: number; start: number; vol: number; }
+export interface Quote { bid: number; ask: number; high: number; low: number; open: number; dir: -1 | 0 | 1; time: number; }
+export interface Candle { t: number; o: number; h: number; l: number; c: number; }
+export interface Position { ticket: number | string; symbol: string; side: Side; lots: number; openPrice: number; openTime: number; sl: number; tp: number; }
+export interface PendingOrder { ticket: number | string; symbol: string; type: Exclude<OrderType, "buy" | "sell">; lots: number; price: number; sl: number; tp: number; time: number; }
+export interface Deal { ticket: number | string; symbol: string; side: Side; lots: number; openPrice: number; closePrice: number; openTime: number; closeTime: number; profit: number; reason: CloseReason | "deposit" | "cancel"; }
+export interface JournalEntry { time: number; msg: string; error?: boolean; }
 export type Result = { ok: true; ticket?: number | string } | { ok: false; error: string };
 
 import { configuredLeverage } from "@/lib/fx/market";
 
-// ─── TIGHT MT5-STYLE SPREADS ───
-const SPREADS: Record<string, number> = {
-  EURUSD: 1, GBPUSD: 2, USDJPY: 1, AUDUSD: 1,
-  USDCAD: 2, USDCHF: 2, NZDUSD: 2, EURJPY: 2,
-  GBPJPY: 3, XAUUSD: 2, 
-};
-
-function spreadFor(symbol: string): number {
-  return SPREADS[symbol] ?? 2;
-}
-
+const SPREADS: Record<string, number> = { EURUSD: 1, GBPUSD: 2, USDJPY: 1, AUDUSD: 1, USDCAD: 2, USDCHF: 2, NZDUSD: 2, EURJPY: 2, GBPJPY: 3, XAUUSD: 2 };
 const RAW: [string, string, number, number, number, number][] = [
-  ["EURUSD", "Euro vs US Dollar", 5, 1, 100000, 1.0852],
-  ["GBPUSD", "Great Britain Pound vs US Dollar", 5, 2, 100000, 1.2648],
-  ["USDJPY", "US Dollar vs Japanese Yen", 3, 1, 100000, 149.52],
-  ["AUDUSD", "Australian Dollar vs US Dollar", 5, 1, 100000, 0.6551],
-  ["USDCAD", "US Dollar vs Canadian Dollar", 5, 2, 100000, 1.3602],
-  ["USDCHF", "US Dollar vs Swiss Franc", 5, 2, 100000, 0.8803],
-  ["NZDUSD", "New Zealand Dollar vs US Dollar", 5, 2, 100000, 0.6004],
-  ["EURJPY", "Euro vs Japanese Yen", 3, 2, 100000, 162.24],
-  ["GBPJPY", "Great Britain Pound vs Japanese Yen", 3, 3, 100000, 189.11],
-  ["XAUUSD", "Gold vs US Dollar", 2, 2, 100, 2351.4],
+  ["EURUSD", "Euro vs US Dollar", 5, 1, 100000, 1.0852], ["GBPUSD", "Great Britain Pound vs US Dollar", 5, 2, 100000, 1.2648],
+  ["USDJPY", "US Dollar vs Japanese Yen", 3, 1, 100000, 149.52], ["AUDUSD", "Australian Dollar vs US Dollar", 5, 1, 100000, 0.6551],
+  ["USDCAD", "US Dollar vs Canadian Dollar", 5, 2, 100000, 1.3602], ["USDCHF", "US Dollar vs Swiss Franc", 5, 2, 100000, 0.8803],
+  ["NZDUSD", "New Zealand Dollar vs US Dollar", 5, 2, 100000, 0.6004], ["EURJPY", "Euro vs Japanese Yen", 3, 2, 100000, 162.24],
+  ["GBPJPY", "Great Britain Pound vs Japanese Yen", 3, 3, 100000, 189.11], ["XAUUSD", "Gold vs US Dollar", 2, 2, 100, 2351.4],
 ];
 
 export const SYMBOLS: SymbolSpec[] = RAW.map(([name, desc, digits, spread, contract, start]) => ({
-  name, desc, digits,
-  point: Math.pow(10, -digits),
-  spread: spreadFor(name),
-  contract, start,
-  vol: start * 1.2e-5,
+  name, desc, digits, point: Math.pow(10, -digits), spread, contract, start, vol: start * 1.2e-5
 }));
 
 const STORAGE_KEY = "mt-terminal-v1";
@@ -126,143 +45,30 @@ const MARGIN_CALL = 100;
 
 export const round = (v: number, d: number) => Math.round(v * Math.pow(10, d)) / Math.pow(10, d);
 
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return function () {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function seededRNG(symbol: string, timestamp: number): () => number {
-  const str = symbol + ":" + timestamp;
-  let h = 0;
-  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
-  return mulberry32((h ^ timestamp) >>> 0);
-}
-
-function gaussFrom(rng: () => number) {
-  let u = 0, v = 0;
-  while (u === 0) u = rng();
-  while (v === 0) v = rng();
-  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
-}
-
+function mulberry32(seed: number): () => number { let a = seed >>> 0; return function () { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function seededRNG(symbol: string, timestamp: number): () => number { const str = symbol + ":" + timestamp; let h = 0; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0; return mulberry32((h ^ timestamp) >>> 0); }
+function gaussFrom(rng: () => number) { let u = 0, v = 0; while (u === 0) u = rng(); while (v === 0) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
 export const isBuyType = (t: OrderType) => t.startsWith("buy");
 export const typeLabel = (t: OrderType) => t.replace("_", " ");
 
 function genCandles(s: SymbolSpec, tfSec: number, nowSec: number, n = 400): Candle[] {
-  const out: Candle[] = [];
-  let p = s.start;
-  const subSigma = s.vol * Math.sqrt((tfSec * 2) / 6);
-  const last = Math.floor(nowSec / tfSec) * tfSec;
-  const rng = seededRNG(s.name, tfSec);
-  
-  for (let i = 0; i < n; i++) {
-    const o = p;
-    let h = p, l = p;
-    for (let k = 0; k < 6; k++) {
-      p += gaussFrom(rng) * subSigma;
-      h = Math.max(h, p);
-      l = Math.min(l, p);
-    }
-    out.push({ t: last - (n - 1 - i) * tfSec, o, h, l, c: p });
-  }
-  const shift = s.start - p;
-  return out.map((c) => ({
-    t: c.t,
-    o: round(c.o + shift, s.digits),
-    h: round(c.h + shift, s.digits),
-    l: round(c.l + shift, s.digits),
-    c: round(c.c + shift, s.digits),
-  }));
+  const out: Candle[] = []; let p = s.start; const subSigma = s.vol * Math.sqrt((tfSec * 2) / 6); const last = Math.floor(nowSec / tfSec) * tfSec; const rng = seededRNG(s.name, tfSec);
+  for (let i = 0; i < n; i++) { const o = p; let h = p, l = p; for (let k = 0; k < 6; k++) { p += gaussFrom(rng) * subSigma; h = Math.max(h, p); l = Math.min(l, p); } out.push({ t: last - (n - 1 - i) * tfSec, o, h, l, c: p }); }
+  const shift = s.start - p; return out.map((c) => ({ t: c.t, o: round(c.o + shift, s.digits), h: round(c.h + shift, s.digits), l: round(c.l + shift, s.digits), c: round(c.c + shift, s.digits) }));
 }
 
-let candlesApiAvailable = true;
-
-// ─── FIXED: Exact case match for backend intervals ───
-const TF_TO_INTERVAL: Record<TF, string> = {
-  M1: '1m', M5: '5m', M15: '15m', M30: '30m', H1: '1H', H4: '4H',
-};
+const TF_TO_INTERVAL: Record<TF, string> = { M1: '1m', M5: '5m', M15: '15m', M30: '30m', H1: '1H', H4: '4H' };
 
 async function fetchCandlesFromBackend(symbol: string, tf: TF, count = 400): Promise<Candle[] | null> {
-  if (!candlesApiAvailable) return null;
   try {
-    // Convert symbol format: EURUSD -> EUR/USD for backend API
     const formattedSymbol = symbol.length === 6 ? `${symbol.slice(0, 3)}/${symbol.slice(3)}` : symbol;
     const interval = TF_TO_INTERVAL[tf] || '5m';
-    const url = `/forex/candles?symbol=${encodeURIComponent(formattedSymbol)}&interval=${interval}&count=${count}`;
-    const res = await fetch(url);
-    if (!res.ok) {
-      if (res.status === 404) {
-        candlesApiAvailable = false;
-      }
-      return null;
-    }
+    const res = await fetch(`/forex/candles?symbol=${encodeURIComponent(formattedSymbol)}&interval=${interval}&count=${count}`);
+    if (!res.ok) return null;
     const data = await res.json();
     if (!data.success || !data.candles || !Array.isArray(data.candles)) return null;
-    return data.candles.map((c: any) => ({
-      t: Math.floor(c.timestamp / 1000),
-      o: c.open,
-      h: c.high,
-      l: c.low,
-      c: c.close,
-    }));
-  } catch {
-    return null;
-  }
-}
-
-// Persistent cache for candle fetch failures (survives page refresh)
-const CANDLE_CACHE_KEY = 'pesaki_candle_fetch_cache';
-function getFailedCache(): Set<string> {
-  try {
-    const raw = localStorage.getItem(CANDLE_CACHE_KEY);
-    return raw ? new Set(JSON.parse(raw)) : new Set();
-  } catch { return new Set(); }
-}
-function saveFailedCache(set: Set<string>) {
-  try { localStorage.setItem(CANDLE_CACHE_KEY, JSON.stringify([...set])); } catch {}
-}
-
-async function fetchHistoricalCandlesPersistent(engine: Engine): Promise<void> {
-  const failedCache = getFailedCache();
-  for (const s of SYMBOLS) {
-    for (const tf of Object.keys(TIMEFRAMES) as TF[]) {
-      const key = `${s.name}:${tf}`;
-      if (engine.historicalCandlesFetched.has(key) || engine.historicalCandlesFailed.has(key) || engine.historicalCandlesFetching.has(key)) {
-        continue;
-      }
-      if (failedCache.has(key)) {
-        engine.historicalCandlesFailed.add(key);
-        continue;
-      }
-      if (engine.historicalCandlesFetching.has(key)) continue;
-      
-      engine.historicalCandlesFetching.add(key);
-      try {
-        const backendCandles = await fetchCandlesFromBackend(s.name, tf);
-        if (backendCandles && backendCandles.length > 0) {
-          engine.candles[s.name][tf] = backendCandles;
-          engine.historicalCandlesFetched.add(key);
-        } else {
-          engine.historicalCandlesFailed.add(key);
-          failedCache.add(key);
-          saveFailedCache(failedCache);
-        }
-      } catch {
-        engine.historicalCandlesFailed.add(key);
-        failedCache.add(key);
-        saveFailedCache(failedCache);
-      } finally {
-        engine.historicalCandlesFetching.delete(key);
-      }
-    }
-  }
-  engine.emit();
+    return data.candles.map((c: any) => ({ t: Math.floor(c.timestamp / 1000), o: c.open, h: c.high, l: c.low, c: c.close }));
+  } catch { return null; }
 }
 
 export class Engine {
@@ -282,9 +88,7 @@ export class Engine {
   
   private listeners = new Set<() => void>();
   private marginCallWarned = false;
-  
   public exposureProvider?: (symbol: string) => number;
-  public totalProfitProvider?: (symbol: string) => number;
   private animationFrameId: number | null = null;
   private lastTickTime = 0;
   private tickCount = 0;
@@ -302,139 +106,93 @@ export class Engine {
     const now = Date.now() / 1000;
     for (const s of SYMBOLS) {
       const tfs = {} as Record<TF, Candle[]>;
-      (Object.keys(TIMEFRAMES) as TF[]).forEach(
-        (tf) => (tfs[tf] = genCandles(s, TIMEFRAMES[tf], now)),
-      );
+      (Object.keys(TIMEFRAMES) as TF[]).forEach((tf) => (tfs[tf] = genCandles(s, TIMEFRAMES[tf], now)));
       this.candles[s.name] = tfs;
       const day = tfs.H1.slice(-24);
-      this.quotes[s.name] = {
-        bid: s.start,
-        ask: round(s.start + s.spread * s.point, s.digits),
-        high: Math.max(...day.map((c) => c.h)),
-        low: Math.min(...day.map((c) => c.l)),
-        open: day[0].o,
-        dir: 0,
-        time: Date.now(),
-      };
+      this.quotes[s.name] = { bid: s.start, ask: round(s.start + s.spread * s.point, s.digits), high: Math.max(...day.map((c) => c.h)), low: Math.min(...day.map((c) => c.l)), open: day[0].o, dir: 0, time: Date.now() };
     }
     this.load();
     this.log("Terminal started. Demo account connected to simulated server.");
     this.start();
-    fetchHistoricalCandlesPersistent(this);
+    this.fetchQuotesAndCandles();
+  }
+
+  private async fetchQuotesAndCandles() {
+    try {
+      const res = await fetch("/forex/quotes?symbols=" + SYMBOLS.map(s => s.name).join(","));
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.quotes) {
+          for (const q of data.quotes) {
+             const sym = q.symbol.replace("/", "");
+             if (this.quotes[sym]) {
+               this.quotes[sym].bid = q.bid;
+               this.quotes[sym].ask = q.ask;
+             }
+          }
+          this.emit();
+        }
+      }
+    } catch {}
+
+    for (const s of SYMBOLS) {
+      for (const tf of Object.keys(TIMEFRAMES) as TF[]) {
+        const key = `${s.name}:${tf}`;
+        if (this.historicalCandlesFetched.has(key)) continue;
+        this.historicalCandlesFetching.add(key);
+        const backendCandles = await fetchCandlesFromBackend(s.name, tf);
+        if (backendCandles && backendCandles.length > 0) {
+          this.candles[s.name][tf] = backendCandles;
+          this.historicalCandlesFetched.add(key);
+        }
+        this.historicalCandlesFetching.delete(key);
+      }
+    }
+    this.emit();
   }
 
   public start() {
     if (this.animationFrameId) return;
     this.lastTickTime = Date.now();
-
     const loop = () => {
       this.animationFrameId = requestAnimationFrame(loop);
       const now = Date.now();
-      
-      if (now - this.lastTickTime >= 200) {
-        this.lastTickTime = now;
-        this.tick();
-      }
+      if (now - this.lastTickTime >= 200) { this.lastTickTime = now; this.tick(); }
     };
     this.animationFrameId = requestAnimationFrame(loop);
   }
 
-  public stop() {
-    if (this.animationFrameId) {
-      cancelAnimationFrame(this.animationFrameId);
-      this.animationFrameId = null;
-    }
-  }
-
-  subscribe = (fn: () => void) => {
-    this.listeners.add(fn);
-    return () => { this.listeners.delete(fn); };
-  };
-  
+  public stop() { if (this.animationFrameId) { cancelAnimationFrame(this.animationFrameId); this.animationFrameId = null; } }
+  subscribe = (fn: () => void) => { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; };
   getVersion = () => this.version;
-  
-  emit() {
-    this.version++;
-    this.listeners.forEach((l) => l());
-  }
+  emit() { this.version++; this.listeners.forEach((l) => l()); }
   
   private save() {
-    if (this.mode === "live") return; // Don't save live data to localStorage
-    try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({
-          balance: this.balance,
-          positions: this.positions,
-          orders: this.orders,
-          history: this.history.slice(0, 500),
-          journal: this.journal.slice(0, 300),
-          nextTicket: this.nextTicket,
-        }),
-      );
-    } catch { /* ignore */ }
+    if (this.mode === "live") return;
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ balance: this.balance, positions: this.positions, orders: this.orders, history: this.history.slice(0, 500), journal: this.journal.slice(0, 300), nextTicket: this.nextTicket })); } catch {}
   }
   
   private load() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
+      const raw = localStorage.getItem(STORAGE_KEY); if (!raw) return;
       const d = JSON.parse(raw);
-      this.balance = d.balance ?? START_BALANCE;
-      this.positions = d.positions ?? [];
-      this.orders = d.orders ?? [];
-      this.history = d.history ?? [];
-      this.journal = d.journal ?? [];
-      this.nextTicket = d.nextTicket ?? this.nextTicket;
-    } catch { /* ignore */ }
+      this.balance = d.balance ?? START_BALANCE; this.positions = d.positions ?? []; this.orders = d.orders ?? [];
+      this.history = d.history ?? []; this.journal = d.journal ?? []; this.nextTicket = d.nextTicket ?? this.nextTicket;
+    } catch {}
   }
   
-  private log(msg: string, error = false) {
-    const e = { time: Date.now(), msg, error };
-    this.journal.unshift(e);
-    if (this.journal.length > 300) this.journal.length = 300;
-    this.notice = e;
-  }
-
-  spec(name: string) {
-    return SYMBOLS.find((s) => s.name === name)!;
-  }
-  fmt(name: string, v: number) {
-    return v.toFixed(this.spec(name).digits);
-  }
-
-  toUSD(symbol: string, amount: number) {
-    const q = symbol.slice(3, 6);
-    if (q === "USD") return amount;
-    const conv = this.quotes["USD" + q];
-    return conv ? amount / conv.bid : amount;
-  }
-  marginFor(symbol: string, usdAmount: number) {
-    return usdAmount / this.leverage;
-  }
-  closePriceOf(p: { symbol: string; side: Side }) {
-    const q = this.quotes[p.symbol];
-    return p.side === "buy" ? q.bid : q.ask;
-  }
-  profitOf(p: Position, usdAmount = p.lots) {
-    const diff = (this.closePriceOf(p) - p.openPrice) * (p.side === "buy" ? 1 : -1);
-    return round((usdAmount * diff) / p.openPrice, 2);
-  }
-  get floating() {
-    return this.positions.reduce((a, p) => a + this.profitOf(p), 0);
-  }
-  get equity() {
-    return round(this.balance + this.floating, 2);
-  }
-  get margin() {
-    return round(this.positions.reduce((a, p) => a + this.marginFor(p.symbol, p.lots), 0), 2);
-  }
-  get freeMargin() {
-    return round(this.equity - this.margin, 2);
-  }
-  get marginLevel() {
-    return this.margin > 0 ? (this.equity / this.margin) * 100 : 0;
-  }
+  private log(msg: string, error = false) { const e = { time: Date.now(), msg, error }; this.journal.unshift(e); if (this.journal.length > 300) this.journal.length = 300; this.notice = e; }
+  spec(name: string) { return SYMBOLS.find((s) => s.name === name)!; }
+  fmt(name: string, v: number) { return v.toFixed(this.spec(name).digits); }
+  toUSD(symbol: string, amount: number) { const q = symbol.slice(3, 6); if (q === "USD") return amount; const conv = this.quotes["USD" + q]; return conv ? amount / conv.bid : amount; }
+  marginFor(symbol: string, usdAmount: number) { return usdAmount / this.leverage; }
+  closePriceOf(p: { symbol: string; side: Side }) { const q = this.quotes[p.symbol]; return p.side === "buy" ? q.bid : q.ask; }
+  profitOf(p: Position, usdAmount = p.lots) { const diff = (this.closePriceOf(p) - p.openPrice) * (p.side === "buy" ? 1 : -1); return round((usdAmount * diff) / p.openPrice, 2); }
+  get floating() { return this.positions.reduce((a, p) => a + this.profitOf(p), 0); }
+  get equity() { return round(this.balance + this.floating, 2); }
+  get margin() { return round(this.positions.reduce((a, p) => a + this.marginFor(p.symbol, p.lots), 0), 2); }
+  get freeMargin() { return round(this.equity - this.margin, 2); }
+  get marginLevel() { return this.margin > 0 ? (this.equity / this.margin) * 100 : 0; }
 
   private checkStops(side: Side, ref: number, sl: number, tp: number, symbol: string): string | null {
     const minDist = this.spec(symbol).point * 10;
@@ -449,11 +207,7 @@ export class Engine {
     return null;
   }
   
-  private fail(msg: string): Result {
-    this.log(msg, true);
-    this.emit();
-    return { ok: false, error: msg };
-  }
+  private fail(msg: string): Result { this.log(msg, true); this.emit(); return { ok: false, error: msg }; }
 
   private openPosition(symbol: string, side: Side, lots: number, sl: number, tp: number, fromOrder?: number): Result {
     const s = this.spec(symbol);
@@ -464,51 +218,33 @@ export class Engine {
     const ticket = fromOrder ?? this.nextTicket++;
     this.positions.push({ ticket, symbol, side, lots, openPrice: price, openTime: Date.now(), sl, tp });
     this.log(`deal #${ticket} ${side} ${lots.toFixed(2)} ${symbol} at ${price.toFixed(s.digits)} done`);
-    this.save();
-    this.emit();
+    this.save(); this.emit();
     return { ok: true, ticket };
   }
 
   async closePosition(ticket: number | string, reason: CloseReason = "manual", lots?: number): Promise<Result> {
     if (this.mode === "live") {
       try {
-        const res = await fetch(`/forex/positions/${ticket}/close`, { 
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ close: true }) // Fixes Fastify empty body error
-        });
+        const res = await fetch(`/forex/positions/${ticket}/close`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ close: true }) });
         const data = await res.json();
         if (!res.ok) return this.fail(data.error || "Failed to close position");
-        await this.fetchLiveBalance(); // Refresh
+        await this.fetchLiveBalance();
         return { ok: true };
-      } catch (e) {
-        return this.fail("Network error closing position");
-      }
+      } catch { return this.fail("Network error closing position"); }
     }
-
     const p = this.positions.find((x) => x.ticket === ticket);
     if (!p) return this.fail(`Position #${ticket} not found`);
     const closeLots = lots ? Math.min(round(lots, 2), p.lots) : p.lots;
-    if (closeLots < 1) return this.fail("Invalid volume (min 1 USD)");
-    
+    if (closeLots < 0.01) return this.fail("Invalid volume (min 0.01)");
     const profit = this.profitOf(p, closeLots);
     const price = this.closePriceOf(p);
     this.balance = round(this.balance + profit, 2);
-    
-    this.history.unshift({
-      ticket: p.ticket, symbol: p.symbol, side: p.side, lots: closeLots,
-      openPrice: p.openPrice, closePrice: price,
-      openTime: p.openTime, closeTime: Date.now(),
-      profit, reason,
-    });
-    
+    this.history.unshift({ ticket: p.ticket, symbol: p.symbol, side: p.side, lots: closeLots, openPrice: p.openPrice, closePrice: price, openTime: p.openTime, closeTime: Date.now(), profit, reason });
     if (closeLots >= p.lots - 1e-9) this.positions = this.positions.filter((x) => x !== p);
     else p.lots = round(p.lots - closeLots, 2);
-    
     const tag = reason === "manual" ? "" : ` [${reason === "stopout" ? "stop out" : reason}]`;
     this.log(`position #${ticket} closed ${closeLots.toFixed(2)} ${p.symbol} at ${this.fmt(p.symbol, price)}, profit ${profit.toFixed(2)}${tag}`, reason === "stopout");
-    this.save();
-    this.emit();
+    this.save(); this.emit();
     return { ok: true };
   }
 
@@ -523,15 +259,12 @@ export class Engine {
     const p = this.positions.find((x) => x.ticket === ticket);
     if (!p) return this.fail(`Position #${ticket} not found`);
     const d = this.spec(p.symbol).digits;
-    sl = round(sl || 0, d);
-    tp = round(tp || 0, d);
+    sl = round(sl || 0, d); tp = round(tp || 0, d);
     const err = this.checkStops(p.side, this.closePriceOf(p), sl, tp, p.symbol);
     if (err) return this.fail(err);
-    p.sl = sl;
-    p.tp = tp;
+    p.sl = sl; p.tp = tp;
     this.log(`position #${ticket} modified: sl ${sl || "-"}, tp ${tp || "-"}`);
-    this.save();
-    this.emit();
+    this.save(); this.emit();
     return { ok: true };
   }
 
@@ -540,8 +273,7 @@ export class Engine {
     if (!o) return this.fail(`Order #${ticket} not found`);
     this.orders = this.orders.filter((x) => x !== o);
     this.log(`order #${ticket} ${typeLabel(o.type)} ${o.lots.toFixed(2)} ${o.symbol} canceled`);
-    this.save();
-    this.emit();
+    this.save(); this.emit();
     return { ok: true };
   }
 
@@ -549,140 +281,73 @@ export class Engine {
     if (!(amountKes > 0 && amountKes <= 1e7)) return this.fail("Invalid deposit amount");
     const usd = amountKes / kesPerQuote("USD");
     this.balance = round(this.balance + usd, 2);
-    this.history.unshift({
-      ticket: this.nextTicket++, symbol: "", side: "buy", lots: 0,
-      openPrice: 0, closePrice: 0, openTime: Date.now(), closeTime: Date.now(),
-      profit: usd, reason: "deposit",
-    });
+    this.history.unshift({ ticket: this.nextTicket++, symbol: "", side: "buy", lots: 0, openPrice: 0, closePrice: 0, openTime: Date.now(), closeTime: Date.now(), profit: usd, reason: "deposit" });
     this.log(`balance deposit ${usd.toFixed(2)} USD (KSh ${amountKes.toFixed(2)})`);
-    this.save();
-    this.emit();
+    this.save(); this.emit();
     return { ok: true };
   }
 
   setMode(mode: "demo" | "live") {
     this.mode = mode;
-    if (mode === "live") {
-      this.startLiveBalancePolling();
-      this.log("Live trading enabled");
-    } else {
-      this.stopLiveBalancePolling();
-      this.log("Demo trading enabled");
-    }
+    if (mode === "live") { this.startLiveBalancePolling(); this.log("Live trading enabled"); }
+    else { this.stopLiveBalancePolling(); this.log("Demo trading enabled"); }
     this.emit();
   }
 
   resetAccount() {
-    this.balance = START_BALANCE;
-    this.positions = [];
-    this.orders = [];
-    this.history = [];
-    this.journal = [];
+    this.balance = START_BALANCE; this.positions = []; this.orders = []; this.history = []; this.journal = [];
     this.log(`Demo account reset to ${START_BALANCE.toFixed(2)} USD`);
-    this.save();
-    this.emit();
+    this.save(); this.emit();
   }
 
   private tick() {
-    const now = Date.now();
-    const nowSec = now / 1000;
-    this.tickCount++;
-
+    const now = Date.now(); const nowSec = now / 1000; this.tickCount++;
     for (const s of SYMBOLS) {
-      const q = this.quotes[s.name];
-      const rng = mulberry32(this.tickCount ^ s.name.charCodeAt(0));
-
-      // 1. Calculate Net Exposure & House Bias (B-Book) - UNTOUCHED
+      const q = this.quotes[s.name]; const rng = mulberry32(this.tickCount ^ s.name.charCodeAt(0));
       let houseBias = 0;
       if (this.exposureProvider) {
         const netExposure = this.exposureProvider(s.name);
-        if (netExposure !== 0) {
-          houseBias = -netExposure * 0.000001; 
-        }
+        if (netExposure !== 0) houseBias = -netExposure * 0.000001;
       }
-
-      // 2. Natural Market Movement
       const randomMove = gaussFrom(rng) * s.vol;
       let proposedBid = q.bid + randomMove + houseBias;
-
-      // 3. HARD SPIKE FILTER
       const maxJump = s.vol * 2.5;
-      if (Math.abs(proposedBid - q.bid) > maxJump) {
-        proposedBid = q.bid + Math.sign(proposedBid - q.bid) * maxJump;
-      }
-
+      if (Math.abs(proposedBid - q.bid) > maxJump) proposedBid = q.bid + Math.sign(proposedBid - q.bid) * maxJump;
       const prev = q.bid;
       const bid = round(Math.max(s.point, proposedBid), s.digits);
-      
       const spreadPts = s.spread; 
       const ask = round(bid + spreadPts * s.point, s.digits);
-
-      q.bid = bid;
-      q.ask = ask;
-      q.dir = bid > prev ? 1 : bid < prev ? -1 : q.dir;
-      q.high = Math.max(q.high, bid);
-      q.low = Math.min(q.low, bid);
-      q.time = now;
-
-      // 4. Update Candles smoothly
+      q.bid = bid; q.ask = ask; q.dir = bid > prev ? 1 : bid < prev ? -1 : q.dir;
+      q.high = Math.max(q.high, bid); q.low = Math.min(q.low, bid); q.time = now;
       for (const tf of Object.keys(TIMEFRAMES) as TF[]) {
-        const arr = this.candles[s.name][tf];
-        const bucket = Math.floor(nowSec / TIMEFRAMES[tf]) * TIMEFRAMES[tf];
+        const arr = this.candles[s.name][tf]; const bucket = Math.floor(nowSec / TIMEFRAMES[tf]) * TIMEFRAMES[tf];
         const last = arr[arr.length - 1];
-        if (last.t === bucket) {
-          last.h = Math.max(last.h, bid);
-          last.l = Math.min(last.l, bid);
-          last.c = bid;
-        } else {
-          arr.push({
-            t: bucket,
-            o: last.c,
-            h: Math.max(last.c, bid),
-            l: Math.min(last.c, bid),
-            c: bid,
-          });
-          if (arr.length > 1500) arr.shift();
-        }
+        if (last.t === bucket) { last.h = Math.max(last.h, bid); last.l = Math.min(last.l, bid); last.c = bid; }
+        else { arr.push({ t: bucket, o: last.c, h: Math.max(last.c, bid), l: Math.min(last.c, bid), c: bid }); if (arr.length > 1500) arr.shift(); }
       }
     }
-    this.processTriggers();
-    this.emit();
+    this.processTriggers(); this.emit();
   }
 
   private processTriggers() {
     for (const o of [...this.orders]) {
       const q = this.quotes[o.symbol];
-      const hit =
-        (o.type === "buy_limit" && q.ask <= o.price) ||
-        (o.type === "sell_limit" && q.bid >= o.price) ||
-        (o.type === "buy_stop" && q.ask >= o.price) ||
-        (o.type === "sell_stop" && q.bid <= o.price);
+      const hit = (o.type === "buy_limit" && q.ask <= o.price) || (o.type === "sell_limit" && q.bid >= o.price) || (o.type === "buy_stop" && q.ask >= o.price) || (o.type === "sell_stop" && q.bid <= o.price);
       if (!hit) continue;
       this.orders = this.orders.filter((x) => x !== o);
       this.log(`order #${o.ticket} ${typeLabel(o.type)} triggered`);
       const r = this.openPosition(o.symbol, isBuyType(o.type) ? "buy" : "sell", o.lots, o.sl, o.tp, o.ticket);
       if (!r.ok) this.log(`order #${o.ticket} canceled: ${r.error}`, true);
     }
-    
     for (const p of [...this.positions]) {
       const c = this.closePriceOf(p);
-      if (p.side === "buy") {
-        if (p.sl && c <= p.sl) this.closePosition(p.ticket, "sl");
-        else if (p.tp && c >= p.tp) this.closePosition(p.ticket, "tp");
-      } else {
-        if (p.sl && c >= p.sl) this.closePosition(p.ticket, "sl");
-        else if (p.tp && c <= p.tp) this.closePosition(p.ticket, "tp");
-      }
+      if (p.side === "buy") { if (p.sl && c <= p.sl) this.closePosition(p.ticket, "sl"); else if (p.tp && c >= p.tp) this.closePosition(p.ticket, "tp"); } 
+      else { if (p.sl && c >= p.sl) this.closePosition(p.ticket, "sl"); else if (p.tp && c <= p.tp) this.closePosition(p.ticket, "tp"); }
     }
-    
     if (this.positions.length) {
       const ml = this.marginLevel;
-      if (ml < MARGIN_CALL && !this.marginCallWarned) {
-        this.marginCallWarned = true;
-        this.log(`Margin call: margin level ${ml.toFixed(2)}%`, true);
-      }
+      if (ml < MARGIN_CALL && !this.marginCallWarned) { this.marginCallWarned = true; this.log(`Margin call: margin level ${ml.toFixed(2)}%`, true); }
       if (ml >= MARGIN_CALL) this.marginCallWarned = false;
-      
       let guard = 0;
       while (this.positions.length && this.marginLevel < STOP_OUT && guard++ < 50) {
         const worst = [...this.positions].sort((a, b) => this.profitOf(a) - this.profitOf(b))[0];
@@ -693,16 +358,7 @@ export class Engine {
 
   async fetchLiveBalance(): Promise<void> {
     try {
-      // 1. Fetch exchange rate
-      try {
-        const rateRes = await fetch("/forex/rates");
-        const rateData = await rateRes.json();
-        if (rateData && rateData.success && rateData.usdToKes) {
-          this.exchangeRate = rateData.usdToKes;
-        }
-      } catch {}
-
-      // 2. Fetch account and positions
+      try { const rateRes = await fetch("/forex/rates"); const rateData = await rateRes.json(); if (rateData?.success && rateData.usdToKes) this.exchangeRate = rateData.usdToKes; } catch {}
       const res = await fetch("/forex/account?account_type=live");
       if (res.ok) {
         const data = await res.json();
@@ -710,25 +366,13 @@ export class Engine {
           this.liveKesBalance = data.account.walletBalance ?? 0;
           this.liveBalance = this.liveKesBalance / this.exchangeRate;
           this.balance = this.liveBalance;
-          
           if (data.positions && Array.isArray(data.positions)) {
-            this.positions = data.positions.map((p: any) => ({
-              ticket: p.id,
-              symbol: p.symbol ? p.symbol.replace("/", "") : "EURUSD",
-              side: p.side as Side,
-              lots: Number(p.quantity),
-              openPrice: Number(p.average_entry_price),
-              openTime: new Date(p.opened_at).getTime(),
-              sl: Number(p.stop_loss || 0),
-              tp: Number(p.take_profit || 0)
-            }));
+            this.positions = data.positions.map((p: any) => ({ ticket: p.id, symbol: p.symbol ? p.symbol.replace("/", "") : "EURUSD", side: p.side as Side, lots: Number(p.quantity), openPrice: Number(p.average_entry_price), openTime: new Date(p.opened_at).getTime(), sl: Number(p.stop_loss || 0), tp: Number(p.take_profit || 0) }));
           }
           this.emit();
         }
       }
-    } catch (e) {
-      console.error("Failed to fetch live balance:", e);
-    }
+    } catch (e) { console.error("Failed to fetch live balance:", e); }
   }
 
   startLiveBalancePolling(): void {
@@ -738,66 +382,50 @@ export class Engine {
   }
 
   stopLiveBalancePolling(): void {
-    if (this.liveBalanceInterval) {
-      clearInterval(this.liveBalanceInterval);
-      this.liveBalanceInterval = null;
-    }
+    if (this.liveBalanceInterval) { clearInterval(this.liveBalanceInterval); this.liveBalanceInterval = null; }
   }
 
-  // ─── FIXED: Live Order Placement ───
   async placeOrderLive(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }): Promise<Result> {
     if (this.mode !== "live") return this.fail("Live trading not enabled");
-
     try {
-      const marginUsd = req.lots * 100; // 0.01 lots = $1.00 USD
-
+      const marginUsd = req.lots * 100; 
       const res = await fetch("/forex/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           symbol: req.symbol.includes("/") ? req.symbol : `${req.symbol.slice(0,3)}/${req.symbol.slice(3)}`,
           side: isBuyType(req.type) ? "buy" : "sell",
-          trade_amount: marginUsd, // Send USD to backend
+          trade_amount: marginUsd, 
           order_type: "market",
           stop_loss: req.sl || undefined,
           take_profit: req.tp || undefined,
           account_type: "live",
         }),
       });
-
       const data = await res.json();
-      if (!res.ok) {
-        return this.fail(data.error || "Order failed");
-      }
-
+      if (!res.ok) return this.fail(data.error || "Order failed");
       await this.fetchLiveBalance();
       return { ok: true, ticket: data.position?.id || data.order?.id };
-    } catch (e) {
-      return this.fail("Network error placing order");
-    }
+    } catch { return this.fail("Network error placing order"); }
   }
 
-  // Single, non-duplicated placeOrder
   placeOrder(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }): Result {
     if (this.mode === "live") {
       this.placeOrderLive(req).catch(e => this.fail(e.message));
-      return { ok: true, ticket: 0 };
+      return { ok: true, ticket: 0 }; 
     }
-
     const s = this.spec(req.symbol);
     if (!s) return this.fail("Unknown symbol");
     const q = this.quotes[req.symbol];
     const lots = round(req.lots, 2);
-    if (!(lots >= 1 && lots <= 10000)) return this.fail("Invalid volume (1 - 10000)");
+    if (!(lots >= 0.01 && lots <= 10000)) return this.fail("Invalid volume (0.01 - 10000)"); // 👈 FIXED MINIMUM LOTS
     const sl = round(req.sl || 0, s.digits), tp = round(req.tp || 0, s.digits);
     const side: Side = isBuyType(req.type) ? "buy" : "sell";
-
     if (req.type === "buy" || req.type === "sell") {
       const err = this.checkStops(side, side === "buy" ? q.ask : q.bid, sl, tp, req.symbol);
       if (err) return this.fail(err);
       return this.openPosition(req.symbol, side, lots, sl, tp);
     }
-
     const price = round(req.price || 0, s.digits);
     if (!price) return this.fail("Invalid price");
     const t = req.type;
@@ -810,14 +438,10 @@ export class Engine {
     const ticket = this.nextTicket++;
     this.orders.push({ ticket, symbol: req.symbol, type: t, lots, price, sl, tp, time: Date.now() });
     this.log(`order #${ticket} ${typeLabel(t)} ${lots.toFixed(2)} ${req.symbol} at ${price.toFixed(s.digits)} placed`);
-    this.save();
-    this.emit();
+    this.save(); this.emit();
     return { ok: true, ticket };
   }
 }
 
 let instance: Engine | null = null;
-export function getEngine() {
-  if (!instance) instance = new Engine();
-  return instance;
-}
+export function getEngine() { if (!instance) instance = new Engine(); return instance; }
