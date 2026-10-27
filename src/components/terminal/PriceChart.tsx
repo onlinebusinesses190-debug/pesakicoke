@@ -270,7 +270,7 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
     ctx.fillStyle = "#1565c0";
     ctx.font = "bold 12px Arial, sans-serif";
     // FIX: Use string concatenation to avoid arrow character corruption
-    ctx.fillText(`${symbol} ${'▼'} ${tf}`, 8, 15);
+    ctx.fillText(`${symbol} ▼ ${tf}`, 8, 15);
     ctx.fillStyle = "#666";
     ctx.font = "11px Arial, sans-serif";
     ctx.fillText(spec.desc || "", 8, 30);
