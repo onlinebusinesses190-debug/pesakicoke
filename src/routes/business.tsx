@@ -40,6 +40,8 @@ interface BusinessApplication {
   amount_requested: number;
   status: string;
   created_at: string;
+  updated_at: string;
+  details: Record<string, any>;
 }
 
 interface BusinessInvestment {
@@ -48,6 +50,7 @@ interface BusinessInvestment {
   business_name: string;
   amount_invested: number;
   projected_return: number;
+  created_at: string;
 }
 
 interface SuccessStory {
@@ -98,17 +101,17 @@ function BusinessPage() {
         .order('created_at', { ascending: false });
 
       if (appsErr) throw appsErr;
-      setApplications(appsData || []);
+      setApplications((appsData || []) as BusinessApplication[]);
 
       console.log("🟢 Fetching investments...");
-      const { data: invData, error: invErr } = await supabase
-        .from('business_investments')
+      const { data: invData, error: invErr } = await (supabase
+        .from('business_investments') as any)
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (invErr) throw invErr;
-      setInvestments(invData || []);
+      setInvestments((invData || []) as unknown as BusinessInvestment[]);
 
       console.log("🟢 Fetching success stories...");
       const { data: storyData, error: storyErr } = await supabase
@@ -117,7 +120,7 @@ function BusinessPage() {
         .order('created_at', { ascending: false });
 
       if (storyErr) throw storyErr;
-      setStories(storyData || []);
+      setStories((storyData || []) as unknown as SuccessStory[]);
 
       const total = appsData?.reduce((sum, a) => sum + (a.amount_requested || 0), 0) || 0;
       const open = appsData?.filter(a => a.status === 'Pending').length || 0;
@@ -236,7 +239,7 @@ function BusinessPage() {
                     <p className="truncate text-sm font-semibold">{a.business_name}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">Requested {fmt(a.amount_requested)}</p>
                   </div>
-                  <Badge tone={a.status === "Approved" ? "success" : a.status === "Disbursed" ? "primary" : "warning"}>
+                  <Badge tone={(a.status === "Approved" ? "success" : a.status === "Disbursed" ? "primary" : "warning") as "success" | "primary" | "warning"}>
                     {a.status}
                   </Badge>
                 </div>
@@ -360,34 +363,34 @@ function StartupForm({ onBack, onClose, user, onSuccess }: any) {
   const [date, setDate] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!requireAuth()) return;
-    if (!agree) return;
-    setLoading(true);
-    const formData = new FormData(e.currentTarget);
-    try {
-      const { error } = await supabase.from('business_applications').insert([{
-        user_id: user?.id,
-        business_name: formData.get('business_name'),
-        business_type: 'startup',
-        amount_requested: parseInt(formData.get('amount') as string),
-        status: 'Pending',
-        details: {
-          type: formData.get('type'),
-          years: formData.get('years'),
-          location: formData.get('location'),
-          founder_name: formData.get('founder_name'),
-          phone: formData.get('phone'),
-          email: formData.get('email'),
-          id_number: formData.get('id_number'),
-          problem: formData.get('problem'),
-          purpose: formData.get('purpose'),
-          expected_profit: formData.get('expected_profit'),
-          training_date: date,
-          training_slot: slot,
-        }
-      }]);
+const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+            e.preventDefault();
+            if (!requireAuth()) return;
+            if (!agree) return;
+            setLoading(true);
+            const formData = new FormData(e.currentTarget);
+            try {
+              const { error } = await supabase.from('business_applications').insert([{
+                user_id: user?.id,
+                business_name: formData.get('business_name') as string,
+                business_type: 'startup',
+                amount_requested: parseInt(formData.get('amount') as string),
+                status: 'Pending',
+                details: {
+                  type: formData.get('type') as string,
+                  years: formData.get('years') as string,
+                  location: formData.get('location') as string,
+                  founder_name: formData.get('founder_name') as string,
+                  phone: formData.get('phone') as string,
+                  email: formData.get('email') as string,
+                  id_number: formData.get('id_number') as string,
+                  problem: formData.get('problem') as string,
+                  purpose: formData.get('purpose') as string,
+                  expected_profit: formData.get('expected_profit') as string,
+                  training_date: date,
+                  training_slot: slot,
+                }
+              }]);
       if (error) throw error;
       toast.success('Application submitted!');
       setDone(true);
@@ -447,7 +450,7 @@ function StartupForm({ onBack, onClose, user, onSuccess }: any) {
         <div className="mt-3 rounded-xl bg-gold/10 p-3 text-xs"><p className="font-semibold text-gold-foreground">You must attend a free one-time physical training to get funds for startup.</p></div>
         <div className="mt-3 space-y-3">
           <div><FieldLabel>Preferred training date</FieldLabel><div className="relative"><Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><input required type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls + " pl-9"} /></div></div>
-          <div><FieldLabel>Preferred time</FieldLabel><div className="mt-1 grid grid-cols-2 gap-2">{([{key:"morning",label:"8:00 AM – 11:00 AM"},{key:"afternoon",label:"2:00 PM – 5:00 PM"}]).map(s => <button type="button" key={s.key} onClick={() => setSlot(s.key)} className={`flex items-center justify-center gap-1.5 rounded-xl border py-2.5 text-xs font-semibold ${slot === s.key ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"}`}><Clock className="h-3.5 w-3.5" /> {s.label}</button>)}</div></div>
+          <div><FieldLabel>Preferred time</FieldLabel><div className="mt-1 grid grid-cols-2 gap-2">{([{key:"morning",label:"8:00 AM – 11:00 AM"},{key:"afternoon",label:"2:00 PM – 5:00 PM"}]).map(s => <button type="button" key={s.key} onClick={() => setSlot(s.key as "morning" | "afternoon")} className={`flex items-center justify-center gap-1.5 rounded-xl border py-2.5 text-xs font-semibold ${slot === s.key ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"}`}><Clock className="h-3.5 w-3.5" /> {s.label}</button>)}</div></div>
         </div>
         <SectionHeader n={6} title="Terms" />
         <label className="mt-3 flex items-start gap-2 rounded-xl border border-border p-3 text-xs"><input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" /><span>I agree to return a percentage of my monthly profit to PESAKI until the full amount is repaid.</span></label>
@@ -472,20 +475,20 @@ function ExistingForm({ onBack, onClose, user, onSuccess }: any) {
     try {
       const { error } = await supabase.from('business_applications').insert([{
         user_id: user?.id,
-        business_name: formData.get('business_name'),
+        business_name: formData.get('business_name') as string,
         business_type: 'existing',
         amount_requested: parseInt(formData.get('amount') as string),
         status: 'Pending',
         details: {
-          registration: formData.get('registration'),
-          type: formData.get('type'),
-          location: formData.get('location'),
-          years: formData.get('years'),
-          monthly_revenue: formData.get('monthly_revenue'),
-          monthly_profit: formData.get('monthly_profit'),
-          reason: formData.get('reason'),
-          repayment_plan: formData.get('repayment_plan'),
-          purpose: formData.get('purpose'),
+          registration: formData.get('registration') as string,
+          type: formData.get('type') as string,
+          location: formData.get('location') as string,
+          years: formData.get('years') as string,
+          monthly_revenue: formData.get('monthly_revenue') as string,
+          monthly_profit: formData.get('monthly_profit') as string,
+          reason: formData.get('reason') as string,
+          repayment_plan: formData.get('repayment_plan') as string,
+          purpose: formData.get('purpose') as string,
         }
       }]);
       if (error) throw error;

@@ -415,8 +415,7 @@ function KaziPage() {
         <PostJobSheet
           onClose={() => {
             setPostJob(false);
-            // Drop ?hireFor= so reopening the sheet later isn't pre-addressed.
-            if (hireFor) navigate({ to: "/kazi", search: {} as never });
+            if (hireFor) navigate({ to: "/kazi", search: {} });
           }}
           initialDescription={hireFor ? `Hiring ${hireFor}…` : undefined}
           onSuccess={refreshData}
@@ -1256,10 +1255,12 @@ export function FileField({
   label,
   accept,
   onChange,
+  required,
 }: {
   label?: string;
   accept?: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  required?: boolean;
 }) {
   return (
     <div>
@@ -1269,6 +1270,7 @@ export function FileField({
         accept={accept}
         onChange={onChange}
         className={inputCls}
+        required={required}
       />
     </div>
   );

@@ -75,7 +75,7 @@ function GoogleCardHelp() {
         subtitle="Create a Google People Card to appear when someone searches your name"
         right={
           <button
-            onClick={() => navigate({ to: "/kazi" })}
+            onClick={() => navigate({ to: "/kazi", search: {} })}
             aria-label="Back to KAZI Link"
             className="grid h-9 w-9 place-items-center rounded-full bg-muted text-foreground"
           >

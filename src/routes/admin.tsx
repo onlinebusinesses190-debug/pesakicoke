@@ -34,14 +34,14 @@ function AdminLayout() {
           setIsAdmin(true);
         } else {
           setIsAdmin(false);
-          navigate({ to: "/", search: {} as never });
+navigate({ to: "/" });
         }
         setLoading(false);
       })
       .catch(() => {
         setIsAdmin(false);
         setLoading(false);
-        navigate({ to: "/", search: {} as never });
+        navigate({ to: "/" });
       });
   }, [ready, user, navigate]);
 

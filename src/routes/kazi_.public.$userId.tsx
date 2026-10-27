@@ -1,4 +1,4 @@
-import { createFileRoute, rootRouteId, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, rootRouteId, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -220,12 +220,12 @@ function KaziPublicProfile() {
       `Messaging on KAZI runs through a job, so there is no direct chat with ${name} yet. Open the job or application to message them.`,
       { duration: 6000 }
     );
-    navigate({ to: "/kazi" });
+    navigate({ to: "/kazi", search: {} });
   };
 
   const handleHire = () => {
     const name = bundle?.profile.full_name?.trim() || "this KAZI member";
-    navigate({ to: "/kazi", search: { hireFor: name } as never });
+    navigate({ to: "/kazi", search: { hireFor: name } });
   };
 
   const handleShare = async () => {
@@ -272,7 +272,7 @@ function KaziPublicProfile() {
           subtitle="KAZI Link"
           right={
             <button
-              onClick={() => navigate({ to: "/kazi" })}
+              onClick={() => navigate({ to: "/kazi", search: {} })}
               aria-label="Back to KAZI Link"
               className="grid h-9 w-9 place-items-center rounded-full bg-muted text-foreground"
             >
@@ -306,15 +306,15 @@ function KaziPublicProfile() {
       <PageHeader
         title={name}
         subtitle="KAZI Link public profile"
-        right={
-          <button
-            onClick={() => (typeof window !== "undefined" ? window.history.back() : navigate({ to: "/kazi" }))}
-            aria-label="Go back"
-            className="grid h-9 w-9 place-items-center rounded-full bg-muted text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-        }
+right={
+            <button
+              onClick={() => (typeof window !== "undefined" ? window.history.back() : navigate({ to: "/kazi", search: {} }))}
+              aria-label="Go back"
+              className="grid h-9 w-9 place-items-center rounded-full bg-muted text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+          }
       />
 
       <div className="space-y-3 px-5 pt-4">

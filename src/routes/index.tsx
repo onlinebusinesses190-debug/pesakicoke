@@ -295,6 +295,7 @@ function HomePage() {
         <div className="grid grid-cols-2 gap-3">
           <Link
             to="/kazi"
+            search={{}}
             className="group relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]"
           >
             <span className="mb-6 grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
@@ -304,8 +305,9 @@ function HomePage() {
              <p className="mt-0.5 text-[11px] text-muted-foreground">Find work. Hire talent.</p>
             <ChevronRight className="absolute bottom-3 right-3 h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
           </Link>
-          <Link
-            to="/business"
+<Link
+            to="/kazi/google-card-help"
+            search={{}}
             className="group relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]"
           >
             <span className="mb-6 grid h-9 w-9 place-items-center rounded-xl gradient-gold text-gold-foreground">
@@ -364,7 +366,7 @@ function HomePage() {
         <SectionTitle
           title="Latest opportunities"
           action={
-            <Link to="/kazi" className="text-xs font-semibold text-primary">
+            <Link to="/kazi" search={{}} className="text-xs font-semibold text-primary">
               See all
             </Link>
           }

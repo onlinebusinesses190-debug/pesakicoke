@@ -152,6 +152,7 @@ function AboutPage() {
         <section className="mt-8 text-center">
           <Link
             to="/kazi"
+            search={{}}
             className="inline-flex items-center justify-center gap-2 rounded-full gradient-primary px-6 py-3 text-sm font-semibold text-primary-foreground"
           >
             Explore KAZI Link <Briefcase className="h-4 w-4" />

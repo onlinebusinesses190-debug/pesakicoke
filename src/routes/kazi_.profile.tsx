@@ -157,7 +157,7 @@ function FileDrop({
         type="file"
         accept={accept}
         className="hidden"
-        onChange={(e) => {
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
           validateAndPick(e.target.files?.[0]);
           e.target.value = "";
         }}
@@ -457,8 +457,20 @@ export function KaziProfileEditor() {
   const isService = form.profile_type === "service_provider" || form.profile_type === "business";
 
   // ── Uploads ────────────────────────────────────────────────────────────────
-  const handleCvUpload = async (file: File) => {
+  const handleCvUpload = async (file?: File) => {
     if (!requireAuth()) return;
+    if (!file) {
+      // Open file picker if no file provided
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.pdf';
+      input.onchange = (e) => {
+        const file = e.target.files?.[0];
+        if (file) handleCvUpload(file);
+      };
+      input.click();
+      return;
+    }
     setUploading("cv");
     const res = await uploadCv(file);
     setUploading(null);
@@ -485,8 +497,19 @@ export function KaziProfileEditor() {
     toast.success("CV removed");
   };
 
-  const handlePhotoUpload = async (file: File) => {
+  const handlePhotoUpload = async (file?: File) => {
     if (!requireAuth()) return;
+    if (!file) {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = (e) => {
+        const file = e.target.files?.[0];
+        if (file) handlePhotoUpload(file);
+      };
+      input.click();
+      return;
+    }
     setUploading("photo");
     const res = await uploadPhoto(file);
     setUploading(null);
@@ -499,8 +522,19 @@ export function KaziProfileEditor() {
     toast.success("Photo updated");
   };
 
-  const handlePortfolioUpload = async (file: File) => {
+  const handlePortfolioUpload = async (file?: File) => {
     if (!requireAuth()) return;
+    if (!file) {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = (e) => {
+        const file = e.target.files?.[0];
+        if (file) handlePortfolioUpload(file);
+      };
+      input.click();
+      return;
+    }
     setUploadingPortfolio(true);
     const res = await uploadPortfolioImage(file);
     setUploadingPortfolio(false);
@@ -724,7 +758,7 @@ export function KaziProfileEditor() {
               )}
             </div>
             <button
-              onClick={() => navigate({ to: "/kazi" })}
+              onClick={() => navigate({ to: "/kazi", search: {} })}
               aria-label="Back to KAZI Link"
               className="grid h-9 w-9 place-items-center rounded-full bg-muted text-foreground"
             >
@@ -774,7 +808,7 @@ export function KaziProfileEditor() {
                   type="file"
                   accept={KAZI_IMAGE_ACCEPT}
                   className="hidden"
-                  onChange={(e) => {
+onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                     const file = e.target.files?.[0];
                     if (file) {
                       if (file.size > KAZI_MAX_UPLOAD_BYTES) {

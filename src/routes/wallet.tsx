@@ -317,7 +317,6 @@ function WalletPage() {
                     {tx.status && (
                       <Badge
                         tone={tx.status === "completed" ? "success" : "warning"}
-                        className="mt-1"
                       >
                         {tx.status}
                       </Badge>
