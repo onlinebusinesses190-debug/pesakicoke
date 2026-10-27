@@ -112,9 +112,14 @@ export function Terminal({ mode = "demo" }: { mode?: "demo" | "real" }) {
             </div>
             
             {mode === "real" ? (
-              <div className="text-xs font-mono font-bold text-green-600">
-                KSh {money(e.liveKesBalance)}
-              </div>
+              <>
+                <div className="text-xs font-mono font-bold text-green-600 leading-tight">
+                  KSh {money(e.liveKesBalance)}
+                </div>
+                <div className="text-[10px] font-mono text-gray-500 font-bold">
+                  ≈ ${money(e.liveBalance)}
+                </div>
+              </>
             ) : (
               <div className="text-xs font-mono font-bold text-gray-900">${money(e.balance)}</div>
             )}
