@@ -47,7 +47,7 @@ export interface Candle {
   c: number;
 }
 export interface Position {
-  ticket: number;
+  ticket: number | string; // Can be string from live backend
   symbol: string;
   side: Side;
   lots: number;
@@ -57,7 +57,7 @@ export interface Position {
   tp: number;
 }
 export interface PendingOrder {
-  ticket: number;
+  ticket: number | string;
   symbol: string;
   type: Exclude<OrderType, "buy" | "sell">;
   lots: number;
@@ -67,7 +67,7 @@ export interface PendingOrder {
   time: number;
 }
 export interface Deal {
-  ticket: number;
+  ticket: number | string;
   symbol: string;
   side: Side;
   lots: number;
@@ -83,7 +83,7 @@ export interface JournalEntry {
   msg: string;
   error?: boolean;
 }
-export type Result = { ok: true; ticket?: number } | { ok: false; error: string };
+export type Result = { ok: true; ticket?: number | string } | { ok: false; error: string };
 
 import { configuredLeverage } from "@/lib/fx/market";
 
@@ -91,7 +91,7 @@ import { configuredLeverage } from "@/lib/fx/market";
 const SPREADS: Record<string, number> = {
   EURUSD: 1, GBPUSD: 2, USDJPY: 1, AUDUSD: 1,
   USDCAD: 2, USDCHF: 2, NZDUSD: 2, EURJPY: 2,
-  GBPJPY: 3, XAUUSD: 2, // Gold spread is usually very tight (0.02)
+  GBPJPY: 3, XAUUSD: 2, 
 };
 
 function spreadFor(symbol: string): number {
@@ -183,7 +183,11 @@ function genCandles(s: SymbolSpec, tfSec: number, nowSec: number, n = 400): Cand
 
 let candlesApiAvailable = true;
 
-// ─── Fetch real historical candles from backend ───
+// ─── FIXED: Exact case match for backend intervals ───
+const TF_TO_INTERVAL: Record<TF, string> = {
+  M1: '1m', M5: '5m', M15: '15m', M30: '30m', H1: '1H', H4: '4H',
+};
+
 async function fetchCandlesFromBackend(symbol: string, tf: TF, count = 400): Promise<Candle[] | null> {
   if (!candlesApiAvailable) return null;
   try {
@@ -195,7 +199,6 @@ async function fetchCandlesFromBackend(symbol: string, tf: TF, count = 400): Pro
     if (!res.ok) {
       if (res.status === 404) {
         candlesApiAvailable = false;
-        console.debug(`[Engine] Candles endpoint not available, disabling further fetches`);
       }
       return null;
     }
@@ -213,23 +216,18 @@ async function fetchCandlesFromBackend(symbol: string, tf: TF, count = 400): Pro
   }
 }
 
-const TF_TO_INTERVAL: Record<TF, string> = {
-  M1: '1m', M5: '5m', M15: '15m', M30: '30m', H1: '1h', H4: '4h',
-};
-
 // Persistent cache for candle fetch failures (survives page refresh)
 const CANDLE_CACHE_KEY = 'pesaki_candle_fetch_cache';
 function getFailedCache(): Set<string> {
   try {
-    const raw = localStorage.getItem('pesaki_candle_fetch_cache');
+    const raw = localStorage.getItem(CANDLE_CACHE_KEY);
     return raw ? new Set(JSON.parse(raw)) : new Set();
   } catch { return new Set(); }
 }
 function saveFailedCache(set: Set<string>) {
-  try { localStorage.setItem('pesaki_candle_fetch_cache', JSON.stringify([...set])); } catch {}
+  try { localStorage.setItem(CANDLE_CACHE_KEY, JSON.stringify([...set])); } catch {}
 }
 
-// ─── Fetch historical candles with persistent cache ───
 async function fetchHistoricalCandlesPersistent(engine: Engine): Promise<void> {
   const failedCache = getFailedCache();
   for (const s of SYMBOLS) {
@@ -291,13 +289,11 @@ export class Engine {
   private lastTickTime = 0;
   private tickCount = 0;
 
-  // Live account state
   liveKesBalance = 0;
   liveBalance = 0;
-  exchangeRate = 130; // KES per USD
+  exchangeRate = 130; 
   private liveBalanceInterval: number | null = null;
 
-  // Cache for historical candle fetch attempts to prevent infinite retries
   historicalCandlesFetched = new Set<string>();
   historicalCandlesFetching = new Set<string>();
   historicalCandlesFailed = new Set<string>();
@@ -324,7 +320,6 @@ export class Engine {
     this.load();
     this.log("Terminal started. Demo account connected to simulated server.");
     this.start();
-    // Fetch real historical candles from backend for seamless refresh (with persistent cache)
     fetchHistoricalCandlesPersistent(this);
   }
 
@@ -364,6 +359,7 @@ export class Engine {
   }
   
   private save() {
+    if (this.mode === "live") return; // Don't save live data to localStorage
     try {
       localStorage.setItem(
         STORAGE_KEY,
@@ -473,7 +469,23 @@ export class Engine {
     return { ok: true, ticket };
   }
 
-  closePosition(ticket: number, reason: CloseReason = "manual", lots?: number): Result {
+  async closePosition(ticket: number | string, reason: CloseReason = "manual", lots?: number): Promise<Result> {
+    if (this.mode === "live") {
+      try {
+        const res = await fetch(`/forex/positions/${ticket}/close`, { 
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ close: true }) // Fixes Fastify empty body error
+        });
+        const data = await res.json();
+        if (!res.ok) return this.fail(data.error || "Failed to close position");
+        await this.fetchLiveBalance(); // Refresh
+        return { ok: true };
+      } catch (e) {
+        return this.fail("Network error closing position");
+      }
+    }
+
     const p = this.positions.find((x) => x.ticket === ticket);
     if (!p) return this.fail(`Position #${ticket} not found`);
     const closeLots = lots ? Math.min(round(lots, 2), p.lots) : p.lots;
@@ -507,7 +519,7 @@ export class Engine {
     });
   }
 
-  modifyPosition(ticket: number, sl: number, tp: number): Result {
+  modifyPosition(ticket: number | string, sl: number, tp: number): Result {
     const p = this.positions.find((x) => x.ticket === ticket);
     if (!p) return this.fail(`Position #${ticket} not found`);
     const d = this.spec(p.symbol).digits;
@@ -523,7 +535,7 @@ export class Engine {
     return { ok: true };
   }
 
-  cancelOrder(ticket: number): Result {
+  cancelOrder(ticket: number | string): Result {
     const o = this.orders.find((x) => x.ticket === ticket);
     if (!o) return this.fail(`Order #${ticket} not found`);
     this.orders = this.orders.filter((x) => x !== o);
@@ -550,8 +562,13 @@ export class Engine {
 
   setMode(mode: "demo" | "live") {
     this.mode = mode;
-    this.log(mode === "live" ? "Live trading enabled" : "Demo trading");
-    this.save();
+    if (mode === "live") {
+      this.startLiveBalancePolling();
+      this.log("Live trading enabled");
+    } else {
+      this.stopLiveBalancePolling();
+      this.log("Demo trading enabled");
+    }
     this.emit();
   }
 
@@ -575,12 +592,12 @@ export class Engine {
       const q = this.quotes[s.name];
       const rng = mulberry32(this.tickCount ^ s.name.charCodeAt(0));
 
-      // 1. Calculate Net Exposure & House Bias (B-Book)
+      // 1. Calculate Net Exposure & House Bias (B-Book) - UNTOUCHED
       let houseBias = 0;
       if (this.exposureProvider) {
         const netExposure = this.exposureProvider(s.name);
         if (netExposure !== 0) {
-          houseBias = -netExposure * 0.000001; // Push against the crowd
+          houseBias = -netExposure * 0.000001; 
         }
       }
 
@@ -588,7 +605,7 @@ export class Engine {
       const randomMove = gaussFrom(rng) * s.vol;
       let proposedBid = q.bid + randomMove + houseBias;
 
-      // 3. HARD SPIKE FILTER (Max 2.5x normal volatility per tick)
+      // 3. HARD SPIKE FILTER
       const maxJump = s.vol * 2.5;
       if (Math.abs(proposedBid - q.bid) > maxJump) {
         proposedBid = q.bid + Math.sign(proposedBid - q.bid) * maxJump;
@@ -597,7 +614,6 @@ export class Engine {
       const prev = q.bid;
       const bid = round(Math.max(s.point, proposedBid), s.digits);
       
-      // 4. TIGHT SPREAD (No dynamic spreading)
       const spreadPts = s.spread; 
       const ask = round(bid + spreadPts * s.point, s.digits);
 
@@ -608,7 +624,7 @@ export class Engine {
       q.low = Math.min(q.low, bid);
       q.time = now;
 
-      // 5. Update Candles smoothly
+      // 4. Update Candles smoothly
       for (const tf of Object.keys(TIMEFRAMES) as TF[]) {
         const arr = this.candles[s.name][tf];
         const bucket = Math.floor(nowSec / TIMEFRAMES[tf]) * TIMEFRAMES[tf];
@@ -675,17 +691,38 @@ export class Engine {
     }
   }
 
-  // ─── Live Account API Integration ───
   async fetchLiveBalance(): Promise<void> {
     try {
+      // 1. Fetch exchange rate
+      try {
+        const rateRes = await fetch("/forex/rates");
+        const rateData = await rateRes.json();
+        if (rateData && rateData.success && rateData.usdToKes) {
+          this.exchangeRate = rateData.usdToKes;
+        }
+      } catch {}
+
+      // 2. Fetch account and positions
       const res = await fetch("/forex/account?account_type=live");
       if (res.ok) {
         const data = await res.json();
-        if (data.success) {
+        if (data.success && data.account) {
           this.liveKesBalance = data.account.walletBalance ?? 0;
-          this.exchangeRate = data.account.usdToKes ?? 130;
           this.liveBalance = this.liveKesBalance / this.exchangeRate;
-          this.balance = this.liveBalance; // Update internal balance for USD math
+          this.balance = this.liveBalance;
+          
+          if (data.positions && Array.isArray(data.positions)) {
+            this.positions = data.positions.map((p: any) => ({
+              ticket: p.id,
+              symbol: p.symbol ? p.symbol.replace("/", "") : "EURUSD",
+              side: p.side as Side,
+              lots: Number(p.quantity),
+              openPrice: Number(p.average_entry_price),
+              openTime: new Date(p.opened_at).getTime(),
+              sl: Number(p.stop_loss || 0),
+              tp: Number(p.take_profit || 0)
+            }));
+          }
           this.emit();
         }
       }
@@ -694,48 +731,10 @@ export class Engine {
     }
   }
 
-  // Legacy placeOrder now forwards to placeOrderLive in live mode for correct margin calculation
-  placeOrder(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }): Result {
-    if (this.mode === "live") {
-      this.placeOrderLive(req).catch(e => this.fail(e.message));
-      return { ok: true, ticket: 0 };
-    }
-
-    const s = this.spec(req.symbol);
-    if (!s) return this.fail("Unknown symbol");
-    const q = this.quotes[req.symbol];
-    const lots = round(req.lots, 2);
-    if (!(lots >= 1 && lots <= 10000)) return this.fail("Invalid volume (1 - 10000)");
-    const sl = round(req.sl || 0, s.digits), tp = round(req.tp || 0, s.digits);
-    const side: Side = isBuyType(req.type) ? "buy" : "sell";
-
-    if (req.type === "buy" || req.type === "sell") {
-      const err = this.checkStops(side, side === "buy" ? q.ask : q.bid, sl, tp, req.symbol);
-      if (err) return this.fail(err);
-      return this.openPosition(req.symbol, side, lots, sl, tp);
-    }
-
-    const price = round(req.price || 0, s.digits);
-    if (!price) return this.fail("Invalid price");
-    const t = req.type;
-    if (t === "buy_limit" && price >= q.ask) return this.fail("Buy Limit must be below Ask");
-    if (t === "sell_limit" && price <= q.bid) return this.fail("Sell Limit must be above Bid");
-    if (t === "buy_stop" && price <= q.ask) return this.fail("Buy Stop must be above Ask");
-    if (t === "sell_stop" && price >= q.bid) return this.fail("Sell Stop must be below Bid");
-    const err = this.checkStops(side, price, sl, tp, req.symbol);
-    if (err) return this.fail(err);
-    const ticket = this.nextTicket++;
-    this.orders.push({ ticket, symbol: req.symbol, type: t, lots, price, sl, tp, time: Date.now() });
-    this.log(`order #${ticket} ${typeLabel(t)} ${lots.toFixed(2)} ${req.symbol} at ${price.toFixed(s.digits)} placed`);
-    this.save();
-    this.emit();
-    return { ok: true, ticket };
-  }
-
   startLiveBalancePolling(): void {
     if (this.liveBalanceInterval) return;
     this.fetchLiveBalance();
-    this.liveBalanceInterval = window.setInterval(() => this.fetchLiveBalance(), 30000);
+    this.liveBalanceInterval = window.setInterval(() => this.fetchLiveBalance(), 5000); 
   }
 
   stopLiveBalancePolling(): void {
@@ -745,31 +744,20 @@ export class Engine {
     }
   }
 
-  // Place order via backend API in live mode
+  // ─── FIXED: Live Order Placement ───
   async placeOrderLive(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }): Promise<Result> {
     if (this.mode !== "live") return this.fail("Live trading not enabled");
 
     try {
-      // Calculate trade_amount in KES (margin = lots * 100 * exchangeRate for 1:100 leverage)
-      const tradeAmountKes = req.lots * 100 * this.exchangeRate; // KES
-      const spec = this.spec(req.symbol);
-      const q = this.quotes[req.symbol];
-      const lots = round(req.lots, 2);
-      if (!(lots >= 0.01 && lots <= 100)) return this.fail("Invalid volume (0.01 - 100 lots)");
-      const sl = round(req.sl || 0, this.spec(req.symbol).digits);
-      const tp = round(req.tp || 0, this.spec(req.symbol).digits);
-      const side: Side = isBuyType(req.type) ? "buy" : "sell";
-      
-      const entry = side === "buy" ? this.quotes[req.symbol].ask : this.quotes[req.symbol].bid;
-      const entryPrice = round(entry, this.spec(req.symbol).digits);
+      const marginUsd = req.lots * 100; // 0.01 lots = $1.00 USD
 
       const res = await fetch("/forex/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          symbol: req.symbol,
-          side,
-          trade_amount: tradeAmountKes, // KES margin amount
+          symbol: req.symbol.includes("/") ? req.symbol : `${req.symbol.slice(0,3)}/${req.symbol.slice(3)}`,
+          side: isBuyType(req.type) ? "buy" : "sell",
+          trade_amount: marginUsd, // Send USD to backend
           order_type: "market",
           stop_loss: req.sl || undefined,
           take_profit: req.tp || undefined,
@@ -782,25 +770,20 @@ export class Engine {
         return this.fail(data.error || "Order failed");
       }
 
-      // Refresh balance after successful order
-      this.fetchLiveBalance();
-      return { ok: true, ticket: data.position?.ticket || data.order?.id };
+      await this.fetchLiveBalance();
+      return { ok: true, ticket: data.position?.id || data.order?.id };
     } catch (e) {
       return this.fail("Network error placing order");
     }
   }
 
-  // Override placeOrder to use live API when in live mode
+  // Single, non-duplicated placeOrder
   placeOrder(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }): Result {
     if (this.mode === "live") {
-      // For live mode, we need to call the async placeOrderLive
-      // Since placeOrder is synchronous, we'll fire and forget the async call
-      // and return a pending result. The actual result will come via fetchLiveBalance polling.
       this.placeOrderLive(req).catch(e => this.fail(e.message));
-      return { ok: true, ticket: 0 }; // Temporary ticket, real one comes from API
+      return { ok: true, ticket: 0 };
     }
 
-    // Demo mode - use existing logic
     const s = this.spec(req.symbol);
     if (!s) return this.fail("Unknown symbol");
     const q = this.quotes[req.symbol];
