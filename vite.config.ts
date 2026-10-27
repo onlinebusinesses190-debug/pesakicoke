@@ -17,6 +17,7 @@ export default defineConfig({
       alias: {
         "fancy-canvas/coordinate-space": "fancy-canvas/coordinate-space.js",
       },
+      tsconfigPaths: true,
     },
     plugins: [
       VitePWA({

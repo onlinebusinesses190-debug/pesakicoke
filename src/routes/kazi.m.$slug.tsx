@@ -26,7 +26,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/kazi/m/$slug")({
   getParentRoute: () => rootRouteId,
-  head: () => (
+  head: () => ({
     meta: [
       { title: "Profile — KAZI Link — PESAKI" },
       {
