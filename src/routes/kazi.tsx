@@ -9,7 +9,7 @@ import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Badge, SectionTitle } from "@/components/ui-bits";
 import { KaziProfileTab, MyProfileShortcut } from "@/components/kazi/KaziProfileTab";
 import { ProfileSearchSheet } from "@/components/kazi/ProfileSearchSheet";
-import { fetchMyProfile, fetchPublicProfile } from "@/components/kazi/api";
+import { fetchPublicProfile } from "@/components/kazi/api";
 import { isProfileEmpty, type KaziProfileBundle } from "@/components/kazi/types";
 import { useAuth } from "@/hooks/useAuth";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
@@ -432,7 +432,7 @@ function KaziPage() {
 
       {tab === "profile" && <KaziProfileTab />}
 
-      {applyJob && <ApplyJobSheet job={applyJob} onClose={() => setApplyJob(null)} onSuccess={refreshData} user={user} />}
+      {applyJob && <ApplyJobSheet job={applyJob} onClose={() => setApplyJob(null)} onSuccess={() => { setApplyJob(null); setTab("mine"); refreshData(); }} user={user} />}
       {postJob && (
         <PostJobSheet
           onClose={() => {
@@ -1526,11 +1526,8 @@ function PhotoUpload({ onPhotoUrl }: { onPhotoUrl: (url: string | null) => void 
 
 // ─── ApplyJobSheet ──────────────────────────────────────────────────────────
 function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
-  const navigate = useNavigate();
   const { requireAuth } = useRequireAuth();
-  const [done, setDone] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [profileEmpty, setProfileEmpty] = useState<boolean | null>(null);
   const [step, setStep] = useState<"review" | "form">("review");
   const [form, setForm] = useState({
     applicantName: user?.user_metadata?.full_name || "",
@@ -1547,17 +1544,6 @@ function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
   const handlePhotoUrl = (url: string | null) => {
     setForm(f => ({ ...f, photo_url: url || '' }));
   };
-
-  useEffect(() => {
-    if (!done) return;
-    let cancelled = false;
-    void fetchMyProfile().then((res) => {
-      if (!cancelled && res.success && res.data) {
-        setProfileEmpty(isProfileEmpty(res.data as KaziProfileBundle));
-      }
-    });
-    return () => { cancelled = true; };
-  }, [done]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -1594,8 +1580,7 @@ function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
       }
       if (!response.ok) throw new Error(result.error || result.message || `Failed to apply (HTTP ${response.status})`);
 
-      toast.success('Application submitted!');
-      setDone(true);
+       toast.success('Application submitted! Redirecting to My Applications…');
       onSuccess();
     } catch (err: any) {
       toast.error(err.message || 'Failed to apply');
@@ -1607,14 +1592,7 @@ function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
 
   return (
     <SheetShell title="Apply for job" onClose={onClose}>
-      {done ? (
-        <ApplicationSuccess
-          jobTitle={job.title}
-          profileEmpty={profileEmpty}
-          onOpenProfile={() => navigate({ to: "/kazi/profile" })}
-          onClose={onClose}
-        />
-      ) : step === "review" ? (
+       {step === "review" ? (
         <div className="space-y-4">
           <div>
             <p className="text-xs font-semibold text-muted-foreground">Job title</p>
