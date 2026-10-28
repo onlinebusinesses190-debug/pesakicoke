@@ -456,10 +456,12 @@ function JobCard({ job, onApply }: { job: Job; onApply: () => void }) {
           <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
             <MapPin className="h-3 w-3" /> {job.location}
           </p>
-          <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+          <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
             <Clock className="h-3 w-3" /> {job.duration}
           </p>
-          <p className="mt-1 text-sm font-bold text-primary">{job.pay}</p>
+          <p className="mt-1 flex items-center gap-1.5 text-lg font-bold text-primary">
+            <Wallet className="h-4 w-4" /> {job.pay}
+          </p>
           <p className="mt-0.5 text-[10px] text-muted-foreground">10% platform fee applies</p>
         </div>
         <Badge tone={job.badge === "Urgent" ? "destructive" : job.badge === "Hot" ? "warning" : "gold"}>
@@ -1594,7 +1596,17 @@ function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
           onClose={onClose}
         />
       ) : (
-        <form className="space-y-3" onSubmit={submit}>
+         <form className="space-y-3" onSubmit={submit}>
+          <div className="rounded-xl bg-primary/5 p-3 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground">Monthly payment</p>
+              <p className="text-lg font-bold text-primary">{job.pay}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">Duration</p>
+              <p className="text-sm font-semibold">{job.duration}</p>
+            </div>
+          </div>
           <div><FieldLabel>Full name</FieldLabel><input required value={form.applicantName} onChange={set("applicantName")} className={inputCls} /></div>
           <div className="grid grid-cols-2 gap-3">
             <div><FieldLabel>Phone</FieldLabel><input required value={form.phone} onChange={set("phone")} className={inputCls} /></div>
