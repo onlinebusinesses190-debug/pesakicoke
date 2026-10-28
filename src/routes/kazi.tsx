@@ -1736,7 +1736,7 @@ function PostJobSheet({ onClose, onSuccess, user, initialDescription }: any) {
         requirements: checked,
       };
 
-      const response = await fetch(`${API_BASE}/kazi/post-job`, {
+       const response = await fetch(`${API_BASE}/kazi/post-job`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1745,7 +1745,13 @@ function PostJobSheet({ onClose, onSuccess, user, initialDescription }: any) {
         body: JSON.stringify(body),
       });
 
-      const result = await response.json();
+      let result: any;
+      try {
+        result = await response.json();
+      } catch {
+        if (!response.ok) throw new Error(`Failed to post job (HTTP ${response.status})`);
+        throw new Error("Unexpected response from server");
+      }
       if (!response.ok) throw new Error(result.error || result.message || "Failed to post job");
 
       toast.success("Job posted!");
