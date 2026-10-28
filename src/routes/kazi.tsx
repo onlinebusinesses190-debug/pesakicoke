@@ -1585,7 +1585,13 @@ function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
         }),
       });
 
-      const result = await response.json();
+      let result: any;
+      try {
+        result = await response.json();
+      } catch {
+        if (!response.ok) throw new Error(`Failed to apply (HTTP ${response.status})`);
+        throw new Error("Unexpected response from server");
+      }
       if (!response.ok) throw new Error(result.error || result.message || `Failed to apply (HTTP ${response.status})`);
 
       toast.success('Application submitted!');

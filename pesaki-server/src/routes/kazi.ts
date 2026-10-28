@@ -543,12 +543,14 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
         return reply.status(400).send({ error: 'This job is no longer open for applications' });
       }
 
-      const { data: existing } = await supabase
+      const { data: existing, error: existingError } = await supabase
         .from('applications')
         .select('id')
         .eq('job_id', job_id)
         .eq('worker_id', user.id)
         .single();
+
+      if (existingError && existingError.code !== 'PGRST116') throw existingError;
 
       if (existing) {
         return reply.status(400).send({ error: 'You have already applied to this job' });
