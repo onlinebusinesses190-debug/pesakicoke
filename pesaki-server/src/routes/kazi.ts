@@ -439,7 +439,12 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
         })
       );
 
-      return reply.send(contracts);
+      const allApps = (applications || []).map((app: any) => {
+        const enriched = contracts.find((c: any) => c.id === app.id);
+        return enriched || app;
+      });
+
+      return reply.send(allApps);
     } catch (err) {
       console.error(err);
       return reply.status(500).send({ error: 'Internal server error' });

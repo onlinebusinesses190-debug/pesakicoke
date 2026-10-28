@@ -191,17 +191,7 @@ function KaziPage() {
       });
       if (myAppsRes.ok) {
         const appsData = await myAppsRes.json();
-        const mappedApps = (appsData || []).map((a: any) => {
-          if (a.jobs) {
-            a.jobs = {
-              ...a.jobs,
-              pay: a.jobs.pay_label || a.jobs.pay || '',
-              payAmount: a.jobs.pay_amount || a.jobs.payAmount || 0,
-            };
-          }
-          return a;
-        });
-        setApplications(mappedApps);
+        setApplications(appsData || []);
       }
 
       // 3. Get my posted jobs (as employer)
