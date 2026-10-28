@@ -4,6 +4,7 @@ import {
   Search, Star, MapPin, ShieldCheck, Plus, X, ArrowLeft, Upload, CheckCircle2,
   Send, Bell, Wallet, User as UserIcon, Phone, Mail, Briefcase, Clock, Loader2,
   MessageCircle, Eye, UserCheck, Calendar, DollarSign, AlertCircle,
+  Paperclip, Image, Video, FileText, Mic, Phone as PhoneIcon, Video as VideoIcon, Smile,
 } from "lucide-react";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Badge, SectionTitle } from "@/components/ui-bits";
@@ -109,6 +110,11 @@ interface ChatMessage {
   message: string;
   created_at: string;
   read: boolean;
+  media_url?: string;
+  media_type?: 'image' | 'video' | 'audio' | 'document';
+  call_type?: 'audio' | 'video';
+  call_status?: 'ringing' | 'answered' | 'missed' | 'ended';
+  call_duration?: number;
 }
 
 function KaziPage() {
@@ -1891,15 +1897,21 @@ function HireSheet({ app, onClose, onHireSuccess, user }: any) {
   );
 }
 
-// ─── ChatSheet ──────────────────────────────────────────────────────────────
+// ─── ChatSheet (WhatsApp-style) ─────────────────────────────────────────────────
 function ChatSheet({ application, job, onClose, user }: any) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
+  const [recording, setRecording] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const otherUser = application.worker_id === user?.id ? 'Employer' : application.applicant_name;
 
   const fetchMessages = async () => {
     if (!mountedRef.current) return;
@@ -1921,8 +1933,19 @@ function ChatSheet({ application, job, onClose, user }: any) {
     }
   };
 
-  const sendMessage = async () => {
-    if (!input.trim()) return;
+   const sendMessage = async (messageOverride?: {
+     message?: string;
+     mediaUrl?: string;
+     mediaType?: 'image' | 'video' | 'audio' | 'document';
+     callType?: 'audio' | 'video';
+     callStatus?: 'ringing' | 'answered' | 'missed' | 'ended';
+     callDuration?: number;
+   }) => {
+    const payload: any = {
+      jobId: job.id,
+      receiverId: application.worker_id === user?.id ? job.employer_id : application.worker_id,
+      ...messageOverride,
+    };
     setSending(true);
     try {
       const { data } = await supabase.auth.getSession();
@@ -1934,23 +1957,84 @@ function ChatSheet({ application, job, onClose, user }: any) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          jobId: job.id,
-          receiverId: application.worker_id === user?.id ? job.employer_id : application.worker_id,
-          message: input,
-        }),
+        body: JSON.stringify(payload),
       });
 
-      if (response.ok) {
-        const newMessage = await response.json();
-        setMessages(prev => [newMessage, ...prev]);
-        setInput("");
+      let result: any;
+      try {
+        result = await response.json();
+      } catch {
+        if (!response.ok) throw new Error(`Send failed (HTTP ${response.status})`);
+        throw new Error("Unexpected response");
       }
-    } catch (err) {
-      toast.error('Failed to send message');
+      if (!response.ok) throw new Error(result.error || result.message || "Failed to send message");
+
+      setMessages(prev => [result, ...prev]);
+      if (!messageOverride?.message) setInput("");
+      setShowAttachmentMenu(false);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to send message');
     } finally {
       setSending(false);
+      setUploadingMedia(false);
     }
+  };
+
+  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingMedia(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error("Not authenticated");
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('jobId', job.id);
+      formData.append(
+        'receiverId',
+        application.worker_id === user?.id ? job.employer_id : application.worker_id
+      );
+
+      const response = await fetch(`${API_BASE}/kazi/send-media`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+
+      let result: any;
+      try {
+        result = await response.json();
+      } catch {
+        if (!response.ok) throw new Error(`Upload failed (HTTP ${response.status})`);
+        throw new Error("Unexpected response");
+      }
+      if (!response.ok) throw new Error(result.error || "Failed to upload media");
+
+      let mediaType: 'image' | 'video' | 'audio' | 'document' = 'document';
+      if (file.type.startsWith('image/')) mediaType = 'image';
+      else if (file.type.startsWith('video/')) mediaType = 'video';
+      else if (file.type.startsWith('audio/')) mediaType = 'audio';
+
+      await sendMessage({ message: '', mediaUrl: result.mediaUrl, mediaType });
+      toast.success(`${mediaType === 'image' ? 'Image' : mediaType === 'video' ? 'Video' : mediaType === 'audio' ? 'Voice note' : 'File'} sent`);
+    } catch (err: any) {
+      toast.error(err.message || 'Upload failed');
+    } finally {
+      setUploadingMedia(false);
+      setShowAttachmentMenu(false);
+    }
+  };
+
+  const startCall = async (type: 'audio' | 'video') => {
+    await sendMessage({
+      callType: type,
+      callStatus: 'ringing',
+      callDuration: 0,
+    });
+    toast(`📞 ${type === 'audio' ? 'Voice' : 'Video'} call started — connecting...`);
   };
 
   useEffect(() => {
@@ -1969,8 +2053,6 @@ function ChatSheet({ application, job, onClose, user }: any) {
     }
   }, [messages]);
 
-  const otherUser = application.worker_id === user?.id ? 'Employer' : application.applicant_name;
-
   return (
     <div className="fixed inset-0 z-[70] grid place-items-end sm:place-items-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
@@ -1980,12 +2062,28 @@ function ChatSheet({ application, job, onClose, user }: any) {
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div className="flex items-center gap-2">
-            <h3 className="text-base font-bold">Chat</h3>
-            <Badge tone="primary">{otherUser}</Badge>
+            <h3 className="text-base font-bold">{otherUser}</h3>
+            <Badge tone="primary">Chat</Badge>
           </div>
-          <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground">
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => startCall('audio')}
+              className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground hover:bg-muted/70"
+              title="Voice call"
+            >
+              <PhoneIcon className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => startCall('video')}
+              className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground hover:bg-muted/70"
+              title="Video call"
+            >
+              <VideoIcon className="h-4 w-4" />
+            </button>
+            <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -1998,11 +2096,33 @@ function ChatSheet({ application, job, onClose, user }: any) {
           ) : (
             messages.map((msg) => {
               const isOwn = msg.sender_id === user?.id;
+              const isCall = !!msg.call_type;
+              const isMedia = !!msg.media_url;
+
               return (
                 <div key={msg.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm ${isOwn ? 'gradient-primary text-primary-foreground' : 'bg-muted'}`}>
-                    <p>{msg.message}</p>
-                    <p className="mt-1 text-[10px] opacity-70">{new Date(msg.created_at).toLocaleTimeString()}</p>
+                  <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${isOwn ? 'gradient-primary text-primary-foreground' : 'bg-muted'}`}>
+                    {isCall ? (
+                      <div className="flex items-center gap-2">
+                        <VideoIcon className="h-4 w-4" />
+                        <span>{msg.message || (msg.call_type === 'video' ? 'Video call' : 'Voice call')}</span>
+                      </div>
+                    ) : isMedia && msg.media_type === 'image' ? (
+                      <img src={msg.media_url} alt="Shared image" className="max-w-full max-h-48 rounded-lg" />
+                    ) : isMedia && msg.media_type === 'video' ? (
+                      <video src={msg.media_url} controls className="max-w-full max-h-48 rounded-lg" />
+                    ) : isMedia && msg.media_type === 'audio' ? (
+                      <audio src={msg.media_url} controls className="w-full" />
+                    ) : isMedia ? (
+                      <a href={msg.media_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 underline text-xs">
+                        <FileText className="h-3 w-3" /> {msg.message || 'View document'}
+                      </a>
+                    ) : (
+                      <p>{msg.message}</p>
+                    )}
+                    <p className={`mt-1 text-[10px] opacity-70 ${isOwn ? 'text-right' : 'text-left'}`}>
+                      {new Date(msg.created_at).toLocaleTimeString()}
+                    </p>
                   </div>
                 </div>
               );
@@ -2011,17 +2131,56 @@ function ChatSheet({ application, job, onClose, user }: any) {
           <div ref={messagesEndRef} />
         </div>
 
+        {showAttachmentMenu && (
+          <div className="absolute bottom-16 left-1/2 -translate-x-1/2 flex gap-3 rounded-full bg-card border border-border px-3 py-2 shadow-lg">
+            <button
+              onClick={() => { setShowAttachmentMenu(false); fileInputRef.current?.click(); }}
+              className="grid h-10 w-10 place-items-center rounded-full bg-muted text-muted-foreground"
+              title="Gallery"
+            >
+              <Image className="h-5 w-5" />
+            </button>
+            <button
+              onClick={() => { setShowAttachmentMenu(false); fileInputRef.current?.click(); }}
+              className="grid h-10 w-10 place-items-center rounded-full bg-muted text-muted-foreground"
+              title="Document"
+            >
+              <FileText className="h-5 w-5" />
+            </button>
+            <button
+              onClick={() => startCall('audio')}
+              className="grid h-10 w-10 place-items-center rounded-full bg-muted text-muted-foreground"
+              title="Voice note"
+            >
+              <Mic className="h-5 w-5" />
+            </button>
+          </div>
+        )}
+
         <div className="border-t border-border p-3">
-          <div className="flex gap-2">
+          <div className="flex items-end gap-2">
+            <button
+              onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground"
+            >
+              <Paperclip className="h-4 w-4" />
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
+              onChange={handleMediaUpload}
+              className="hidden"
+            />
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+              onKeyDown={(e) => e.key === 'Enter' && sendMessage({ message: input })}
               placeholder="Type a message..."
               className="flex-1 rounded-full border border-border bg-background px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
             />
             <button
-              onClick={sendMessage}
+              onClick={() => sendMessage({ message: input })}
               disabled={sending || !input.trim()}
               className="grid h-10 w-10 place-items-center rounded-full gradient-primary text-primary-foreground disabled:opacity-50"
             >

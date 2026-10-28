@@ -177,8 +177,13 @@ ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS contract_id uuid REFERENCES
 ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS sender_id   uuid REFERENCES auth.users(id) ON DELETE CASCADE;
 ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS receiver_id uuid REFERENCES auth.users(id) ON DELETE CASCADE;
 ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS message     text;
-ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS read        boolean DEFAULT false NOT NULL;
-ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS created_at  timestamptz DEFAULT now() NOT NULL;
+ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS media_url    text;
+ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS media_type   text CHECK (media_type IN ('image','video','audio','document'));
+ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS call_type    text CHECK (call_type IN ('audio','video'));
+ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS call_status  text CHECK (call_status IN ('ringing','answered','missed','ended'));
+ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS call_duration numeric;
+ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS read         boolean DEFAULT false NOT NULL;
+ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS created_at   timestamptz DEFAULT now() NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_messages_job       ON public.messages(job_id);
 CREATE INDEX IF NOT EXISTS idx_messages_contract  ON public.messages(contract_id);

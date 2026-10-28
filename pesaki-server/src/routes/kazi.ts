@@ -1217,10 +1217,13 @@ return reply.send(disputes || []);
 
       const user = await getUserFromToken(token);
       const body = request.body as any;
-      const { jobId, receiverId, message } = body;
+      const { jobId, receiverId, message, mediaUrl, mediaType, callType, callStatus, callDuration } = body;
 
-      if (!jobId || !receiverId || !message) {
-        return reply.status(400).send({ error: 'jobId, receiverId, and message are required' });
+      if (!jobId || !receiverId) {
+        return reply.status(400).send({ error: 'jobId and receiverId are required' });
+      }
+      if (!message && !mediaUrl && !callType) {
+        return reply.status(400).send({ error: 'Provide at least message, mediaUrl, or callType' });
       }
 
       // Verify user is part of this job
@@ -1240,7 +1243,12 @@ return reply.send(disputes || []);
           job_id: jobId,
           sender_id: user.id,
           receiver_id: receiverId,
-          message,
+          message: message || '',
+          media_url: mediaUrl || null,
+          media_type: mediaType || null,
+          call_type: callType || null,
+          call_status: callStatus || null,
+          call_duration: callDuration || null,
           read: false,
         })
         .select()
@@ -1260,6 +1268,103 @@ return reply.send(disputes || []);
     } catch (err) {
       console.error(err);
       return reply.status(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  // POST /kazi/send-media — upload image/video/audio/file and send as message
+  server.post('/kazi/send-media', async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const token = request.headers.authorization?.replace('Bearer ', '');
+      if (!token) return reply.status(401).send({ error: 'Unauthorized' });
+
+      const user = await getUserFromToken(token);
+
+      const isMultipart = (request.headers['content-type'] || '').includes('multipart/form-data');
+      if (!isMultipart || !request.isMultipart?.()) {
+        return reply.status(400).send({ error: 'Content-Type must be multipart/form-data' });
+      }
+
+      let jobId: string | null = null;
+      let receiverId: string | null = null;
+      let mediaUrl: string | null = null;
+      let mediaType: string | null = null;
+
+      const parts = request.parts();
+      for await (const part of parts) {
+        if (part.type === 'field') {
+          if (part.fieldname === 'jobId') jobId = String(part.value);
+          if (part.fieldname === 'receiverId') receiverId = String(part.value);
+        } else if (part.type === 'file') {
+          if (part.fieldname === 'file' && jobId && receiverId) {
+            const fileBuffer = await part.toBuffer();
+            const safeName = (part.filename || 'upload').replace(/[^a-zA-Z0-9.\-]/g, '_');
+            const filename = `kazi-chat/${jobId}/${Date.now()}-${safeName}`;
+            const contentType = part.mimetype || 'application/octet-stream';
+
+            const { data: uploadData, error: uploadError } = await supabase.storage
+              .from('kazi-applicant-photos')
+              .upload(filename, fileBuffer, { contentType, upsert: false });
+
+            if (uploadError) {
+              console.error('Media upload failed', uploadError);
+              return reply.status(500).send({ error: 'Failed to upload media: ' + uploadError.message });
+            }
+
+            const { data: urlData } = supabase.storage
+              .from('kazi-applicant-photos')
+              .getPublicUrl(uploadData.path);
+            mediaUrl = urlData.publicUrl;
+
+            if (contentType.startsWith('image/')) mediaType = 'image';
+            else if (contentType.startsWith('video/')) mediaType = 'video';
+            else if (contentType.startsWith('audio/')) mediaType = 'audio';
+            else mediaType = 'document';
+          }
+        }
+      }
+
+      if (!jobId || !receiverId || !mediaUrl) {
+        return reply.status(400).send({ error: 'file, jobId, and receiverId are required' });
+      }
+
+      // Verify user is part of this job
+      const { data: job } = await supabase
+        .from('jobs')
+        .select('employer_id, hired_worker_id')
+        .eq('id', jobId)
+        .single();
+
+      if (!job || (job.employer_id !== user.id && job.hired_worker_id !== user.id)) {
+        return reply.status(403).send({ error: 'Unauthorized: not part of this job' });
+      }
+
+      const { data: newMessage, error } = await supabase
+        .from('messages')
+        .insert({
+          job_id: jobId,
+          sender_id: user.id,
+          receiver_id: receiverId,
+          message: '',
+          media_url: mediaUrl,
+          media_type: mediaType,
+          read: false,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      await notifyUser(
+        receiverId,
+        'New media message',
+        `You have received a ${mediaType === 'image' ? 'photo' : mediaType === 'video' ? 'video' : mediaType === 'audio' ? 'voice note' : 'document'}`,
+        { jobId, type: 'message' }
+      );
+
+      return reply.send({ message: newMessage, mediaUrl });
+    } catch (err: any) {
+      console.error('Error in /kazi/send-media:', err);
+      return reply.status(500).send({ error: err.message || 'Internal server error' });
     }
   });
 
