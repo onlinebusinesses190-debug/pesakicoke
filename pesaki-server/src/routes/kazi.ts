@@ -1,10 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { createClient } from '@supabase/supabase-js';
-import {
-  generateKaziAccessToken,
-  initiateKaziSTKPush,
-  debitKaziSource,
-} from './kazi_helpers';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -1270,7 +1265,7 @@ server.get('/kazi/escrow/:jobId', async (request: FastifyRequest, reply: Fastify
       return reply.status(500).send({ error: 'Internal server error' });
     }
   });
-// POST /kazi/post-job â€” employer pays upfront before the job is posted
+// POST /kazi/post-job — creates a job listing (free; escrow is created at hire time)
   server.post('/kazi/post-job', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -1280,7 +1275,7 @@ server.get('/kazi/escrow/:jobId', async (request: FastifyRequest, reply: Fastify
 
       const user = await getUserFromToken(token);
       const body = request.body as any;
-      const { title, category, location, pay, payAmount, duration, description, accommodation, requirements, paymentSource } = body;
+      const { title, category, location, pay, payAmount, duration, description, accommodation, requirements } = body;
 
       if (!title || !category || !location || !pay || !payAmount || !duration || !description) {
         return reply.status(400).send({
@@ -1294,12 +1289,6 @@ server.get('/kazi/escrow/:jobId', async (request: FastifyRequest, reply: Fastify
         return reply.status(400).send({ error: 'Invalid pay amount' });
       }
 
-      const source = paymentSource || 'wallet';
-      if (!['wallet', 'banking', 'mpesa'].includes(source)) {
-        return reply.status(400).send({ error: 'paymentSource must be wallet, banking, or mpesa' });
-      }
-
-      // Create the job row in a pending state (not visible publicly until paid)
       const { data: job, error: insertError } = await supabase
         .from('jobs')
         .insert({
@@ -1315,7 +1304,7 @@ server.get('/kazi/escrow/:jobId', async (request: FastifyRequest, reply: Fastify
           requirements: requirements || [],
           status: 'open',
           escrow_amount: amount,
-          escrow_status: 'held',
+          escrow_status: 'pending',
           badge: 'Hot',
           created_at: new Date().toISOString(),
         })
@@ -1328,25 +1317,8 @@ server.get('/kazi/escrow/:jobId', async (request: FastifyRequest, reply: Fastify
           code: insertError.code,
           details: insertError.details,
           hint: insertError.hint,
-          columns: Object.keys({
-            employer_id: user.id,
-            title,
-            category,
-            location,
-            pay_label: pay,
-            pay_amount: amount,
-            duration,
-            description,
-            accommodation: accommodation || false,
-            requirements: requirements || [],
-            status: 'open',
-            escrow_amount: amount,
-            escrow_status: 'held',
-            badge: 'Hot',
-            created_at: new Date().toISOString(),
-          }),
         });
-        return reply.status(500).send({ 
+        return reply.status(500).send({
           error: 'Database error: ' + insertError.message,
           code: insertError.code,
           details: insertError.details,
@@ -1354,99 +1326,7 @@ server.get('/kazi/escrow/:jobId', async (request: FastifyRequest, reply: Fastify
         });
       }
 
-      if (source === 'mpesa') {
-        const phone = body.phone;
-        if (!phone) {
-          await supabase.from('jobs').delete().eq('id', job.id);
-          return reply.status(400).send({ error: 'Phone number required for M-Pesa payment' });
-        }
-
-        const cleanPhone = String(phone).replace(/\D/g, '');
-        let normalized = cleanPhone;
-        if (normalized.startsWith('0')) normalized = '254' + normalized.slice(1);
-        if (!normalized.startsWith('254')) normalized = '254' + normalized;
-        if (!/^254[71]\d{8}$/.test(normalized)) {
-          await supabase.from('jobs').delete().eq('id', job.id);
-          return reply.status(400).send({ error: 'Invalid Kenyan phone number' });
-        }
-
-        const localRequestId = 'kazi_' + user.id + '_' + job.id + '_' + Date.now();
-
-        const { data: _mpesaDeposit, error: mpesaError } = await supabase
-          .from('mpesa_deposits')
-          .insert({
-            user_id: user.id,
-            phone: normalized,
-            amount,
-            checkout_request_id: localRequestId,
-            status: 'pending',
-            kazi_job_id: job.id,
-            created_at: new Date().toISOString(),
-          })
-          .select()
-          .single();
-
-        if (mpesaError) {
-          console.error('Failed to create mpesa deposit', mpesaError);
-          await supabase.from('jobs').delete().eq('id', job.id);
-          return reply.status(500).send({ error: 'Failed to initialize M-Pesa payment' });
-        }
-
-        const accessToken = await generateKaziAccessToken();
-        if (!accessToken) {
-          await supabase.from('jobs').delete().eq('id', job.id);
-          return reply.status(500).send({ error: 'Failed to authenticate with M-Pesa' });
-        }
-
-        const stkResult = await initiateKaziSTKPush(accessToken, amount, normalized, user.id, localRequestId);
-        if (!stkResult) {
-          await supabase
-            .from('mpesa_deposits')
-            .update({ status: 'failed' })
-            .eq('checkout_request_id', localRequestId);
-          await supabase.from('jobs').delete().eq('id', job.id);
-          return reply.status(500).send({ error: 'Failed to initiate M-Pesa prompt' });
-        }
-
-        return reply.status(202).send({
-          job,
-          payment: {
-            source: 'mpesa',
-            checkoutRequestId: stkResult.CheckoutRequestID,
-            merchantRequestId: stkResult.MerchantRequestID,
-            customerMessage: stkResult.CustomerMessage,
-            message: 'STK Push sent. Check your phone and enter your M-Pesa PIN.',
-          },
-        });
-      }
-
-      // wallet or banking
-      const debitResult = await debitKaziSource(source, user.id, amount);
-      if (!debitResult.success) {
-        await supabase.from('jobs').delete().eq('id', job.id);
-        return reply.status(400).send({ error: debitResult.error || 'Payment failed' });
-      }
-
-      const { data: escrow, error: escrowError } = await supabase
-        .from('kazi_escrow')
-        .insert({
-          job_id: job.id,
-          employer_id: user.id,
-          amount,
-          status: 'held',
-          source,
-          released_amount: 0,
-          fee_amount: Math.round(amount * FEE_RATE),
-        })
-        .select()
-        .single();
-
-      if (escrowError) {
-        console.error('Failed to create escrow', escrowError);
-        return reply.status(500).send({ error: 'Failed to create escrow record' });
-      }
-
-      return reply.status(201).send({ job, escrow });
+      return reply.status(201).send(job);
     } catch (err: any) {
       console.error('[kazi/post-job] ERROR:', {
         message: err.message,

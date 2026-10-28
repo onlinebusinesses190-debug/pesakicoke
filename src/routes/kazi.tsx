@@ -9,7 +9,7 @@ import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Badge, SectionTitle } from "@/components/ui-bits";
 import { KaziProfileTab, MyProfileShortcut } from "@/components/kazi/KaziProfileTab";
 import { ProfileSearchSheet } from "@/components/kazi/ProfileSearchSheet";
-import { fetchMyProfile } from "@/components/kazi/api";
+import { fetchMyProfile, fetchPublicProfile } from "@/components/kazi/api";
 import { isProfileEmpty, type KaziProfileBundle } from "@/components/kazi/types";
 import { useAuth } from "@/hooks/useAuth";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
@@ -187,16 +187,17 @@ function KaziPage() {
       }
 
       // 3. Get my posted jobs (as employer)
+      let fetchedPostedJobs: any[] = [];
       const myJobsRes = await fetch(`${API_BASE}/kazi/my-jobs`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (myJobsRes.ok) {
-        const jobsData = await myJobsRes.json();
-        setMyPostedJobs(jobsData);
+        fetchedPostedJobs = await myJobsRes.json();
+        setMyPostedJobs(fetchedPostedJobs);
       }
 
       // 4. Get applicants for my jobs
-      if (myPostedJobs.length > 0) {
+      if (fetchedPostedJobs.length > 0) {
         const applicantsRes = await fetch(`${API_BASE}/kazi/my-job-applicants`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -406,8 +407,10 @@ function KaziPage() {
         <MyPanel
           apps={applications}
           postedJobs={myPostedJobs}
+          jobApplicants={jobApplicants}
           contracts={contracts}
           onChat={(app: Application, job: Job) => setChatApp({ application: app, job })}
+          onHire={(app: Application) => { if (!requireAuth()) return; setHireApp(app); }}
           onRefresh={refreshData}
           user={user}
           onOpenProfile={() => setTab("profile")}
@@ -588,20 +591,40 @@ function ApplicantMiniCard({ application, onChat, onHire, onViewProfile }: any) 
 
 // ─── Applicant Profile Modal ───────────────────────────────────────────────
 function ApplicantProfileModal({ application, onClose }: any) {
+  const [profile, setProfile] = useState<KaziProfileBundle | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!application.worker_id) return;
+    void fetchPublicProfile(application.worker_id).then((res) => {
+      if (res.success && res.data) {
+        setProfile(res.data as KaziProfileBundle);
+      } else {
+        setProfileError(res.error || null);
+      }
+    });
+  }, [application.worker_id]);
+
+  const hasProfile = profile && !isProfileEmpty(profile);
+
   return (
     <SheetShell title="Applicant Profile" onClose={onClose}>
       <div className="space-y-4">
         <div className="flex items-center gap-4">
           <div className="grid h-20 w-20 shrink-0 place-items-center rounded-full bg-primary/10 text-2xl font-bold text-primary">
-            {application.photo_url ? (
+            {profile?.profile?.photo_url ? (
+              <img src={profile.profile.photo_url} alt="" className="h-20 w-20 rounded-full object-cover" />
+            ) : application.photo_url ? (
               <img src={application.photo_url} alt="" className="h-20 w-20 rounded-full object-cover" />
             ) : (
               application.applicant_name.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase()
             )}
           </div>
           <div>
-            <p className="text-xl font-bold">{application.applicant_name}</p>
-            <p className="text-sm text-muted-foreground">{application.location}</p>
+            <p className="text-xl font-bold">{profile?.profile?.full_name || application.applicant_name}</p>
+            <p className="text-sm text-muted-foreground">
+              {profile?.profile?.headline || profile?.profile?.category || application.location}
+            </p>
           </div>
         </div>
 
@@ -610,7 +633,20 @@ function ApplicantProfileModal({ application, onClose }: any) {
           <div className="flex justify-between"><span className="text-muted-foreground">Email</span><span>{application.email}</span></div>
           <div className="flex justify-between"><span className="text-muted-foreground">Experience</span><span>{application.experience} years</span></div>
           <div className="flex justify-between"><span className="text-muted-foreground">Availability</span><span>{application.availability}</span></div>
+          {profile?.profile?.is_verified && (
+            <div className="flex justify-between"><span className="text-muted-foreground">Verified</span><span className="text-success">✓ Verified</span></div>
+          )}
+          {profile && (
+            <div className="flex justify-between"><span className="text-muted-foreground">Profile completeness</span><span>{profile.profile.completeness}%</span></div>
+          )}
         </div>
+
+        {profile?.profile?.bio && (
+          <div className="rounded-xl bg-muted/50 p-3">
+            <p className="text-xs font-semibold text-muted-foreground mb-1">About</p>
+            <p className="text-sm">{profile.profile.bio}</p>
+          </div>
+        )}
 
         {application.additional_description && (
           <div className="rounded-xl bg-muted/50 p-3">
@@ -618,13 +654,61 @@ function ApplicantProfileModal({ application, onClose }: any) {
             <p className="text-sm">{application.additional_description}</p>
           </div>
         )}
+
+        {hasProfile && profile && (
+          <>
+            {profile.skills.length > 0 && (
+              <div className="rounded-xl bg-muted/50 p-3">
+                <p className="text-xs font-semibold text-muted-foreground mb-1">Skills</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {profile.skills.map((s) => (
+                    <span key={s.id} className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                      {s.skill_name} {s.years_experience ? `(${s.years_experience} yrs)` : ""}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {profile.experience.length > 0 && (
+              <div className="rounded-xl bg-muted/50 p-3">
+                <p className="text-xs font-semibold text-muted-foreground mb-1">Experience</p>
+                <div className="space-y-2 text-sm">
+                  {profile.experience.map((e) => (
+                    <div key={e.id} className="flex justify-between">
+                      <span>{e.job_title} {e.company && `· ${e.company}`}</span>
+                      <span className="text-muted-foreground">{e.start_date} – {e.is_current ? "Present" : e.end_date}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {profile.education.length > 0 && (
+              <div className="rounded-xl bg-muted/50 p-3">
+                <p className="text-xs font-semibold text-muted-foreground mb-1">Education</p>
+                <div className="space-y-1 text-sm">
+                  {profile.education.map((e) => (
+                    <div key={e.id}>{e.institution} — {e.qualification} {e.field_of_study}</div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {!hasProfile && !profileError && (
+          <p className="text-xs text-muted-foreground">
+            This applicant has not yet created a detailed KAZI profile.
+          </p>
+        )}
       </div>
     </SheetShell>
   );
 }
 
 // ─── My Panel ─────────────────────────────────────────────────────────────────
-function MyPanel({ apps, postedJobs, contracts, onChat, onRefresh, user, onOpenProfile }: any) {
+function MyPanel({ apps, postedJobs, jobApplicants, contracts, onChat, onHire, onRefresh, user, onOpenProfile }: any) {
   const [activeTab, setActiveTab] = useState<"applications" | "jobs" | "contracts">("applications");
 
   return (
@@ -675,23 +759,43 @@ function MyPanel({ apps, postedJobs, contracts, onChat, onRefresh, user, onOpenP
           {postedJobs.length === 0 ? (
             <EmptyState label="You haven't posted any jobs yet." />
           ) : (
-            postedJobs.map((job: Job) => (
-              <Card key={job.id} className="!p-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-sm font-semibold">{job.title}</p>
-                    <p className="text-xs text-muted-foreground">{job.location} · {job.duration}</p>
-                    <p className="mt-1 text-sm font-bold text-primary">{job.pay}</p>
+            postedJobs.map((job: Job) => {
+              const applicants = (jobApplicants && jobApplicants[job.id]) || [];
+              const pending = applicants.filter((a: any) => a.status === 'Pending');
+
+              return (
+                <Card key={job.id} className="!p-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-sm font-semibold">{job.title}</p>
+                      <p className="text-xs text-muted-foreground">{job.location} · {job.duration}</p>
+                      <p className="mt-1 text-sm font-bold text-primary">{job.pay}</p>
+                    </div>
+                    <Badge tone={job.status === 'open' ? 'success' : 'warning'}>
+                      {job.status}
+                    </Badge>
                   </div>
-                  <Badge tone={job.status === 'open' ? 'success' : 'warning'}>
-                    {job.status}
-                  </Badge>
-                </div>
-                {job.hired_worker_id && (
-                  <p className="mt-2 text-xs text-success">✓ Worker hired</p>
-                )}
-              </Card>
-            ))
+                  {job.hired_worker_id && (
+                    <p className="mt-2 text-xs text-success">✓ Worker hired</p>
+                  )}
+                  {pending.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-xs font-semibold text-muted-foreground">
+                        {pending.length} pending {pending.length === 1 ? "applicant" : "applicants"}
+                      </p>
+                      {pending.map((app: Application) => (
+                        <ApplicantMiniCard
+                          key={app.id}
+                          application={app}
+                          onChat={() => onChat(app, job)}
+                          onHire={() => onHire?.(app)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              );
+            })
           )}
         </div>
       )}
@@ -1524,8 +1628,6 @@ function PostJobSheet({ onClose, onSuccess, user, initialDescription }: any) {
   const requirements = ["Experience required", "ID Required", "References", "Background check", "Own tools"];
   const [form, setForm] = useState({
     title: "", category: "", location: "", pay: "", payAmount: 0, duration: "",
-    // Pre-seeded from ?hireFor=Name so the employer starts with context instead
-    // of an empty box. Still fully editable.
     description: initialDescription || "",
   });
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -1533,78 +1635,19 @@ function PostJobSheet({ onClose, onSuccess, user, initialDescription }: any) {
     setForm((f) => ({ ...f, [k]: v }));
   };
 
-  const [step, setStep] = useState<"form" | "pay" | "processing" | "waiting" | "success">("form");
-  const [paymentSource, setPaymentSource] = useState<"wallet" | "banking" | "mpesa">("wallet");
-  const [mpesaPhone, setMpesaPhone] = useState("");
-  const [checkoutId, setCheckoutId] = useState<string | null>(null);
-  const pollRef = useRef<number | null>(null);
-  const attemptsRef = useRef(0);
-  let currentToken: string | null = null;
-
-  const stopPolling = () => {
-    if (pollRef.current) {
-      clearTimeout(pollRef.current);
-      pollRef.current = null;
-    }
-  };
-
-  const pollJobPayment = async (checkoutRequestId: string) => {
-    if (attemptsRef.current >= 20) {
-      stopPolling();
-      setStep("success");
-      toast.success("Job posted and paid!");
-      onSuccess();
-      return;
-    }
-    attemptsRef.current += 1;
-    try {
-      const res = await fetch(`${API_BASE}/kazi/mpesa/job-status/${checkoutRequestId}`, {
-        headers: { Authorization: `Bearer ${currentToken}` },
-      });
-      const data = await res.json();
-      const status = String(data?.status || "").toLowerCase();
-      if (status === "completed") {
-        stopPolling();
-        setStep("success");
-        toast.success("Job posted and paid!");
-        onSuccess();
-      } else if (status === "failed") {
-        stopPolling();
-        setStep("form");
-        toast.error("Payment failed. Please try again.");
-      } else {
-        pollRef.current = window.setTimeout(() => pollJobPayment(checkoutRequestId), 3000);
-      }
-    } catch {
-      pollRef.current = window.setTimeout(() => pollJobPayment(checkoutRequestId), 3000);
-    }
-  };
-
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!requireAuth()) return;
-    if (step !== "form") return;
-    setStep("pay");
-  }
-
-  async function payNow() {
-    if (!requireAuth()) return;
     setLoading(true);
-    setStep("processing");
     try {
       const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token ?? null;
-      currentToken = token;
+      const token = data.session?.access_token;
 
       const body: any = {
         ...form,
         accommodation,
         requirements: checked,
-        paymentSource,
       };
-      if (paymentSource === "mpesa") {
-        body.phone = mpesaPhone;
-      }
 
       const response = await fetch(`${API_BASE}/kazi/post-job`, {
         method: "POST",
@@ -1618,19 +1661,11 @@ function PostJobSheet({ onClose, onSuccess, user, initialDescription }: any) {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || result.message || "Failed to post job");
 
-      if (paymentSource === "mpesa" && result.payment?.checkoutRequestId) {
-        setCheckoutId(result.payment.checkoutRequestId);
-        setStep("waiting");
-        attemptsRef.current = 0;
-        pollJobPayment(result.payment.checkoutRequestId);
-      } else {
-        setStep("success");
-        toast.success("Job posted and paid!");
-        onSuccess();
-      }
+      toast.success("Job posted!");
+      setDone(true);
+      onSuccess();
     } catch (err: any) {
       toast.error(err.message || "Failed to post job");
-      setStep("form");
     } finally {
       setLoading(false);
     }
@@ -1638,57 +1673,8 @@ function PostJobSheet({ onClose, onSuccess, user, initialDescription }: any) {
 
   return (
     <SheetShell title="Post a Job" onClose={onClose}>
-      {step === "success" ? (
-        <SuccessBlock message="Your job is now live and visible in Find Work. Money is held in escrow." onClose={onClose} />
-      ) : step === "waiting" ? (
-        <div className="py-8 text-center">
-          <Loader2 className="mx-auto h-10 w-10 animate-spin text-warning" />
-          <p className="mt-4 text-base font-bold">M-Pesa prompt sent</p>
-          <p className="mt-1 text-xs text-muted-foreground">Check your phone and enter your PIN to pay KES {form.payAmount}.</p>
-        </div>
-      ) : step === "processing" ? (
-        <div className="py-8 text-center">
-          <Loader2 className="mx-auto h-10 w-10 animate-spin text-primary" />
-          <p className="mt-4 text-base font-bold">Processing payment…</p>
-        </div>
-      ) : step === "pay" ? (
-        <div className="space-y-4">
-          <div className="rounded-xl bg-primary/5 p-3 text-xs">
-            <p className="font-semibold">Pay {fmt(form.payAmount)} upfront to post this job</p>
-            <p className="mt-1 text-muted-foreground">Money goes into escrow. It is fully refundable until the worker accepts the job.</p>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            {(["wallet", "banking", "mpesa"] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => setPaymentSource(s)}
-                className={`rounded-xl border p-3 text-xs font-semibold transition-all ${
-                  paymentSource === s ? "border-primary bg-primary/5" : "border-border"
-                }`}
-              >
-                {s === "wallet" ? "Wallet" : s === "banking" ? "Banking Hub" : "M-Pesa"}
-              </button>
-            ))}
-          </div>
-          {paymentSource === "mpesa" && (
-            <div>
-              <FieldLabel>M-Pesa phone number</FieldLabel>
-              <input
-                type="tel"
-                value={mpesaPhone}
-                onChange={(e) => setMpesaPhone(e.target.value)}
-                className={inputCls}
-                placeholder="0712345678"
-              />
-            </div>
-          )}
-          <div className="flex gap-2">
-            <button onClick={() => setStep("form")} className="flex-1 rounded-full border border-border py-2.5 text-xs font-semibold">Back</button>
-            <button onClick={payNow} disabled={loading || (paymentSource === "mpesa" && !mpesaPhone)} className="flex-1 rounded-full gradient-primary py-2.5 text-xs font-semibold text-primary-foreground disabled:opacity-50">
-              Pay {fmt(form.payAmount)}
-            </button>
-          </div>
-        </div>
+      {done ? (
+        <SuccessBlock message="Your job is now live and visible in Find Work." onClose={onClose} />
       ) : (
         <form className="space-y-3" onSubmit={submit}>
           <div><FieldLabel>Job title</FieldLabel><input required value={form.title} onChange={set("title")} className={inputCls} placeholder="e.g. Live-in House Help" /></div>
@@ -1714,7 +1700,7 @@ function PostJobSheet({ onClose, onSuccess, user, initialDescription }: any) {
           <div><FieldLabel>Description</FieldLabel><textarea required rows={4} value={form.description} onChange={set("description")} className={inputCls} placeholder="Describe duties, working hours, expectations…" /></div>
 
           <div className="rounded-xl bg-primary/5 p-3 text-xs">
-            <p className="font-semibold">ℹ️ Platform fee: 10% of the total job payment will be deducted when you hire a worker.</p>
+            <p className="font-semibold">ℹ️ Posting is free. 10% platform fee applies only when you hire a worker.</p>
           </div>
 
           <button type="submit" disabled={loading} className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50 flex items-center justify-center gap-2">
