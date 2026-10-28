@@ -523,8 +523,8 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
         }
       } else {
         body = (request.body as any) || {};
-        photoUrl = body.photoUrl || null;
-        additionalDescription = body.additionalDescription || null;
+        photoUrl = body.photoUrl || body.photo_url || null;
+        additionalDescription = body.additionalDescription || body.additional_description || null;
       }
 
       const { job_id, applicant_name, phone, email, location, experience, availability } = body;
