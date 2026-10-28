@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { CookieBanner } from "../components/CookieBanner";
+import { Toaster } from "@/components/ui/sonner";
 import { useAuth } from "@/hooks/useAuth";
 
 // Routes reachable without a session. The landing page and the auth screens are
@@ -210,6 +211,7 @@ function RootComponent() {
         <Outlet />
       </AuthRouteGuard>
       <CookieBanner />
+      <Toaster />
     </QueryClientProvider>
   );
 }
