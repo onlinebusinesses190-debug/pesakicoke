@@ -44,10 +44,12 @@ interface Job {
   location: string;
   pay: string;
   payAmount: number;
-   duration: string;
-   description: string;
-   accommodation?: boolean;
-   badge: string;
+  pay_label?: string;
+  pay_amount?: number;
+  duration: string;
+  description: string;
+  accommodation?: boolean;
+  badge: string;
   status: string;
   created_at: string;
   employer_id: string;
@@ -175,7 +177,12 @@ function KaziPage() {
       });
       if (jobsRes.ok) {
         const jobsData = await jobsRes.json();
-        setJobs(jobsData);
+        const mapped = (jobsData || []).map((j: any) => ({
+          ...j,
+          pay: j.pay_label || j.pay || '',
+          payAmount: j.pay_amount || j.payAmount || 0,
+        }));
+        setJobs(mapped);
       }
 
       // 2. Get my applications (as worker)
@@ -193,7 +200,12 @@ function KaziPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (myJobsRes.ok) {
-        fetchedPostedJobs = await myJobsRes.json();
+        const rawJobs = await myJobsRes.json();
+        fetchedPostedJobs = (rawJobs || []).map((j: any) => ({
+          ...j,
+          pay: j.pay_label || j.pay || '',
+          payAmount: j.pay_amount || j.payAmount || 0,
+        }));
         setMyPostedJobs(fetchedPostedJobs);
       }
 
