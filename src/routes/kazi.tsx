@@ -459,10 +459,9 @@ function JobCard({ job, onApply }: { job: Job; onApply: () => void }) {
           <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
             <Clock className="h-3 w-3" /> {job.duration}
           </p>
-          <p className="mt-1 flex items-center gap-1.5 text-lg font-bold text-primary">
+           <p className="mt-1 flex items-center gap-1.5 text-lg font-bold text-primary">
             <Wallet className="h-4 w-4" /> {job.pay}
           </p>
-          <p className="mt-0.5 text-[10px] text-muted-foreground">10% platform fee applies</p>
         </div>
         <Badge tone={job.badge === "Urgent" ? "destructive" : job.badge === "Hot" ? "warning" : "gold"}>
           {job.badge}
@@ -1572,8 +1571,8 @@ function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
         }),
       });
 
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message || "Failed to apply");
+       const result = await response.json();
+      if (!response.ok) throw new Error(result.error || result.message || `Failed to apply (HTTP ${response.status})`);
 
       toast.success('Application submitted!');
       setDone(true);

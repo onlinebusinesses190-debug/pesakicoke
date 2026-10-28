@@ -531,6 +531,18 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
         });
       }
 
+      const { data: jobCheck, error: jobError } = await supabase
+        .from('jobs')
+        .select('id, status')
+        .eq('id', job_id)
+        .single();
+      if (jobError || !jobCheck) {
+        return reply.status(404).send({ error: 'Job not found' });
+      }
+      if (jobCheck.status !== 'open') {
+        return reply.status(400).send({ error: 'This job is no longer open for applications' });
+      }
+
       const { data: existing } = await supabase
         .from('applications')
         .select('id')
