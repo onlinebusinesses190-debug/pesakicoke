@@ -44,9 +44,10 @@ interface Job {
   location: string;
   pay: string;
   payAmount: number;
-  duration: string;
-  description: string;
-  badge: string;
+   duration: string;
+   description: string;
+   accommodation?: boolean;
+   badge: string;
   status: string;
   created_at: string;
   employer_id: string;
@@ -1518,6 +1519,7 @@ function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
   const [done, setDone] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [profileEmpty, setProfileEmpty] = useState<boolean | null>(null);
+  const [step, setStep] = useState<"review" | "form">("review");
   const [form, setForm] = useState({
     applicantName: user?.user_metadata?.full_name || "",
     phone: user?.user_metadata?.phone || "",
@@ -1571,7 +1573,7 @@ function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
         }),
       });
 
-       const result = await response.json();
+      const result = await response.json();
       if (!response.ok) throw new Error(result.error || result.message || `Failed to apply (HTTP ${response.status})`);
 
       toast.success('Application submitted!');
@@ -1594,8 +1596,64 @@ function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
           onOpenProfile={() => navigate({ to: "/kazi/profile" })}
           onClose={onClose}
         />
+      ) : step === "review" ? (
+        <div className="space-y-4">
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground">Job title</p>
+            <p className="text-lg font-bold text-foreground">{job.title}</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground">Pay</p>
+              <p className="text-lg font-bold text-primary">{job.pay}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground">Duration</p>
+              <p className="text-sm font-semibold">{job.duration}</p>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground">Location</p>
+            <p className="text-sm">{job.location}</p>
+          </div>
+
+          {job.accommodation && (
+            <div className="flex items-center gap-2 rounded-xl bg-success/10 px-3 py-2 text-xs">
+              <CheckCircle2 className="h-4 w-4 text-success" />
+              <span>Accommodation is provided</span>
+            </div>
+          )}
+
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground">Category</p>
+            <p className="text-sm">{job.category || 'General'}</p>
+          </div>
+
+          {job.description && (
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground mb-1">Description</p>
+              <p className="text-sm text-muted-foreground whitespace-pre-line">{job.description}</p>
+            </div>
+          )}
+
+          <button
+            onClick={() => setStep("form")}
+            className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground"
+          >
+            Continue with application
+          </button>
+        </div>
       ) : (
          <form className="space-y-3" onSubmit={submit}>
+          <button
+            type="button"
+            onClick={() => setStep("review")}
+            className="text-xs font-semibold text-primary underline"
+          >
+            ← Back to job details
+          </button>
           <div className="rounded-xl bg-primary/5 p-3 flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold text-muted-foreground">Monthly payment</p>
@@ -2041,7 +2099,11 @@ function ApplicationSuccess({
         The employer will review your details and respond soon.
       </p>
 
-      {profileEmpty === null ? null : profileEmpty ? (
+      {profileEmpty === false ? (
+        <p className="mt-4 text-[11px] text-muted-foreground">
+          Your applications are visible in My Panel.
+        </p>
+      ) : (
         <div className="mt-5 rounded-xl border border-primary/20 bg-primary/5 p-4">
           <p className="mb-2 text-xs text-muted-foreground">
             Complete your profile to strengthen your job eligibility and get noticed by more employers.
@@ -2056,10 +2118,6 @@ function ApplicationSuccess({
             Your applications are saved in My Panel.
           </p>
         </div>
-      ) : (
-        <p className="mt-4 text-[11px] text-muted-foreground">
-          Your applications are visible in My Panel.
-        </p>
       )}
 
       <button
