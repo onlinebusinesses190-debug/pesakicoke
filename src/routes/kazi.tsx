@@ -9,6 +9,8 @@ import { AppShell, PageHeader } from "@/components/AppShell";
 import { Card, Badge, SectionTitle } from "@/components/ui-bits";
 import { KaziProfileTab, MyProfileShortcut } from "@/components/kazi/KaziProfileTab";
 import { ProfileSearchSheet } from "@/components/kazi/ProfileSearchSheet";
+import { fetchMyProfile } from "@/components/kazi/api";
+import { isProfileEmpty, type KaziProfileBundle } from "@/components/kazi/types";
 import { useAuth } from "@/hooks/useAuth";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { toast } from "sonner";
@@ -1406,9 +1408,11 @@ function PhotoUpload({ onPhotoUrl }: { onPhotoUrl: (url: string | null) => void 
 
 // ─── ApplyJobSheet ──────────────────────────────────────────────────────────
 function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
+  const navigate = useNavigate();
   const { requireAuth } = useRequireAuth();
   const [done, setDone] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [profileEmpty, setProfileEmpty] = useState<boolean | null>(null);
   const [form, setForm] = useState({
     applicantName: user?.user_metadata?.full_name || "",
     phone: user?.user_metadata?.phone || "",
@@ -1424,6 +1428,17 @@ function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
   const handlePhotoUrl = (url: string | null) => {
     setForm(f => ({ ...f, photo_url: url || '' }));
   };
+
+  useEffect(() => {
+    if (!done) return;
+    let cancelled = false;
+    void fetchMyProfile().then((res) => {
+      if (!cancelled && res.success && res.data) {
+        setProfileEmpty(isProfileEmpty(res.data as KaziProfileBundle));
+      }
+    });
+    return () => { cancelled = true; };
+  }, [done]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -1468,7 +1483,12 @@ function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
   return (
     <SheetShell title="Apply for job" onClose={onClose}>
       {done ? (
-        <SuccessBlock message={`Your application for "${job.title}" has been submitted.`} onClose={onClose} />
+        <ApplicationSuccess
+          jobTitle={job.title}
+          profileEmpty={profileEmpty}
+          onOpenProfile={() => navigate({ to: "/kazi/profile" })}
+          onClose={onClose}
+        />
       ) : (
         <form className="space-y-3" onSubmit={submit}>
           <div><FieldLabel>Full name</FieldLabel><input required value={form.applicantName} onChange={set("applicantName")} className={inputCls} /></div>
@@ -1996,6 +2016,59 @@ export function SuccessBlock({ message, onClose }: { message: string; onClose: (
       <p className="mt-3 text-base font-bold">Success</p>
       <p className="mt-1 text-xs text-muted-foreground">{message}</p>
       <button onClick={onClose} className="mt-4 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground">
+        Done
+      </button>
+    </div>
+  );
+}
+
+function ApplicationSuccess({
+  jobTitle,
+  profileEmpty,
+  onOpenProfile,
+  onClose,
+}: {
+  jobTitle: string;
+  profileEmpty: boolean | null;
+  onOpenProfile: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="py-6 text-center">
+      <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-success/15 text-success">
+        <CheckCircle2 className="h-6 w-6" />
+      </div>
+      <h3 className="mt-3 text-lg font-bold text-foreground">Application submitted</h3>
+      <p className="mt-1.5 max-w-sm text-xs leading-relaxed text-muted-foreground">
+        Your application for &ldquo;{jobTitle}&rdquo; has been submitted successfully.
+        The employer will review your details and respond soon.
+      </p>
+
+      {profileEmpty === null ? null : profileEmpty ? (
+        <div className="mt-5 rounded-xl border border-primary/20 bg-primary/5 p-4">
+          <p className="mb-2 text-xs text-muted-foreground">
+            Complete your profile to strengthen your job eligibility and get noticed by more employers.
+          </p>
+          <button
+            onClick={onOpenProfile}
+            className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground"
+          >
+            Create Profile
+          </button>
+          <p className="mt-2 text-[10px] text-muted-foreground">
+            Your applications are saved in My Panel.
+          </p>
+        </div>
+      ) : (
+        <p className="mt-4 text-[11px] text-muted-foreground">
+          Your applications are visible in My Panel.
+        </p>
+      )}
+
+      <button
+        onClick={onClose}
+        className="mt-4 h-11 w-full rounded-xl border border-border text-sm font-semibold text-foreground"
+      >
         Done
       </button>
     </div>

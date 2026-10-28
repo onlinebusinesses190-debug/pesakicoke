@@ -21,6 +21,7 @@ export interface KaziProfile {
   monthly_rate: number | null;
   is_verified: boolean;
   completeness: number;
+  slug: string | null;
   created_at: string;
   updated_at: string;
 }
