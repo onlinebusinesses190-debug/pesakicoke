@@ -191,7 +191,17 @@ function KaziPage() {
       });
       if (myAppsRes.ok) {
         const appsData = await myAppsRes.json();
-        setApplications(appsData);
+        const mappedApps = (appsData || []).map((a: any) => {
+          if (a.jobs) {
+            a.jobs = {
+              ...a.jobs,
+              pay: a.jobs.pay_label || a.jobs.pay || '',
+              payAmount: a.jobs.pay_amount || a.jobs.payAmount || 0,
+            };
+          }
+          return a;
+        });
+        setApplications(mappedApps);
       }
 
       // 3. Get my posted jobs (as employer)
@@ -874,7 +884,7 @@ function WorkerApplications({ apps, onChat, onRefresh, user }: any) {
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold">{job?.title || 'Unknown'}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{job?.pay_label || 'KES 0'}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{job?.pay || job?.pay_label || 'KES 0'}</p>
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
                   Applied {new Date(a.applied_at).toLocaleDateString()}
                 </p>
