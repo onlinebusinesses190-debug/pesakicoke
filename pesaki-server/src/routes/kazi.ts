@@ -342,6 +342,19 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+
+      // Filter out jobs that have a 'Hired' application (employer already hired someone)
+      const { data: hiredJobs, error: hiredError } = await supabase
+        .from('applications')
+        .select('job_id')
+        .eq('status', 'Hired');
+
+      if (!hiredError && hiredJobs && hiredJobs.length > 0) {
+        const hiredJobIds = new Set(hiredJobs.map((a: any) => a.job_id));
+        const filteredJobs = (jobs || []).filter((j: any) => !hiredJobIds.has(j.id));
+        return reply.send(filteredJobs);
+      }
+
       return reply.send(jobs);
     } catch (err) {
       console.error(err);
