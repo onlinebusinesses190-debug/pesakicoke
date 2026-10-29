@@ -1951,8 +1951,18 @@ function ChatSheet({ application, job, onClose, user }: any) {
       message: messageOverride?.message ?? input,
       ...messageOverride,
     };
-    if (!payload.jobId || !payload.receiverId) {
-      toast.error('Cannot send message: missing jobId or receiverId. Please refresh and try again.');
+    const payload: any = {
+      jobId: job?.id,
+      receiverId: application.worker_id === user?.id ? job?.employer_id : application.worker_id,
+      message: messageOverride?.message ?? input,
+      ...messageOverride,
+    };
+    if (!payload.jobId) {
+      toast.error('Cannot send message: missing jobId. job.id is ' + (job?.id ? 'set' : 'undefined'));
+      return;
+    }
+    if (!payload.receiverId) {
+      toast.error('Cannot send message: missing receiverId. worker_id=' + application.worker_id + ', user.id=' + user?.id + ', employer_id=' + job?.employer_id);
       return;
     }
     setSending(true);
