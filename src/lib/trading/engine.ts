@@ -278,8 +278,10 @@ export class Engine {
     this.load();
     this.log("Terminal started. Demo account connected to simulated server.");
     this.start();
-    // Fetch real historical candles from backend for seamless refresh
-    this.fetchHistoricalCandles();
+    // Note: Historical candles from backend are NOT fetched because the backend's
+    // candle generation algorithm differs from this engine's deterministic walk,
+    // causing price discontinuities. Simulated candles provide smoother, more
+    // realistic movement for the demo account.
   }
 
   private async fetchHistoricalCandles(): Promise<void> {
