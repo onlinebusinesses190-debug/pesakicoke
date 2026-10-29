@@ -1184,15 +1184,28 @@ return reply.send(disputes || []);
 
       if (!jobId) return reply.status(400).send({ error: 'jobId is required' });
 
-      // Verify user is part of this job (either employer or hired worker)
+      // Verify user is part of this job (employer, hired worker, OR applicant)
       const { data: job } = await supabase
         .from('jobs')
         .select('employer_id, hired_worker_id')
         .eq('id', jobId)
         .single();
 
-      if (!job || (job.employer_id !== user.id && job.hired_worker_id !== user.id)) {
-        return reply.status(403).send({ error: 'Unauthorized: not part of this job' });
+      if (!job) {
+        return reply.status(404).send({ error: 'Job not found' });
+      }
+      if (job.employer_id !== user.id && job.hired_worker_id !== user.id) {
+        // Check if user is an applicant (has a non-rejected application)
+        const { data: appCheck } = await supabase
+          .from('applications')
+          .select('id')
+          .eq('job_id', jobId)
+          .eq('worker_id', user.id)
+          .in('status', ['Pending', 'Hired'])
+          .maybeSingle();
+        if (!appCheck) {
+          return reply.status(403).send({ error: 'Unauthorized: not part of this job' });
+        }
       }
 
       const { data: messages, error } = await supabase
@@ -1226,15 +1239,28 @@ return reply.send(disputes || []);
         return reply.status(400).send({ error: 'Provide at least message, mediaUrl, or callType' });
       }
 
-      // Verify user is part of this job
+      // Verify user is part of this job (employer, hired worker, OR applicant)
       const { data: job } = await supabase
         .from('jobs')
         .select('employer_id, hired_worker_id')
         .eq('id', jobId)
         .single();
 
-      if (!job || (job.employer_id !== user.id && job.hired_worker_id !== user.id)) {
-        return reply.status(403).send({ error: 'Unauthorized: not part of this job' });
+      if (!job) {
+        return reply.status(404).send({ error: 'Job not found' });
+      }
+      if (job.employer_id !== user.id && job.hired_worker_id !== user.id) {
+        // Check if user is an applicant (has a non-rejected application)
+        const { data: appCheck } = await supabase
+          .from('applications')
+          .select('id')
+          .eq('job_id', jobId)
+          .eq('worker_id', user.id)
+          .in('status', ['Pending', 'Hired'])
+          .maybeSingle();
+        if (!appCheck) {
+          return reply.status(403).send({ error: 'Unauthorized: not part of this job' });
+        }
       }
 
       const { data: newMessage, error } = await supabase
@@ -1334,8 +1360,20 @@ return reply.send(disputes || []);
         .eq('id', jobId)
         .single();
 
-      if (!job || (job.employer_id !== user.id && job.hired_worker_id !== user.id)) {
-        return reply.status(403).send({ error: 'Unauthorized: not part of this job' });
+      if (!job) {
+        return reply.status(404).send({ error: 'Job not found' });
+      }
+      if (job.employer_id !== user.id && job.hired_worker_id !== user.id) {
+        const { data: appCheck } = await supabase
+          .from('applications')
+          .select('id')
+          .eq('job_id', jobId)
+          .eq('worker_id', user.id)
+          .in('status', ['Pending', 'Hired'])
+          .maybeSingle();
+        if (!appCheck) {
+          return reply.status(403).send({ error: 'Unauthorized: not part of this job' });
+        }
       }
 
       const { data: newMessage, error } = await supabase

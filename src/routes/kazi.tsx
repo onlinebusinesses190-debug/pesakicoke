@@ -1942,10 +1942,14 @@ function ChatSheet({ application, job, onClose, user }: any) {
      callDuration?: number;
    }) => {
     const payload: any = {
-      jobId: job.id,
-      receiverId: application.worker_id === user?.id ? job.employer_id : application.worker_id,
+      jobId: job?.id,
+      receiverId: application.worker_id === user?.id ? job?.employer_id : application.worker_id,
       ...messageOverride,
     };
+    if (!payload.jobId || !payload.receiverId) {
+      toast.error('Cannot send message: missing jobId or receiverId');
+      return;
+    }
     setSending(true);
     try {
       const { data } = await supabase.auth.getSession();
