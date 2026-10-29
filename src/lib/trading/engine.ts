@@ -57,6 +57,7 @@ export interface Position {
   openTime: number;
   sl: number;
   tp: number;
+  backendId?: string;
 }
 export interface PendingOrder {
   ticket: number;
@@ -265,9 +266,11 @@ export class Engine {
       );
       this.candles[s.name] = tfs;
       const day = tfs.H1.slice(-24);
+      const lastCandle = tfs.H1[tfs.H1.length - 1];
+      const startPrice = lastCandle ? lastCandle.c : s.start;
       this.quotes[s.name] = {
-        bid: s.start,
-        ask: round(s.start + s.spread * s.point, s.digits),
+        bid: startPrice,
+        ask: round(startPrice + s.spread * s.point, s.digits),
         high: Math.max(...day.map((c) => c.h)),
         low: Math.min(...day.map((c) => c.l)),
         open: day[0].o,
@@ -381,6 +384,7 @@ export class Engine {
           history: this.history.slice(0, 500),
           journal: this.journal.slice(0, 300),
           nextTicket: this.nextTicket,
+          tickCount: this.tickCount,
         }),
       );
     } catch { /* ignore */ }
@@ -397,6 +401,7 @@ export class Engine {
       this.history = d.history ?? [];
       this.journal = d.journal ?? [];
       this.nextTicket = d.nextTicket ?? this.nextTicket;
+      this.tickCount = d.tickCount ?? 0;
     } catch { /* ignore */ }
   }
   
@@ -481,10 +486,14 @@ export class Engine {
   }
 
   closePosition(ticket: number, reason: CloseReason = "manual", lots?: number): Result {
+    if (this.mode === "live") {
+      this.closePositionLive(ticket, reason, lots).catch(e => this.log(`Close error: ${e}`, true));
+      return { ok: true };
+    }
     const p = this.positions.find((x) => x.ticket === ticket);
     if (!p) return this.fail(`Position #${ticket} not found`);
     const closeLots = lots ? Math.min(round(lots, 2), p.lots) : p.lots;
-    if (closeLots < 1) return this.fail("Invalid volume (min 1 USD)");
+    if (closeLots < 0.01) return this.fail("Invalid volume (min 0.01 lots)");
     
     const profit = this.profitOf(p, closeLots);
     const price = this.closePriceOf(p);
@@ -761,22 +770,115 @@ export class Engine {
         return this.fail(data.error || "Order failed");
       }
 
+      const backendTicket = data.position?.ticket || data.order?.id;
+      const backendId = data.position?.id || data.position?.backendId;
+
+      // Update local position with the real backend ticket if different
+      if (backendTicket !== undefined || backendId) {
+        const p = this.positions.find((x) => x.symbol === req.symbol && x.side === side);
+        if (p) {
+          if (backendTicket && typeof backendTicket === "number" && backendTicket !== p.ticket) {
+            this.positions = this.positions.filter((x) => x !== p);
+            p.ticket = backendTicket;
+            this.positions.push(p);
+          }
+          if (backendId) p.backendId = String(backendId);
+          this.emit();
+        }
+      }
+
       // Refresh balance after successful order
       this.fetchLiveBalance();
-      return { ok: true, ticket: data.position?.ticket || data.order?.id };
+      return { ok: true, ticket: backendTicket };
     } catch (e) {
       return this.fail("Network error placing order");
+    }
+  }
+
+  async closePositionLive(ticket: number, reason: CloseReason = "manual", lots?: number): Promise<Result> {
+    if (this.mode !== "live") return this.fail("Live trading not enabled");
+    const p = this.positions.find((x) => x.ticket === ticket);
+    if (!p) return this.fail(`Position #${ticket} not found`);
+    const closeLots = lots ? Math.min(round(lots, 2), p.lots) : p.lots;
+    if (closeLots < 0.01) return this.fail("Invalid volume (min 0.01 lots)");
+
+    try {
+      const path = p.backendId
+        ? `/forex/positions/${p.backendId}/close`
+        : `/forex/positions/${p.ticket}/close`;
+      const res = await apiFetch(path, {
+        method: "POST",
+        body: JSON.stringify({ lots: closeLots }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return this.fail(data.error || "Close order failed");
+      }
+
+      // Remove from local positions
+      if (closeLots >= p.lots - 1e-9) {
+        this.positions = this.positions.filter((x) => x !== p);
+      } else {
+        p.lots = round(p.lots - closeLots, 2);
+      }
+
+      const profit = this.profitOf(p, closeLots);
+      const closePrice = this.closePriceOf(p);
+      this.history.unshift({
+        ticket: p.ticket, symbol: p.symbol, side: p.side, lots: closeLots,
+        openPrice: p.openPrice, closePrice: closePrice,
+        openTime: p.openTime, closeTime: Date.now(),
+        profit, reason,
+      });
+
+      this.fetchLiveBalance();
+      this.emit();
+      return { ok: true, ticket };
+    } catch (e) {
+      return this.fail("Network error closing position");
     }
   }
 
   // Override placeOrder to use live API when in live mode
   placeOrder(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }): Result {
     if (this.mode === "live") {
-      // For live mode, we need to call the async placeOrderLive
-      // Since placeOrder is synchronous, we'll fire and forget the async call
-      // and return a pending result. The actual result will come via fetchLiveBalance polling.
-      this.placeOrderLive(req).catch(e => this.fail(e.message));
-      return { ok: true, ticket: 0 }; // Temporary ticket, real one comes from API
+      // Validate first
+      const s = this.spec(req.symbol);
+      if (!s) return this.fail("Unknown symbol");
+      const q = this.quotes[req.symbol];
+      const lots = round(req.lots, 2);
+      if (!(lots >= 0.01 && lots <= 100)) return this.fail("Invalid volume (0.01 - 100 lots)");
+      const sl = round(req.sl || 0, s.digits), tp = round(req.tp || 0, s.digits);
+      const side: Side = isBuyType(req.type) ? "buy" : "sell";
+      const err = this.checkStops(side, side === "buy" ? q.ask : q.bid, sl, tp, req.symbol);
+      if (err) return this.fail(err);
+      const entry = side === "buy" ? q.ask : q.bid;
+      const entryPrice = round(entry, s.digits);
+
+      // Create local position immediately so UI can show it and allow closing
+      const ticket = this.nextTicket++;
+      this.positions.push({
+        ticket, symbol: req.symbol, side, lots, openPrice: entryPrice,
+        openTime: Date.now(), sl, tp,
+      });
+      this.emit();
+
+      // Fire async API call - placeOrderLive will update with real ticket from backend
+      this.placeOrderLive(req).then((res) => {
+        if (res.ok && res.ticket !== undefined) {
+          // Update local position with real backend ticket
+          const p = this.positions.find((x) => x.ticket === ticket);
+          if (p) {
+            if (res.ticket !== ticket) {
+              this.positions = this.positions.filter((x) => x !== p);
+              p.ticket = res.ticket;
+              this.positions.push(p);
+            }
+            this.emit();
+          }
+        }
+      }).catch(e => this.log(`Order error: ${e}`, true));
+      return { ok: true, ticket };
     }
 
     // Demo mode - use existing logic
@@ -784,7 +886,7 @@ export class Engine {
     if (!s) return this.fail("Unknown symbol");
     const q = this.quotes[req.symbol];
     const lots = round(req.lots, 2);
-    if (!(lots >= 1 && lots <= 10000)) return this.fail("Invalid volume (1 - 10000)");
+    if (!(lots >= 0.01 && lots <= 100)) return this.fail("Invalid volume (0.01 - 100 lots)");
     const sl = round(req.sl || 0, s.digits), tp = round(req.tp || 0, s.digits);
     const side: Side = isBuyType(req.type) ? "buy" : "sell";
 

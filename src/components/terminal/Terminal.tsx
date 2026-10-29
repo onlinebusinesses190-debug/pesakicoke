@@ -172,8 +172,8 @@ export function Terminal({ mode = "demo" }: { mode?: "demo" | "real" }) {
             <div>
               <div className="p-2 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
                 <h3 className="text-xs font-bold text-gray-700">Open Positions</h3>
-                {e.positions.length > 0 && (
-                  <button onClick={() => setShowBulkMenu(true)} className="text-[10px] text-red-600 font-bold hover:underline">Bulk Ops</button>
+                 {e.positions.length > 0 && (
+                  <button onClick={() => setShowBulkMenu(true)} className="text-gray-500 hover:text-gray-700 text-xl leading-none font-bold py-0.5 px-1">⋮</button>
                 )}
               </div>
               <div className="divide-y divide-gray-100">
