@@ -1944,23 +1944,25 @@ function ChatSheet({ application, job, onClose, user }: any) {
      callStatus?: 'ringing' | 'answered' | 'missed' | 'ended';
      callDuration?: number;
     }) => {
+    const senderId = user?.id;
+    const isSenderWorker = application.worker_id === senderId;
+    const receiverId = isSenderWorker
+      ? (job?.employer_id || application?.jobs?.employer_id)
+      : application.worker_id;
+
     const payload: any = {
-      jobId: job?.id,
-      receiverId: application.worker_id === user?.id ? job?.employer_id : application.worker_id,
+      jobId: job?.id || application.job_id,
+      receiverId: receiverId || application.worker_id,
       message: messageOverride?.message ?? input,
       ...messageOverride,
     };
+    console.log('[ChatSheet] payload:', { jobId: payload.jobId, receiverId: payload.receiverId, senderId, isSenderWorker, jobIdFromJob: job?.id, jobIdFromApp: application.job_id });
+
     if (!payload.jobId) {
-      console.error('[ChatSheet] Missing jobId:', { job, application, user });
       toast.error('Cannot send message: job information is missing');
       return;
     }
     if (!payload.receiverId) {
-      console.error('[ChatSheet] Missing receiverId:', {
-        worker_id: application.worker_id,
-        user_id: user?.id,
-        employer_id: job?.employer_id
-      });
       toast.error('Cannot send message: recipient information is missing');
       return;
     }
