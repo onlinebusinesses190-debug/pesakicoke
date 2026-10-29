@@ -579,7 +579,10 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('[kazi/apply] INSERT error:', { message: error.message, code: error.code, details: error.details, hint: error.hint, body });
+        return reply.status(500).send({ error: error.message, code: error.code, details: error.details, hint: error.hint });
+      }
 
       const { data: jobData } = await supabase
         .from('jobs')

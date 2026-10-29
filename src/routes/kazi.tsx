@@ -200,6 +200,8 @@ function KaziPage() {
       if (myAppsRes.ok) {
         const appsData = await myAppsRes.json();
         setApplications(appsData || []);
+      } else {
+        console.error('[kazi] my-applications failed:', myAppsRes.status, await myAppsRes.text());
       }
 
       // 3. Get my posted jobs (as employer)
