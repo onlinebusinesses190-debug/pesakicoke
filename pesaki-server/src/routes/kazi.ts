@@ -632,10 +632,12 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
         .eq('id', applicationId);
 
       // Move job to hired state (removed from public listings)
-      await supabase
+      const { error: jobUpdateError } = await supabase
         .from('jobs')
         .update({ status: 'hired', hired_worker_id: app.worker_id })
         .eq('id', jobId);
+
+      console.log('[kazi/hire] job update:', { jobId, worker_id: app.worker_id, jobUpdateError: jobUpdateError?.message });
 
       // Reject all other pending applications for this job and notify them
       const { data: otherApplicants } = await supabase
@@ -675,14 +677,20 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
           worker_id: app.worker_id,
           amount: totalAmount,
           status: 'held',
-          source: 'wallet',
-          released_amount: 0,
-          fee_amount: platformFee,
         })
         .select()
         .single();
 
-      if (escrowError) throw escrowError;
+      if (escrowError) {
+        console.error('[kazi/hire] escrow creation failed:', escrowError.message, escrowError.code, escrowError.details, escrowError.hint);
+        // Rollback: try to reset the job status
+        await supabase.from('jobs').update({ status: 'open', hired_worker_id: null }).eq('id', jobId);
+        return reply.status(500).send({
+          error: 'Failed to create escrow record',
+          details: escrowError.message,
+          code: escrowError.code,
+        });
+      }
 
       const durationMonths = getDurationInMonths(app.jobs.duration);
       const endDate = new Date();

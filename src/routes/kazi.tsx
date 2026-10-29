@@ -1881,12 +1881,12 @@ function HireSheet({ app, onClose, onHireSuccess, user }: any) {
       });
 
       const result = await response.json();
-      if (!response.ok) throw new Error(result.message || "Failed to hire");
+      if (!response.ok) throw new Error(result.error || "Failed to hire");
 
-       toast.success(`You have hired ${app.applicant_name}!`);
-       
-       setDone(true);
-       onHireSuccess();
+      toast.success(`You have hired ${app.applicant_name}!`);
+      
+      setDone(true);
+      onHireSuccess();
       setTimeout(() => onClose(), 3000);
     } catch (err: any) {
       toast.error(err.message || "Failed to hire");

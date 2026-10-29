@@ -117,8 +117,11 @@ export class Engine {
           const formattedSymbol = `${s.name.slice(0, 3)}/${s.name.slice(3)}`;
           const res = await apiFetch(`/forex/candles?symbol=${encodeURIComponent(formattedSymbol)}&interval=${interval}&count=400`);
           const data = await res.json().catch(() => null);
-          if (data?.success && data.candles) {
-            this.candles[s.name][tf] = data.candles.map((c: any) => ({ t: Math.floor(c.timestamp / 1000), o: c.open, h: c.high, l: c.low, c: c.close }));
+          if (data?.success && data.candles?.length) {
+            const mapped = data.candles.map((c: any) => ({ t: Math.floor(c.timestamp / 1000), o: c.open, h: c.high, l: c.low, c: c.close }));
+            const serverRange = Math.max(...mapped.map((c: Candle) => c.h)) - Math.min(...mapped.map((c: Candle) => c.l));
+            const simRange = Math.max(...this.candles[s.name][tf].map((c) => c.h)) - Math.min(...this.candles[s.name][tf].map((c) => c.l));
+            if (serverRange > simRange * 0.1) this.candles[s.name][tf] = mapped;
           }
         } catch {}
       }

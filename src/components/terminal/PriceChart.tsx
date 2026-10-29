@@ -102,8 +102,10 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
 
       if (view.current.offset === 0) { lo = Math.min(lo, smoothBid); hi = Math.max(hi, smoothAsk); }
       
-      const pad = (hi - lo) * 0.15 || spec.point * 10;
-      const rawLo = lo - pad, rawHi = hi + pad;
+      const priceRange = hi - lo;
+      const minRange = spec.point * 100;
+      const pad = priceRange * 0.15 || minRange;
+      const rawLo = lo - Math.max(pad, minRange), rawHi = hi + Math.max(pad, minRange);
 
       if (loRef.current === 0 && hiRef.current === 0) {
         loRef.current = rawLo; hiRef.current = rawHi;
@@ -113,7 +115,8 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
 
       const smoothLo = loRef.current;
       const smoothHi = hiRef.current;
-      const y = (p: number) => plotH - ((p - smoothLo) / (smoothHi - smoothLo)) * plotH;
+      const smoothRange = Math.max(smoothHi - smoothLo, spec.point * 100);
+      const y = (p: number) => plotH - ((p - smoothLo) / smoothRange) * plotH;
       const xOf = (i: number) => plotW - 12 - (bars.length - i - 0.5) * sp;
 
       // ─── Y-AXIS ───
@@ -121,17 +124,18 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
 
-      const targetPixels = 24; 
-      const rawStep = (smoothHi - smoothLo) / (plotH / targetPixels);
-      const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
-      const norm = rawStep / mag;
+      const targetPixels = 24;
+      const rawStep = smoothRange / (plotH / targetPixels);
+      const safeStep = Math.max(rawStep, spec.point * 0.1);
+      const mag = Math.pow(10, Math.floor(Math.log10(safeStep)));
+      const norm = safeStep / mag;
       let niceNorm = 1;
       if (norm > 5) niceNorm = 10; else if (norm > 2) niceNorm = 5; else if (norm > 1) niceNorm = 2;
-      const step = niceNorm * mag;
+      const step = Math.max(niceNorm * mag, spec.point * 0.1);
+      const safeStart = Math.ceil(smoothLo / step) * step;
 
       ctx.strokeStyle = cGrid; ctx.lineWidth = 1; ctx.setLineDash([2, 3]);
-      const startLine = Math.ceil(smoothLo / step) * step;
-      for (let p = startLine; p <= smoothHi; p += step) {
+      for (let p = safeStart; p <= smoothHi; p += step) {
         const yy = Math.round(y(p)) + 0.5;
         ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke();
         ctx.fillStyle = cText; 
