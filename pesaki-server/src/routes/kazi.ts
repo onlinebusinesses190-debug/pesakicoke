@@ -49,7 +49,7 @@ async function notifyUser(
   }
 }
 
-const FEE_RATE = 0.10;
+// KAZI Link is now completely FREE — no fees, no escrow, no payments
 
 // ─── KAZI Profile helpers ─────────────────────────────────────────────────────
 // Every profile endpoint answers with { success: true, data } or
@@ -604,7 +604,7 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
       return reply.status(500).send({ error: err.message || 'Internal server error' });
     }
   });
-  // POST /kazi/hire — employer hires an applicant; creates escrow + contract
+  // POST /kazi/hire — employer hires an applicant; KAZI Link is FREE (no payments)
   server.post('/kazi/hire', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -616,7 +616,7 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
 
       const { data: app, error: appError } = await supabase
         .from('applications')
-        .select('*, jobs!inner ( pay_amount, duration, employer_id, title )')
+        .select('*, jobs!inner ( duration, employer_id, title )')
         .eq('id', applicationId)
         .single();
 
@@ -626,18 +626,21 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
         return reply.status(403).send({ error: 'Unauthorized' });
       }
 
+      // Mark the selected application as Hired
       await supabase
         .from('applications')
         .update({ status: 'Hired' })
         .eq('id', applicationId);
 
-      // Move job to hired state (removed from public listings)
+      // Move job to hired state — this immediately removes it from Find Work
       const { error: jobUpdateError } = await supabase
         .from('jobs')
         .update({ status: 'hired', hired_worker_id: app.worker_id })
         .eq('id', jobId);
 
-      console.log('[kazi/hire] job update:', { jobId, worker_id: app.worker_id, jobUpdateError: jobUpdateError?.message });
+      if (jobUpdateError) {
+        console.error('[kazi/hire] job status update failed:', jobUpdateError.message);
+      }
 
       // Reject all other pending applications for this job and notify them
       const { data: otherApplicants } = await supabase
@@ -665,44 +668,7 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
         }
       }
 
-      const totalAmount = Number(app.jobs.pay_amount) || 0;
-      const platformFee = totalAmount > 0 ? Math.round(totalAmount * FEE_RATE) : 0;
-      const workerAmount = totalAmount - platformFee;
-
-      console.log('[kazi/hire] creating escrow with:', { jobId, workerId: app.worker_id, totalAmount, platformFee, FEE_RATE });
-
-      let escrow: any = null;
-      if (totalAmount > 0) {
-        const escrowResult = await supabase
-          .from('kazi_escrow')
-          .insert({
-            job_id: jobId,
-            employer_id: user.id,
-            worker_id: app.worker_id,
-            amount: totalAmount,
-            status: 'held',
-            source: 'wallet',
-            released_amount: 0,
-            fee_amount: platformFee,
-          })
-          .select()
-          .single();
-
-        escrow = escrowResult.data;
-
-        if (escrowResult.error) {
-          console.error('[kazi/hire] escrow creation failed:', {
-            message: escrowResult.error.message,
-            code: escrowResult.error.code,
-            details: escrowResult.error.details,
-            hint: escrowResult.error.hint,
-          });
-          // Continue anyway — still create contract and update job status
-        }
-      } else {
-        console.log('[kazi/hire] skipping escrow (amount=0)');
-      }
-
+      // Create contract (no escrow, no payments — KAZI Link is free)
       const durationMonths = getDurationInMonths(app.jobs.duration);
       const endDate = new Date();
       endDate.setMonth(endDate.getMonth() + durationMonths);
@@ -714,10 +680,10 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
           employer_id: user.id,
           worker_id: app.worker_id,
           status: 'active',
-          total_amount: totalAmount,
-          platform_fee: platformFee,
-          worker_amount: workerAmount,
-          escrow_id: escrow ? escrow.id : null,
+          total_amount: 0,
+          platform_fee: 0,
+          worker_amount: 0,
+          escrow_id: null,
           worker_accepted: false,
           job_done: false,
           start_date: new Date().toISOString(),
@@ -727,7 +693,10 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
         .select()
         .single();
 
-      if (contractError) throw contractError;
+      if (contractError) {
+        console.error('[kazi/hire] contract creation failed:', contractError.message);
+        // Job is still updated to hired — that's the important part
+      }
 
       await notifyUser(
         app.worker_id,
@@ -742,14 +711,14 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
         { jobId, type: 'hired' }
       );
 
-      return reply.send({ contract, escrow });
+      return reply.send({ contract, escrow: null });
     } catch (err: any) {
       console.error('Error in /kazi/hire:', err);
       return reply.status(500).send({ error: err.message || 'Internal server error' });
     }
   });
 
-  // POST /kazi/accept-job — worker accepts; escrow becomes locked permanently
+  // POST /kazi/accept-job — worker accepts the hire; no escrow needed (free)
   server.post('/kazi/accept-job', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -769,35 +738,27 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
         return reply.status(403).send({ error: 'Unauthorized: not the hired worker' });
       }
 
-      const { data: escrow, error: escrowError } = await supabase
-        .from('kazi_escrow')
-        .update({ status: 'locked', updated_at: new Date().toISOString() })
-        .eq('job_id', jobId)
-        .eq('employer_id', job.employer_id)
-        .select()
-        .single();
-      if (escrowError) throw escrowError;
-
+      // No escrow lock needed — KAZI Link is free
       await supabase
         .from('job_contracts')
-        .update({ worker_accepted: true })
+        .update({ worker_accepted: true, start_date: new Date().toISOString() })
         .eq('job_id', jobId)
         .eq('worker_id', user.id);
 
       await notifyUser(
         job.employer_id,
-        'Job accepted',
-        `The worker has accepted "${job.title}". Escrow is now locked.`,
+        'Worker accepted',
+        `The worker has accepted "${job.title}".`,
         { jobId, type: 'accepted' }
       );
 
-      return reply.send({ success: true, escrow });
+      return reply.send({ success: true });
     } catch (err: any) {
       console.error('Error in /kazi/accept-job:', err);
       return reply.status(500).send({ error: err.message || 'Internal server error' });
     }
   });
-  // POST /kazi/confirm-done — employer confirms job done; releases 90% to worker
+  // POST /kazi/confirm-done — employer confirms job done; no payments (free)
   server.post('/kazi/confirm-done', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -817,47 +778,11 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
         return reply.status(403).send({ error: 'Unauthorized: not the employer' });
       }
 
-      const { data: escrow, error: escrowError } = await supabase
-        .from('kazi_escrow')
-        .select('*')
-        .eq('job_id', jobId)
-        .single();
-      if (escrowError) throw escrowError;
-      if (!escrow) return reply.status(404).send({ error: 'Escrow not found' });
-      if (escrow.status !== 'locked') {
-        return reply.status(400).send({ error: 'Escrow must be locked before confirming done' });
-      }
-
-      const workerAmount = Math.round(Number(escrow.amount) * (1 - FEE_RATE));
-      const feeAmount = Number(escrow.amount) - workerAmount;
-
-      const { data: _creditData, error: creditError } = await supabase.rpc('credit_wallet', {
-        p_user_id: escrow.worker_id,
-        p_amount: workerAmount,
-        p_mode: 'real',
-        p_description: `KAZI Link payment for job ${jobId} (10% fee: ${feeAmount})`,
-      });
-      if (creditError) {
-        console.error('Failed to credit worker', creditError);
-        return reply.status(500).send({ error: 'Failed to credit worker wallet' });
-      }
-
-      await supabase
-        .from('kazi_escrow')
-        .update({
-          status: 'released',
-          released_amount: workerAmount,
-          fee_amount: feeAmount,
-          released_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', escrow.id);
-
+      // No escrow, no wallet credit — KAZI Link is free
       await supabase
         .from('job_contracts')
-        .update({ job_done: true, status: 'completed', amount_released: workerAmount })
-        .eq('job_id', jobId)
-        .eq('worker_id', escrow.worker_id);
+        .update({ job_done: true, status: 'completed', amount_released: 0 })
+        .eq('job_id', jobId);
 
       await supabase
         .from('jobs')
@@ -865,20 +790,20 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
         .eq('id', jobId);
 
       await notifyUser(
-        escrow.worker_id,
+        job.hired_worker_id,
         'Job confirmed done',
-        `Job "${job.title}" confirmed done. You can now withdraw KES ${workerAmount}.`,
+        `Job "${job.title}" has been confirmed as done.`,
         { jobId, type: 'done' }
       );
 
-return reply.send({ success: true, workerAmount, feeAmount });
+      return reply.send({ success: true });
     } catch (err: any) {
       console.error('Error in /kazi/confirm-done:', err);
       return reply.status(500).send({ error: err.message || 'Internal server error' });
     }
   });
 
-  // POST /kazi/start-job — employer starts the job; marks contract as active for payout schedule
+  // POST /kazi/start-job — employer starts the job; no escrow needed (free)
   server.post('/kazi/start-job', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -912,17 +837,7 @@ return reply.send({ success: true, workerAmount, feeAmount });
         return reply.status(400).send({ error: 'Contract must be active' });
       }
 
-      const { data: escrow, error: escrowError } = await supabase
-        .from('kazi_escrow')
-        .select('*')
-        .eq('job_id', jobId)
-        .single();
-      if (escrowError) throw escrowError;
-      if (!escrow) return reply.status(404).send({ error: 'Escrow not found' });
-      if (escrow.status !== 'locked') {
-        return reply.status(400).send({ error: 'Escrow must be locked before starting job' });
-      }
-
+      // No escrow check — KAZI Link is free
       await supabase
         .from('job_contracts')
         .update({ start_date: new Date().toISOString() })
@@ -931,7 +846,7 @@ return reply.send({ success: true, workerAmount, feeAmount });
       await notifyUser(
         contract.worker_id,
         'Job started',
-        `The employer has started "${job.title}". Payout schedule is now active.`,
+        `The employer has started "${job.title}".`,
         { jobId, type: 'started' }
       );
 
@@ -942,130 +857,17 @@ return reply.send({ success: true, workerAmount, feeAmount });
     }
   });
 
-  // POST /kazi/withdraw — worker withdraws released funds from escrow
-  server.post('/kazi/withdraw', async (request: FastifyRequest, reply: FastifyReply) => {
-    try {
-      const token = request.headers.authorization?.replace('Bearer ', '');
-      if (!token) return reply.status(401).send({ error: 'Unauthorized' });
-
-      const user = await getUserFromToken(token);
-      const body = request.body as any;
-      const { contractId } = body;
-
-      const { data: contract, error: contractError } = await supabase
-        .from('job_contracts')
-        .select('*, kazi_escrow!inner (*)')
-        .eq('id', contractId)
-        .eq('worker_id', user.id)
-        .single();
-      if (contractError) throw contractError;
-      if (!contract) return reply.status(404).send({ error: 'Contract not found' });
-
-      const escrow = contract.kazi_escrow;
-      if (!escrow) return reply.status(404).send({ error: 'Escrow not found' });
-      if (escrow.status !== 'released') {
-        return reply.status(400).send({ error: 'Funds not released yet' });
-      }
-      if (Number(escrow.released_amount) <= 0) {
-        return reply.status(400).send({ error: 'No funds available to withdraw' });
-      }
-
-const { data: _creditData, error: creditError } = await supabase.rpc('credit_wallet', {
-        p_user_id: user.id,
-        p_amount: Number(escrow.released_amount),
-        p_mode: 'real',
-        p_description: `KAZI Link withdrawal for contract ${contractId}`,
-      });
-      if (creditError) {
-        console.error('Failed to credit worker wallet', creditError);
-        return reply.status(500).send({ error: 'Failed to credit wallet' });
-      }
-
-      await supabase
-        .from('kazi_escrow')
-        .update({ released_amount: 0, updated_at: new Date().toISOString() })
-        .eq('id', escrow.id);
-
-      await supabase
-        .from('job_contracts')
-        .update({ amount_released: 0 })
-        .eq('id', contractId);
-
-      return reply.send({ success: true, amount: Number(escrow.released_amount) });
-    } catch (err: any) {
-      console.error('Error in /kazi/withdraw:', err);
-      return reply.status(500).send({ error: err.message || 'Internal server error' });
-    }
+  // POST /kazi/withdraw — KAZI Link is free, no withdrawals
+  server.post('/kazi/withdraw', (_request: FastifyRequest, reply: FastifyReply) => {
+    return reply.send({ success: true, message: 'KAZI Link is free — no withdrawals needed' });
   });
 
-  // POST /kazi/request-refund — employer requests early reversal after acceptance
-  server.post('/kazi/request-refund', async (request: FastifyRequest, reply: FastifyReply) => {
-    try {
-      const token = request.headers.authorization?.replace('Bearer ', '');
-      if (!token) return reply.status(401).send({ error: 'Unauthorized' });
-
-      const user = await getUserFromToken(token);
-      const body = request.body as any;
-      const { jobId, reason } = body;
-
-      if (!reason) return reply.status(400).send({ error: 'Reason is required' });
-
-      const { data: job, error: jobError } = await supabase
-        .from('jobs')
-        .select('*')
-        .eq('id', jobId)
-        .single();
-      if (jobError) throw jobError;
-      if (job.employer_id !== user.id) {
-        return reply.status(403).send({ error: 'Unauthorized: not the employer' });
-      }
-
-      const { data: escrow, error: escrowError } = await supabase
-        .from('kazi_escrow')
-        .select('*')
-        .eq('job_id', jobId)
-        .single();
-      if (escrowError) throw escrowError;
-      if (!escrow) return reply.status(404).send({ error: 'Escrow not found' });
-      if (escrow.status !== 'locked') {
-        return reply.status(400).send({ error: 'Can only request refund when escrow is locked' });
-      }
-
-      const autoReleaseAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
-      const { data: dispute, error: disputeError } = await supabase
-        .from('kazi_disputes')
-        .insert({
-          job_id: jobId,
-          escrow_id: escrow.id,
-          employer_id: user.id,
-          worker_id: escrow.worker_id,
-          employer_reason: reason,
-          auto_release_at: autoReleaseAt,
-        })
-        .select()
-        .single();
-      if (disputeError) throw disputeError;
-
-      await supabase
-        .from('kazi_escrow')
-        .update({ status: 'disputed', reason, refund_requested_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-        .eq('id', escrow.id);
-
-      await notifyUser(
-        escrow.worker_id,
-        'Employer requests withdrawal',
-        `${user.email} requested to withdraw from "${job.title}". Reason: ${reason}. Please respond within 7 days.`,
-        { jobId, type: 'dispute' }
-      );
-
-      return reply.send({ success: true, dispute, autoReleaseAt });
-    } catch (err: any) {
-      console.error('Error in /kazi/request-refund:', err);
-      return reply.status(500).send({ error: err.message || 'Internal server error' });
-    }
+  // POST /kazi/request-refund — KAZI Link is free, no refunds needed
+  server.post('/kazi/request-refund', (_request: FastifyRequest, reply: FastifyReply) => {
+    return reply.send({ success: true, message: 'KAZI Link is free — no refunds needed' });
   });
-  // POST /kazi/dispute/:id/respond — worker accepts or declines the employer refund request
+
+  // POST /kazi/dispute/:id/respond — worker responds to dispute (free, no payments)
   server.post('/kazi/dispute/:id/respond', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -1085,7 +887,7 @@ const { data: _creditData, error: creditError } = await supabase.rpc('credit_wal
 
       const { data: dispute, error: disputeError } = await supabase
         .from('kazi_disputes')
-        .select('*, kazi_escrow!inner (*)')
+        .select('*')
         .eq('id', id)
         .single();
       if (disputeError) throw disputeError;
@@ -1097,7 +899,6 @@ const { data: _creditData, error: creditError } = await supabase.rpc('credit_wal
         return reply.status(400).send({ error: 'Dispute already responded to' });
       }
 
-      const escrow = dispute.kazi_escrow;
       const now = new Date().toISOString();
 
       await supabase
@@ -1106,20 +907,7 @@ const { data: _creditData, error: creditError } = await supabase.rpc('credit_wal
         .eq('id', id);
 
       if (response === 'accepted') {
-        const employerAmount = Math.round(Number(escrow.amount) * (1 - FEE_RATE));
-        const feeAmount = Number(escrow.amount) - employerAmount;
-
-        await supabase
-          .from('kazi_escrow')
-          .update({
-            status: 'refunded',
-            released_amount: employerAmount,
-            fee_amount: feeAmount,
-            released_at: now,
-            updated_at: now,
-          })
-          .eq('id', escrow.id);
-
+        // Worker accepted the refund — just cancel the job
         await supabase
           .from('jobs')
           .update({ status: 'cancelled' })
@@ -1127,20 +915,16 @@ const { data: _creditData, error: creditError } = await supabase.rpc('credit_wal
 
         await notifyUser(
           dispute.employer_id,
-          'Refund approved',
-          `The worker accepted your withdrawal request. You will receive KES ${employerAmount} (10% service fee retained).`,
+          'Job cancelled',
+          `The worker accepted the cancellation request. Job has been cancelled.`,
           { jobId: dispute.job_id, type: 'dispute_resolved' }
         );
       } else {
-        await supabase
-          .from('kazi_escrow')
-          .update({ status: 'locked', updated_at: now })
-          .eq('id', escrow.id);
-
+        // Worker declined — notify employer
         await notifyUser(
           dispute.employer_id,
-          'Refund declined',
-          `The worker declined your withdrawal request. Reason: ${reason}. Escrow remains locked.`,
+          'Cancellation declined',
+          `The worker declined your cancellation request. Reason: ${reason}.`,
           { jobId: dispute.job_id, type: 'dispute_declined' }
         );
       }
@@ -1207,7 +991,7 @@ const { data: _creditData, error: creditError } = await supabase.rpc('credit_wal
 
       const { data: disputes, error } = await supabase
         .from('kazi_disputes')
-        .select('*, kazi_escrow!inner (amount, status, job_id, jobs!inner (title))')
+        .select('*, jobs!inner (title)')
         .or(`employer_id.eq.${user.id},worker_id.eq.${user.id}`)
         .order('created_at', { ascending: false });
 
@@ -1510,28 +1294,12 @@ return reply.send(disputes || []);
     }
   });
 
-  // GET /kazi/escrow/:jobId
-server.get('/kazi/escrow/:jobId', async (request: FastifyRequest, reply: FastifyReply) => {
-    try {
-      const token = request.headers.authorization?.replace('Bearer ', '');
-      if (!token) return reply.status(401).send({ error: 'Unauthorized' });
-
-      const { jobId } = request.params as { jobId: string };
-
-      const { data: escrow, error } = await supabase
-        .from('kazi_escrow')
-        .select('*')
-        .eq('job_id', jobId)
-        .single();
-
-      if (error && error.code !== 'PGRST116') throw error;
-      return reply.send(escrow || null);
-    } catch (err) {
-      console.error(err);
-      return reply.status(500).send({ error: 'Internal server error' });
-    }
+  // GET /kazi/escrow/:jobId — always returns null (KAZI Link is free, no escrow)
+  server.get('/kazi/escrow/:jobId', (_request: FastifyRequest, reply: FastifyReply) => {
+    return reply.send(null);
   });
-// POST /kazi/post-job — creates a job listing (free; escrow is created at hire time)
+
+  // POST /kazi/post-job — creates a job listing (KAZI Link is completely free)
   server.post('/kazi/post-job', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -1543,17 +1311,14 @@ server.get('/kazi/escrow/:jobId', async (request: FastifyRequest, reply: Fastify
       const body = request.body as any;
       const { title, category, location, pay, payAmount, duration, description, accommodation, requirements } = body;
 
-      if (!title || !category || !location || !pay || !payAmount || !duration || !description) {
+      if (!title || !category || !location || !pay || !duration || !description) {
         return reply.status(400).send({
           error: 'Missing required fields',
-          required: ['title', 'category', 'location', 'pay', 'payAmount', 'duration', 'description'],
+          required: ['title', 'category', 'location', 'pay', 'duration', 'description'],
         });
       }
 
-      const amount = parseInt(payAmount);
-      if (!Number.isFinite(amount) || amount <= 0) {
-        return reply.status(400).send({ error: 'Invalid pay amount' });
-      }
+      const amount = payAmount ? parseInt(payAmount) : 0;
 
       const { data: job, error: insertError } = await supabase
         .from('jobs')
@@ -1563,14 +1328,12 @@ server.get('/kazi/escrow/:jobId', async (request: FastifyRequest, reply: Fastify
           category,
           location,
           pay_label: pay,
-          pay_amount: amount,
+          pay_amount: amount || 0,
           duration,
           description,
           accommodation: accommodation || false,
           requirements: requirements || [],
           status: 'open',
-          escrow_amount: amount,
-          escrow_status: 'pending',
           badge: 'Hot',
           created_at: new Date().toISOString(),
         })
@@ -1660,6 +1423,7 @@ server.get('/kazi/escrow/:jobId', async (request: FastifyRequest, reply: Fastify
       }
 
       const finalAmount = callbackAmount > 0 ? callbackAmount : Number(deposit.amount);
+      console.log('[mpesa/callback] deposit completed:', { jobId: deposit.kazi_job_id, finalAmount });
       const jobId = deposit.kazi_job_id;
 
       if (!jobId) {
@@ -1670,37 +1434,12 @@ server.get('/kazi/escrow/:jobId', async (request: FastifyRequest, reply: Fastify
         return reply.status(200).send({ ResultCode: 0, ResultDesc: 'Accepted' });
       }
 
-      // Create the escrow record now that payment has cleared
-      const { data: _escrow, error: escrowError } = await supabase
-        .from('kazi_escrow')
-        .insert({
-          job_id: jobId,
-          employer_id: deposit.user_id,
-          amount: finalAmount,
-          status: 'held',
-          source: 'mpesa',
-          released_amount: 0,
-          fee_amount: Math.round(finalAmount * FEE_RATE),
-          checkout_request_id: checkoutRequestId,
-          mpesa_receipt: mpesaReceipt || null,
-        })
-        .select()
-        .single();
-
-      if (escrowError) {
-        console.error('Failed to create escrow on M-Pesa callback', escrowError);
-        return reply.status(200).send({ ResultCode: 0, ResultDesc: 'Accepted' });
-      }
-
+      // KAZI Link is free — no escrow needed
+      // Just mark the deposit as completed
       await supabase
         .from('mpesa_deposits')
         .update({ status: 'completed', mpesa_receipt: mpesaReceipt || null })
         .eq('checkout_request_id', checkoutRequestId);
-
-      await supabase
-        .from('jobs')
-        .update({ escrow_amount: finalAmount, escrow_status: 'held' })
-        .eq('id', jobId);
 
       return reply.status(200).send({ ResultCode: 0, ResultDesc: 'Accepted' });
     } catch (err) {

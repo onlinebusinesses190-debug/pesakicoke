@@ -869,8 +869,6 @@ function MyPanel({ apps, postedJobs, jobApplicants, contracts, onChat, onHire, o
 
 // ─── Worker Applications ──────────────────────────────────────────────────
 function WorkerApplications({ apps, onChat, onRefresh, user }: any) {
-  const { requireAuth } = useRequireAuth();
-  const [withdrawing, setWithdrawing] = useState<string | null>(null);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
@@ -902,33 +900,6 @@ function WorkerApplications({ apps, onChat, onRefresh, user }: any) {
     }
   };
 
-  const handleWithdraw = async (contractId: string) => {
-    if (!requireAuth()) return;
-    setWithdrawing(contractId);
-    try {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-
-      const response = await fetch(`${API_BASE}/kazi/withdraw`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ contractId }),
-      });
-
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message || "Withdrawal failed");
-      toast.success("Payment withdrawn successfully!");
-      onRefresh();
-    } catch (err: any) {
-      toast.error(err.message || "Withdrawal failed");
-    } finally {
-      setWithdrawing(null);
-    }
-  };
-
   if (apps.length === 0) {
     return <EmptyState label="You haven't applied to any jobs yet. Head to Find Work to get started." />;
   }
@@ -953,11 +924,9 @@ function WorkerApplications({ apps, onChat, onRefresh, user }: any) {
                 {a.status === 'Hired' && (
                   <div className="mt-2 flex items-center gap-2">
                     <Badge tone="success">Hired</Badge>
-                    {a.contract && (
-                      <span className="text-[10px] text-muted-foreground">
-                        {a.contract.amount_released > 0 ? `Released: ${fmt(a.contract.amount_released)}` : 'Awaiting first payout'}
-                      </span>
-                    )}
+                    <span className="text-[10px] text-muted-foreground">
+                      Accepted{a.contract?.worker_accepted ? ' ✓' : ' — awaiting your acceptance'}
+                    </span>
                   </div>
                 )}
                 {a.status === 'Completed' && (
@@ -984,19 +953,6 @@ function WorkerApplications({ apps, onChat, onRefresh, user }: any) {
                   </span>
                 )}
               </button>
-              {a.status === 'Hired' && a.contract && (
-                <button
-                  onClick={() => handleWithdraw(a.contract.id)}
-                  disabled={withdrawing === a.contract.id || a.contract.amount_released <= 0}
-                  className="rounded-full gradient-primary py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
-                >
-                  {withdrawing === a.contract.id ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin inline" />
-                  ) : (
-                    `Withdraw ${fmt(a.contract.amount_released)}`
-                  )}
-                </button>
-              )}
               {a.status === 'Completed' && (
                 <button
                   className="rounded-full gradient-gold py-2 text-xs font-semibold text-gold-foreground"
@@ -1017,8 +973,6 @@ function ActiveContracts({ contracts, onRefresh, user }: any) {
   const { requireAuth } = useRequireAuth();
   const [starting, setStarting] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
-  const [refundJob, setRefundJob] = useState<any>(null);
-  const [refundReason, setRefundReason] = useState("");
   const [dispute, setDispute] = useState<any>(null);
   const [disputeResponse, setDisputeResponse] = useState<"accepted" | "declined">("accepted");
   const [disputeReason, setDisputeReason] = useState("");
@@ -1041,7 +995,7 @@ function ActiveContracts({ contracts, onRefresh, user }: any) {
 
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || "Failed to start job");
-      toast.success("Job started! Countdown for payouts has begun.");
+      toast.success("Job started!");
       onRefresh();
     } catch (err: any) {
       toast.error(err.message || "Failed to start job");
@@ -1069,46 +1023,12 @@ function ActiveContracts({ contracts, onRefresh, user }: any) {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Failed to confirm done");
 
-      toast.success("Job confirmed done! Funds released to worker.");
+      toast.success("Job confirmed done!");
       onRefresh();
     } catch (err: any) {
       toast.error(err.message || "Failed to confirm done");
     } finally {
       setConfirming(null);
-    }
-  };
-
-  const handleRequestRefund = async () => {
-    if (!requireAuth() || !refundJob) return;
-    if (!refundReason.trim()) {
-      toast.error("Please provide a reason");
-      return;
-    }
-    setStarting(refundJob.id);
-    try {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-
-      const response = await fetch(`${API_BASE}/kazi/request-refund`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ jobId: refundJob.id, reason: refundReason.trim() }),
-      });
-
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Failed to request refund");
-
-      toast.success("Withdrawal request sent to worker.");
-      setRefundJob(null);
-      setRefundReason("");
-      onRefresh();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to request refund");
-    } finally {
-      setStarting(null);
     }
   };
 
@@ -1131,7 +1051,7 @@ function ActiveContracts({ contracts, onRefresh, user }: any) {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Failed to accept job");
 
-      toast.success("Job accepted! Escrow is now locked.");
+      toast.success("Job accepted!");
       onRefresh();
     } catch (err: any) {
       toast.error(err.message || "Failed to accept job");
@@ -1166,39 +1086,12 @@ function ActiveContracts({ contracts, onRefresh, user }: any) {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Failed to respond");
 
-      toast.success(disputeResponse === "accepted" ? "Withdrawal approved." : "Withdrawal declined.");
+      toast.success(disputeResponse === "accepted" ? "Cancelled." : "Declined.");
       setDispute(null);
       setDisputeReason("");
       onRefresh();
     } catch (err: any) {
       toast.error(err.message || "Failed to respond");
-    } finally {
-      setStarting(null);
-    }
-  };
-
-  const handleWithdraw = async (contractId: string) => {
-    if (!requireAuth()) return;
-    setStarting(contractId);
-    try {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-
-      const response = await fetch(`${API_BASE}/kazi/withdraw`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ contractId }),
-      });
-
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message || "Withdrawal failed");
-      toast.success("Payment withdrawn successfully!");
-      onRefresh();
-    } catch (err: any) {
-      toast.error(err.message || "Withdrawal failed");
     } finally {
       setStarting(null);
     }
@@ -1240,24 +1133,9 @@ function ActiveContracts({ contracts, onRefresh, user }: any) {
               </div>
             </div>
 
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <p className="text-muted-foreground">Total Amount</p>
-                <p className="font-semibold">{fmt(c.total_amount)}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Released</p>
-                <p className="font-semibold text-success">{fmt(c.amount_released)}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Held</p>
-                <p className="font-semibold text-warning">{fmt(c.amount_held)}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Platform Fee</p>
-                <p className="font-semibold text-muted-foreground">{fmt(c.platform_fee)}</p>
-              </div>
-            </div>
+             <div className="mt-3 text-center text-xs text-muted-foreground">
+               KAZI Link is free — no payments or fees involved
+             </div>
 
             {isEmployer && c.status === 'active' && !c.job_done && (
               <div className="mt-3 space-y-2">
@@ -1287,18 +1165,8 @@ function ActiveContracts({ contracts, onRefresh, user }: any) {
                   ) : (
                     '✓ Confirm Job Done'
                   )}
-                </button>
-                <button
-                  onClick={() => {
-                    setRefundJob(c);
-                    setRefundReason("");
-                  }}
-                  disabled={starting === c.id}
-                  className="w-full rounded-full border border-border py-2 text-xs font-semibold"
-                >
-                  Request Withdrawal
-                </button>
-              </div>
+                 </button>
+               </div>
             )}
 
             {!isEmployer && c.status === 'active' && !c.worker_accepted && (
@@ -1322,22 +1190,8 @@ function ActiveContracts({ contracts, onRefresh, user }: any) {
             )}
 
             {!isEmployer && c.job_done && (
-              <button
-                onClick={() => handleWithdraw(c.id)}
-                disabled={starting === c.id || Number(c.amount_released) <= 0}
-                className="mt-3 w-full rounded-full gradient-primary py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
-              >
-                {starting === c.id ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin inline" />
-                ) : (
-                  `Withdraw ${fmt(c.amount_released)}`
-                )}
-              </button>
-            )}
-
-            {isEmployer && c.job_done && (
               <p className="mt-3 text-xs text-success">
-                ✅ Job completed. Funds released to worker.
+                ✅ Job completed.
               </p>
             )}
           </Card>
@@ -1347,41 +1201,13 @@ function ActiveContracts({ contracts, onRefresh, user }: any) {
     </div>
   );
 
-  if (refundJob) {
-    return (
-      <SheetShell title="Request Withdrawal" onClose={() => { setRefundJob(null); setRefundReason(""); }}>
-        <div className="space-y-4">
-          <div className="rounded-xl bg-warning/10 p-3 text-xs text-warning-foreground">
-            <p className="font-semibold">⚠️ Employer early withdrawal</p>
-            <p>The worker has accepted the job. If you request withdrawal, the worker must respond within 7 days. If they do not respond, you will automatically receive 90% (10% service fee retained).</p>
-          </div>
-          <div>
-            <FieldLabel>Reason (required)</FieldLabel>
-            <textarea
-              rows={3}
-              value={refundReason}
-              onChange={(e) => setRefundReason(e.target.value)}
-              className={inputCls}
-              placeholder="Explain why you want to withdraw the funds..."
-            />
-          </div>
-          <div className="flex gap-2">
-            <button onClick={() => { setRefundJob(null); setRefundReason(""); }} className="flex-1 rounded-full border border-border py-2.5 text-xs font-semibold">Cancel</button>
-            <button onClick={handleRequestRefund} disabled={!!starting} className="flex-1 rounded-full gradient-primary py-2.5 text-xs font-semibold text-primary-foreground disabled:opacity-50">
-              Send Request
-            </button>
-          </div>
-        </div>
-      </SheetShell>
-    );
-  }
-
   if (dispute) {
     return (
-      <SheetShell title="Respond to Withdrawal Request" onClose={() => { setDispute(null); setDisputeReason(""); }}>
+      <SheetShell title="Respond to Cancellation Request" onClose={() => { setDispute(null); setDisputeReason(""); }}>
         <div className="space-y-4">
           <div className="rounded-xl bg-primary/5 p-3 text-xs">
-            <p className="font-semibold">{dispute.employer_reason}</p>
+            <p className="font-semibold">Employer reason:</p>
+            <p>{dispute.employer_reason}</p>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <button
@@ -1729,7 +1555,7 @@ function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
           </button>
           <div className="rounded-xl bg-primary/5 p-3 flex items-center justify-between">
             <div>
-              <p className="text-xs font-semibold text-muted-foreground">Monthly payment</p>
+              <p className="text-xs font-semibold text-muted-foreground">Payment terms</p>
               <p className="text-lg font-bold text-primary">{job.pay}</p>
             </div>
             <div className="text-right">
@@ -1838,9 +1664,9 @@ function PostJobSheet({ onClose, onSuccess, user, initialDescription }: any) {
             <button type="button" onClick={() => setAccommodation(v => !v)} className={`relative h-6 w-11 rounded-full transition-colors ${accommodation ? "bg-primary" : "bg-muted"}`}><span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${accommodation ? "left-[22px]" : "left-0.5"}`} /></button>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+           <div className="grid grid-cols-2 gap-3">
             <div><FieldLabel>Pay label</FieldLabel><input required value={form.pay} onChange={set("pay")} className={inputCls} placeholder="e.g. KES 25,000/mo" /></div>
-            <div><FieldLabel>Pay amount (KES)</FieldLabel><input required type="number" min={1} value={form.payAmount || ""} onChange={set("payAmount")} className={inputCls} placeholder="25000" /></div>
+            <div><FieldLabel>Pay amount (KES, optional)</FieldLabel><input type="number" min={0} value={form.payAmount || ""} onChange={set("payAmount")} className={inputCls} placeholder="25000" /></div>
           </div>
 
           <div><FieldLabel>Requirements</FieldLabel><div className="mt-1 grid grid-cols-2 gap-2">{requirements.map(r => <label key={r} className="flex items-center gap-2 rounded-lg border border-border p-2 text-xs"><input type="checkbox" className="h-4 w-4 accent-primary" checked={checked.includes(r)} onChange={e => setChecked(c => e.target.checked ? [...c, r] : c.filter(x => x !== r))} />{r}</label>)}</div></div>
@@ -1848,7 +1674,7 @@ function PostJobSheet({ onClose, onSuccess, user, initialDescription }: any) {
           <div><FieldLabel>Description</FieldLabel><textarea required rows={4} value={form.description} onChange={set("description")} className={inputCls} placeholder="Describe duties, working hours, expectations…" /></div>
 
           <div className="rounded-xl bg-primary/5 p-3 text-xs">
-            <p className="font-semibold">ℹ️ Posting is free. 10% platform fee applies only when you hire a worker.</p>
+            <p className="font-semibold">ℹ️ KAZI Link is completely free — no fees, no payments.</p>
           </div>
 
           <button type="submit" disabled={loading} className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50 flex items-center justify-center gap-2">
@@ -1915,10 +1741,10 @@ function HireSheet({ app, onClose, onHireSuccess, user }: any) {
             {app.applicant_name} has been hired for the job.
           </p>
           <p className="mt-2 text-xs text-muted-foreground">
-            💰 Total amount: {app.jobs?.pay_label}
+            💰 Pay: {app.jobs?.pay_label}
           </p>
           <p className="text-xs text-muted-foreground">
-            📊 Platform fee (10%): will be deducted from the total.
+            📊 KAZI Link is completely free — no fees or payments.
           </p>
           <button onClick={onClose} className="mt-4 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground">
             Done
@@ -1953,10 +1779,9 @@ function HireSheet({ app, onClose, onHireSuccess, user }: any) {
           <p><span className="font-semibold">Availability:</span> {app.availability}</p>
         </div>
 
-        <div className="rounded-xl bg-warning/10 p-3 text-xs text-warning-foreground">
-          <p className="font-semibold">⚠️ Important</p>
-          <p>10% platform fee will be deducted from the total job amount.</p>
-          <p>You can start the job and release payouts after hiring.</p>
+        <div className="rounded-xl bg-primary/5 p-3 text-xs">
+          <p className="font-semibold">ℹ️ KAZI Link is completely free.</p>
+          <p>No payments, fees, or escrow required. Simply hire and work.</p>
         </div>
 
         <button
