@@ -475,7 +475,13 @@ function KaziPage() {
         />
       )}
       {profileSearchOpen && <ProfileSearchSheet onClose={() => setProfileSearchOpen(false)} />}
-      {hireApp && <HireSheet app={hireApp} onClose={() => setHireApp(null)} onHireSuccess={refreshData} user={user} />}
+      {hireApp && <HireSheet app={hireApp} onClose={() => setHireApp(null)} onHireSuccess={() => {
+        // Remove the hired job from Find Work immediately
+        const hiredJobId = hireApp.job_id;
+        setJobs(prev => prev.filter(j => j.id !== hiredJobId));
+        setMyPostedJobs(prev => prev.filter(j => j.id !== hiredJobId));
+        refreshData();
+      }} user={user} />}
       {chatApp && (
         <ChatSheet
           application={chatApp.application}
@@ -1878,11 +1884,6 @@ function HireSheet({ app, onClose, onHireSuccess, user }: any) {
       if (!response.ok) throw new Error(result.message || "Failed to hire");
 
        toast.success(`You have hired ${app.applicant_name}!`);
-       
-       // Optimistic: remove the job from Find Work immediately
-       const hiredJobId = app.job_id;
-       setJobs(prev => prev.filter(j => j.id !== hiredJobId));
-       setMyPostedJobs(prev => prev.filter(j => j.id !== hiredJobId));
        
        setDone(true);
        onHireSuccess();
