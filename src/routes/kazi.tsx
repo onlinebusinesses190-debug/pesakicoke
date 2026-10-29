@@ -1951,6 +1951,7 @@ function ChatSheet({ application, job, onClose, user }: any) {
       message: messageOverride?.message ?? input,
       ...messageOverride,
     };
+    console.log('[ChatSheet] sendMessage payload:', payload, 'job:', job?.id, 'user:', user?.id, 'worker_id:', application.worker_id);
     if (!payload.jobId || !payload.receiverId) {
       toast.error('Cannot send message: missing jobId or receiverId. Please refresh and try again.');
       return;
