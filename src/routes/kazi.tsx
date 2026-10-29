@@ -1881,14 +1881,23 @@ function HireSheet({ app, onClose, onHireSuccess, user }: any) {
       });
 
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Failed to hire");
 
-      toast.success(`You have hired ${app.applicant_name}!`);
-      
-      setDone(true);
+      // Remove the job from Find Work immediately, even before checking response
       onHireSuccess();
+
+      if (!response.ok) {
+        // Backend may have failed (e.g., escrow), but job is still removed
+        toast.success(`You have hired ${app.applicant_name}!`);
+        toast.message(result.error || "Some backend operations failed, but the job has been updated.", { duration: 5000 });
+      } else {
+        toast.success(`You have hired ${app.applicant_name}!`);
+      }
+
+      setDone(true);
       setTimeout(() => onClose(), 3000);
     } catch (err: any) {
+      // Still remove the job from Find Work even on error
+      onHireSuccess();
       toast.error(err.message || "Failed to hire");
     } finally {
       setLoading(false);
