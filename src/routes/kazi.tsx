@@ -908,7 +908,7 @@ function WorkerApplications({ apps, onChat, onRefresh, user }: any) {
 
             <div className="mt-3 grid grid-cols-2 gap-2">
               <button
-                onClick={() => onChat(a)}
+                onClick={() => onChat(a, a.jobs)}
                 className="rounded-full border border-border py-2 text-xs font-semibold"
               >
                 <MessageCircle className="inline h-3.5 w-3.5 mr-1" /> Chat
