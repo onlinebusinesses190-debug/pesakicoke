@@ -908,7 +908,7 @@ function WorkerApplications({ apps, onChat, onRefresh, user }: any) {
 
             <div className="mt-3 grid grid-cols-2 gap-2">
               <button
-                onClick={() => onChat(a, a.jobs)}
+                onClick={() => onChat(a, { ...a.jobs, id: a.job_id })}
                 className="rounded-full border border-border py-2 text-xs font-semibold"
               >
                 <MessageCircle className="inline h-3.5 w-3.5 mr-1" /> Chat
@@ -1969,7 +1969,7 @@ function ChatSheet({ application, job, onClose, user }: any) {
       }
       if (!response.ok) throw new Error(result.error || result.message || "Failed to send message");
 
-      setMessages(prev => [result, ...prev]);
+      setMessages(prev => [...prev, result]);
       if (!messageOverride?.message) setInput("");
       setShowAttachmentMenu(false);
     } catch (err: any) {
