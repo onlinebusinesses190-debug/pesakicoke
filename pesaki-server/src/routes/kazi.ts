@@ -1239,8 +1239,6 @@ return reply.send(disputes || []);
       const callStatus = body.callStatus || body.call_status;
       const callDuration = body.callDuration || body.call_duration;
 
-      console.log('[kazi/send-message] parsed:', { jobId, receiverId, message, mediaUrl, mediaType, callType });
-
       if (!jobId || !receiverId) {
         return reply.status(400).send({ error: 'jobId and receiverId are required', received: body });
       }
