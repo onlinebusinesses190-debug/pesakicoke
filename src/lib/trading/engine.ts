@@ -521,10 +521,17 @@ export class Engine {
   }
 
   setMode(mode: "demo" | "live") {
+    const prev = this.mode;
     this.mode = mode;
     this.log(mode === "live" ? "Live trading enabled" : "Demo trading");
     this.save();
     this.emit();
+    if (mode === "live" && prev !== "live") {
+      this.fetchLiveBalance();
+      this.startLiveBalancePolling();
+    } else if (mode === "demo") {
+      this.stopLiveBalancePolling();
+    }
   }
 
   resetAccount() {
