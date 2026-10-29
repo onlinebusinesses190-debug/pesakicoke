@@ -2,13 +2,7 @@
 // Runs entirely in the browser: live price feed, order execution, margin, SL/TP, stop-out.
 // Supports fetching real historical candles from backend for seamless refresh.
 
-import { supabase } from "@/integrations/supabase/client";
-
-export async function getAuthHeaders(): Promise<Record<string, string>> {
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
+import { apiFetch } from "@/utils/api";
 
 export const TIMEFRAMES = { M1: 60, M5: 300, M15: 900, M30: 1800, H1: 3600, H4: 14400 } as const;
 export type TF = keyof typeof TIMEFRAMES;
@@ -195,8 +189,7 @@ async function fetchCandlesFromBackend(symbol: string, tf: TF, count = 400): Pro
     // Convert symbol format: EURUSD -> EUR/USD for backend API
     const formattedSymbol = symbol.length === 6 ? `${symbol.slice(0, 3)}/${symbol.slice(3)}` : symbol;
     const interval = TF_TO_INTERVAL[tf] || '5m';
-    const url = `/forex/candles?symbol=${encodeURIComponent(formattedSymbol)}&interval=${interval}&count=${count}`;
-    const res = await fetch(url);
+    const res = await apiFetch(`/forex/candles?symbol=${encodeURIComponent(formattedSymbol)}&interval=${interval}&count=${count}`);
     if (!res.ok) {
       if (res.status === 404) {
         console.debug(`[Engine] Candles endpoint not found for ${formattedSymbol} ${interval}, falling back to generated candles`);
@@ -665,11 +658,10 @@ export class Engine {
   // ─── Live Account API Integration ───
   async fetchLiveBalance(): Promise<void> {
     try {
-      const headers = await getAuthHeaders();
-      // Fetch both account and rates in parallel
+      // Fetch both account and rates in parallel via apiFetch (handles auth headers + API URL)
       const [accRes, ratesRes] = await Promise.all([
-        fetch("/forex/account?account_type=live", { headers }),
-        fetch("/forex/rates"),
+        apiFetch("/forex/account?account_type=live"),
+        apiFetch("/forex/rates"),
       ]);
       if (accRes.ok) {
         const data = await accRes.json();
@@ -717,10 +709,8 @@ export class Engine {
       const entry = side === "buy" ? this.quotes[req.symbol].ask : this.quotes[req.symbol].bid;
       const entryPrice = round(entry, this.spec(req.symbol).digits);
 
-      const headers = await getAuthHeaders();
-      const res = await fetch("/forex/orders", {
+      const res = await apiFetch("/forex/orders", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...headers },
         body: JSON.stringify({
           symbol: req.symbol,
           side,
