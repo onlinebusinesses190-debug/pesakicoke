@@ -416,13 +416,17 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
       const token = request.headers.authorization?.replace('Bearer ', '');
       if (!token) return reply.status(401).send({ error: 'Unauthorized' });
 
-      const user = await getUserFromToken(token);
+       const user = await getUserFromToken(token);
+
+      console.log('[kazi/my-applications] user.id:', user.id);
 
       const { data: applications, error } = await supabase
         .from('applications')
         .select('*, jobs:job_id ( title, pay_label, pay_amount, employer_id, location, duration )')
         .eq('worker_id', user.id)
         .order('applied_at', { ascending: false });
+
+      console.log('[kazi/my-applications] fetched applications:', applications?.length, 'error:', error?.message);
 
       if (error) throw error;
 
@@ -579,7 +583,14 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
         .select()
         .single();
 
-      if (error) throw error;
+      console.log('[kazi/apply] inserted application:', application?.id, 'error:', error?.message);
+
+      if (error) {
+        console.error('[kazi/apply] INSERT error:', { message: error.message, code: error.code, details: error.details, hint: error.hint });
+        throw error;
+      }
+
+      console.log('[kazi/apply] Returning application:', JSON.stringify(application));
 
       const { data: jobData } = await supabase
         .from('jobs')
