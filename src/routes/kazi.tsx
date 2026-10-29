@@ -413,16 +413,15 @@ function KaziPage() {
         </>
       )}
 
-      {tab === "hire" && (
-        <EmployerView
-          postedJobs={myPostedJobs}
-          jobApplicants={jobApplicants}
-          onChat={(jobId: string, application: Application) => {
-            const job = myPostedJobs.find(j => j.id === jobId);
-            if (job) setChatApp({ application, job });
-          }}
+       {tab === "hire" && (
+         <EmployerView
+           postedJobs={myPostedJobs}
+           jobApplicants={jobApplicants}
+           onChat={(application: Application, job: Job) => {
+             setChatApp({ application, job });
+           }}
            onHire={(app: Application) => { if (!requireAuth()) return; setHireApp(app); }}
-          onRefresh={refreshData}
+           onRefresh={refreshData}
         />
       )}
 
@@ -1952,11 +1951,17 @@ function ChatSheet({ application, job, onClose, user }: any) {
       ...messageOverride,
     };
     if (!payload.jobId) {
-      toast.error('Cannot send message: missing jobId. job.id is ' + (job?.id ? 'set' : 'undefined'));
+      console.error('[ChatSheet] Missing jobId:', { job, application, user });
+      toast.error('Cannot send message: job information is missing');
       return;
     }
     if (!payload.receiverId) {
-      toast.error('Cannot send message: missing receiverId. worker_id=' + application.worker_id + ', user.id=' + user?.id + ', employer_id=' + job?.employer_id);
+      console.error('[ChatSheet] Missing receiverId:', {
+        worker_id: application.worker_id,
+        user_id: user?.id,
+        employer_id: job?.employer_id
+      });
+      toast.error('Cannot send message: recipient information is missing');
       return;
     }
     setSending(true);
