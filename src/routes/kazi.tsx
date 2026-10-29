@@ -770,7 +770,7 @@ function MyPanel({ apps, postedJobs, jobApplicants, contracts, onChat, onHire, o
         <WorkerApplications
           apps={apps}
           onChat={(app: Application) => {
-            const job = app.jobs;
+            const job = app.jobs ? { ...app.jobs, id: app.job_id } : undefined;
             if (job) onChat(app, job);
           }}
           onRefresh={onRefresh}
@@ -1951,7 +1951,7 @@ function ChatSheet({ application, job, onClose, user }: any) {
       message: messageOverride?.message ?? input,
       ...messageOverride,
     };
-    console.log('[ChatSheet] sendMessage payload:', payload, 'job:', job?.id, 'user:', user?.id, 'worker_id:', application.worker_id);
+    console.log('[ChatSheet] payload:', { jobId: payload.jobId, receiverId: payload.receiverId, userId: user?.id, workerId: application.worker_id, employerId: job?.employer_id });
     if (!payload.jobId || !payload.receiverId) {
       toast.error('Cannot send message: missing jobId or receiverId. Please refresh and try again.');
       return;
