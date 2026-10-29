@@ -266,6 +266,36 @@ function KaziPage() {
   useEffect(() => {
     if (user && !hasFetched.current) fetchData();
     if (!user) setLoading(false);
+
+    // Auto-check: every 10 seconds, check if any of our posted jobs have a
+    // "Hired" application and permanently remove them from Find Work.
+    // This handles the case where the backend server is stale/not restarted.
+    if (user) {
+      const interval = setInterval(async () => {
+        try {
+          const token = await getAuthToken();
+          const res = await fetch(`${API_BASE}/kazi/my-applications`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) {
+            const apps = await res.json();
+            if (Array.isArray(apps)) {
+              const hiredJobIds = apps
+                .filter((a: any) => a.status === 'Hired')
+                .map((a: any) => a.job_id);
+              if (hiredJobIds.length > 0) {
+                hiredJobIds.forEach(jid => removedJobsRef.current.add(jid));
+                setJobs(prev => prev.filter(j => !hiredJobIds.includes(j.id)));
+                setMyPostedJobs(prev => prev.filter(j => !hiredJobIds.includes(j.id)));
+              }
+            }
+          }
+        } catch (err) {
+          // Silent — will retry on next interval
+        }
+      }, 10000);
+      return () => clearInterval(interval);
+    }
   }, [user?.id]);
 
   const refreshData = () => {
