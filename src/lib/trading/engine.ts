@@ -2,6 +2,14 @@
 // Runs entirely in the browser: live price feed, order execution, margin, SL/TP, stop-out.
 // Supports fetching real historical candles from backend for seamless refresh.
 
+import { supabase } from "@/integrations/supabase/client";
+
+export async function getAuthHeaders(): Promise<Record<string, string>> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export const TIMEFRAMES = { M1: 60, M5: 300, M15: 900, M30: 1800, H1: 3600, H4: 14400 } as const;
 export type TF = keyof typeof TIMEFRAMES;
 
@@ -657,12 +665,17 @@ export class Engine {
   // ─── Live Account API Integration ───
   async fetchLiveBalance(): Promise<void> {
     try {
-      const res = await fetch("/forex/account?account_type=live");
-      if (res.ok) {
-        const data = await res.json();
+      const headers = await getAuthHeaders();
+      // Fetch both account and rates in parallel
+      const [accRes, ratesRes] = await Promise.all([
+        fetch("/forex/account?account_type=live", { headers }),
+        fetch("/forex/rates"),
+      ]);
+      if (accRes.ok) {
+        const data = await accRes.json();
         if (data.success) {
           this.liveKesBalance = data.account.walletBalance ?? 0;
-          this.exchangeRate = data.account.usdToKes ?? 130;
+          this.exchangeRate = ratesRes.ok ? (await ratesRes.json()).usdToKes ?? 130 : 130;
           this.liveBalance = this.liveKesBalance / this.exchangeRate;
           this.balance = this.liveBalance; // Update internal balance for USD math
           this.emit();
@@ -704,9 +717,10 @@ export class Engine {
       const entry = side === "buy" ? this.quotes[req.symbol].ask : this.quotes[req.symbol].bid;
       const entryPrice = round(entry, this.spec(req.symbol).digits);
 
+      const headers = await getAuthHeaders();
       const res = await fetch("/forex/orders", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...headers },
         body: JSON.stringify({
           symbol: req.symbol,
           side,
