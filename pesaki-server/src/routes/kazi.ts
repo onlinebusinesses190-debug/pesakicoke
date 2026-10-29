@@ -1230,10 +1230,19 @@ return reply.send(disputes || []);
 
       const user = await getUserFromToken(token);
       const body = request.body as any;
-      const { jobId, receiverId, message, mediaUrl, mediaType, callType, callStatus, callDuration } = body;
+      const jobId = body.jobId || body.job_id;
+      const receiverId = body.receiverId || body.receiver_id;
+      const message = body.message;
+      const mediaUrl = body.mediaUrl || body.media_url;
+      const mediaType = body.mediaType || body.media_type;
+      const callType = body.callType || body.call_type;
+      const callStatus = body.callStatus || body.call_status;
+      const callDuration = body.callDuration || body.call_duration;
+
+      console.log('[kazi/send-message] parsed:', { jobId, receiverId, message, mediaUrl, mediaType, callType });
 
       if (!jobId || !receiverId) {
-        return reply.status(400).send({ error: 'jobId and receiverId are required' });
+        return reply.status(400).send({ error: 'jobId and receiverId are required', received: body });
       }
       if (!message && !mediaUrl && !callType) {
         return reply.status(400).send({ error: 'Provide at least message, mediaUrl, or callType' });
