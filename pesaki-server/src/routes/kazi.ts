@@ -637,6 +637,32 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
         .update({ status: 'hired', hired_worker_id: app.worker_id })
         .eq('id', jobId);
 
+      // Reject all other pending applications for this job and notify them
+      const { data: otherApplicants } = await supabase
+        .from('applications')
+        .select('worker_id, applicant_name')
+        .eq('job_id', jobId)
+        .eq('status', 'Pending')
+        .neq('id', applicationId);
+
+      await supabase
+        .from('applications')
+        .update({ status: 'Rejected' })
+        .eq('job_id', jobId)
+        .eq('status', 'Pending')
+        .neq('id', applicationId);
+
+      if (otherApplicants && otherApplicants.length > 0) {
+        for (const applicant of otherApplicants) {
+          await notifyUser(
+            applicant.worker_id,
+            'Application Not Selected',
+            `The employer selected another candidate for "${app.jobs.title}".`,
+            { jobId, type: 'application_rejected' }
+          );
+        }
+      }
+
       const totalAmount = Number(app.jobs.pay_amount);
       const platformFee = Math.round(totalAmount * FEE_RATE);
       const workerAmount = totalAmount - platformFee;
