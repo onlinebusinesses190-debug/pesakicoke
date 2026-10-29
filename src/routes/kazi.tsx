@@ -267,26 +267,46 @@ function KaziPage() {
     if (user && !hasFetched.current) fetchData();
     if (!user) setLoading(false);
 
-    // Auto-check: every 10 seconds, check if any of our posted jobs have a
+    // Auto-check: every 10 seconds, check if any of our jobs have a
     // "Hired" application and permanently remove them from Find Work.
     // This handles the case where the backend server is stale/not restarted.
     if (user) {
       const interval = setInterval(async () => {
         try {
           const token = await getAuthToken();
-          const res = await fetch(`${API_BASE}/kazi/my-applications`, {
+
+          // Check my-job-applicants (employer view)
+          const res1 = await fetch(`${API_BASE}/kazi/my-job-applicants`, {
             headers: { Authorization: `Bearer ${token}` },
           });
-          if (res.ok) {
-            const apps = await res.json();
+          if (res1.ok) {
+            const grouped = await res1.json();
+            const hiredJobIds: string[] = [];
+            Object.entries(grouped).forEach(([jobId, apps]: [string, any]) => {
+              if (Array.isArray(apps)) {
+                const hasHired = apps.some((a: any) => a.status === 'Hired');
+                if (hasHired) hiredJobIds.push(jobId);
+              }
+            });
+            if (hiredJobIds.length > 0) {
+              hiredJobIds.forEach(jid => removedJobsRef.current.add(jid));
+              setJobs(prev => prev.filter(j => !hiredJobIds.includes(j.id)));
+              setMyPostedJobs(prev => prev.filter(j => !hiredJobIds.includes(j.id)));
+            }
+          }
+
+          // Also check my-applications (worker view)
+          const res2 = await fetch(`${API_BASE}/kazi/my-applications`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res2.ok) {
+            const apps = await res2.json();
             if (Array.isArray(apps)) {
-              const hiredJobIds = apps
-                .filter((a: any) => a.status === 'Hired')
-                .map((a: any) => a.job_id);
-              if (hiredJobIds.length > 0) {
-                hiredJobIds.forEach(jid => removedJobsRef.current.add(jid));
-                setJobs(prev => prev.filter(j => !hiredJobIds.includes(j.id)));
-                setMyPostedJobs(prev => prev.filter(j => !hiredJobIds.includes(j.id)));
+              const hired = apps.filter((a: any) => a.status === 'Hired').map((a: any) => a.job_id);
+              if (hired.length > 0) {
+                hired.forEach(jid => removedJobsRef.current.add(jid));
+                setJobs(prev => prev.filter(j => !hired.includes(j.id)));
+                setMyPostedJobs(prev => prev.filter(j => !hired.includes(j.id)));
               }
             }
           }
