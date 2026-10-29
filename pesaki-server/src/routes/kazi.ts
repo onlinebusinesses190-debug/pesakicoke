@@ -418,15 +418,11 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
 
        const user = await getUserFromToken(token);
 
-      console.log('[kazi/my-applications] user.id:', user.id);
-
       const { data: applications, error } = await supabase
         .from('applications')
         .select('*, jobs:job_id ( title, pay_label, pay_amount, employer_id, location, duration )')
         .eq('worker_id', user.id)
         .order('applied_at', { ascending: false });
-
-      console.log('[kazi/my-applications] fetched applications:', applications?.length, 'error:', error?.message);
 
       if (error) throw error;
 
@@ -583,14 +579,7 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
         .select()
         .single();
 
-      console.log('[kazi/apply] inserted application:', application?.id, 'error:', error?.message);
-
-      if (error) {
-        console.error('[kazi/apply] INSERT error:', { message: error.message, code: error.code, details: error.details, hint: error.hint });
-        throw error;
-      }
-
-      console.log('[kazi/apply] Returning application:', JSON.stringify(application));
+      if (error) throw error;
 
       const { data: jobData } = await supabase
         .from('jobs')

@@ -63,6 +63,7 @@ interface Job {
 interface Application {
   id: string;
   job_id: string;
+  worker_id: string;
   jobs?: {
     title: string;
     pay_label: string;
@@ -80,7 +81,8 @@ interface Application {
   status: string; // Pending, Hired, Rejected, Completed
   applied_at: string;
   photo_url?: string;
-  worker_id: string;
+  additional_description?: string;
+  contract?: JobContract;
 }
 
 interface JobContract {
@@ -1944,10 +1946,11 @@ function ChatSheet({ application, job, onClose, user }: any) {
     const payload: any = {
       jobId: job?.id,
       receiverId: application.worker_id === user?.id ? job?.employer_id : application.worker_id,
+      message: messageOverride?.message ?? input,
       ...messageOverride,
     };
     if (!payload.jobId || !payload.receiverId) {
-      toast.error('Cannot send message: missing jobId or receiverId');
+      toast.error('Cannot send message: missing jobId or receiverId. Please refresh and try again.');
       return;
     }
     setSending(true);
