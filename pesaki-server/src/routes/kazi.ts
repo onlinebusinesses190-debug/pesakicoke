@@ -1225,6 +1225,57 @@ return reply.send(disputes || []);
     }
   });
 
+  // GET /kazi/unread-counts — get unread message counts per job
+  server.get('/kazi/unread-counts', async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const token = request.headers.authorization?.replace('Bearer ', '');
+      if (!token) return reply.status(401).send({ error: 'Unauthorized' });
+
+      const user = await getUserFromToken(token);
+
+      const { data: unread, error } = await supabase
+        .from('messages')
+        .select('job_id, count()')
+        .eq('receiver_id', user.id)
+        .eq('read', false) as any;
+
+      if (error) throw error;
+
+      const counts: Record<string, number> = {};
+      (unread || []).forEach((u: any) => {
+        counts[u.job_id] = parseInt(String(u.count || u.count_ || 1), 10);
+      });
+      return reply.send(counts);
+    } catch (err) {
+      console.error(err);
+      return reply.status(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  // POST /kazi/messages/:jobId/mark-read — mark all messages in a job as read
+  server.post('/kazi/messages/:jobId/mark-read', async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const token = request.headers.authorization?.replace('Bearer ', '');
+      if (!token) return reply.status(401).send({ error: 'Unauthorized' });
+
+      const user = await getUserFromToken(token);
+      const { jobId } = request.params as { jobId: string };
+
+      const { error } = await supabase
+        .from('messages')
+        .update({ read: true })
+        .eq('job_id', jobId)
+        .eq('receiver_id', user.id)
+        .eq('read', false);
+
+      if (error) throw error;
+      return reply.send({ success: true });
+    } catch (err) {
+      console.error(err);
+      return reply.status(500).send({ error: 'Internal server error' });
+    }
+  });
+
   // POST /kazi/send-message — send a chat message
   server.post('/kazi/send-message', async (request: FastifyRequest, reply: FastifyReply) => {
     try {

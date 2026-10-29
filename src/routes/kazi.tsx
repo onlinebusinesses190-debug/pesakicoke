@@ -162,7 +162,9 @@ function KaziPage() {
   // ─── Data state ────────────────────────────────────────────────────────────
   const [jobs, setJobs] = useState<Job[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
-  const [notifications, setNotifications] = useState<any[]>([]);
+   const [notifications, setNotifications] = useState<any[]>([]);
+  const [notificationSoundEnabled, setNotificationSoundEnabled] = useState(true);
+  const prevNotifCountRef = useRef(0);
   const [myPostedJobs, setMyPostedJobs] = useState<Job[]>([]);
   const [jobApplicants, setJobApplicants] = useState<Record<string, Application[]>>({});
 
@@ -282,7 +284,26 @@ function KaziPage() {
     return list;
   }, [jobs, q]);
 
-  const unread = notifications.filter((n) => !n.read).length;
+   const unread = notifications.filter((n) => !n.read).length;
+
+  useEffect(() => {
+    if (unread > 0 && notifications.length > prevNotifCountRef.current) {
+      // Show browser notification
+      if (Notification.permission === 'granted' && document.visibilityState !== 'visible') {
+        const latest = notifications[0];
+        new Notification('KAZI Link', {
+          body: latest?.body || latest?.kazi_type || 'New notification',
+          icon: '/favicon.ico',
+        });
+      }
+      // Play sound
+      if (notificationSoundEnabled && document.visibilityState !== 'visible') {
+        const audio = new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAAAAAAAAAAAAAAAAAAWgAAACPgqqqq3uQqAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAAAAAAA=');
+        audio.play().catch(() => {});
+      }
+    }
+    prevNotifCountRef.current = notifications.length;
+  }, [unread, notifications, notificationSoundEnabled]);
 
   if (loading) {
     return (
@@ -838,6 +859,36 @@ function MyPanel({ apps, postedJobs, jobApplicants, contracts, onChat, onHire, o
 function WorkerApplications({ apps, onChat, onRefresh, user }: any) {
   const { requireAuth } = useRequireAuth();
   const [withdrawing, setWithdrawing] = useState<string | null>(null);
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    fetchUnreadCounts();
+    const interval = setInterval(fetchUnreadCounts, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  async function fetchUnreadCounts() {
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      const response = await fetch(`${API_BASE}/kazi/unread-counts`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const counts = await response.json();
+        setUnreadCounts(counts);
+      }
+    } catch (err) {
+      console.error('Failed to fetch unread counts:', err);
+    }
+  }
+
+  const handleChatOpen = (app: Application, job: Job) => {
+    onChat(app, job);
+    if (app.job_id && unreadCounts[app.job_id]) {
+      setUnreadCounts(prev => ({ ...prev, [app.job_id]: 0 }));
+    }
+  };
 
   const handleWithdraw = async (contractId: string) => {
     if (!requireAuth()) return;
@@ -911,10 +962,15 @@ function WorkerApplications({ apps, onChat, onRefresh, user }: any) {
 
             <div className="mt-3 grid grid-cols-2 gap-2">
               <button
-                onClick={() => onChat(a, { ...a.jobs, id: a.job_id })}
-                className="rounded-full border border-border py-2 text-xs font-semibold"
+                onClick={() => handleChatOpen(a, { ...a.jobs, id: a.job_id })}
+                className="relative rounded-full border border-border py-2 text-xs font-semibold"
               >
                 <MessageCircle className="inline h-3.5 w-3.5 mr-1" /> Chat
+                {(unreadCounts[a.job_id] || 0) > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-green-500 px-1 text-[10px] font-bold text-white">
+                    {unreadCounts[a.job_id] > 9 ? '9+' : unreadCounts[a.job_id]}
+                  </span>
+                )}
               </button>
               {a.status === 'Hired' && a.contract && (
                 <button
@@ -1916,6 +1972,35 @@ function ChatSheet({ application, job, onClose, user }: any) {
 
   const otherUser = application.worker_id === user?.id ? 'Employer' : application.applicant_name;
 
+  const [unreadCount, setUnreadCount] = useState(0);
+  const prevMessageCountRef = useRef(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    audioRef.current = new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAAAAAAAAAAAAAAAAAAWgAAACPgqqqq3uQqAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAAAAAAA=');
+  }, []);
+
+  const playNotificationSound = () => {
+    if (audioRef.current && document.visibilityState !== 'visible') {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(() => {});
+    }
+  };
+
+  const markMessagesAsRead = async () => {
+    if (!mountedRef.current) return;
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      await fetch(`${API_BASE}/kazi/messages/${job.id}/mark-read`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch (err) {
+      console.error('Failed to mark messages as read:', err);
+    }
+  };
+
   const fetchMessages = async () => {
     if (!mountedRef.current) return;
     try {
@@ -1927,6 +2012,12 @@ function ChatSheet({ application, job, onClose, user }: any) {
       });
       if (response.ok && mountedRef.current) {
         const data = await response.json();
+        const newUnread = (data || []).filter((m: ChatMessage) => !m.read && m.sender_id !== user?.id).length;
+        if (data.length > prevMessageCountRef.current && data.length > 0) {
+          playNotificationSound();
+        }
+        prevMessageCountRef.current = data.length;
+        setUnreadCount(newUnread);
         setMessages(data);
       }
     } catch (err) {
@@ -2073,6 +2164,27 @@ function ChatSheet({ application, job, onClose, user }: any) {
     }
   }, [messages]);
 
+  useEffect(() => {
+    if (unreadCount > 0 && messages.length > 0) {
+      const latestMsg = messages[messages.length - 1];
+      if (latestMsg.sender_id !== user?.id && !latestMsg.read) {
+        playNotificationSound();
+      }
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    return () => { audioRef.current = null; };
+  }, []);
+
+  // Mark messages as read when ChatSheet mounts
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (mountedRef.current) markMessagesAsRead();
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [job.id]);
+
   return (
     <div className="fixed inset-0 z-[70] grid place-items-end sm:place-items-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
@@ -2083,6 +2195,11 @@ function ChatSheet({ application, job, onClose, user }: any) {
           </button>
           <div className="flex items-center gap-2">
             <h3 className="text-base font-bold">{otherUser}</h3>
+            {unreadCount > 0 && (
+              <div className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-green-500 px-1.5 text-[10px] font-bold text-white">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </div>
+            )}
             <Badge tone="primary">Chat</Badge>
           </div>
           <div className="flex items-center gap-1">
