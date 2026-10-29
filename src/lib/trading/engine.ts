@@ -226,18 +226,56 @@ const TF_TO_INTERVAL: Record<TF, string> = {
 export class Engine {
   quotes: Record<string, Quote> = {};
   candles: Record<string, Record<TF, Candle[]>> = {};
-  balance = START_BALANCE;
   leverage = configuredLeverage();
   currency = "USD";
   mode: "demo" | "live" = "demo";
-  positions: Position[] = [];
-  orders: PendingOrder[] = [];
-  history: Deal[] = [];
   journal: JournalEntry[] = [];
   notice: JournalEntry | null = null;
   nextTicket = 100000001;
   version = 0;
-  
+
+  // Demo mode state (virtual $10,000 account)
+  private _demoBalance = START_BALANCE;
+  private _demoPositions: Position[] = [];
+  private _demoOrders: PendingOrder[] = [];
+  private _demoHistory: Deal[] = [];
+
+  // Live mode state (real wallet)
+  liveKesBalance = 0;
+  exchangeRate = 130; // KES per USD
+
+  // Getters/setters that return/set the active mode's data
+  get balance() { return this.mode === "live" ? this.liveBalance : this._demoBalance; }
+  set balance(v: number) {
+    if (this.mode === "live") this.liveBalance = v;
+    else this._demoBalance = v;
+  }
+  get liveBalance() { return this.liveKesBalance / this.exchangeRate; }
+  set liveBalance(v: number) { this.liveKesBalance = v * this.exchangeRate; }
+
+  get positions() { return this.mode === "live" ? this._livePositions : this._demoPositions; }
+  set positions(v: Position[]) {
+    if (this.mode === "live") this._livePositions = v;
+    else this._demoPositions = v;
+  }
+
+  get orders() { return this.mode === "live" ? this._liveOrders : this._demoOrders; }
+  set orders(v: PendingOrder[]) {
+    if (this.mode === "live") this._liveOrders = v;
+    else this._demoOrders = v;
+  }
+
+  get history() { return this.mode === "live" ? this._liveHistory : this._demoHistory; }
+  set history(v: Deal[]) {
+    if (this.mode === "live") this._liveHistory = v;
+    else this._demoHistory = v;
+  }
+
+  // Live positions/orders stored on the backend, tracked locally for UI
+  private _livePositions: Position[] = [];
+  private _liveOrders: PendingOrder[] = [];
+  private _liveHistory: Deal[] = [];
+
   private listeners = new Set<() => void>();
   private marginCallWarned = false;
   
@@ -247,10 +285,6 @@ export class Engine {
   private lastTickTime = 0;
   private tickCount = 0;
 
-  // Live account state
-  liveKesBalance = 0;
-  liveBalance = 0;
-  exchangeRate = 130; // KES per USD
   private liveBalanceInterval: number | null = null;
 
   // Cache for historical candle fetch attempts to prevent infinite retries
@@ -378,10 +412,10 @@ export class Engine {
       localStorage.setItem(
         STORAGE_KEY,
         JSON.stringify({
-          balance: this.balance,
-          positions: this.positions,
-          orders: this.orders,
-          history: this.history.slice(0, 500),
+          demoBalance: this._demoBalance,
+          demoPositions: this._demoPositions,
+          demoOrders: this._demoOrders,
+          demoHistory: this._demoHistory.slice(0, 500),
           journal: this.journal.slice(0, 300),
           nextTicket: this.nextTicket,
           tickCount: this.tickCount,
@@ -395,10 +429,10 @@ export class Engine {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
       const d = JSON.parse(raw);
-      this.balance = d.balance ?? START_BALANCE;
-      this.positions = d.positions ?? [];
-      this.orders = d.orders ?? [];
-      this.history = d.history ?? [];
+      this._demoBalance = d.demoBalance ?? START_BALANCE;
+      this._demoPositions = d.demoPositions ?? [];
+      this._demoOrders = d.demoOrders ?? [];
+      this._demoHistory = d.demoHistory ?? [];
       this.journal = d.journal ?? [];
       this.nextTicket = d.nextTicket ?? this.nextTicket;
       this.tickCount = d.tickCount ?? 0;
@@ -568,22 +602,22 @@ export class Engine {
     const prev = this.mode;
     this.mode = mode;
     this.log(mode === "live" ? "Live trading enabled" : "Demo trading");
-    this.save();
-    this.emit();
     if (mode === "live" && prev !== "live") {
       this.fetchLiveBalance();
       this.startLiveBalancePolling();
-    } else if (mode === "demo") {
+    }
+    if (mode === "demo") {
       this.stopLiveBalancePolling();
     }
+    this.emit();
   }
 
   resetAccount() {
-    this.balance = START_BALANCE;
-    this.positions = [];
-    this.orders = [];
-    this.history = [];
-    this.journal = [];
+    // Only reset demo account, never touch live wallet
+    this._demoBalance = START_BALANCE;
+    this._demoPositions = [];
+    this._demoOrders = [];
+    this._demoHistory = [];
     this.log(`Demo account reset to ${START_BALANCE.toFixed(2)} USD`);
     this.save();
     this.emit();
@@ -711,8 +745,6 @@ export class Engine {
         if (data.success) {
           this.liveKesBalance = data.account.walletBalance ?? 0;
           this.exchangeRate = ratesRes.ok ? (await ratesRes.json()).usdToKes ?? 130 : 130;
-          this.liveBalance = this.liveKesBalance / this.exchangeRate;
-          this.balance = this.liveBalance; // Update internal balance for USD math
           this.emit();
         }
       }
