@@ -1944,13 +1944,7 @@ function ChatSheet({ application, job, onClose, user }: any) {
      callType?: 'audio' | 'video';
      callStatus?: 'ringing' | 'answered' | 'missed' | 'ended';
      callDuration?: number;
-   }) => {
-    const payload: any = {
-      jobId: job?.id,
-      receiverId: application.worker_id === user?.id ? job?.employer_id : application.worker_id,
-      message: messageOverride?.message ?? input,
-      ...messageOverride,
-    };
+    }) => {
     const payload: any = {
       jobId: job?.id,
       receiverId: application.worker_id === user?.id ? job?.employer_id : application.worker_id,
