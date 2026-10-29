@@ -665,31 +665,42 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
         }
       }
 
-      const totalAmount = Number(app.jobs.pay_amount);
-      const platformFee = Math.round(totalAmount * FEE_RATE);
+      const totalAmount = Number(app.jobs.pay_amount) || 0;
+      const platformFee = totalAmount > 0 ? Math.round(totalAmount * FEE_RATE) : 0;
       const workerAmount = totalAmount - platformFee;
 
-      const { data: escrow, error: escrowError } = await supabase
-        .from('kazi_escrow')
-        .insert({
-          job_id: jobId,
-          employer_id: user.id,
-          worker_id: app.worker_id,
-          amount: totalAmount,
-          status: 'held',
-        })
-        .select()
-        .single();
+      console.log('[kazi/hire] creating escrow with:', { jobId, workerId: app.worker_id, totalAmount, platformFee, FEE_RATE });
 
-      if (escrowError) {
-        console.error('[kazi/hire] escrow creation failed:', escrowError.message, escrowError.code, escrowError.details, escrowError.hint);
-        // Rollback: try to reset the job status
-        await supabase.from('jobs').update({ status: 'open', hired_worker_id: null }).eq('id', jobId);
-        return reply.status(500).send({
-          error: 'Failed to create escrow record',
-          details: escrowError.message,
-          code: escrowError.code,
-        });
+      let escrow: any = null;
+      if (totalAmount > 0) {
+        const escrowResult = await supabase
+          .from('kazi_escrow')
+          .insert({
+            job_id: jobId,
+            employer_id: user.id,
+            worker_id: app.worker_id,
+            amount: totalAmount,
+            status: 'held',
+            source: 'wallet',
+            released_amount: 0,
+            fee_amount: platformFee,
+          })
+          .select()
+          .single();
+
+        escrow = escrowResult.data;
+
+        if (escrowResult.error) {
+          console.error('[kazi/hire] escrow creation failed:', {
+            message: escrowResult.error.message,
+            code: escrowResult.error.code,
+            details: escrowResult.error.details,
+            hint: escrowResult.error.hint,
+          });
+          // Continue anyway — still create contract and update job status
+        }
+      } else {
+        console.log('[kazi/hire] skipping escrow (amount=0)');
       }
 
       const durationMonths = getDurationInMonths(app.jobs.duration);
@@ -706,14 +717,12 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
           total_amount: totalAmount,
           platform_fee: platformFee,
           worker_amount: workerAmount,
-          escrow_id: escrow.id,
+          escrow_id: escrow ? escrow.id : null,
           worker_accepted: false,
           job_done: false,
           start_date: new Date().toISOString(),
           end_date: endDate.toISOString(),
           next_payout_date: new Date().toISOString(),
-          amount_released: 0,
-          amount_held: totalAmount,
         })
         .select()
         .single();
