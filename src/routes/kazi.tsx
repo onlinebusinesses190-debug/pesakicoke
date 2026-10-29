@@ -167,8 +167,18 @@ function KaziPage() {
   const prevNotifCountRef = useRef(0);
   const [myPostedJobs, setMyPostedJobs] = useState<Job[]>([]);
   const [jobApplicants, setJobApplicants] = useState<Record<string, Application[]>>({});
-  // Track job IDs that have been hired/closed — they should never reappear in Find Work
-  const removedJobsRef = useRef<Set<string>>(new Set());
+  // Track job IDs that have been hired/closed — permanently persisted via localStorage
+  // so they never reappear in Find Work, even after refresh or reload
+  const getPersistedRemovedJobs = () => {
+    if (typeof window === 'undefined') return new Set<string>();
+    try {
+      const stored = localStorage.getItem('kazi_removed_jobs');
+      return new Set<string>(stored ? JSON.parse(stored) : []);
+    } catch {
+      return new Set<string>();
+    }
+  };
+  const removedJobsRef = useRef<Set<string>>(getPersistedRemovedJobs());
 
   // ─── Fetch all data from backend ─────────────────────────────────────────
   const fetchData = async () => {
@@ -263,6 +273,20 @@ function KaziPage() {
     }
   };
 
+  const persistRemovedJobs = (jobIds: string[]) => {
+    jobIds.forEach(jid => removedJobsRef.current.add(jid));
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('kazi_removed_jobs', JSON.stringify(Array.from(removedJobsRef.current)));
+      } catch {}
+    }
+  };
+
+  const refreshData = () => {
+    hasFetched.current = false;
+    fetchData();
+  };
+
   useEffect(() => {
     if (user && !hasFetched.current) fetchData();
     if (!user) setLoading(false);
@@ -289,7 +313,7 @@ function KaziPage() {
               }
             });
             if (hiredJobIds.length > 0) {
-              hiredJobIds.forEach(jid => removedJobsRef.current.add(jid));
+              persistRemovedJobs(hiredJobIds);
               setJobs(prev => prev.filter(j => !hiredJobIds.includes(j.id)));
               setMyPostedJobs(prev => prev.filter(j => !hiredJobIds.includes(j.id)));
             }
@@ -304,7 +328,7 @@ function KaziPage() {
             if (Array.isArray(apps)) {
               const hired = apps.filter((a: any) => a.status === 'Hired').map((a: any) => a.job_id);
               if (hired.length > 0) {
-                hired.forEach(jid => removedJobsRef.current.add(jid));
+                persistRemovedJobs(hired);
                 setJobs(prev => prev.filter(j => !hired.includes(j.id)));
                 setMyPostedJobs(prev => prev.filter(j => !hired.includes(j.id)));
               }
@@ -317,11 +341,6 @@ function KaziPage() {
       return () => clearInterval(interval);
     }
   }, [user?.id]);
-
-  const refreshData = () => {
-    hasFetched.current = false;
-    fetchData();
-  };
 
   // ─── Filtered jobs ────────────────────────────────────────────────────────
   const visibleJobs = useMemo(() => {
@@ -531,9 +550,9 @@ function KaziPage() {
       )}
       {profileSearchOpen && <ProfileSearchSheet onClose={() => setProfileSearchOpen(false)} />}
       {hireApp && <HireSheet app={hireApp} onClose={() => setHireApp(null)} onHireSuccess={() => {
-        // Remove the hired job from Find Work immediately
+        // Remove the hired job from Find Work immediately and persist
         const hiredJobId = hireApp.job_id;
-        removedJobsRef.current.add(hiredJobId);
+        persistRemovedJobs([hiredJobId]);
         setJobs(prev => prev.filter(j => j.id !== hiredJobId));
         setMyPostedJobs(prev => prev.filter(j => j.id !== hiredJobId));
         refreshData();
