@@ -284,6 +284,7 @@ export class Engine {
   private animationFrameId: number | null = null;
   private lastTickTime = 0;
   private tickCount = 0;
+  private lastSaveTick = 0;
 
   private liveBalanceInterval: number | null = null;
 
@@ -419,6 +420,10 @@ export class Engine {
           journal: this.journal.slice(0, 300),
           nextTicket: this.nextTicket,
           tickCount: this.tickCount,
+          // Persist quote prices so they survive refresh
+          quotePrices: Object.fromEntries(
+            Object.entries(this.quotes).map(([k, v]) => [k, { bid: v.bid, ask: v.ask, high: v.high, low: v.low, open: v.open }]),
+          ),
         }),
       );
     } catch { /* ignore */ }
@@ -436,6 +441,25 @@ export class Engine {
       this.journal = d.journal ?? [];
       this.nextTicket = d.nextTicket ?? this.nextTicket;
       this.tickCount = d.tickCount ?? 0;
+
+      // Restore quote prices from localStorage to prevent candle/quote reset on refresh.
+      // We persist these periodically during ticking. On first load (tickCount === 0),
+      // keep the freshly generated candles; otherwise restore the persisted prices
+      // so the price movement continues seamlessly across refreshes.
+      if (d.quotePrices && this.tickCount > 0) {
+        for (const [symbol, q] of Object.entries(d.quotePrices as Record<string, { bid: number; ask: number; high: number; low: number; open: number }>)) {
+          if (this.quotes[symbol]) {
+            const s = this.spec(symbol);
+            if (s) {
+              this.quotes[symbol].bid = q.bid;
+              this.quotes[symbol].ask = q.ask;
+              this.quotes[symbol].high = q.high;
+              this.quotes[symbol].low = q.low;
+              this.quotes[symbol].open = q.open;
+            }
+          }
+        }
+      }
     } catch { /* ignore */ }
   }
   
@@ -688,6 +712,11 @@ export class Engine {
     }
     this.processTriggers();
     this.emit();
+    // Periodically persist state so quote prices survive refresh
+    if (this.tickCount - this.lastSaveTick >= 250) {
+      this.lastSaveTick = this.tickCount;
+      this.save();
+    }
   }
 
   private processTriggers() {
