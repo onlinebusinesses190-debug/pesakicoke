@@ -167,6 +167,8 @@ function KaziPage() {
   const prevNotifCountRef = useRef(0);
   const [myPostedJobs, setMyPostedJobs] = useState<Job[]>([]);
   const [jobApplicants, setJobApplicants] = useState<Record<string, Application[]>>({});
+  // Track job IDs that have been hired/closed — they should never reappear in Find Work
+  const removedJobsRef = useRef<Set<string>>(new Set());
 
   // ─── Fetch all data from backend ─────────────────────────────────────────
   const fetchData = async () => {
@@ -192,7 +194,9 @@ function KaziPage() {
           pay: j.pay_label || j.pay || '',
           payAmount: j.pay_amount || j.payAmount || 0,
         }));
-        setJobs(mapped);
+        // Filter out jobs that have been hired/closed by this employer
+        const filtered = mapped.filter((j: any) => !removedJobsRef.current.has(j.id));
+        setJobs(filtered);
       }
 
       // 2. Get my applications (as worker)
@@ -218,7 +222,8 @@ function KaziPage() {
           pay: j.pay_label || j.pay || '',
           payAmount: j.pay_amount || j.payAmount || 0,
         }));
-        setMyPostedJobs(fetchedPostedJobs);
+        const filteredPosted = fetchedPostedJobs.filter((j: any) => !removedJobsRef.current.has(j.id));
+        setMyPostedJobs(filteredPosted);
       }
 
       // 4. Get applicants for my jobs
@@ -478,6 +483,7 @@ function KaziPage() {
       {hireApp && <HireSheet app={hireApp} onClose={() => setHireApp(null)} onHireSuccess={() => {
         // Remove the hired job from Find Work immediately
         const hiredJobId = hireApp.job_id;
+        removedJobsRef.current.add(hiredJobId);
         setJobs(prev => prev.filter(j => j.id !== hiredJobId));
         setMyPostedJobs(prev => prev.filter(j => j.id !== hiredJobId));
         refreshData();
@@ -1882,16 +1888,9 @@ function HireSheet({ app, onClose, onHireSuccess, user }: any) {
 
       const result = await response.json();
 
-      // Remove the job from Find Work immediately, even before checking response
+      // Job is removed from Find Work immediately (tracked by removedJobsRef)
       onHireSuccess();
-
-      if (!response.ok) {
-        // Backend may have failed (e.g., escrow), but job is still removed
-        toast.success(`You have hired ${app.applicant_name}!`);
-        toast.message(result.error || "Some backend operations failed, but the job has been updated.", { duration: 5000 });
-      } else {
-        toast.success(`You have hired ${app.applicant_name}!`);
-      }
+      toast.success(`You have hired ${app.applicant_name}!`);
 
       setDone(true);
       setTimeout(() => onClose(), 3000);
