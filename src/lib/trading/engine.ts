@@ -184,7 +184,12 @@ function genCandles(s: SymbolSpec, tfSec: number, nowSec: number, n = 400): Cand
 }
 
 // ─── Fetch real historical candles from backend ───
+// Skip symbols not supported by the backend (e.g. XAU/USD gold)
+const BACKEND_UNSUPPORTED_SYMBOLS = new Set(["XAUUSD"]);
+
 async function fetchCandlesFromBackend(symbol: string, tf: TF, count = 400): Promise<Candle[] | null> {
+  // Skip unsupported symbols to avoid 400 Bad Request
+  if (BACKEND_UNSUPPORTED_SYMBOLS.has(symbol)) return null;
   try {
     // Convert symbol format: EURUSD -> EUR/USD for backend API
     const formattedSymbol = symbol.length === 6 ? `${symbol.slice(0, 3)}/${symbol.slice(3)}` : symbol;
@@ -193,6 +198,8 @@ async function fetchCandlesFromBackend(symbol: string, tf: TF, count = 400): Pro
     if (!res.ok) {
       if (res.status === 404) {
         console.debug(`[Engine] Candles endpoint not found for ${formattedSymbol} ${interval}, falling back to generated candles`);
+      } else if (res.status === 400) {
+        console.debug(`[Engine] Backend rejected ${formattedSymbol} ${interval}, falling back to generated candles`);
       }
       return null;
     }
@@ -287,9 +294,34 @@ export class Engine {
         try {
           const backendCandles = await fetchCandlesFromBackend(s.name, tf);
           if (backendCandles && backendCandles.length > 0) {
-            // Replace generated candles with real historical data
-            this.candles[s.name][tf] = backendCandles;
-            this.historicalCandlesFetched.add(key);
+            // Merge: replace generated candles with real historical data
+            // but only if the last timestamp aligns reasonably (within 2x timeframe)
+            const now = Date.now() / 1000;
+            const expectedBucket = Math.floor(now / TIMEFRAMES[tf]) * TIMEFRAMES[tf];
+            const lastBackendTs = backendCandles[backendCandles.length - 1].t;
+            const timeDiff = Math.abs(expectedBucket - lastBackendTs);
+            
+            // Only use backend candles if they're recent (within 2 bars)
+            if (timeDiff < TIMEFRAMES[tf] * 2) {
+              const oldCandles = this.candles[s.name][tf];
+              this.candles[s.name][tf] = backendCandles;
+              // Sync the quote to the backend's last close price to avoid price jump
+              const lastClose = backendCandles[backendCandles.length - 1].c;
+              const q = this.quotes[s.name];
+              q.bid = lastClose;
+              q.ask = round(lastClose + s.spread * s.point, s.digits);
+              q.open = backendCandles[0].o;
+              // Update high/low to encompass both sets
+              q.high = Math.max(
+                Math.max(...backendCandles.map(c => c.h)),
+                ...oldCandles.map(c => c.h)
+              );
+              q.low = Math.min(
+                Math.min(...backendCandles.map(c => c.l)),
+                ...oldCandles.map(c => c.l)
+              );
+              this.historicalCandlesFetched.add(key);
+            }
           }
         } catch {
           // Ignore errors, keep generated candles
