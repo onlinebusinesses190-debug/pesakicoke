@@ -302,8 +302,10 @@ function AviatorPage() {
         const socket = io(`${WS_URL}/aviator`, {
           transports: ["websocket"],
           reconnection: true,
-          reconnectionAttempts: 5,
-          reconnectionDelay: 1000,
+          reconnectionAttempts: 3,
+          reconnectionDelay: 2000,
+          reconnectionDelayMax: 10000,
+          timeout: 5000,
           auth: { token: session.access_token },
         });
 

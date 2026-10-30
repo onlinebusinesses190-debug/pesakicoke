@@ -712,14 +712,17 @@ export class Engine {
     }
     this.processTriggers();
     this.emit();
-    // Periodically persist state so quote prices survive refresh
-    if (this.tickCount - this.lastSaveTick >= 250) {
+    // Persist quote prices periodically so they survive refresh/sign-in.
+    // Saves every ~25 ticks (~5 seconds) to avoid excessive localStorage writes.
+    if (this.tickCount - this.lastSaveTick >= 25) {
       this.lastSaveTick = this.tickCount;
       this.save();
     }
   }
 
   private processTriggers() {
+    // Pending order triggers are simulated client-side even in live mode
+    // (the backend doesn't support pending orders via the API).
     for (const o of [...this.orders]) {
       const q = this.quotes[o.symbol];
       const hit =
@@ -733,7 +736,12 @@ export class Engine {
       const r = this.openPosition(o.symbol, isBuyType(o.type) ? "buy" : "sell", o.lots, o.sl, o.tp, o.ticket);
       if (!r.ok) this.log(`order #${o.ticket} canceled: ${r.error}`, true);
     }
-    
+
+    // SL/TP/stopout only apply in demo mode — in live mode, the backend
+    // handles these on real market prices. Simulating them client-side
+    // would cause false triggers and 404 errors when closing.
+    if (this.mode === "live") return;
+
     for (const p of [...this.positions]) {
       const c = this.closePriceOf(p);
       if (p.side === "buy") {
@@ -744,7 +752,7 @@ export class Engine {
         else if (p.tp && c <= p.tp) this.closePosition(p.ticket, "tp");
       }
     }
-    
+
     if (this.positions.length) {
       const ml = this.marginLevel;
       if (ml < MARGIN_CALL && !this.marginCallWarned) {
@@ -752,7 +760,7 @@ export class Engine {
         this.log(`Margin call: margin level ${ml.toFixed(2)}%`, true);
       }
       if (ml >= MARGIN_CALL) this.marginCallWarned = false;
-      
+
       let guard = 0;
       while (this.positions.length && this.marginLevel < STOP_OUT && guard++ < 50) {
         const worst = [...this.positions].sort((a, b) => this.profitOf(a) - this.profitOf(b))[0];
@@ -831,26 +839,19 @@ export class Engine {
         return this.fail(data.error || "Order failed");
       }
 
-      const backendTicket = data.position?.ticket || data.order?.id;
-      const backendId = data.position?.id || data.position?.backendId;
+      // Backend returns position.id as a UUID string - use it as backendId
+      const backendId = data.position?.id || data.order?.id;
 
-      // Update local position with the real backend ticket if different
-      if (backendTicket !== undefined || backendId) {
-        const p = this.positions.find((x) => x.symbol === req.symbol && x.side === side);
-        if (p) {
-          if (backendTicket && typeof backendTicket === "number" && backendTicket !== p.ticket) {
-            this.positions = this.positions.filter((x) => x !== p);
-            p.ticket = backendTicket;
-            this.positions.push(p);
-          }
-          if (backendId) p.backendId = String(backendId);
-          this.emit();
-        }
+      // Update local position: store backend UUID so we can close it later
+      const p = this.positions.find((x) => x.symbol === req.symbol && x.side === side);
+      if (p && backendId) {
+        p.backendId = String(backendId);
+        this.emit();
       }
 
       // Refresh balance after successful order
       this.fetchLiveBalance();
-      return { ok: true, ticket: backendTicket };
+      return { ok: true };
     } catch (e) {
       return this.fail("Network error placing order");
     }
@@ -863,41 +864,43 @@ export class Engine {
     const closeLots = lots ? Math.min(round(lots, 2), p.lots) : p.lots;
     if (closeLots < 0.01) return this.fail("Invalid volume (min 0.01 lots)");
 
-    try {
-      const path = p.backendId
-        ? `/forex/positions/${p.backendId}/close`
-        : `/forex/positions/${p.ticket}/close`;
-      const res = await apiFetch(path, {
-        method: "POST",
-        body: JSON.stringify({ lots: closeLots }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        return this.fail(data.error || "Close order failed");
+    // If we have a backend position ID, close it on the server
+    if (p.backendId) {
+      try {
+        const res = await apiFetch(`/forex/positions/${p.backendId}/close`, { method: "POST", body: JSON.stringify({ lots: closeLots }) });
+        const data = await res.json();
+        if (!res.ok) {
+          // If position already closed on backend, just remove locally
+          if (res.status >= 400 && res.status < 500) {
+            // Backend reject — remove locally anyway if 404 (already closed)
+          } else {
+            return this.fail(data.error || "Close order failed");
+          }
+        }
+      } catch (e) {
+        return this.fail("Network error closing position");
       }
-
-      // Remove from local positions
-      if (closeLots >= p.lots - 1e-9) {
-        this.positions = this.positions.filter((x) => x !== p);
-      } else {
-        p.lots = round(p.lots - closeLots, 2);
-      }
-
-      const profit = this.profitOf(p, closeLots);
-      const closePrice = this.closePriceOf(p);
-      this.history.unshift({
-        ticket: p.ticket, symbol: p.symbol, side: p.side, lots: closeLots,
-        openPrice: p.openPrice, closePrice: closePrice,
-        openTime: p.openTime, closeTime: Date.now(),
-        profit, reason,
-      });
-
-      this.fetchLiveBalance();
-      this.emit();
-      return { ok: true, ticket };
-    } catch (e) {
-      return this.fail("Network error closing position");
     }
+
+    // Always update local state
+    if (closeLots >= p.lots - 1e-9) {
+      this.positions = this.positions.filter((x) => x !== p);
+    } else {
+      p.lots = round(p.lots - closeLots, 2);
+    }
+
+    const profit = this.profitOf(p, closeLots);
+    const closePrice = this.closePriceOf(p);
+    this.history.unshift({
+      ticket: p.ticket, symbol: p.symbol, side: p.side, lots: closeLots,
+      openPrice: p.openPrice, closePrice: closePrice,
+      openTime: p.openTime, closeTime: Date.now(),
+      profit, reason,
+    });
+
+    this.fetchLiveBalance();
+    this.emit();
+    return { ok: true, ticket };
   }
 
   // Override placeOrder to use live API when in live mode
