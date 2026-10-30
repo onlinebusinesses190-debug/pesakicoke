@@ -780,8 +780,9 @@ export class Engine {
       if (accRes.ok) {
         const data = await accRes.json();
         if (data.success) {
-          this.liveKesBalance = data.account.walletBalance ?? 0;
+          // Set exchange rate first so liveBalance getter uses the correct rate
           this.exchangeRate = ratesRes.ok ? (await ratesRes.json()).usdToKes ?? 130 : 130;
+          this.liveKesBalance = data.account.walletBalance ?? 0;
           this.emit();
         }
       }
@@ -821,10 +822,15 @@ export class Engine {
       const entry = side === "buy" ? this.quotes[req.symbol].ask : this.quotes[req.symbol].bid;
       const entryPrice = round(entry, this.spec(req.symbol).digits);
 
+      // Convert frontend symbol format (EURUSD) to backend format (EUR/USD)
+      const backendSymbol = req.symbol.length === 6
+        ? `${req.symbol.slice(0, 3)}/${req.symbol.slice(3)}`
+        : req.symbol;
+
       const res = await apiFetch("/forex/orders", {
         method: "POST",
         body: JSON.stringify({
-          symbol: req.symbol,
+          symbol: backendSymbol,
           side,
           trade_amount: tradeAmountKes, // KES margin amount
           order_type: "market",
@@ -904,7 +910,7 @@ export class Engine {
   }
 
   // Override placeOrder to use live API when in live mode
-  placeOrder(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }): Result {
+  async placeOrder(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }): Promise<Result> {
     if (this.mode === "live") {
       // Validate first
       const s = this.spec(req.symbol);
@@ -916,33 +922,26 @@ export class Engine {
       const side: Side = isBuyType(req.type) ? "buy" : "sell";
       const err = this.checkStops(side, side === "buy" ? q.ask : q.bid, sl, tp, req.symbol);
       if (err) return this.fail(err);
-      const entry = side === "buy" ? q.ask : q.bid;
-      const entryPrice = round(entry, s.digits);
 
       // Create local position immediately so UI can show it and allow closing
       const ticket = this.nextTicket++;
       this.positions.push({
-        ticket, symbol: req.symbol, side, lots, openPrice: entryPrice,
+        ticket, symbol: req.symbol, side, lots, openPrice: round(side === "buy" ? q.ask : q.bid, s.digits),
         openTime: Date.now(), sl, tp,
       });
       this.emit();
 
-      // Fire async API call - placeOrderLive will update with real ticket from backend
-      this.placeOrderLive(req).then((res) => {
-        if (res.ok && res.ticket !== undefined) {
-          // Update local position with real backend ticket
-          const p = this.positions.find((x) => x.ticket === ticket);
-          if (p) {
-            if (res.ticket !== ticket) {
-              this.positions = this.positions.filter((x) => x !== p);
-              p.ticket = res.ticket;
-              this.positions.push(p);
-            }
-            this.emit();
-          }
-        }
-      }).catch(e => this.log(`Order error: ${e}`, true));
-      return { ok: true, ticket };
+      // Call backend and update/remove local position based on result
+      const res = await this.placeOrderLive(req);
+      if (res.ok) {
+        this.emit();
+      } else {
+        // Backend rejected — remove local position and log error
+        this.positions = this.positions.filter((x) => x.ticket !== ticket);
+        this.log(`Order rejected: ${res.error}`, true);
+        this.emit();
+      }
+      return res;
     }
 
     // Demo mode - use existing logic
