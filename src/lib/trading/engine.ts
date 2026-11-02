@@ -301,34 +301,42 @@ export class Engine {
   private historicalCandlesFetching = new Set<string>();
 
   constructor() {
+    // First load from localStorage to restore candles/quotes if available
+    this.load();
+    
     const now = Date.now() / 1000;
     for (const s of SYMBOLS) {
-      const tfs = {} as Record<TF, Candle[]>;
-      (Object.keys(TIMEFRAMES) as TF[]).forEach(
-        (tf) => (tfs[tf] = genCandles(s, TIMEFRAMES[tf], now)),
-      );
-      this.candles[s.name] = tfs;
-      const day = tfs.H1.slice(-24);
-      const lastCandle = tfs.H1[tfs.H1.length - 1];
-      const startPrice = lastCandle ? lastCandle.c : s.start;
-      this.quotes[s.name] = {
-        bid: startPrice,
-        ask: round(startPrice + s.spread * s.point, s.digits),
-        high: Math.max(...day.map((c) => c.h)),
-        low: Math.min(...day.map((c) => c.l)),
-        open: day[0].o,
-        dir: 0,
-        time: Date.now(),
-      };
+      // Only generate candles if not already loaded from localStorage
+      if (!this.candles[s.name]) {
+        const tfs = {} as Record<TF, Candle[]>;
+        (Object.keys(TIMEFRAMES) as TF[]).forEach(
+          (tf) => (tfs[tf] = genCandles(s, TIMEFRAMES[tf], now)),
+        );
+        this.candles[s.name] = tfs;
+      }
+      // Ensure quotes are initialized (either from load or fresh)
+      if (!this.quotes[s.name]) {
+        const tfs = this.candles[s.name];
+        const day = tfs.H1.slice(-24);
+        const lastCandle = tfs.H1[tfs.H1.length - 1];
+        const startPrice = lastCandle ? lastCandle.c : s.start;
+        this.quotes[s.name] = {
+          bid: startPrice,
+          ask: round(startPrice + s.spread * s.point, s.digits),
+          high: Math.max(...day.map((c) => c.h)),
+          low: Math.min(...day.map((c) => c.l)),
+          open: day[0].o,
+          dir: 0,
+          time: Date.now(),
+        };
+      }
     }
-    this.load();
     this.log("Terminal started. Demo account connected to simulated server.");
     this.start();
-    // Load real historical candles from backend for seamless refresh
-    // The backend provides the true latest price reference point so the live
-    // ticker can continue from the actual market state rather than an artificial
-    // restart.
-    this.fetchHistoricalCandles();
+    // Note: Historical candles from backend are NOT fetched because we use
+    // frontend-generated candles for smooth, deterministic rendering.
+    // Backend is only used for order execution and wallet balances.
+    // this.fetchHistoricalCandles();
   }
 
   private async fetchHistoricalCandles(): Promise<void> {
@@ -471,6 +479,8 @@ export class Engine {
           quotePrices: Object.fromEntries(
             Object.entries(this.quotes).map(([k, v]) => [k, { bid: v.bid, ask: v.ask, high: v.high, low: v.low, open: v.open }]),
           ),
+          // Persist candles for smooth persistence across refreshes
+          candles: this.candles,
         }),
       );
     } catch { /* ignore */ }
@@ -503,6 +513,11 @@ export class Engine {
             }
           }
         }
+      }
+
+      // Restore candles from localStorage for smooth persistence
+      if (d.candles) {
+        this.candles = d.candles;
       }
     } catch { /* ignore */ }
   }

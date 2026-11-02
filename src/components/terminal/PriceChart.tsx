@@ -123,12 +123,13 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         if (p.tp) { lo = Math.min(lo, p.tp); hi = Math.max(hi, p.tp); }
       }
 
-      if (view.current.offset === 0) { lo = Math.min(lo, smoothBid); hi = Math.max(hi, smoothAsk); }
-      
-      const priceRange = hi - lo;
-      const minRange = spec.point * 100;
-      const pad = priceRange * 0.15 || minRange;
-      const rawLo = lo - Math.max(pad, minRange), rawHi = hi + Math.max(pad, minRange);
+if (view.current.offset === 0) { lo = Math.min(lo, smoothBid); hi = Math.max(hi, smoothAsk); }
+       
+       const priceRange = hi - lo;
+       // Enforce minimum range of 20 pips (spec.point * 200) to prevent squished candles
+       const minRange = spec.point * 200;
+       const pad = priceRange * 0.15 || minRange;
+       const rawLo = lo - Math.max(pad, minRange), rawHi = hi + Math.max(pad, minRange);
 
       if (loRef.current === 0 && hiRef.current === 0) {
         loRef.current = rawLo; hiRef.current = rawHi;
@@ -138,7 +139,7 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
 
       const smoothLo = loRef.current;
       const smoothHi = hiRef.current;
-      const smoothRange = Math.max(smoothHi - smoothLo, spec.point * 100);
+      const smoothRange = Math.max(smoothHi - smoothLo, spec.point * 200);
       const y = (p: number) => plotH - ((p - smoothLo) / smoothRange) * plotH;
       const xOf = (i: number) => plotW - 12 - (bars.length - i - 0.5) * sp;
 
