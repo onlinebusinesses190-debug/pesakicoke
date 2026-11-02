@@ -7,7 +7,7 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
 
-  const view = useRef({ spacing: 5, offset: 0 });
+  const view = useRef({ spacing: 8, offset: 0 });
   const pinch = useRef<{ dist: number; spacing: number } | null>(null);
   const drag = useRef<{ x: number; offset: number } | null>(null); // Restored for panning
   
@@ -17,7 +17,7 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
   const displayAsk = useRef<number | null>(null);
 
   useEffect(() => {
-    view.current.spacing = Math.min(30, Math.max(2, 5 * zoom));
+    view.current.spacing = Math.min(30, Math.max(2, 8 * zoom));
   }, [zoom]);
 
   useEffect(() => {
@@ -53,7 +53,17 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       
       const q = engine?.quotes?.[symbol];
       const spec = engine?.spec(symbol);
-      const all = engine?.candles?.[symbol]?.[tf] || [];
+      const allRaw = engine?.candles?.[symbol]?.[tf] || [];
+
+      // Sanitize data: filter out invalid candles (null, NaN, undefined)
+      const all = allRaw.filter((c: any) => 
+        c && 
+        typeof c.o === 'number' && !isNaN(c.o) &&
+        typeof c.h === 'number' && !isNaN(c.h) &&
+        typeof c.l === 'number' && !isNaN(c.l) &&
+        typeof c.c === 'number' && !isNaN(c.c) &&
+        typeof c.t === 'number' && !isNaN(c.t)
+      );
 
       const dpr = window.devicePixelRatio || 1;
       cv.width = Math.floor(size.w * dpr);
@@ -91,8 +101,21 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         bars[bars.length - 1] = { ...last, c: smoothMid, h: Math.max(last.h, smoothMid, smoothAsk), l: Math.min(last.l, smoothMid, smoothBid) };
       }
 
+      // Outlier protection for Y-axis: calculate average candle height and ignore outliers > 3x average
+      let heights = bars.map((b: any) => b.h - b.l);
+      const avgHeight = heights.reduce((sum: number, h: number) => sum + h, 0) / (heights.length || 1);
+      const maxAllowedHeight = avgHeight * 3;
+      heights = heights.filter((h: number) => h <= maxAllowedHeight);
+      
       let lo = Infinity, hi = -Infinity;
-      for (const b of bars) { lo = Math.min(lo, b.l); hi = Math.max(hi, b.h); }
+      for (const b of bars) { 
+        // Only use this candle for Y-axis if it's not an extreme outlier
+        const h = b.h - b.l;
+        if (h <= maxAllowedHeight) {
+          lo = Math.min(lo, b.l); 
+          hi = Math.max(hi, b.h); 
+        }
+      }
 
       const symbolPositions = engine.positions?.filter((x: any) => x.symbol === symbol) || [];
       for (const p of symbolPositions) {
@@ -164,7 +187,7 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
 
       // ─── CANDLES ───
       ctx.setLineDash([]);
-      const bw = Math.max(1, Math.floor(sp * 0.6));
+      const bw = Math.max(3, Math.floor(sp * 0.7));
       bars.forEach((b: any, i: number) => {
         const x = Math.round(xOf(i)); const bull = b.c >= b.o;
         ctx.strokeStyle = ctx.fillStyle = bull ? cBull : cBear;

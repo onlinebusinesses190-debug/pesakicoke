@@ -40,6 +40,9 @@ export interface Quote {
   open: number;
   dir: -1 | 0 | 1;
   time: number;
+  // Target prices for smooth drift when backend candles load
+  targetBid?: number;
+  targetAsk?: number;
 }
 export interface Candle {
   t: number;
@@ -207,13 +210,18 @@ async function fetchCandlesFromBackend(symbol: string, tf: TF, count = 400): Pro
     const data = await res.json();
     if (!data.success || !data.candles || !Array.isArray(data.candles)) return null;
     // Map backend candle format to frontend Candle format
-    return data.candles.map((c: any) => ({
-      t: Math.floor(c.timestamp / 1000), // backend returns ms, we need seconds
-      o: c.open,
-      h: c.high,
-      l: c.low,
-      c: c.close,
-    }));
+    // Fix timestamp validation: ensure timestamp is in seconds, handle ms from backend
+    return data.candles.map((c: any) => {
+      const safeTime = Math.floor(Number(c.timestamp) / 1000);
+      if (isNaN(safeTime)) return null;
+      return {
+        t: safeTime,
+        o: c.open,
+        h: c.high,
+        l: c.low,
+        c: c.close,
+      };
+    }).filter((c: Candle | null): c is Candle => c !== null);
   } catch {
     return null;
   }
@@ -335,30 +343,68 @@ export class Engine {
         try {
           const backendCandles = await fetchCandlesFromBackend(s.name, tf);
           if (backendCandles && backendCandles.length > 0) {
+            // Sort candles by timestamp to ensure proper order
+            backendCandles.sort((a, b) => a.t - b.t);
+            
+            // Fill gaps in backend candles with flat candles
+            const tfSec = TIMEFRAMES[tf];
+            const filledCandles: Candle[] = [];
+            for (let i = 0; i < backendCandles.length; i++) {
+              const curr = backendCandles[i];
+              filledCandles.push(curr);
+              
+              // Check if there's a gap to the next candle
+              if (i < backendCandles.length - 1) {
+                const next = backendCandles[i + 1];
+                const expectedNextT = curr.t + tfSec;
+                const gap = next.t - expectedNextT;
+                
+                // If there's a gap (more than 1.5x the timeframe), fill with flat candles
+                if (gap > tfSec * 1.5) {
+                  const numMissing = Math.floor(gap / tfSec);
+                  for (let j = 1; j <= numMissing; j++) {
+                    const missingT = curr.t + j * tfSec;
+                    // Flat candle: o = h = l = c = last close
+                    filledCandles.push({
+                      t: missingT,
+                      o: curr.c,
+                      h: curr.c,
+                      l: curr.c,
+                      c: curr.c,
+                    });
+                  }
+                }
+              }
+            }
+            
             // Merge: replace generated candles with real historical data
             // but only if the last timestamp aligns reasonably (within 2x timeframe)
             const now = Date.now() / 1000;
             const expectedBucket = Math.floor(now / TIMEFRAMES[tf]) * TIMEFRAMES[tf];
-            const lastBackendTs = backendCandles[backendCandles.length - 1].t;
+            const lastBackendTs = filledCandles[filledCandles.length - 1].t;
             const timeDiff = Math.abs(expectedBucket - lastBackendTs);
             
             // Only use backend candles if they're recent (within 2 bars)
             if (timeDiff < TIMEFRAMES[tf] * 2) {
               const oldCandles = this.candles[s.name][tf];
-              this.candles[s.name][tf] = backendCandles;
-              // Sync the quote to the backend's last close price to avoid price jump
-              const lastClose = backendCandles[backendCandles.length - 1].c;
+              this.candles[s.name][tf] = filledCandles;
+              
+              // Seamless handover: Instead of instantly jumping to backend price,
+              // store the target price and drift towards it over several ticks
+              const lastClose = filledCandles[filledCandles.length - 1].c;
               const q = this.quotes[s.name];
-              q.bid = lastClose;
-              q.ask = round(lastClose + s.spread * s.point, s.digits);
-              q.open = backendCandles[0].o;
+              // Store the target price for smooth drift
+              q.targetBid = lastClose;
+              q.targetAsk = round(lastClose + s.spread * s.point, s.digits);
+              
+              q.open = filledCandles[0].o;
               // Update high/low to encompass both sets
               q.high = Math.max(
-                Math.max(...backendCandles.map(c => c.h)),
+                Math.max(...filledCandles.map(c => c.h)),
                 ...oldCandles.map(c => c.h)
               );
               q.low = Math.min(
-                Math.min(...backendCandles.map(c => c.l)),
+                Math.min(...filledCandles.map(c => c.l)),
                 ...oldCandles.map(c => c.l)
               );
               this.historicalCandlesFetched.add(key);
@@ -680,8 +726,23 @@ export class Engine {
       const spreadPts = s.spread; 
       const ask = round(bid + spreadPts * s.point, s.digits);
 
-      q.bid = bid;
-      q.ask = ask;
+      // Seamless handover: Smoothly drift towards target prices if set (from backend candles)
+      if (q.targetBid !== undefined && q.targetAsk !== undefined) {
+        const driftFactor = 0.05; // 5% per tick = smooth drift over ~20 ticks (~4 seconds)
+        q.bid = round(q.bid + (q.targetBid - q.bid) * driftFactor, s.digits);
+        q.ask = round(q.ask + (q.targetAsk - q.ask) * driftFactor, s.digits);
+        
+        // Check if we've reached the target (within 1 point)
+        if (Math.abs(q.bid - q.targetBid) <= s.point && Math.abs(q.ask - q.targetAsk) <= s.point) {
+          q.bid = q.targetBid;
+          q.ask = q.targetAsk;
+          q.targetBid = undefined;
+          q.targetAsk = undefined;
+        }
+      } else {
+        q.bid = bid;
+        q.ask = ask;
+      }
       q.dir = bid > prev ? 1 : bid < prev ? -1 : q.dir;
       q.high = Math.max(q.high, bid);
       q.low = Math.min(q.low, bid);
