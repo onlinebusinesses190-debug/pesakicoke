@@ -884,7 +884,7 @@ export class Engine {
   }
 
   // Place order via backend API in live mode
-  async placeOrderLive(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }): Promise<Result> {
+  async placeOrderLive(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }, ticket: number): Promise<Result> {
     if (this.mode !== "live") return this.fail("Live trading not enabled");
 
     try {
@@ -899,9 +899,11 @@ export class Engine {
       const entry = side === "buy" ? this.quotes[req.symbol].ask : this.quotes[req.symbol].bid;
       const entryPrice = round(entry, this.spec(req.symbol).digits);
 
-      // Calculate trade_amount in KES as total notional value: lots * contract_size * price * exchange_rate
-      const notionalUsd = lots * spec.contract * entry;
-      const tradeAmountKes = notionalUsd * this.exchangeRate;
+      // Calculate trade_amount in KES as MARGIN REQUIRED (not notional):
+      // 0.01 lots = $1.00 margin at 1:100 leverage
+      // marginUsd = lots * 100
+      const marginUsd = lots * 100;
+      const tradeAmountKes = marginUsd * this.exchangeRate;
 
       // Convert frontend symbol format (EURUSD) to backend format (EUR/USD)
       const backendSymbol = req.symbol.length === 6
@@ -913,8 +915,8 @@ export class Engine {
         body: JSON.stringify({
           symbol: backendSymbol,
           side,
-          lots: lots,  // Send lots directly - backend will use this for sizing
-          trade_amount: tradeAmountKes, // Also send notional in KES
+          lots: lots,
+          trade_amount: tradeAmountKes, // KES margin amount (not notional)
           order_type: "market",
           stop_loss: req.sl || undefined,
           take_profit: req.tp || undefined,
@@ -930,8 +932,8 @@ export class Engine {
       // Backend returns position.id as a UUID string - use it as backendId
       const backendId = data.position?.id || data.order?.id;
 
-      // Update local position: store backend UUID so we can close it later
-      const p = this.positions.find((x) => x.symbol === req.symbol && x.side === side);
+      // Update local position by ticket: store backend UUID so we can close it later
+      const p = this.positions.find((x) => x.ticket === ticket);
       if (p && backendId) {
         p.backendId = String(backendId);
         this.emit();
@@ -1014,7 +1016,7 @@ export class Engine {
       this.emit();
 
       // Call backend and update/remove local position based on result
-      const res = await this.placeOrderLive(req);
+      const res = await this.placeOrderLive(req, ticket);
       if (res.ok) {
         this.emit();
       } else {
