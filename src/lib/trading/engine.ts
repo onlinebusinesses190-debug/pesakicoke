@@ -591,7 +591,12 @@ export class Engine {
   private openPosition(symbol: string, side: Side, lots: number, sl: number, tp: number, fromOrder?: number): Result {
     const s = this.spec(symbol);
     const need = this.marginFor(symbol, lots);
-    if (this.freeMargin < need) return this.fail(`Not enough money: required margin ${need.toFixed(2)} USD`);
+    // Fix floating-point precision: round both values to 2 decimal places before comparing
+    // Allow a small 2% tolerance buffer for floating-point precision
+    const freeMarginRounded = round(this.freeMargin, 2);
+    const needRounded = round(need, 2);
+    const tolerance = needRounded * 0.02; // 2% tolerance
+    if (freeMarginRounded + tolerance < needRounded) return this.fail(`Not enough money: required margin ${needRounded.toFixed(2)} USD`);
     const q = this.quotes[symbol];
     const price = side === "buy" ? q.ask : q.bid;
     const ticket = fromOrder ?? this.nextTicket++;

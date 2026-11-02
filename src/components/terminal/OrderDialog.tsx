@@ -229,6 +229,12 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
   const totalRequiredKes = totalRequiredUsd * exchangeRate;
   const availableKes = e.mode === "live" ? e.liveKesBalance : e.balance * exchangeRate;
 
+  // Round both values to 2 decimal places and apply 2% tolerance for floating-point precision
+  const totalRequiredKesRounded = Math.round(totalRequiredKes * 100) / 100;
+  const availableKesRounded = Math.round(availableKes * 100) / 100;
+  const toleranceKes = totalRequiredKesRounded * 0.02; // 2% tolerance
+  const hasSufficientMargin = (availableKesRounded + toleranceKes) >= totalRequiredKesRounded;
+
   return (
     <Shell title="PESAKI FX Order" onClose={onClose}>
       <Row label="Symbol">
@@ -345,8 +351,8 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
         {e.mode === "live" && (
           <div className="flex justify-between text-[11px] text-gray-600 mt-1">
             <span>Your Available Balance:</span>
-            <span className={`font-mono font-bold ${availableKes >= totalRequiredKes ? "text-green-600" : "text-red-600"}`}>
-              KSh {availableKes.toFixed(2)}
+            <span className={`font-mono font-bold ${hasSufficientMargin ? "text-green-600" : "text-red-600"}`}>
+              KSh {availableKesRounded.toFixed(2)}
             </span>
           </div>
         )}
@@ -358,7 +364,7 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
           <button
             className="bg-[#c62828] hover:bg-[#b71c1c] py-3 text-white text-sm font-bold uppercase rounded-sm transition-colors flex flex-col items-center disabled:opacity-50"
             onClick={() => handleTrade("sell")}
-            disabled={loading || lotsValue < 0.01}
+            disabled={loading || lotsValue < 0.01 || (e.mode === "live" && !hasSufficientMargin)}
           >
             <span>{loading ? "..." : "Sell"}</span>
             <span className="text-xs font-mono opacity-90">{q.bid.toFixed(s.digits)}</span>
@@ -366,7 +372,7 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
           <button
             className="bg-[#1565c0] hover:bg-[#0d47a1] py-3 text-white text-sm font-bold uppercase rounded-sm transition-colors flex flex-col items-center disabled:opacity-50"
             onClick={() => handleTrade("buy")}
-            disabled={loading || lotsValue < 0.01}
+            disabled={loading || lotsValue < 0.01 || (e.mode === "live" && !hasSufficientMargin)}
           >
             <span>{loading ? "..." : "Buy"}</span>
             <span className="text-xs font-mono opacity-90">{q.ask.toFixed(s.digits)}</span>
@@ -376,7 +382,7 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
         <button
           className="w-full bg-[#1565c0] hover:bg-[#0d47a1] text-white py-3 text-sm font-bold uppercase rounded-sm mt-2 transition-colors disabled:opacity-50"
           onClick={handlePending}
-          disabled={loading || lotsValue < 0.01}
+          disabled={loading || lotsValue < 0.01 || (e.mode === "live" && !hasSufficientMargin)}
         >
           {loading ? "Processing..." : "Place Pending Order"}
         </button>
