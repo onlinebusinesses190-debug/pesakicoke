@@ -316,10 +316,11 @@ export class Engine {
     this.load();
     this.log("Terminal started. Demo account connected to simulated server.");
     this.start();
-    // Note: Historical candles from backend are NOT fetched because the backend's
-    // candle generation algorithm differs from this engine's deterministic walk,
-    // causing price discontinuities. Simulated candles provide smoother, more
-    // realistic movement for the demo account.
+    // Load real historical candles from backend for seamless refresh
+    // The backend provides the true latest price reference point so the live
+    // ticker can continue from the actual market state rather than an artificial
+    // restart.
+    this.fetchHistoricalCandles();
   }
 
   private async fetchHistoricalCandles(): Promise<void> {
@@ -420,7 +421,7 @@ export class Engine {
           journal: this.journal.slice(0, 300),
           nextTicket: this.nextTicket,
           tickCount: this.tickCount,
-          // Persist quote prices so they survive refresh
+          // Persist quotePrices so they survive refresh
           quotePrices: Object.fromEntries(
             Object.entries(this.quotes).map(([k, v]) => [k, { bid: v.bid, ask: v.ask, high: v.high, low: v.low, open: v.open }]),
           ),
@@ -442,11 +443,8 @@ export class Engine {
       this.nextTicket = d.nextTicket ?? this.nextTicket;
       this.tickCount = d.tickCount ?? 0;
 
-      // Restore quote prices from localStorage to prevent candle/quote reset on refresh.
-      // We persist these periodically during ticking. On first load (tickCount === 0),
-      // keep the freshly generated candles; otherwise restore the persisted prices
-      // so the price movement continues seamlessly across refreshes.
-      if (d.quotePrices && this.tickCount > 0) {
+      // Restore quote prices from localStorage
+      if (d.quotePrices) {
         for (const [symbol, q] of Object.entries(d.quotePrices as Record<string, { bid: number; ask: number; high: number; low: number; open: number }>)) {
           if (this.quotes[symbol]) {
             const s = this.spec(symbol);
