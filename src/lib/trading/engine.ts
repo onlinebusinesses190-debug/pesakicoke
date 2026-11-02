@@ -114,7 +114,7 @@ const RAW: [string, string, number, number, number, number][] = [
   ["NZDUSD", "New Zealand Dollar vs US Dollar", 5, 2, 10000, 0.6004],
   ["EURJPY", "Euro vs Japanese Yen", 3, 2, 10000, 162.24],
   ["GBPJPY", "Great Britain Pound vs Japanese Yen", 3, 3, 10000, 189.11],
-  ["XAUUSD", "Gold vs US Dollar", 2, 2, 100, 2351.4],
+  ["XAUUSD", "Gold vs US Dollar", 2, 2, 10, 2351.4],
 ];
 
 export const SYMBOLS: SymbolSpec[] = RAW.map(([name, desc, digits, spread, contract, start]) => ({

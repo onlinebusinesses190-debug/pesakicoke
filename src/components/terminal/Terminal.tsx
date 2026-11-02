@@ -121,7 +121,7 @@ export function Terminal({ mode = "demo" }: { mode?: "demo" | "real" }) {
                 </div>
               </>
             ) : (
-              <div className="text-xs font-mono font-bold text-gray-900">${money(e.balance)}</div>
+              <div className="text-xs font-mono font-bold text-gray-900">${money(e.equity)}</div>
             )}
           </div>
           
