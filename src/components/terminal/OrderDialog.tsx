@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { SYMBOLS, type OrderType } from "@/lib/trading/engine";
+import { SYMBOLS, type OrderType, round } from "@/lib/trading/engine";
 import { useEngine } from "@/lib/trading/use-engine";
 
 export type DialogState =
@@ -217,9 +217,11 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
   const s = e.spec(symbol);
   const q = e.quotes[symbol];
   
-  // PESAKI MATH: 0.01 Lots = $1.00 Margin
+  // Proper forex margin: (lots * contractSize * price) / leverage
   const lotsValue = num(lots);
-  const marginUsd = lotsValue * 100; // e.g. 0.01 * 100 = $1.00
+  const leverage = e.leverage || 10;
+  const bidPrice = q.bid; // Use bid price for margin calculation
+  const marginUsd = round((lotsValue * s.contract * bidPrice) / leverage, 2);
   const openFeeUsd = marginUsd * 0.005; // 0.5% of margin
   const closeFeeUsd = marginUsd * 0.005; // 0.5% of margin
   const totalRequiredUsd = marginUsd + openFeeUsd;

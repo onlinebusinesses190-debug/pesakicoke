@@ -542,8 +542,11 @@ export class Engine {
     const conv = this.quotes["USD" + q];
     return conv ? amount / conv.bid : amount;
   }
-  marginFor(symbol: string, usdAmount: number) {
-    return usdAmount / this.leverage;
+  marginFor(symbol: string, lots: number) {
+    const s = this.spec(symbol);
+    const price = this.quotes[symbol]?.bid || s.start;
+    // Proper forex margin: (lots * contractSize * price) / leverage
+    return round((lots * s.contract * price) / this.leverage, 2);
   }
   closePriceOf(p: { symbol: string; side: Side }) {
     const q = this.quotes[p.symbol];
@@ -916,7 +919,7 @@ export class Engine {
           symbol: backendSymbol,
           side,
           lots: lots,
-          trade_amount: tradeAmountKes, // KES margin amount (not notional)
+          // Don't send trade_amount - let backend calculate margin from lots
           order_type: "market",
           stop_loss: req.sl || undefined,
           take_profit: req.tp || undefined,
