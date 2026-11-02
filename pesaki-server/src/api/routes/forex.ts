@@ -319,6 +319,8 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
 
     let freeMargin = 0;
     if (body.account_type === "live") {
+      // Ensure wallet exists before reading balance (creates wallet if missing)
+      await ensureWalletExists(userId);
       const { data: wallet } = await supabase.from("wallets").select("balance, locked").eq("user_id", userId).maybeSingle();
       const walletBalance = Number(wallet?.balance ?? 0);
       const walletLocked = Number(wallet?.locked ?? 0);
