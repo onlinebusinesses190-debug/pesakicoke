@@ -128,7 +128,7 @@ if (view.current.offset === 0) { lo = Math.min(lo, smoothBid); hi = Math.max(hi,
        const priceRange = hi - lo;
        // Enforce minimum range of 20 pips (spec.point * 200) to prevent squished candles
        const minRange = spec.point * 200;
-       const pad = priceRange * 0.15 || minRange;
+       const pad = priceRange * 0.05 || minRange; // 5% padding (reduced from 15%) for tighter Y-axis
        const rawLo = lo - Math.max(pad, minRange), rawHi = hi + Math.max(pad, minRange);
 
       if (loRef.current === 0 && hiRef.current === 0) {
@@ -188,6 +188,7 @@ if (view.current.offset === 0) { lo = Math.min(lo, smoothBid); hi = Math.max(hi,
 
       // ─── CANDLES ───
       ctx.setLineDash([]);
+      ctx.lineWidth = 1; // Ensure wicks are exactly 1px for sharp rendering
       const bw = Math.max(4, Math.floor(sp * 0.7));
       bars.forEach((b: any, i: number) => {
         const x = Math.round(xOf(i)); const bull = b.c >= b.o;
