@@ -160,7 +160,7 @@ function gaussFrom(rng: () => number) {
 export const isBuyType = (t: OrderType) => t.startsWith("buy");
 export const typeLabel = (t: OrderType) => t.replace("_", " ");
 
-function genCandles(s: SymbolSpec, tfSec: number, nowSec: number, n = 400): Candle[] {
+function genCandles(s: SymbolSpec, tfSec: number, nowSec: number, n = 1000): Candle[] {
   const out: Candle[] = [];
   let p = s.start;
   const subSigma = s.vol * Math.sqrt((tfSec * 2) / 6);

@@ -132,9 +132,9 @@ export function Terminal({ mode = "demo" }: { mode?: "demo" | "real" }) {
       </div>
 
       <div className="flex bg-white border-b border-gray-300 select-none z-10 shrink-0">
-        <button onClick={() => handleTrade("sell")} className={`flex-1 ${sellBg} text-white py-1 flex flex-col items-center justify-center transition-colors duration-150`}>
+        <button onClick={() => handleTrade("sell")} className={`flex-1 ${sellBg} text-white py-0.5 flex flex-col items-center justify-center transition-colors duration-150`}>
           <span className="text-[9px] font-bold tracking-wider opacity-90">SELL</span>
-          <span className="text-lg font-bold">{renderPrice(q?.bid, s?.digits || 5)}</span>
+          <span className="text-base font-bold">{renderPrice(q?.bid, s?.digits || 5)}</span>
         </button>
 
         <div className="w-24 flex flex-col items-center justify-center bg-white border-x border-gray-200 py-0.5">
@@ -143,9 +143,9 @@ export function Terminal({ mode = "demo" }: { mode?: "demo" | "real" }) {
            <ChevronDown size={16} className="text-gray-500 cursor-pointer" onClick={() => setLots(Math.max(0.01, lots - 0.01))} />
         </div>
 
-        <button onClick={() => handleTrade("buy")} className={`flex-1 ${buyBg} text-white py-1 flex flex-col items-center justify-center transition-colors duration-150`}>
+        <button onClick={() => handleTrade("buy")} className={`flex-1 ${buyBg} text-white py-0.5 flex flex-col items-center justify-center transition-colors duration-150`}>
           <span className="text-[9px] font-bold tracking-wider opacity-90">BUY</span>
-          <span className="text-lg font-bold">{renderPrice(q?.ask, s?.digits || 5)}</span>
+          <span className="text-base font-bold">{renderPrice(q?.ask, s?.digits || 5)}</span>
         </button>
       </div>
 

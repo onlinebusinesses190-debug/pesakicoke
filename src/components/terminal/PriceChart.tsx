@@ -188,7 +188,7 @@ if (view.current.offset === 0) { lo = Math.min(lo, smoothBid); hi = Math.max(hi,
 
       // ─── CANDLES ───
       ctx.setLineDash([]);
-      const bw = Math.max(3, Math.floor(sp * 0.7));
+      const bw = Math.max(4, Math.floor(sp * 0.7));
       bars.forEach((b: any, i: number) => {
         const x = Math.round(xOf(i)); const bull = b.c >= b.o;
         ctx.strokeStyle = ctx.fillStyle = bull ? cBull : cBear;
