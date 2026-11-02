@@ -543,10 +543,8 @@ export class Engine {
     return conv ? amount / conv.bid : amount;
   }
   marginFor(symbol: string, lots: number) {
-    const s = this.spec(symbol);
-    const price = this.quotes[symbol]?.bid || s.start;
-    // Proper forex margin: (lots * contractSize * price) / leverage
-    return round((lots * s.contract * price) / this.leverage, 2);
+    // PESAKI Logic: 1 lot = $100 margin, so 0.01 lots = $1.00 margin
+    return round(lots * 100, 2);
   }
   closePriceOf(p: { symbol: string; side: Side }) {
     const q = this.quotes[p.symbol];
@@ -921,7 +919,7 @@ export class Engine {
           symbol: backendSymbol,
           side,
           lots: lots,
-          // Don't send trade_amount - let backend calculate margin from lots
+          trade_amount: tradeAmountKes, // KES margin amount: lots * 100 * exchangeRate
           order_type: "market",
           stop_loss: req.sl || undefined,
           take_profit: req.tp || undefined,

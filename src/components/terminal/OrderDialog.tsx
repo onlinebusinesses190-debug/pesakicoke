@@ -217,11 +217,9 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
   const s = e.spec(symbol);
   const q = e.quotes[symbol];
   
-  // Proper forex margin: (lots * contractSize * price) / leverage
+  // PESAKI Logic: 0.01 lots = $1.00 Margin (1 lot = $100 margin)
   const lotsValue = num(lots);
-  const leverage = e.leverage || 10;
-  const bidPrice = q.bid; // Use bid price for margin calculation
-  const marginUsd = round((lotsValue * s.contract * bidPrice) / leverage, 2);
+  const marginUsd = lotsValue * 100; // 1 lot = $100 margin
   const openFeeUsd = marginUsd * 0.005; // 0.5% of margin
   const closeFeeUsd = marginUsd * 0.005; // 0.5% of margin
   const totalRequiredUsd = marginUsd + openFeeUsd;
