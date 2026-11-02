@@ -883,8 +883,6 @@ export class Engine {
     if (this.mode !== "live") return this.fail("Live trading not enabled");
 
     try {
-      // Calculate trade_amount in KES (margin = lots * 100 * exchangeRate for 1:100 leverage)
-      const tradeAmountKes = req.lots * 100 * this.exchangeRate; // KES
       const spec = this.spec(req.symbol);
       const q = this.quotes[req.symbol];
       const lots = round(req.lots, 2);
@@ -896,6 +894,10 @@ export class Engine {
       const entry = side === "buy" ? this.quotes[req.symbol].ask : this.quotes[req.symbol].bid;
       const entryPrice = round(entry, this.spec(req.symbol).digits);
 
+      // Calculate trade_amount in KES as total notional value: lots * contract_size * price * exchange_rate
+      const notionalUsd = lots * spec.contract * entry;
+      const tradeAmountKes = notionalUsd * this.exchangeRate;
+
       // Convert frontend symbol format (EURUSD) to backend format (EUR/USD)
       const backendSymbol = req.symbol.length === 6
         ? `${req.symbol.slice(0, 3)}/${req.symbol.slice(3)}`
@@ -906,7 +908,8 @@ export class Engine {
         body: JSON.stringify({
           symbol: backendSymbol,
           side,
-          trade_amount: tradeAmountKes, // KES margin amount
+          lots: lots,  // Send lots directly - backend will use this for sizing
+          trade_amount: tradeAmountKes, // Also send notional in KES
           order_type: "market",
           stop_loss: req.sl || undefined,
           take_profit: req.tp || undefined,

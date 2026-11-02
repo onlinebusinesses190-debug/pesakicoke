@@ -162,10 +162,10 @@ export function Terminal({ mode = "demo" }: { mode?: "demo" | "real" }) {
 
         <div className={`order-3 md:w-80 md:h-auto border-t md:border-t-0 md:border-l border-gray-300 bg-white overflow-y-auto ${["trade", "history", "messages"].includes(mobileTab) ? "block flex-1" : "hidden md:block"}`}>
           <div className="bg-[#f8f9fa] border-b border-gray-300 p-3 text-[11px] text-gray-700 space-y-1">
-            <div className="flex justify-between"><span>Balance:</span> <span className="font-mono">{mode === "real" ? `KSh ${money(e.liveKesBalance)}` : `$${money(e.balance)}`}</span></div>
-            <div className="flex justify-between"><span>Equity:</span> <span className="font-mono">{mode === "real" ? `KSh ${money(e.liveKesBalance + e.floating)}` : `$${money(e.equity)}`}</span></div>
-            <div className="flex justify-between"><span>Margin:</span> <span className="font-mono">{mode === "real" ? `KSh ${money(e.margin * e.exchangeRate)}` : `$${money(e.margin)}`}</span></div>
-            <div className="flex justify-between"><span>Free Margin:</span> <span className="font-mono">{mode === "real" ? `KSh ${money(e.liveKesBalance - e.margin * e.exchangeRate)}` : `$${money(e.freeMargin)}`}</span></div>
+            <div className="flex justify-between"><span>Balance:</span> <span className="font-mono">{mode === "real" ? `$${money(e.liveBalance)}` : `$${money(e.balance)}`}</span></div>
+            <div className="flex justify-between"><span>Equity:</span> <span className="font-mono">{mode === "real" ? `$${money(e.liveBalance + e.floating)}` : `$${money(e.equity)}`}</span></div>
+            <div className="flex justify-between"><span>Margin:</span> <span className="font-mono">{mode === "real" ? `$${money(e.margin)}` : `$${money(e.margin)}`}</span></div>
+            <div className="flex justify-between"><span>Free Margin:</span> <span className="font-mono">{mode === "real" ? `$${money(e.liveBalance - e.margin)}` : `$${money(e.freeMargin)}`}</span></div>
           </div>
 
           {mobileTab === "trade" && (
