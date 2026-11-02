@@ -105,15 +105,15 @@ function spreadFor(symbol: string): number {
 }
 
 const RAW: [string, string, number, number, number, number][] = [
-  ["EURUSD", "Euro vs US Dollar", 5, 1, 100000, 1.0852],
-  ["GBPUSD", "Great Britain Pound vs US Dollar", 5, 2, 100000, 1.2648],
-  ["USDJPY", "US Dollar vs Japanese Yen", 3, 1, 100000, 149.52],
-  ["AUDUSD", "Australian Dollar vs US Dollar", 5, 1, 100000, 0.6551],
-  ["USDCAD", "US Dollar vs Canadian Dollar", 5, 2, 100000, 1.3602],
-  ["USDCHF", "US Dollar vs Swiss Franc", 5, 2, 100000, 0.8803],
-  ["NZDUSD", "New Zealand Dollar vs US Dollar", 5, 2, 100000, 0.6004],
-  ["EURJPY", "Euro vs Japanese Yen", 3, 2, 100000, 162.24],
-  ["GBPJPY", "Great Britain Pound vs Japanese Yen", 3, 3, 100000, 189.11],
+  ["EURUSD", "Euro vs US Dollar", 5, 1, 10000, 1.0852],
+  ["GBPUSD", "Great Britain Pound vs US Dollar", 5, 2, 10000, 1.2648],
+  ["USDJPY", "US Dollar vs Japanese Yen", 3, 1, 10000, 149.52],
+  ["AUDUSD", "Australian Dollar vs US Dollar", 5, 1, 10000, 0.6551],
+  ["USDCAD", "US Dollar vs Canadian Dollar", 5, 2, 10000, 1.3602],
+  ["USDCHF", "US Dollar vs Swiss Franc", 5, 2, 10000, 0.8803],
+  ["NZDUSD", "New Zealand Dollar vs US Dollar", 5, 2, 10000, 0.6004],
+  ["EURJPY", "Euro vs Japanese Yen", 3, 2, 10000, 162.24],
+  ["GBPJPY", "Great Britain Pound vs Japanese Yen", 3, 3, 10000, 189.11],
   ["XAUUSD", "Gold vs US Dollar", 2, 2, 100, 2351.4],
 ];
 
@@ -553,8 +553,10 @@ export class Engine {
     return p.side === "buy" ? q.bid : q.ask;
   }
   profitOf(p: Position, usdAmount = p.lots) {
+    const spec = this.spec(p.symbol);
     const diff = (this.closePriceOf(p) - p.openPrice) * (p.side === "buy" ? 1 : -1);
-    return round((usdAmount * diff) / p.openPrice, 2);
+    const units = usdAmount * spec.contract;
+    return round(diff * units, 2);
   }
   get floating() {
     return this.positions.reduce((a, p) => a + this.profitOf(p), 0);
