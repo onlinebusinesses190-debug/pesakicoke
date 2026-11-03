@@ -997,8 +997,12 @@ export class Engine {
         this.emit();
       }
 
-      // Refresh balance after successful order
-      this.fetchLiveBalance();
+      // Refresh balance, positions, and history after successful order
+      await Promise.all([
+        this.fetchLiveBalance(),
+        this.fetchLivePositions(),
+        this.fetchLiveHistory()
+      ]);
       return { ok: true };
     } catch (e) {
       return this.fail("Network error placing order");
@@ -1047,6 +1051,10 @@ export class Engine {
     });
 
     this.fetchLiveBalance();
+    await Promise.all([
+      this.fetchLivePositions(),
+      this.fetchLiveHistory()
+    ]);
     this.emit();
     return { ok: true, ticket };
   }
