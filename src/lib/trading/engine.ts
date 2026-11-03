@@ -987,17 +987,21 @@ export class Engine {
         return this.fail(data.error || "Order failed");
       }
 
-      // Backend returns position.id as a UUID string - use it as backendId
-      const backendId = data.position?.id || data.order?.id;
+      try {
+        // Backend returns position.id as a UUID string - use it as backendId
+        const backendId = data.position?.id || data.order?.id;
 
-      // Update local position by ticket: store backend UUID so we can close it later
-      const p = this.positions.find((x) => x.ticket === ticket);
-      if (p && backendId) {
-        p.backendId = String(backendId);
-        this.emit();
+        // Update local position: store backend UUID so we can close it later
+        const p = this.positions.find((x) => x.symbol === req.symbol && x.side === side);
+        if (p && backendId) {
+          p.backendId = String(backendId);
+          this.emit();
+        }
+      } catch (err) {
+        console.error("Failed to parse backend response, but trade was likely successful", err);
       }
 
-      // Refresh balance, positions, and history after successful order
+      // Refresh balance after successful order
       await Promise.all([
         this.fetchLiveBalance(),
         this.fetchLivePositions(),

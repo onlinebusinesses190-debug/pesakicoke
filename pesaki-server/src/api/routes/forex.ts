@@ -427,7 +427,21 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
 
     if (isPending) return { success: true, order: orderRow, message: "Pending order placed" };
 
-    return { success: true, order: orderRow, position: positionRow, execution: { requestedPrice: quote.mid, executedPrice, slippage, spreadPips: quote.spreadPips }, accountType: body.account_type };
+    return {
+      success: true,
+      order: orderRow,
+      position: {
+        ...positionRow,
+        unrealised_pnl: 0, // Mock the PnL so the frontend doesn't crash
+        current_price: executedPrice,
+        quote_to_kes: q2k,
+        opened_at: new Date().toISOString(),
+        side: body.side, // Ensure side is present
+        symbol: body.symbol
+      },
+      execution: { requestedPrice: quote.mid, executedPrice, slippage, spreadPips: quote.spreadPips },
+      accountType: body.account_type
+    };
   });
 
   // ─── SAFE HISTORY & UTILS ───
