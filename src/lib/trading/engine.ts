@@ -553,8 +553,9 @@ export class Engine {
   }
   profitOf(p: Position, usdAmount = p.lots) {
     const spec = this.spec(p.symbol);
+    if (!spec) return 0;
     const diff = (this.closePriceOf(p) - p.openPrice) * (p.side === "buy" ? 1 : -1);
-    const units = usdAmount * spec.contract;
+    const units = usdAmount * (spec.contract ?? 10000);
     return round(diff * units, 2);
   }
   get floating() {
