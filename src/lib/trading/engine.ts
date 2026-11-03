@@ -864,7 +864,8 @@ export class Engine {
         if (data.success) {
           // Set exchange rate first so liveBalance getter uses the correct rate
           this.exchangeRate = ratesRes.ok ? (await ratesRes.json()).usdToKes ?? 130 : 130;
-          this.liveKesBalance = data.account.walletBalance ?? 0;
+          // Use availableBalance (free margin) instead of walletBalance
+          this.liveKesBalance = data.account.availableBalance ?? data.account.walletBalance ?? 0;
           this.emit();
         }
       }

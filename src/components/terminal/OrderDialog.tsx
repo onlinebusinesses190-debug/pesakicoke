@@ -350,7 +350,7 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
         </div>
         {e.mode === "live" && (
           <div className="flex justify-between text-[11px] text-gray-600 mt-1">
-            <span>Your Available Balance:</span>
+            <span>Free Margin:</span>
             <span className={`font-mono font-bold ${hasSufficientMargin ? "text-green-600" : "text-red-600"}`}>
               KSh {availableKesRounded.toFixed(2)}
             </span>
