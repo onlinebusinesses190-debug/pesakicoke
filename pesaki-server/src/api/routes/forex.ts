@@ -22,12 +22,9 @@ import {
   configuredLeverage,
   marginState,
   minTradeAmount,
-  sizeFromTradeAmount,
   settlementLegs,
-  validateLots,
   validateStopLoss,
   validateTakeProfit,
-  validateTradeAmount,
 } from "../../services/forex/risk";
 import { reserveMargin, settleReal } from "../../services/forex/walletBridge";
 import { ensureWalletExists, releaseLockedFunds } from "../../wallet/service";
@@ -321,7 +318,6 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     if (!validateTakeProfit(body.side, entry, body.take_profit ?? null).ok) return bad(reply, "Invalid take profit");
 
     const q2k = quoteToKes(spec);
-    const leverage = configuredLeverage();
     const isPending = ["limit", "stop", "stop_limit"].includes(body.order_type);
 
     let freeMargin = 0;
