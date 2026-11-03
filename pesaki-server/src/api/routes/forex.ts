@@ -386,11 +386,13 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
       stop_loss: body.stop_loss ?? null,
       take_profit: body.take_profit ?? null,
       idempotency_key: body.idempotency_key ?? null,
+      quote_to_kes: q2k, // Add this
     }).select().single();
 
     if (orderError) {
+      logger.error({ err: orderError }, "Order creation failed");
       if (reserved) await releaseReservation(userId, body.account_type, sizing.margin, "insert order failed");
-      return reply.code(500).send({ success: false, error: "Order creation failed.", code: "EXECUTION_FAILED" });
+      return reply.code(500).send({ success: false, error: `DB Error: ${orderError.message}`, code: "EXECUTION_FAILED" });
     }
 
     let positionRow = null;
@@ -411,8 +413,9 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
       }).select().single();
 
       if (posError) {
+        logger.error({ err: posError }, "Position creation failed");
         if (reserved) await releaseReservation(userId, body.account_type, sizing.margin, "insert position failed");
-        return reply.code(500).send({ success: false, error: "Position creation failed.", code: "EXECUTION_FAILED" });
+        return reply.code(500).send({ success: false, error: `Position DB Error: ${posError.message}`, code: "EXECUTION_FAILED" });
       }
       positionRow = posRow;
 
