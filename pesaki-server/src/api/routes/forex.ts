@@ -333,23 +333,23 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
       freeMargin = Number(account.equity ?? account.balance ?? 0) - Number(account.used_margin ?? 0);
     }
 
-    // 👈 BULLETPROOF MARGIN MATH (Bypasses broken marginForLots function)
-    const requestedLots = body.lots || 0.01;
-    const marginUsd = requestedLots * 100; // 0.01 lots = $1.00 USD
-    const marginKes = marginUsd * q2k;     // Convert USD to KES
+   // 👈 BULLETPROOF MARGIN MATH (Bypasses broken marginForLots function)
+   const requestedLots = body.lots || 0.01;
+   const marginUsd = requestedLots * 100; // 0.01 lots = $1.00 USD exactly like Demo
+   const marginKes = marginUsd * q2k;     // Convert to KES
 
-    const sizing = {
-      tradeAmount: marginKes,
-      exposure: requestedLots * PESAKI_CONTRACT_SIZE * entry * q2k,
-      units: requestedLots * PESAKI_CONTRACT_SIZE,
-      margin: marginKes,
-      lots: requestedLots,
-      notionalPerLot: PESAKI_CONTRACT_SIZE * entry * q2k
-    };
+   const sizing = {
+     tradeAmount: marginKes,
+     margin: marginKes,
+     lots: requestedLots,
+     units: requestedLots * PESAKI_CONTRACT_SIZE,
+     exposure: requestedLots * PESAKI_CONTRACT_SIZE * entry * q2k,
+     notionalPerLot: PESAKI_CONTRACT_SIZE * entry * q2k
+   };
 
-    if (sizing.margin > freeMargin) {
-      return bad(reply, `Order rejected: insufficient free margin. You have KSh ${freeMargin.toFixed(2)} available, but need KSh ${sizing.margin.toFixed(2)}.`);
-    }
+   if (sizing.margin > freeMargin) {
+     return bad(reply, `Order rejected: insufficient free margin. You have KSh ${freeMargin.toFixed(2)} available, but need KSh ${sizing.margin.toFixed(2)}.`);
+   }
 
     const executedPrice = body.side === "buy" ? quote.ask : quote.bid;
     const slippage = Number((executedPrice - quote.mid).toFixed(spec.digits));
