@@ -918,8 +918,7 @@ export class Engine {
         body: JSON.stringify({
           symbol: backendSymbol,
           side,
-          lots: lots,
-          trade_amount: tradeAmountKes, // KES margin amount: lots * 100 * exchangeRate
+          lots: req.lots, // 👈 SEND LOTS DIRECTLY
           order_type: "market",
           stop_loss: req.sl || undefined,
           take_profit: req.tp || undefined,

@@ -20,15 +20,11 @@ import {
   calculatePositionSize,
   computePnl,
   configuredLeverage,
-  marginForLots,
   marginState,
   minTradeAmount,
-  sizeFromTradeAmount,
   settlementLegs,
-  validateLots,
   validateStopLoss,
   validateTakeProfit,
-  validateTradeAmount,
 } from "../../services/forex/risk";
 import { reserveMargin, settleReal } from "../../services/forex/walletBridge";
 import { ensureWalletExists, releaseLockedFunds } from "../../wallet/service";
@@ -89,9 +85,9 @@ async function releaseReservation(userId: string, mode: "demo" | "live", margin:
 }
 
 const orderSchema = z.object({
-  symbol: z.enum(SYMBOLS as [string, ...string[]]),
+  symbol: z.string().min(3), // Accepts "EURUSD" or "EUR/USD"
   side: z.enum(["buy", "sell"]),
-  trade_amount: z.number().positive().optional(),
+  trade_amount: z.number().nonnegative().optional(),
   lots: z.number().positive().optional(),
   order_type: z.enum(["market", "limit", "stop", "stop_limit"]).default("market"),
   limit_price: z.number().positive().nullable().optional(),
@@ -314,7 +310,6 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     if (!validateTakeProfit(body.side, entry, body.take_profit ?? null).ok) return bad(reply, "Invalid take profit");
 
     const q2k = quoteToKes(spec);
-    const leverage = configuredLeverage();
     const isPending = ["limit", "stop", "stop_limit"].includes(body.order_type);
 
     let freeMargin = 0;
@@ -334,17 +329,23 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
 
     const tradeAmountKes = body.trade_amount || 0;
 
-    const sizing = (() => {
-      if (body.trade_amount != null) return sizeFromTradeAmount({ tradeAmount: tradeAmountKes, entryPrice: entry, instrument: spec, quoteToKes: q2k, leverage });
-      const lots = body.lots!;
-      return { tradeAmount: 0, exposure: lots * spec.contractSize * entry * q2k, units: lots * spec.contractSize, margin: marginForLots(lots, entry, spec, q2k, 100 / leverage), lots, notionalPerLot: spec.contractSize * entry * q2k };
-    })();
+    // 👈 OVERRIDE: Force PESAKI math (0.01 lots = $1.00 margin)
+    const requestedLots = body.lots || 0.01;
+    const marginUsd = requestedLots * 100; // 1 lot = $100 margin
+    const marginKes = marginUsd * (q2k > 1 ? q2k : 130); // Convert to KES
 
-    if (body.trade_amount != null) {
-      if (!validateTradeAmount(tradeAmountKes, freeMargin).ok) return bad(reply, "Insufficient free margin.");
-    } else {
-      if (!validateLots(body.lots!, spec).ok) return bad(reply, "Invalid volume.");
-      if (sizing.margin > freeMargin) return bad(reply, `Order rejected: insufficient free margin. You have KSh ${freeMargin.toFixed(2)} available, but need KSh ${sizing.margin.toFixed(2)}.`);
+    const sizing = {
+      tradeAmount: marginKes,
+      exposure: requestedLots * 100000 * entry * q2k,
+      units: requestedLots * 100000,
+      margin: marginKes,
+      lots: requestedLots,
+      notionalPerLot: 100000 * entry * q2k
+    };
+
+    // The margin check
+    if (sizing.margin > freeMargin) {
+      return bad(reply, `Order rejected: insufficient free margin. You have KSh ${freeMargin.toFixed(2)} available, but need KSh ${sizing.margin.toFixed(2)}.`);
     }
 
     const executedPrice = body.side === "buy" ? quote.ask : quote.bid;
