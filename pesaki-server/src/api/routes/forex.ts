@@ -371,36 +371,56 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
       reserved = true;
     }
 
-    const { data: result, error: execError } = await supabase.rpc("forex_open_market_position", {
-      p_user_id: userId, p_account_id: account.id, p_instrument_id: instrumentRow.id, p_order_type: body.order_type,
-      p_side: body.side, p_quantity: sizing.lots, p_requested_price: quote.mid, p_executed_price: executedPrice,
-      p_slippage: slippage, p_quote_to_kes: q2k, p_limit_price: body.limit_price ?? null, p_trigger_price: body.trigger_price ?? null,
-      p_stop_loss: body.stop_loss ?? null, p_take_profit: body.take_profit ?? null, p_idempotency_key: body.idempotency_key ?? null, p_pending: isPending,
-    });
+    // 1. Insert the Order
+    const { data: orderRow, error: orderError } = await supabase.from("forex_orders").insert({
+      user_id: userId,
+      account_id: account.id,
+      instrument_id: instrumentRow.id,
+      order_type: body.order_type,
+      side: body.side,
+      quantity: sizing.lots,
+      requested_price: quote.mid,
+      executed_price: executedPrice,
+      slippage: slippage,
+      status: isPending ? "pending" : "filled",
+      stop_loss: body.stop_loss ?? null,
+      take_profit: body.take_profit ?? null,
+      idempotency_key: body.idempotency_key ?? null,
+    }).select().single();
 
-    if (execError) {
-      const reason = execError.message ?? "";
-      if (reserved) {
-        await releaseReservation(userId, body.account_type, sizing.margin, "open failed");
-        if (body.account_type === "live" && marginKes > 0) await supabase.rpc('credit_wallet', { p_user_id: userId, p_amount: marginKes * COMMISSION_RATE, p_mode: 'live', p_description: `Refund Commission` });
-      }
-      if (reason.includes("INSUFFICIENT_MARGIN")) return bad(reply, `Order rejected: insufficient free margin.`);
-      return reply.code(500).send({ success: false, error: "Order execution failed. Nothing was charged.", code: "EXECUTION_FAILED" });
+    if (orderError) {
+      if (reserved) await releaseReservation(userId, body.account_type, sizing.margin, "insert order failed");
+      return reply.code(500).send({ success: false, error: "Order creation failed.", code: "EXECUTION_FAILED" });
     }
 
-    if (result?.idempotent) {
-      if (reserved) {
-        await releaseReservation(userId, body.account_type, sizing.margin, "idempotent replay");
-        if (body.account_type === "live" && marginKes > 0) await supabase.rpc('credit_wallet', { p_user_id: userId, p_amount: marginKes * COMMISSION_RATE, p_mode: 'live', p_description: `Refund Commission` });
-      }
-      const { data: existing } = await supabase.from("forex_orders").select("*").eq("id", result.order_id).maybeSingle();
-      return { success: true, order: existing, idempotent: true };
-    }
+    let positionRow = null;
+    if (!isPending) {
+      // 2. Insert the Position
+      const { data: posRow, error: posError } = await supabase.from("forex_positions").insert({
+        user_id: userId,
+        account_id: account.id,
+        instrument_id: instrumentRow.id,
+        side: body.side,
+        quantity: sizing.lots,
+        average_entry_price: executedPrice,
+        margin: sizing.margin,
+        quote_to_kes: q2k,
+        stop_loss: body.stop_loss ?? null,
+        take_profit: body.take_profit ?? null,
+        opened_at: new Date().toISOString(),
+      }).select().single();
 
-    const [{ data: orderRow }, { data: positionRow }] = await Promise.all([
-      supabase.from("forex_orders").select("*").eq("id", result.order_id).maybeSingle(),
-      result.position_id ? supabase.from("forex_positions").select("*").eq("id", result.position_id).maybeSingle() : Promise.resolve({ data: null }),
-    ]);
+      if (posError) {
+        if (reserved) await releaseReservation(userId, body.account_type, sizing.margin, "insert position failed");
+        return reply.code(500).send({ success: false, error: "Position creation failed.", code: "EXECUTION_FAILED" });
+      }
+      positionRow = posRow;
+
+      // 3. Update Account Equity/Used Margin (Directly)
+      await supabase.from("forex_accounts").update({
+        used_margin: Number(account.used_margin ?? 0) + sizing.margin
+      }).eq("id", account.id);
+    }
 
     if (isPending) return { success: true, order: orderRow, message: "Pending order placed" };
 
