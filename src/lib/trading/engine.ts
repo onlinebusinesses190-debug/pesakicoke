@@ -612,7 +612,7 @@ export class Engine {
     return { ok: true, ticket };
   }
 
-  closePosition(ticket: number, reason: CloseReason = "manual", lots?: number): Result {
+  async closePosition(ticket: number, reason: CloseReason = "manual", lots?: number): Promise<Result> {
     const p = this.positions.find((x) => x.ticket === ticket);
     if (!p) return this.fail(`Position #${ticket} not found`);
     const closeLots = lots ? Math.min(round(lots, 2), p.lots) : p.lots;
