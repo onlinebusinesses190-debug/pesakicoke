@@ -39,6 +39,7 @@ const DEFAULT_INITIAL_PRICES: Record<string, number> = {
   "USD/CHF": 0.8896, "AUD/USD": 0.6612, "USD/CAD": 1.3592,
   "NZD/USD": 0.6088, "EUR/GBP": 0.8777, "EUR/JPY": 171.06,
   "GBP/JPY": 194.88, "KES/USD": 0.00769,
+  "XAU/USD": 2351.4,
 };
 
 const num = (key: string, fallback: number) => {
