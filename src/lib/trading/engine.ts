@@ -548,7 +548,8 @@ export class Engine {
   }
   closePriceOf(p: { symbol: string; side: Side }) {
     const q = this.quotes[p.symbol];
-    return p.side === "buy" ? q.bid : q.ask;
+    if (!q) return 0;
+    return p.side === "buy" ? (q.bid ?? 0) : (q.ask ?? 0);
   }
   profitOf(p: Position, usdAmount = p.lots) {
     const spec = this.spec(p.symbol);
