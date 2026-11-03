@@ -20,17 +20,22 @@ import {
   calculatePositionSize,
   computePnl,
   configuredLeverage,
+  marginForLots,
   marginState,
   minTradeAmount,
+  sizeFromTradeAmount,
   settlementLegs,
+  validateLots,
   validateStopLoss,
   validateTakeProfit,
+  validateTradeAmount,
 } from "../../services/forex/risk";
 import { reserveMargin, settleReal } from "../../services/forex/walletBridge";
 import { ensureWalletExists, releaseLockedFunds } from "../../wallet/service";
 
 const DEMO_START_BALANCE = 100_000;
 const COMMISSION_RATE = 0.005; // 0.5% PESAKI Commission
+const PESAKI_CONTRACT_SIZE = 10000; // Custom contract size for $1 margin per 0.01 lot
 
 const REAL_TRADING_ENABLED = process.env.PESAKI_FX_REAL_ENABLED === "true";
 
@@ -84,10 +89,11 @@ async function releaseReservation(userId: string, mode: "demo" | "live", margin:
   try { await releaseLockedFunds(userId, margin, true); } catch (err) { logger.error({ err, userId, margin, reason }, "Forex margin release failed"); }
 }
 
+// 👈 FIXED ZOD SCHEMA
 const orderSchema = z.object({
-  symbol: z.string().min(3), // Accepts "EURUSD" or "EUR/USD"
+  symbol: z.string().min(3), // Accepts EURUSD or EUR/USD
   side: z.enum(["buy", "sell"]),
-  trade_amount: z.number().nonnegative().optional(),
+  trade_amount: z.number().nonnegative().optional(), // Allows 0 if lots are provided
   lots: z.number().positive().optional(),
   order_type: z.enum(["market", "limit", "stop", "stop_limit"]).default("market"),
   limit_price: z.number().positive().nullable().optional(),
@@ -182,7 +188,7 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
         try {
           const quote = getEngine().quote(spec.symbol);
           const mid = quote.mid, q2k = quoteToKes(spec);
-          const pnl = computePnl({ side: p.side, lots: Number(p.quantity), entryPrice: Number(p.average_entry_price), exitPrice: mid, instrument: spec, quoteToKes: q2k });
+          const pnl = computePnl({ side: p.side, lots: Number(p.quantity), entryPrice: Number(p.average_entry_price), exitPrice: mid, instrument: { ...spec, contractSize: PESAKI_CONTRACT_SIZE }, quoteToKes: q2k });
           unrealised += pnl; marked.push({ id: p.id, price: mid, q2k });
           enriched.push({ ...p, current_price: mid, unrealised_pnl: pnl });
         } catch { enriched.push({ ...p, unrealised_pnl: 0, priceStatus: "unavailable" }); }
@@ -258,7 +264,8 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     const parsed = z.object({ symbol: z.enum(SYMBOLS as [string, ...string[]]), side: z.enum(["buy", "sell"]), balance: z.number().positive(), risk_percent: z.number().positive().max(100), entry_price: z.number().positive(), stop_loss: z.number().positive() }).safeParse(request.body);
     if (!parsed.success) return bad(reply, "Invalid risk inputs");
     const { symbol, side, balance, risk_percent, entry_price, stop_loss } = parsed.data;
-    const spec = getInstrument(symbol)!;
+    let spec = getInstrument(symbol)!;
+    spec = { ...spec, contractSize: PESAKI_CONTRACT_SIZE };
     if (!validateStopLoss(side, entry_price, stop_loss).ok) return bad(reply, "Invalid stop loss");
 
     try {
@@ -276,8 +283,12 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     if (!parsed.success) return bad(reply, "Invalid order details");
     const body = parsed.data;
     const userId = request.user!.id;
-    const spec = getInstrument(body.symbol);
+    
+    let spec = getInstrument(body.symbol);
     if (!spec) return bad(reply, "Instrument not available");
+    // 👈 OVERRIDE CONTRACT SIZE FOR PESAKI MATH
+    spec = { ...spec, contractSize: PESAKI_CONTRACT_SIZE };
+
     if (body.account_type === "live" && !REAL_TRADING_ENABLED) return bad(reply, "Live trading unavailable.", 403);
 
     if (body.idempotency_key) {
@@ -291,7 +302,6 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     
     if (account.status !== "active") return bad(reply, "Account not active");
 
-    // 👈 FIXED: Safe check for slash formatting
     let dbSymbol = body.symbol;
     if (dbSymbol.length === 6 && !dbSymbol.includes("/")) {
         dbSymbol = `${dbSymbol.slice(0, 3)}/${dbSymbol.slice(3)}`;
@@ -310,18 +320,17 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     if (!validateTakeProfit(body.side, entry, body.take_profit ?? null).ok) return bad(reply, "Invalid take profit");
 
     const q2k = quoteToKes(spec);
+    const leverage = configuredLeverage();
     const isPending = ["limit", "stop", "stop_limit"].includes(body.order_type);
 
     let freeMargin = 0;
     if (body.account_type === "live") {
-      // Ensure wallet exists before reading balance (creates wallet if missing)
       await ensureWalletExists(userId);
       const { data: wallet } = await supabase.from("wallets").select("balance, locked").eq("user_id", userId).maybeSingle();
       const walletBalance = Number(wallet?.balance ?? 0);
       const walletLocked = Number(wallet?.locked ?? 0);
       freeMargin = walletBalance - walletLocked;
       
-      // Force sync to DB so the RPC doesn't fail with 0 balance
       await supabase.from("forex_accounts").update({ balance: walletBalance, equity: walletBalance }).eq("id", account.id);
     } else {
       freeMargin = Number(account.equity ?? account.balance ?? 0) - Number(account.used_margin ?? 0);
@@ -329,23 +338,17 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
 
     const tradeAmountKes = body.trade_amount || 0;
 
-    // 👈 OVERRIDE: Force PESAKI math (0.01 lots = $1.00 margin)
-    const requestedLots = body.lots || 0.01;
-    const marginUsd = requestedLots * 100; // 1 lot = $100 margin
-    const marginKes = marginUsd * (q2k > 1 ? q2k : 130); // Convert to KES
+    const sizing = (() => {
+      if (body.trade_amount != null && body.trade_amount > 0) return sizeFromTradeAmount({ tradeAmount: tradeAmountKes, entryPrice: entry, instrument: spec, quoteToKes: q2k, leverage });
+      const lots = body.lots || 0.01;
+      return { tradeAmount: 0, exposure: lots * spec.contractSize * entry * q2k, units: lots * spec.contractSize, margin: marginForLots(lots, entry, spec, q2k, 100 / leverage), lots, notionalPerLot: spec.contractSize * entry * q2k };
+    })();
 
-    const sizing = {
-      tradeAmount: marginKes,
-      exposure: requestedLots * 100000 * entry * q2k,
-      units: requestedLots * 100000,
-      margin: marginKes,
-      lots: requestedLots,
-      notionalPerLot: 100000 * entry * q2k
-    };
-
-    // The margin check
-    if (sizing.margin > freeMargin) {
-      return bad(reply, `Order rejected: insufficient free margin. You have KSh ${freeMargin.toFixed(2)} available, but need KSh ${sizing.margin.toFixed(2)}.`);
+    if (body.trade_amount != null && body.trade_amount > 0) {
+      if (!validateTradeAmount(tradeAmountKes, freeMargin).ok) return bad(reply, "Insufficient free margin.");
+    } else {
+      if (!validateLots(body.lots || 0.01, spec).ok) return bad(reply, "Invalid volume.");
+      if (sizing.margin > freeMargin) return bad(reply, `Order rejected: insufficient free margin. You have KSh ${freeMargin.toFixed(2)} available, but need KSh ${sizing.margin.toFixed(2)}.`);
     }
 
     const executedPrice = body.side === "buy" ? quote.ask : quote.bid;
@@ -355,7 +358,7 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     if (!isPending) {
       let commissionKes = 0;
       if (body.account_type === "live" && tradeAmountKes > 0) {
-        commissionKes = tradeAmountKes * COMMISSION_RATE; // 0.5% opening fee
+        commissionKes = tradeAmountKes * COMMISSION_RATE;
         await supabase.rpc('debit_wallet', { p_user_id: userId, p_amount: commissionKes, p_mode: 'live', p_description: `Forex Opening Commission` });
       }
 
@@ -489,12 +492,15 @@ async function closePosition(request: FastifyRequest, reply: FastifyReply, posit
   if (position.closed_at) return reply.code(409).send({ success: false, error: "Position already closed" });
 
   const sym = await symbolForInstrument(position.instrument_id);
-  const spec = sym ? getInstrument(sym) : undefined;
+  const baseSpec = sym ? getInstrument(sym) : undefined;
   
-  if (!spec) {
+  if (!baseSpec) {
     logger.error({ positionId, instrumentId: position.instrument_id }, "Close failed: unknown instrument in DB");
     return reply.code(400).send({ success: false, error: "Unknown instrument. Please contact support.", code: "UNKNOWN_INSTRUMENT" });
   }
+  
+  // 👈 OVERRIDE CONTRACT SIZE FOR CLOSING
+  const spec = { ...baseSpec, contractSize: PESAKI_CONTRACT_SIZE };
 
   const remaining = Number(position.quantity);
   if (!remaining || remaining <= 0) {
@@ -546,7 +552,7 @@ async function closePosition(request: FastifyRequest, reply: FastifyReply, posit
     const releasedMargin = Number((Number(position.margin ?? 0) * closedFraction).toFixed(4));
     const legs = settlementLegs({ 
       side: position.side, 
-      units: closeLots * spec.contractSize, 
+      units: closeLots * spec.contractSize, // Now uses 10,000
       entryPrice: Number(position.average_entry_price), 
       exitPrice, 
       quoteToKes: q2k, 
