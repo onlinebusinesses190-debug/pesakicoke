@@ -692,6 +692,23 @@ export class Engine {
   deposit(amountKes: number): Result {
     if (!(amountKes > 0 && amountKes <= 1e7)) return this.fail("Invalid deposit amount");
     const usd = amountKes / kesPerQuote("USD");
+
+    if (this.mode === "live") {
+      // Live deposits go to the real wallet via the backend route.
+      (async () => {
+        try {
+          await apiFetch("/forex/deposit", {
+            method: "POST",
+            body: JSON.stringify({ amount: amountKes, account_type: "live" }),
+          });
+          await this.fetchLiveBalance();
+        } catch (e) {
+          this.log("Live deposit failed", true);
+        }
+      })();
+      return { ok: true };
+    }
+
     this.balance = round(this.balance + usd, 2);
     this.history.unshift({
       ticket: this.nextTicket++, symbol: "", side: "buy", lots: 0,
