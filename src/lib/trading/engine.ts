@@ -695,6 +695,8 @@ export class Engine {
     this.log(mode === "live" ? "Live trading enabled" : "Demo trading");
     if (mode === "live" && prev !== "live") {
       this.fetchLiveBalance();
+      this.fetchLivePositions();
+      this.fetchLiveHistory();
       this.startLiveBalancePolling();
     }
     if (mode === "demo") {
@@ -884,6 +886,59 @@ export class Engine {
     if (this.liveBalanceInterval) {
       clearInterval(this.liveBalanceInterval);
       this.liveBalanceInterval = null;
+    }
+  }
+
+  // Fetch live positions from backend
+  async fetchLivePositions(): Promise<void> {
+    try {
+      const res = await apiFetch("/forex/positions?mode=live");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.positions) {
+          this._livePositions = data.positions.map((p: any) => ({
+            ticket: Number(p.id) || p.ticket || 0,
+            symbol: p.symbol || p.instrument?.symbol || "",
+            side: p.side,
+            lots: Number(p.quantity) || Number(p.lots) || 0,
+            openPrice: Number(p.average_entry_price) || Number(p.open_price) || 0,
+            openTime: new Date(p.opened_at).getTime() || Date.now(),
+            sl: Number(p.stop_loss) || 0,
+            tp: Number(p.take_profit) || 0,
+            backendId: p.id,
+          }));
+          this.emit();
+        }
+      }
+    } catch (e) {
+      console.error("Failed to fetch live positions:", e);
+    }
+  }
+
+  // Fetch live history from backend
+  async fetchLiveHistory(): Promise<void> {
+    try {
+      const res = await apiFetch("/forex/history?mode=live&limit=100");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.history) {
+          this._liveHistory = data.history.map((h: any) => ({
+            ticket: Number(h.id) || h.ticket || 0,
+            symbol: h.symbol,
+            side: h.side,
+            lots: Number(h.quantity) || Number(h.lots) || 0,
+            openPrice: Number(h.entry) || Number(h.openPrice) || 0,
+            closePrice: Number(h.close_price) || Number(h.closePrice) || 0,
+            openTime: new Date(h.opened_at).getTime() || 0,
+            closeTime: new Date(h.closed_at).getTime() || 0,
+            profit: Number(h.profit) || Number(h.realized_pnl) || 0,
+            reason: h.close_reason || "manual",
+          }));
+          this.emit();
+        }
+      }
+    } catch (e) {
+      console.error("Failed to fetch live history:", e);
     }
   }
 
