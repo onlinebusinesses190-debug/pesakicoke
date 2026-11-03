@@ -284,6 +284,9 @@ export class Engine {
   private _liveOrders: PendingOrder[] = [];
   private _liveHistory: Deal[] = [];
 
+  private liveBackendToTicket = new Map<string, number>();
+  private nextLiveTicket = 200000001;
+
   private listeners = new Set<() => void>();
   private marginCallWarned = false;
   
@@ -896,10 +899,13 @@ export class Engine {
       if (accRes.ok) {
         const data = await accRes.json();
         if (data.success) {
-          // Set exchange rate first so liveBalance getter uses the correct rate
           this.exchangeRate = ratesRes.ok ? (await ratesRes.json()).usdToKes ?? 130 : 130;
-          // Use availableBalance (free margin) instead of walletBalance
-          this.liveKesBalance = data.account.availableBalance ?? data.account.walletBalance ?? 0;
+          // Prefer available (free) balance, fall back to wallet/account balance/equity
+          const acc = data.account;
+          const available = Number(acc?.availableBalance ?? 0);
+          const walletBal = Number(acc?.walletBalance ?? 0);
+          const acctBal = Number(acc?.balance ?? acc?.equity ?? 0);
+          this.liveKesBalance = available > 0 ? available : (walletBal > 0 ? walletBal : acctBal);
           this.emit();
         }
       }
@@ -910,8 +916,13 @@ export class Engine {
 
   startLiveBalancePolling(): void {
     if (this.liveBalanceInterval) return;
-    this.fetchLiveBalance();
-    this.liveBalanceInterval = window.setInterval(() => this.fetchLiveBalance(), 30000);
+    const tick = async () => {
+      await this.fetchLiveBalance();
+      await this.fetchLivePositions();
+      await this.fetchLiveHistory();
+    };
+    tick();
+    this.liveBalanceInterval = window.setInterval(tick, 30000);
   }
 
   stopLiveBalancePolling(): void {
@@ -921,24 +932,54 @@ export class Engine {
     }
   }
 
+  private instrumentsById = new Map<number, string>();
+  private instrumentsLoaded = false;
+
+  private async ensureInstruments(): Promise<void> {
+    if (this.instrumentsLoaded) return;
+    try {
+      const res = await apiFetch("/forex/instruments");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.instruments)) {
+          for (const inst of data.instruments) {
+            if (inst.id != null && inst.symbol) this.instrumentsById.set(Number(inst.id), inst.symbol);
+          }
+        }
+      }
+    } catch { /* ignore */ }
+    this.instrumentsLoaded = true;
+  }
+
   // Fetch live positions from backend
   async fetchLivePositions(): Promise<void> {
     try {
+      await this.ensureInstruments();
       const res = await apiFetch("/forex/positions?mode=live");
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.positions) {
-          this._livePositions = data.positions.map((p: any) => ({
-            ticket: Number(p.id) || p.ticket || 0,
-            symbol: p.symbol || p.instrument?.symbol || "",
-            side: p.side,
-            lots: Number(p.quantity) || Number(p.lots) || 0,
-            openPrice: Number(p.average_entry_price) || Number(p.open_price) || 0,
-            openTime: new Date(p.opened_at).getTime() || Date.now(),
-            sl: Number(p.stop_loss) || 0,
-            tp: Number(p.take_profit) || 0,
-            backendId: p.id,
-          }));
+          const mapped = data.positions.map((p: any) => {
+            const backendId = String(p.id ?? "");
+            let ticket = this.liveBackendToTicket.get(backendId);
+            if (ticket == null) {
+              ticket = this.nextLiveTicket++;
+              this.liveBackendToTicket.set(backendId, ticket);
+            }
+            const symbol = p.symbol || this.instrumentsById.get(Number(p.instrument_id)) || p.instrument?.symbol || "";
+            return {
+              ticket,
+              symbol,
+              side: p.side,
+              lots: Number(p.quantity) || Number(p.lots) || 0,
+              openPrice: Number(p.average_entry_price) || Number(p.open_price) || 0,
+              openTime: new Date(p.opened_at).getTime() || Date.now(),
+              sl: Number(p.stop_loss) || 0,
+              tp: Number(p.take_profit) || 0,
+              backendId,
+            };
+          });
+          this._livePositions = mapped;
           this.emit();
         }
       }
