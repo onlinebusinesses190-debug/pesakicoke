@@ -613,15 +613,12 @@ export class Engine {
   }
 
   closePosition(ticket: number, reason: CloseReason = "manual", lots?: number): Result {
-    if (this.mode === "live") {
-      this.closePositionLive(ticket, reason, lots).catch(e => this.log(`Close error: ${e}`, true));
-      return { ok: true };
-    }
     const p = this.positions.find((x) => x.ticket === ticket);
     if (!p) return this.fail(`Position #${ticket} not found`);
     const closeLots = lots ? Math.min(round(lots, 2), p.lots) : p.lots;
     if (closeLots < 0.01) return this.fail("Invalid volume (min 0.01 lots)");
     
+    // Identical profit/balance/history logic for both demo and live modes.
     const profit = this.profitOf(p, closeLots);
     const price = this.closePriceOf(p);
     this.balance = round(this.balance + profit, 2);
@@ -635,6 +632,22 @@ export class Engine {
     
     if (closeLots >= p.lots - 1e-9) this.positions = this.positions.filter((x) => x !== p);
     else p.lots = round(p.lots - closeLots, 2);
+    
+    // Keep the backend wallet/source of truth in sync for live mode.
+    if (this.mode === "live") {
+      if (p.backendId) {
+        try {
+          const res = await apiFetch(`/forex/positions/${p.backendId}/close`, { method: "POST", body: JSON.stringify({ lots: closeLots }) });
+          if (!res.ok && res.status !== 404) {
+            const data = await res.json().catch(() => ({}));
+            this.log(`Backend close rejected: ${data.error || res.status}`, true);
+          }
+        } catch (e) {
+          this.log("Backend close sync failed; local position updated.", true);
+        }
+      }
+      this.fetchLiveBalance();
+    }
     
     const tag = reason === "manual" ? "" : ` [${reason === "stopout" ? "stop out" : reason}]`;
     this.log(`position #${ticket} closed ${closeLots.toFixed(2)} ${p.symbol} at ${this.fmt(p.symbol, price)}, profit ${profit.toFixed(2)}${tag}`, reason === "stopout");
@@ -1064,43 +1077,7 @@ export class Engine {
     this.emit();
     return { ok: true, ticket };
   }
-
-  // Override placeOrder to use live API when in live mode
   async placeOrder(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }): Promise<Result> {
-    if (this.mode === "live") {
-      // Validate first
-      const s = this.spec(req.symbol);
-      if (!s) return this.fail("Unknown symbol");
-      const q = this.quotes[req.symbol];
-      const lots = round(req.lots, 2);
-      if (!(lots >= 0.01 && lots <= 100)) return this.fail("Invalid volume (0.01 - 100 lots)");
-      const sl = round(req.sl || 0, s.digits), tp = round(req.tp || 0, s.digits);
-      const side: Side = isBuyType(req.type) ? "buy" : "sell";
-      const err = this.checkStops(side, side === "buy" ? q.ask : q.bid, sl, tp, req.symbol);
-      if (err) return this.fail(err);
-
-      // Create local position immediately so UI can show it and allow closing
-      const ticket = this.nextTicket++;
-      this.positions.push({
-        ticket, symbol: req.symbol, side, lots, openPrice: round(side === "buy" ? q.ask : q.bid, s.digits),
-        openTime: Date.now(), sl, tp,
-      });
-      this.emit();
-
-      // Call backend and update/remove local position based on result
-      const res = await this.placeOrderLive(req, ticket);
-      if (res.ok) {
-        this.emit();
-      } else {
-        // Backend rejected — remove local position and log error
-        this.positions = this.positions.filter((x) => x.ticket !== ticket);
-        this.log(`Order rejected: ${res.error}`, true);
-        this.emit();
-      }
-      return res;
-    }
-
-    // Demo mode - use existing logic
     const s = this.spec(req.symbol);
     if (!s) return this.fail("Unknown symbol");
     const q = this.quotes[req.symbol];
@@ -1112,7 +1089,30 @@ export class Engine {
     if (req.type === "buy" || req.type === "sell") {
       const err = this.checkStops(side, side === "buy" ? q.ask : q.bid, sl, tp, req.symbol);
       if (err) return this.fail(err);
-      return this.openPosition(req.symbol, side, lots, sl, tp);
+      // Identical execution for demo and live: open locally first.
+      const res = this.openPosition(req.symbol, side, lots, sl, tp);
+      if (!res.ok) return res;
+      const ticket = res.ticket!;
+      const p = this.positions.find((x) => x.ticket === ticket)!;
+      // Persist to backend for live mode (real money).
+      if (this.mode === "live") {
+        try {
+          const backendRes = await this.placeOrderLive({ ...req, symbol: req.symbol, lots, price: p.openPrice, sl, tp }, ticket);
+          if (!backendRes.ok) {
+            this.positions = this.positions.filter((x) => x.ticket !== ticket);
+            this.log(`Order rejected: ${backendRes.error}`, true);
+            this.emit();
+            return backendRes;
+          }
+        } catch (e) {
+          this.positions = this.positions.filter((x) => x.ticket !== ticket);
+          this.log("Order placement failed", true);
+          this.emit();
+          return this.fail("Network error placing order");
+        }
+        await Promise.all([this.fetchLiveBalance(), this.fetchLivePositions(), this.fetchLiveHistory()]);
+      }
+      return res;
     }
 
     const price = round(req.price || 0, s.digits);
