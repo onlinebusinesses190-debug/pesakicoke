@@ -20,7 +20,6 @@ import {
   calculatePositionSize,
   computePnl,
   configuredLeverage,
-  marginForLots,
   marginState,
   minTradeAmount,
   sizeFromTradeAmount,
@@ -261,10 +260,11 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
 
   // ─── SAFE RISK PREVIEW ───
   fastify.post("/risk/preview", async (request, reply) => {
-    const parsed = z.object({ symbol: z.enum(SYMBOLS as [string, ...string[]]), side: z.enum(["buy", "sell"]), balance: z.number().positive(), risk_percent: z.number().positive().max(100), entry_price: z.number().positive(), stop_loss: z.number().positive() }).safeParse(request.body);
+    const parsed = z.object({ symbol: z.string(), side: z.enum(["buy", "sell"]), balance: z.number().positive(), risk_percent: z.number().positive().max(100), entry_price: z.number().positive(), stop_loss: z.number().positive() }).safeParse(request.body);
     if (!parsed.success) return bad(reply, "Invalid risk inputs");
     const { symbol, side, balance, risk_percent, entry_price, stop_loss } = parsed.data;
     let spec = getInstrument(symbol)!;
+    if (!spec) return bad(reply, "Instrument not available");
     spec = { ...spec, contractSize: PESAKI_CONTRACT_SIZE };
     if (!validateStopLoss(side, entry_price, stop_loss).ok) return bad(reply, "Invalid stop loss");
 
@@ -286,7 +286,8 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     
     let spec = getInstrument(body.symbol);
     if (!spec) return bad(reply, "Instrument not available");
-    // 👈 OVERRIDE CONTRACT SIZE FOR PESAKI MATH
+    
+    // 👈 FORCE CONTRACT SIZE
     spec = { ...spec, contractSize: PESAKI_CONTRACT_SIZE };
 
     if (body.account_type === "live" && !REAL_TRADING_ENABLED) return bad(reply, "Live trading unavailable.", 403);
@@ -336,19 +337,22 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
       freeMargin = Number(account.equity ?? account.balance ?? 0) - Number(account.used_margin ?? 0);
     }
 
-    const tradeAmountKes = body.trade_amount || 0;
+    // 👈 BULLETPROOF MARGIN MATH (Bypasses broken marginForLots function)
+    const requestedLots = body.lots || 0.01;
+    const marginUsd = requestedLots * 100; // 0.01 lots = $1.00 USD
+    const marginKes = marginUsd * q2k;     // Convert USD to KES
 
-    const sizing = (() => {
-      if (body.trade_amount != null && body.trade_amount > 0) return sizeFromTradeAmount({ tradeAmount: tradeAmountKes, entryPrice: entry, instrument: spec, quoteToKes: q2k, leverage });
-      const lots = body.lots || 0.01;
-      return { tradeAmount: 0, exposure: lots * spec.contractSize * entry * q2k, units: lots * spec.contractSize, margin: marginForLots(lots, entry, spec, q2k, 100 / leverage), lots, notionalPerLot: spec.contractSize * entry * q2k };
-    })();
+    const sizing = {
+      tradeAmount: marginKes,
+      exposure: requestedLots * PESAKI_CONTRACT_SIZE * entry * q2k,
+      units: requestedLots * PESAKI_CONTRACT_SIZE,
+      margin: marginKes,
+      lots: requestedLots,
+      notionalPerLot: PESAKI_CONTRACT_SIZE * entry * q2k
+    };
 
-    if (body.trade_amount != null && body.trade_amount > 0) {
-      if (!validateTradeAmount(tradeAmountKes, freeMargin).ok) return bad(reply, "Insufficient free margin.");
-    } else {
-      if (!validateLots(body.lots || 0.01, spec).ok) return bad(reply, "Invalid volume.");
-      if (sizing.margin > freeMargin) return bad(reply, `Order rejected: insufficient free margin. You have KSh ${freeMargin.toFixed(2)} available, but need KSh ${sizing.margin.toFixed(2)}.`);
+    if (sizing.margin > freeMargin) {
+      return bad(reply, `Order rejected: insufficient free margin. You have KSh ${freeMargin.toFixed(2)} available, but need KSh ${sizing.margin.toFixed(2)}.`);
     }
 
     const executedPrice = body.side === "buy" ? quote.ask : quote.bid;
@@ -357,8 +361,8 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     let reserved = false;
     if (!isPending) {
       let commissionKes = 0;
-      if (body.account_type === "live" && tradeAmountKes > 0) {
-        commissionKes = tradeAmountKes * COMMISSION_RATE;
+      if (body.account_type === "live" && marginKes > 0) {
+        commissionKes = marginKes * COMMISSION_RATE;
         await supabase.rpc('debit_wallet', { p_user_id: userId, p_amount: commissionKes, p_mode: 'live', p_description: `Forex Opening Commission` });
       }
 
@@ -382,7 +386,7 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
       const reason = execError.message ?? "";
       if (reserved) {
         await releaseReservation(userId, body.account_type, sizing.margin, "open failed");
-        if (body.account_type === "live" && tradeAmountKes > 0) await supabase.rpc('credit_wallet', { p_user_id: userId, p_amount: tradeAmountKes * COMMISSION_RATE, p_mode: 'live', p_description: `Refund Commission` });
+        if (body.account_type === "live" && marginKes > 0) await supabase.rpc('credit_wallet', { p_user_id: userId, p_amount: marginKes * COMMISSION_RATE, p_mode: 'live', p_description: `Refund Commission` });
       }
       if (reason.includes("INSUFFICIENT_MARGIN")) return bad(reply, `Order rejected: insufficient free margin.`);
       return reply.code(500).send({ success: false, error: "Order execution failed. Nothing was charged.", code: "EXECUTION_FAILED" });
@@ -391,7 +395,7 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     if (result?.idempotent) {
       if (reserved) {
         await releaseReservation(userId, body.account_type, sizing.margin, "idempotent replay");
-        if (body.account_type === "live" && tradeAmountKes > 0) await supabase.rpc('credit_wallet', { p_user_id: userId, p_amount: tradeAmountKes * COMMISSION_RATE, p_mode: 'live', p_description: `Refund Commission` });
+        if (body.account_type === "live" && marginKes > 0) await supabase.rpc('credit_wallet', { p_user_id: userId, p_amount: marginKes * COMMISSION_RATE, p_mode: 'live', p_description: `Refund Commission` });
       }
       const { data: existing } = await supabase.from("forex_orders").select("*").eq("id", result.order_id).maybeSingle();
       return { success: true, order: existing, idempotent: true };
@@ -499,7 +503,6 @@ async function closePosition(request: FastifyRequest, reply: FastifyReply, posit
     return reply.code(400).send({ success: false, error: "Unknown instrument. Please contact support.", code: "UNKNOWN_INSTRUMENT" });
   }
   
-  // 👈 OVERRIDE CONTRACT SIZE FOR CLOSING
   const spec = { ...baseSpec, contractSize: PESAKI_CONTRACT_SIZE };
 
   const remaining = Number(position.quantity);
@@ -552,14 +555,13 @@ async function closePosition(request: FastifyRequest, reply: FastifyReply, posit
     const releasedMargin = Number((Number(position.margin ?? 0) * closedFraction).toFixed(4));
     const legs = settlementLegs({ 
       side: position.side, 
-      units: closeLots * spec.contractSize, // Now uses 10,000
+      units: closeLots * spec.contractSize,
       entryPrice: Number(position.average_entry_price), 
       exitPrice, 
       quoteToKes: q2k, 
       margin: releasedMargin 
     });
     
-    // 0.5% CLOSING COMMISSION
     const closingCommissionKes = releasedMargin * COMMISSION_RATE; 
     const netProfitAfterCommission = legs.profit - legs.loss - closingCommissionKes;
     
