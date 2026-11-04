@@ -177,32 +177,33 @@ export function Terminal({ mode = "demo" }: { mode?: "demo" | "real" }) {
                 )}
               </div>
               <div className="divide-y divide-gray-100">
-                {e.positions.length === 0 ? (
-                  <div className="p-4 text-center text-xs text-gray-500">No open positions</div>
-                ) : (
-                  e.positions.map((p) => {
-                    const pnl = e.profitOf(p);
-                    const spec = e.spec(p.symbol);
-                    const quote = e.quotes[p.symbol];
-                    const closePrice = p.side === "buy" ? quote.bid : quote.ask;
-                    return (
-                      <div key={p.ticket} className="p-2 hover:bg-gray-50 relative group">
-                        <div className="flex justify-between items-center mb-1">
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs font-bold text-gray-800">{p.symbol}</span>
-                            <span className={`text-[10px] font-bold uppercase ${p.side === "buy" ? "text-[#1565c0]" : "text-[#c62828]"}`}>{p.side}</span>
-                            <span className="text-[10px] text-gray-500">{p.lots.toFixed(2)} lots</span>
-                          </div>
-                          <div className={`font-mono text-xs font-bold ${pnl >= 0 ? "text-[#1565c0]" : "text-[#c62828]"}`}>{pnl.toFixed(2)} USD</div>
+              {e.positions.length === 0 ? (
+                <div className="p-4 text-center text-xs text-gray-500">No open positions</div>
+              ) : (
+                e.positions.map((p) => {
+                  const pnl = e.profitOf(p);
+                  const spec = e.spec(p.symbol);
+                  const digits = spec?.digits ?? 2;
+                  const quote = e.quotes[p.symbol];
+                  const closePrice = p.side === "buy" ? (quote?.bid ?? p.openPrice) : (quote?.ask ?? p.openPrice);
+                  return (
+                    <div key={p.ticket} className="p-2 hover:bg-gray-50 relative group">
+                      <div className="flex justify-between items-center mb-1">
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs font-bold text-gray-800">{p.symbol}</span>
+                          <span className={`text-[10px] font-bold uppercase ${p.side === "buy" ? "text-[#1565c0]" : "text-[#c62828]"}`}>{p.side}</span>
+                          <span className="text-[10px] text-gray-500">{p.lots.toFixed(2)} lots</span>
                         </div>
-                        <div className="flex justify-between items-center text-[10px] text-gray-500 font-mono">
-                          <div>{p.openPrice.toFixed(spec.digits)} → {closePrice.toFixed(spec.digits)}</div>
-                          <button onClick={() => e.closePosition(p.ticket, "manual", p.lots)} className="bg-red-50 text-red-600 px-2 py-0.5 rounded text-[10px] font-bold hover:bg-red-100">Close</button>
-                        </div>
+                        <div className={`font-mono text-xs font-bold ${pnl >= 0 ? "text-[#1565c0]" : "text-[#c62828]"}`}>{pnl.toFixed(2)} USD</div>
                       </div>
-                    );
-                  })
-                )}
+                      <div className="flex justify-between items-center text-[10px] text-gray-500 font-mono">
+                        <div>{p.openPrice.toFixed(digits)} → {closePrice.toFixed(digits)}</div>
+                        <button onClick={() => e.closePosition(p.ticket, "manual", p.lots)} className="bg-red-50 text-red-600 px-2 py-0.5 rounded text-[10px] font-bold hover:bg-red-100">Close</button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
               </div>
             </div>
           )}

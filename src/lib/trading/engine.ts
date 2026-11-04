@@ -979,7 +979,9 @@ export class Engine {
               ticket = this.nextLiveTicket++;
               this.liveBackendToTicket.set(backendId, ticket);
             }
-            const symbol = p.symbol || this.instrumentsById.get(Number(p.instrument_id)) || p.instrument?.symbol || "";
+            const rawSymbol = p.symbol || this.instrumentsById.get(Number(p.instrument_id)) || p.instrument?.symbol || "";
+            // Backend stores symbols as "EUR/USD"; frontend SYMBOLS uses "EURUSD".
+            const symbol = rawSymbol.replace("/", "");
             return {
               ticket,
               symbol,
