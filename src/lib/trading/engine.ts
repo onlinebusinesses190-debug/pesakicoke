@@ -724,14 +724,16 @@ export class Engine {
     return { ok: true };
   }
 
-  setMode(mode: "demo" | "live") {
+  async setMode(mode: "demo" | "live") {
     const prev = this.mode;
     this.mode = mode;
     this.log(mode === "live" ? "Live trading enabled" : "Demo trading");
-    if (mode === "live" && prev !== "live") {
-      this.fetchLiveBalance();
-      this.fetchLivePositions();
-      this.fetchLiveHistory();
+    if (mode === "live") {
+      // Always (re)fetch wallet/positions/history when entering live mode so the
+      // real balance and open trades are shown even if the engine was already live.
+      await this.fetchLiveBalance();
+      await this.fetchLivePositions();
+      await this.fetchLiveHistory();
       this.startLiveBalancePolling();
     }
     if (mode === "demo") {
