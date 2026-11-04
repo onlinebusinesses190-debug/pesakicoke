@@ -999,7 +999,10 @@ export class Engine {
               backendId,
             };
           });
-          this._livePositions = mapped;
+          // Merge backend positions with existing local ones (don't wipe local trades)
+          const byBackendId = new Map(this._livePositions.map((x) => [x.backendId ?? "", x]));
+          for (const m of mapped) byBackendId.set(m.backendId, m);
+          this._livePositions = [...byBackendId.values()];
           this.emit();
         }
       }
