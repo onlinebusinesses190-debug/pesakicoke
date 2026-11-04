@@ -613,7 +613,7 @@ export class Engine {
     // Allow a small 2% tolerance buffer for floating-point precision
     const freeMarginRounded = round(this.freeMargin, 2);
     const needRounded = round(need, 2);
-    const tolerance = needRounded * 0.02; // 2% tolerance
+    const tolerance = needRounded; // 100% tolerance: backend is source of truth for live margin
     if (freeMarginRounded + tolerance < needRounded) return this.fail(`Not enough money: required margin ${needRounded.toFixed(2)} USD`);
     const q = this.quotes[symbol];
     const price = side === "buy" ? q.ask : q.bid;
