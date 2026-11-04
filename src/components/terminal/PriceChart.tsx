@@ -118,25 +118,23 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         const ps = (x.symbol || "").replace("/", "").toUpperCase();
         return ps === targetSymbol;
       }) || [];
-      // Include position entry prices in axis so they appear at their real level (MT5 behavior)
+      // Include position entry prices only if they are within a reasonable
+      // distance of the current candle range, so candles don't collapse.
+      // Far-away entries are drawn as clamped edge markers instead.
+      const currentRange = hi - lo;
+      const margin = Math.max(currentRange * 1.0, spec.point * 200);
       for (const p of symbolPositions) {
         const openPx = Number(p.openPrice) || 0;
-        if (openPx > 0) { lo = Math.min(lo, openPx); hi = Math.max(hi, openPx); }
+        if (openPx > 0 && openPx >= lo - margin && openPx <= hi + margin) {
+          lo = Math.min(lo, openPx);
+          hi = Math.max(hi, openPx);
+        }
         if (p.sl) { lo = Math.min(lo, p.sl); hi = Math.max(hi, p.sl); }
         if (p.tp) { lo = Math.min(lo, p.tp); hi = Math.max(hi, p.tp); }
       }
 
       if (view.current.offset === 0) { lo = Math.min(lo, smoothBid); hi = Math.max(hi, smoothAsk); }
-      
-      // Cap axis expansion so candles don't collapse, but always fit positions
-      const currentRange = hi - lo;
-      const maxRange = Math.max(currentRange * 3, spec.point * 500);
-      if (hi - lo > maxRange) {
-        const mid = (lo + hi) / 2;
-        lo = mid - maxRange / 2;
-        hi = mid + maxRange / 2;
-      }
-       
+
       const priceRange = hi - lo;
       const minRange = spec.point * 200;
       const pad = priceRange * 0.05 || minRange; 
