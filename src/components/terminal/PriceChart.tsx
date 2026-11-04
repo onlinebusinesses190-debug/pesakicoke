@@ -122,6 +122,8 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         return ps === symbol;
       }) || [];
       for (const p of symbolPositions) {
+        const openPx = Number(p.openPrice) || 0;
+        if (openPx > 0) { lo = Math.min(lo, openPx); hi = Math.max(hi, openPx); }
         if (p.sl) { lo = Math.min(lo, p.sl); hi = Math.max(hi, p.sl); }
         if (p.tp) { lo = Math.min(lo, p.tp); hi = Math.max(hi, p.tp); }
       }
