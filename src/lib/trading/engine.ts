@@ -1,5 +1,5 @@
 // Simulated MetaTrader-style trading engine.
-import { apiFetch } from "@/utils/api";
+// 100% LOCAL FOR BOTH DEMO AND REAL (Backend temporarily disconnected for UI perfection)
 
 export const TIMEFRAMES = { M1: 60, M5: 300, M15: 900, M30: 1800, H1: 3600, H4: 14400 } as const;
 export type TF = keyof typeof TIMEFRAMES;
@@ -55,7 +55,7 @@ function genCandles(s: SymbolSpec, tfSec: number, nowSec: number, n = 1000): Can
 export class Engine {
   quotes: Record<string, Quote> = {};
   candles: Record<string, Record<TF, Candle[]>> = {};
-  leverage = 100; 
+  leverage = 100; // Forced leverage
   currency = "USD";
   mode: "demo" | "live" = "demo";
   journal: JournalEntry[] = [];
@@ -63,21 +63,23 @@ export class Engine {
   nextTicket = 100000001;
   version = 0;
 
+  // Separate local state for Demo and Real so they don't mix
   private _demoBalance = START_BALANCE;
   private _demoPositions: Position[] = [];
   private _demoOrders: PendingOrder[] = [];
   private _demoHistory: Deal[] = [];
 
-  private _realBalance = 0;
+  private _realBalance = START_BALANCE; // Simulated real wallet
   private _realPositions: Position[] = [];
   private _realOrders: PendingOrder[] = [];
   private _realHistory: Deal[] = [];
 
   exchangeRate = 130; 
 
-  get balance() { return this.mode === "live" ? this.liveBalance : this._demoBalance; }
-  set balance(v: number) { if (this.mode === "live") this.liveBalance = v; else this._demoBalance = v; }
+  get balance() { return this.mode === "live" ? this._realBalance : this._demoBalance; }
+  set balance(v: number) { if (this.mode === "live") this._realBalance = v; else this._demoBalance = v; }
   
+  // Map liveBalance to realBalance for UI compatibility
   get liveBalance() { return this._realBalance; }
   get liveKesBalance() { return this._realBalance * this.exchangeRate; }
   get liveAvailableBalance() { return this.freeMargin * this.exchangeRate; }
@@ -95,7 +97,6 @@ export class Engine {
   private lastTickTime = 0;
   private tickCount = 0;
   private lastSaveTick = 0;
-  private liveBalanceInterval: number | null = null;
 
   constructor() {
     this.load();
@@ -128,6 +129,7 @@ export class Engine {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ 
         demoBalance: this._demoBalance, demoPositions: this._demoPositions, demoOrders: this._demoOrders, demoHistory: this._demoHistory.slice(0, 500), 
+        realBalance: this._realBalance, realPositions: this._realPositions, realOrders: this._realOrders, realHistory: this._realHistory.slice(0, 500),
         journal: this.journal.slice(0, 300), nextTicket: this.nextTicket, tickCount: this.tickCount, 
         quotePrices: Object.fromEntries(Object.entries(this.quotes).map(([k, v]) => [k, { bid: v.bid, ask: v.ask, high: v.high, low: v.low, open: v.open }])), 
         candles: this.candles 
@@ -140,6 +142,7 @@ export class Engine {
       const raw = localStorage.getItem(STORAGE_KEY); if (!raw) return;
       const d = JSON.parse(raw);
       this._demoBalance = d.demoBalance ?? START_BALANCE; this._demoPositions = d.demoPositions ?? []; this._demoOrders = d.demoOrders ?? []; this._demoHistory = d.demoHistory ?? [];
+      this._realBalance = d.realBalance ?? START_BALANCE; this._realPositions = d.realPositions ?? []; this._realOrders = d.realOrders ?? []; this._realHistory = d.realHistory ?? [];
       
       this.journal = d.journal ?? []; this.nextTicket = d.nextTicket ?? this.nextTicket; this.tickCount = d.tickCount ?? 0;
       if (d.quotePrices) { for (const [symbol, q] of Object.entries(d.quotePrices as Record<string, { bid: number; ask: number; high: number; low: number; open: number }>)) { if (this.quotes[symbol]) { const s = this.spec(symbol); if (s) { this.quotes[symbol].bid = q.bid; this.quotes[symbol].ask = q.ask; this.quotes[symbol].high = q.high; this.quotes[symbol].low = q.low; this.quotes[symbol].open = q.open; } } } }
@@ -187,20 +190,6 @@ export class Engine {
     const closeLots = lots ? Math.min(round(lots, 2), p.lots) : p.lots;
     if (closeLots < 0.01) return this.fail("Invalid volume (min 0.01 lots)");
     
-    // If live mode and we have a backend ID, send the close request FIRST
-    if (this.mode === "live" && p.backendId) {
-       try {
-         const res = await apiFetch(`/forex/positions/${p.backendId}/close`, { method: "POST", body: JSON.stringify({ lots: closeLots }) });
-         if (!res.ok) {
-            const data = await res.json().catch(() => ({}));
-            return this.fail(`Backend close failed: ${data.error || res.status}`);
-         }
-       } catch (e) {
-         return this.fail("Network error closing position");
-       }
-    }
-
-    // Only remove locally if backend succeeded (or if it's a demo trade)
     const profit = this.profitOf(p, closeLots);
     const price = this.closePriceOf(p);
     this.balance = round(this.balance + profit, 2);
@@ -210,24 +199,12 @@ export class Engine {
     else p.lots = round(p.lots - closeLots, 2);
     
     this.log(`position #${ticket} closed ${closeLots.toFixed(2)} ${p.symbol} at ${this.fmt(p.symbol, price)}, profit ${profit.toFixed(2)}`);
-    
-    if (this.mode === "live") {
-      this.fetchLiveBalance();
-    }
-    
     this.save(); this.emit(); return { ok: true };
   }
 
   async setMode(mode: "demo" | "live") {
     this.mode = mode;
     this.log(mode === "live" ? "Live trading enabled" : "Demo trading");
-    if (mode === "live") {
-      await this.fetchLiveBalance();
-      await this.fetchLivePositions();
-      this.startLiveBalancePolling();
-    } else {
-      this.stopLiveBalancePolling();
-    }
     this.emit();
   }
 
@@ -254,71 +231,6 @@ export class Engine {
     if (this.tickCount - this.lastSaveTick >= 25) { this.lastSaveTick = this.tickCount; this.save(); }
   }
 
-  async fetchLiveBalance(): Promise<void> {
-    try {
-      const [accRes, ratesRes] = await Promise.all([apiFetch("/forex/account?account_type=live"), apiFetch("/forex/rates")]);
-      if (accRes.ok) {
-        const data = await accRes.json();
-        if (data.success) {
-          this.exchangeRate = ratesRes.ok ? (await ratesRes.json()).usdToKes ?? 130 : 130;
-          const acc = data.account;
-          this._realBalance = (Number(acc?.availableBalance ?? 0) + Number(acc?.used_margin ?? 0)) / this.exchangeRate;
-          this.emit();
-        }
-      }
-    } catch (e) { console.error("Failed to fetch live balance:", e); }
-  }
-
-  startLiveBalancePolling(): void {
-    if (this.liveBalanceInterval) return;
-    const tick = async () => { await this.fetchLiveBalance(); await this.fetchLivePositions(); };
-    tick(); this.liveBalanceInterval = window.setInterval(tick, 30000);
-  }
-  stopLiveBalancePolling(): void { if (this.liveBalanceInterval) { clearInterval(this.liveBalanceInterval); this.liveBalanceInterval = null; } }
-
-  private instrumentsById = new Map<number, string>();
-  private instrumentsLoaded = false;
-  private async ensureInstruments(): Promise<void> {
-    if (this.instrumentsLoaded) return;
-    try { const res = await apiFetch("/forex/instruments"); if (res.ok) { const data = await res.json(); if (data.success && Array.isArray(data.instruments)) { for (const inst of data.instruments) { if (inst.id != null && inst.symbol) this.instrumentsById.set(Number(inst.id), inst.symbol); } } } } catch { /* ignore */ }
-    this.instrumentsLoaded = true;
-  }
-
-  async fetchLivePositions(): Promise<void> {
-    try {
-      await this.ensureInstruments();
-      const res = await apiFetch("/forex/positions?mode=live");
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.positions) {
-          const mapped = data.positions.map((p: any) => {
-            const backendId = String(p.id ?? "");
-            const existing = this._realPositions.find(x => x.backendId === backendId);
-            let ticket = existing ? existing.ticket : this.nextTicket++;
-            
-            let instrSymbol = "";
-            const fi = p.forex_instruments;
-            if (Array.isArray(fi) && fi.length > 0) instrSymbol = fi[0]?.symbol ?? "";
-            else if (fi && typeof fi === "object") instrSymbol = fi.symbol ?? "";
-            const rawSymbol = p.symbol || instrSymbol || this.instrumentsById.get(Number(p.instrument_id)) || p.instrument?.symbol || "";
-            const finalSymbol = rawSymbol.replace("/", "") || existing?.symbol || "EURUSD"; 
-
-            return { 
-              ticket, symbol: finalSymbol, side: p.side, 
-              lots: Number(p.quantity) || Number(p.lots) || existing?.lots || 0, 
-              openPrice: Number(p.average_entry_price) || Number(p.open_price) || existing?.openPrice || 0, 
-              openTime: new Date(p.opened_at).getTime() || Date.now(), 
-              sl: Number(p.stop_loss) || existing?.sl || 0, tp: Number(p.take_profit) || existing?.tp || 0, 
-              backendId 
-            };
-          });
-          this._realPositions = mapped;
-          this.emit();
-        }
-      }
-    } catch (e) { console.error("Failed to fetch live positions:", e); }
-  }
-
   async placeOrder(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }): Promise<Result> {
     const s = this.spec(req.symbol); if (!s) return this.fail("Unknown symbol");
     const q = this.quotes[req.symbol]; const lots = round(req.lots, 2);
@@ -329,49 +241,7 @@ export class Engine {
     if (req.type === "buy" || req.type === "sell") {
       const err = this.checkStops(side, side === "buy" ? q.ask : q.bid, sl, tp, req.symbol);
       if (err) return this.fail(err);
-      
-      // 1. Optimistic Open (Instantly appears on chart)
-      const res = this.openPosition(req.symbol, side, lots, sl, tp);
-      if (!res.ok) return res;
-      const ticket = res.ticket!;
-      
-      // 2. Sync to Backend (If Live Mode)
-      if (this.mode === "live") {
-        try {
-          const backendSymbol = req.symbol.length === 6 ? `${req.symbol.slice(0, 3)}/${req.symbol.slice(3)}` : req.symbol;
-          const backendRes = await apiFetch("/forex/orders", { 
-            method: "POST", 
-            body: JSON.stringify({ 
-              symbol: backendSymbol, side, lots: req.lots, order_type: "market", 
-              stop_loss: req.sl || undefined, take_profit: req.tp || undefined, account_type: "live" 
-            }) 
-          });
-          const data = await backendRes.json();
-          
-          if (!backendRes.ok) {
-            // Backend rejected! Rollback local UI.
-            this.positions = this.positions.filter((x) => x.ticket !== ticket);
-            this.log(`Order rejected: ${data.error || "Backend failed"}`, true);
-            this.emit();
-            return this.fail(data.error || "Order rejected by backend");
-          }
-          
-          // Attach backend ID so we can close it later
-          const p = this.positions.find((x) => x.ticket === ticket);
-          if (p && (data.position?.id || data.order?.id)) {
-            p.backendId = String(data.position?.id || data.order?.id);
-            this.emit();
-          }
-          
-          await this.fetchLiveBalance();
-        } catch (e) {
-          this.positions = this.positions.filter((x) => x.ticket !== ticket);
-          this.log("Network error placing order", true);
-          this.emit();
-          return this.fail("Network error placing order");
-        }
-      }
-      return res;
+      return this.openPosition(req.symbol, side, lots, sl, tp);
     }
     
     const price = round(req.price || 0, s.digits); if (!price) return this.fail("Invalid price");
