@@ -334,16 +334,12 @@ export class Engine {
         const res = await apiRequest(`/forex/orders`, {
           method: "POST",
           body: JSON.stringify({
+            symbol: req.symbol,
             order_type: req.type,
             side,
-            quantity: lots,
-            requested_price: side === "buy" ? q.ask : q.bid,
-            executed_price: side === "buy" ? q.ask : q.bid,
-            slippage: 0,
-            status: "filled",
-            stop_loss: sl || null,
-            take_profit: tp || null,
-            idempotency_key: null,
+            lots,
+            stop_loss: sl || undefined,
+            take_profit: tp || undefined,
             account_type: "live",
           }),
         });
