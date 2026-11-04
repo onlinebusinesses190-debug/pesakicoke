@@ -455,7 +455,7 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     const accountType = mode === "live" ? "live" : "demo";
     const { data: account } = await supabase.from("forex_accounts").select("id").eq("user_id", request.user!.id).eq("account_type", accountType).maybeSingle();
     if (!account) return { success: true, positions: [] };
-    const { data } = await supabase.from("forex_positions").select("*").eq("account_id", account.id).is("closed_at", null).order("opened_at", { ascending: false });
+    const { data } = await supabase.from("forex_positions").select("*, forex_instruments(symbol)").eq("account_id", account.id).is("closed_at", null).order("opened_at", { ascending: false });
     return { success: true, positions: data ?? [] };
   });
 
