@@ -9,7 +9,7 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
 
   const view = useRef({ spacing: 8, offset: 0 });
   const pinch = useRef<{ dist: number; spacing: number } | null>(null);
-  const drag = useRef<{ x: number; offset: number } | null>(null); // Restored for panning
+  const drag = useRef<{ x: number; offset: number } | null>(null); 
   
   const loRef = useRef<number>(0);
   const hiRef = useRef<number>(0);
@@ -55,10 +55,9 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       const spec = engine?.spec(symbol);
       const allRaw = engine?.candles?.[symbol]?.[tf] || [];
 
-      // Sanitize data: filter out invalid candles (null, NaN, undefined)
+      // Sanitize data
       const all = allRaw.filter((c: any) => 
-        c && 
-        typeof c.o === 'number' && !isNaN(c.o) &&
+        c && typeof c.o === 'number' && !isNaN(c.o) &&
         typeof c.h === 'number' && !isNaN(c.h) &&
         typeof c.l === 'number' && !isNaN(c.l) &&
         typeof c.c === 'number' && !isNaN(c.c) &&
@@ -101,7 +100,7 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         bars[bars.length - 1] = { ...last, c: smoothMid, h: Math.max(last.h, smoothMid, smoothAsk), l: Math.min(last.l, smoothMid, smoothBid) };
       }
 
-      // Outlier protection for Y-axis: calculate average candle height and ignore outliers > 3x average
+      // Outlier protection for Y-axis
       let heights = bars.map((b: any) => b.h - b.l);
       const avgHeight = heights.reduce((sum: number, h: number) => sum + h, 0) / (heights.length || 1);
       const maxAllowedHeight = avgHeight * 3;
@@ -109,7 +108,6 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       
       let lo = Infinity, hi = -Infinity;
       for (const b of bars) { 
-        // Only use this candle for Y-axis if it's not an extreme outlier
         const h = b.h - b.l;
         if (h <= maxAllowedHeight) {
           lo = Math.min(lo, b.l); 
@@ -117,32 +115,22 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         }
       }
 
+      // Robust symbol matching
+      const targetSymbol = symbol.replace("/", "").toUpperCase();
       const symbolPositions = engine.positions?.filter((x: any) => {
-        const ps = (x.symbol || "").replace("/", "");
-        return ps === symbol;
+        const ps = (x.symbol || "").replace("/", "").toUpperCase();
+        return ps === targetSymbol;
       }) || [];
-      for (const p of symbolPositions) {
-        const openPx = Number(p.openPrice) || 0;
-        if (openPx > 0) {
-          // Only expand axis for open prices near the current range to avoid collapsing candles
-          const range = hi - lo;
-          const margin = Math.max(range * 0.5, spec.point * 50);
-          if (openPx >= lo - margin && openPx <= hi + margin) {
-            lo = Math.min(lo, openPx);
-            hi = Math.max(hi, openPx);
-          }
-        }
-        if (p.sl) { lo = Math.min(lo, p.sl); hi = Math.max(hi, p.sl); }
-        if (p.tp) { lo = Math.min(lo, p.tp); hi = Math.max(hi, p.tp); }
-      }
 
-if (view.current.offset === 0) { lo = Math.min(lo, smoothBid); hi = Math.max(hi, smoothAsk); }
+      // We NO LONGER expand the Y-axis for open positions. 
+      // It strictly follows the candles so it never squishes.
+      
+      if (view.current.offset === 0) { lo = Math.min(lo, smoothBid); hi = Math.max(hi, smoothAsk); }
        
-       const priceRange = hi - lo;
-       // Enforce minimum range of 20 pips (spec.point * 200) to prevent squished candles
-       const minRange = spec.point * 200;
-       const pad = priceRange * 0.05 || minRange; // 5% padding (reduced from 15%) for tighter Y-axis
-       const rawLo = lo - Math.max(pad, minRange), rawHi = hi + Math.max(pad, minRange);
+      const priceRange = hi - lo;
+      const minRange = spec.point * 200;
+      const pad = priceRange * 0.05 || minRange; 
+      const rawLo = lo - Math.max(pad, minRange), rawHi = hi + Math.max(pad, minRange);
 
       if (loRef.current === 0 && hiRef.current === 0) {
         loRef.current = rawLo; hiRef.current = rawHi;
@@ -201,7 +189,7 @@ if (view.current.offset === 0) { lo = Math.min(lo, smoothBid); hi = Math.max(hi,
 
       // ─── CANDLES ───
       ctx.setLineDash([]);
-      ctx.lineWidth = 1; // Ensure wicks are exactly 1px for sharp rendering
+      ctx.lineWidth = 1; 
       const bw = Math.max(4, Math.floor(sp * 0.7));
       bars.forEach((b: any, i: number) => {
         const x = Math.round(xOf(i)); const bull = b.c >= b.o;
@@ -219,28 +207,34 @@ if (view.current.offset === 0) { lo = Math.min(lo, smoothBid); hi = Math.max(hi,
       ctx.font = "11px Arial, sans-serif";
       ctx.fillText(spec.desc || "", 8, 30);
 
-      // ─── POSITION LINES (Fixed Overlap) ───
-      const drawnLabelYs: number[] = []; // Track drawn labels to prevent overlap
+      // ─── POSITION LINES (Clamped to Edges) ───
+      const drawnLabelYs: number[] = []; 
       
       symbolPositions.forEach((p: any) => {
         const openPrice = Number(p.openPrice) || smoothMid;
-        if (openPrice < smoothLo || openPrice > smoothHi) return;
-        const yy = Math.round(y(openPrice)) + 0.5;
-        const pnl = engine.profitOf(p);
+        let yy = y(openPrice);
+        let isOffScreen = false;
         
-        // Draw dashed line at the exact price
-        ctx.strokeStyle = p.side === "buy" ? "#1565c0" : "#c62828";
-        ctx.setLineDash([3, 3]);
-        ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke();
-        ctx.setLineDash([]);
+        // Clamp to top or bottom if off screen
+        if (yy < 0) { yy = 15; isOffScreen = true; }
+        else if (yy > plotH) { yy = plotH - 15; isOffScreen = true; }
+        
+        // Only draw the dashed line if it's actually on screen
+        if (!isOffScreen) {
+          ctx.strokeStyle = p.side === "buy" ? "#1565c0" : "#c62828";
+          ctx.setLineDash([3, 3]);
+          ctx.beginPath(); ctx.moveTo(0, Math.round(yy) + 0.5); ctx.lineTo(plotW, Math.round(yy) + 0.5); ctx.stroke();
+          ctx.setLineDash([]);
+        }
 
         // Determine label Y, offsetting if it overlaps
         let labelY = yy - 8;
         while (drawnLabelYs.some((ly) => Math.abs(ly - labelY) < 16)) {
-          labelY += 16; // Push down by 16px
+          labelY += 16; 
         }
         drawnLabelYs.push(labelY);
 
+        const pnl = engine.profitOf(p);
         const txt = `${p.side.toUpperCase()} ${p.lots.toFixed(2)}   ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD`;
         const txtWidth = ctx.measureText(txt).width;
         
@@ -300,7 +294,6 @@ if (view.current.offset === 0) { lo = Math.min(lo, smoothBid); hi = Math.max(hi,
       className="absolute inset-0 touch-none overflow-hidden bg-white cursor-crosshair"
       onWheel={(ev) => {
         ev.preventDefault();
-        // Zoom in/out with mouse wheel
         const zoomFactor = ev.deltaY < 0 ? 1.15 : 0.85;
         view.current.spacing = Math.min(30, Math.max(2, view.current.spacing * zoomFactor));
       }}
@@ -315,7 +308,6 @@ if (view.current.offset === 0) { lo = Math.min(lo, smoothBid); hi = Math.max(hi,
         const dx = ev.clientX - drag.current.x;
         const candles = engine?.candles?.[symbol]?.[tf] || [];
         const maxOffset = Math.max(0, candles.length - 10);
-        // Calculate candle shift based on drag distance
         const candleShift = Math.round(-dx / view.current.spacing);
         view.current.offset = Math.max(0, Math.min(maxOffset, drag.current.offset + candleShift));
       }}
