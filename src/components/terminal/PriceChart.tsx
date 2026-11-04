@@ -123,7 +123,15 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       }) || [];
       for (const p of symbolPositions) {
         const openPx = Number(p.openPrice) || 0;
-        if (openPx > 0) { lo = Math.min(lo, openPx); hi = Math.max(hi, openPx); }
+        if (openPx > 0) {
+          // Only expand axis for open prices near the current range to avoid collapsing candles
+          const range = hi - lo;
+          const margin = Math.max(range * 0.5, spec.point * 50);
+          if (openPx >= lo - margin && openPx <= hi + margin) {
+            lo = Math.min(lo, openPx);
+            hi = Math.max(hi, openPx);
+          }
+        }
         if (p.sl) { lo = Math.min(lo, p.sl); hi = Math.max(hi, p.sl); }
         if (p.tp) { lo = Math.min(lo, p.tp); hi = Math.max(hi, p.tp); }
       }
