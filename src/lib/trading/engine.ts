@@ -363,10 +363,21 @@ export class Engine {
           }),
         });
         if (!res.success) return this.fail(res.error || "Order rejected");
+        // Add optimistically so it shows immediately in UI
+        const newTicket = this.nextTicket++;
+        this._livePositions.push({
+          ticket: newTicket,
+          symbol: req.symbol,
+          side,
+          lots,
+          openPrice: q.ask ?? q.bid,
+          openTime: Date.now(),
+          sl: sl || 0,
+          tp: tp || 0,
+        });
         await this.fetchLiveBalance();
         await this.fetchLivePositions();
-        const newPos = this._livePositions.find((p) => p.symbol === req.symbol && p.side === side && p.lots === lots);
-        return { ok: true, ticket: newPos ? newPos.ticket : this.nextTicket++ };
+        return { ok: true, ticket: newTicket };
       } catch (e: any) {
         return this.fail(e.message || "Network error placing order");
       }
