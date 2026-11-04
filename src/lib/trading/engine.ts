@@ -331,6 +331,9 @@ export class Engine {
       const err = this.checkStops(side, side === "buy" ? q.ask : q.bid, sl, tp, req.symbol);
       if (err) return this.fail(err);
       try {
+        const backendSymbol = req.symbol.length === 6 && !req.symbol.includes("/")
+          ? `${req.symbol.slice(0, 3)}/${req.symbol.slice(3)}`
+          : req.symbol;
         const backendOrderType = req.type === "buy" || req.type === "sell" ? "market" : req.type;
         const isLimit = backendOrderType.endsWith("_limit");
         const isStop = backendOrderType.endsWith("_stop");
@@ -338,7 +341,7 @@ export class Engine {
         const res = await apiRequest(`/forex/orders`, {
           method: "POST",
           body: JSON.stringify({
-            symbol: req.symbol,
+            symbol: backendSymbol,
             order_type: backendOrderType,
             side,
             lots,
