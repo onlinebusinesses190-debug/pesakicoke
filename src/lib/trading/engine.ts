@@ -331,13 +331,19 @@ export class Engine {
       const err = this.checkStops(side, side === "buy" ? q.ask : q.bid, sl, tp, req.symbol);
       if (err) return this.fail(err);
       try {
+        const backendOrderType = req.type === "buy" || req.type === "sell" ? "market" : req.type;
+        const isLimit = backendOrderType.endsWith("_limit");
+        const isStop = backendOrderType.endsWith("_stop");
+        const pendingPrice = (isLimit || isStop) ? (req.price || 0) : undefined;
         const res = await apiRequest(`/forex/orders`, {
           method: "POST",
           body: JSON.stringify({
             symbol: req.symbol,
-            order_type: req.type,
+            order_type: backendOrderType,
             side,
             lots,
+            limit_price: isLimit ? pendingPrice : undefined,
+            trigger_price: isStop ? pendingPrice : undefined,
             stop_loss: sl || undefined,
             take_profit: tp || undefined,
             account_type: "live",
