@@ -55,7 +55,6 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       const spec = engine?.spec(symbol);
       const allRaw = engine?.candles?.[symbol]?.[tf] || [];
 
-      // Sanitize data
       const all = allRaw.filter((c: any) => 
         c && typeof c.o === 'number' && !isNaN(c.o) &&
         typeof c.h === 'number' && !isNaN(c.h) &&
@@ -100,7 +99,6 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         bars[bars.length - 1] = { ...last, c: smoothMid, h: Math.max(last.h, smoothMid, smoothAsk), l: Math.min(last.l, smoothMid, smoothBid) };
       }
 
-      // Outlier protection for Y-axis
       let heights = bars.map((b: any) => b.h - b.l);
       const avgHeight = heights.reduce((sum: number, h: number) => sum + h, 0) / (heights.length || 1);
       const maxAllowedHeight = avgHeight * 3;
@@ -115,16 +113,12 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         }
       }
 
-      // Robust symbol matching
       const targetSymbol = symbol.replace("/", "").toUpperCase();
       const symbolPositions = engine.positions?.filter((x: any) => {
         const ps = (x.symbol || "").replace("/", "").toUpperCase();
         return ps === targetSymbol;
       }) || [];
 
-      // We NO LONGER expand the Y-axis for open positions. 
-      // It strictly follows the candles so it never squishes.
-      
       if (view.current.offset === 0) { lo = Math.min(lo, smoothBid); hi = Math.max(hi, smoothAsk); }
        
       const priceRange = hi - lo;
@@ -144,7 +138,6 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       const y = (p: number) => plotH - ((p - smoothLo) / smoothRange) * plotH;
       const xOf = (i: number) => plotW - 12 - (bars.length - i - 0.5) * sp;
 
-      // ─── Y-AXIS ───
       ctx.font = "11px Arial, sans-serif"; 
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
@@ -167,7 +160,6 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         ctx.fillText(p.toFixed(spec.digits), plotW + 4, yy);
       }
 
-      // ─── X-AXIS ───
       ctx.textAlign = "center";
       const every = Math.max(1, Math.round(90 / sp));
       let lastLabelX = -100;
@@ -187,7 +179,6 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       }
       ctx.textAlign = "left";
 
-      // ─── CANDLES ───
       ctx.setLineDash([]);
       ctx.lineWidth = 1; 
       const bw = Math.max(4, Math.floor(sp * 0.7));
@@ -199,7 +190,6 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         if (bw > 2) ctx.fillRect(x - bw / 2, top, bw, bh);
       });
 
-      // ─── CHART TOP-LEFT TEXT OVERLAY ───
       ctx.fillStyle = "#1565c0";
       ctx.font = "bold 12px Arial, sans-serif";
       ctx.fillText(`${symbol} ▼ ${tf}`, 8, 15);
@@ -207,19 +197,15 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       ctx.font = "11px Arial, sans-serif";
       ctx.fillText(spec.desc || "", 8, 30);
 
-      // ─── POSITION LINES (Clamped to Edges) ───
       const drawnLabelYs: number[] = []; 
-      
       symbolPositions.forEach((p: any) => {
         const openPrice = Number(p.openPrice) || smoothMid;
         let yy = y(openPrice);
         let isOffScreen = false;
         
-        // Clamp to top or bottom if off screen
         if (yy < 0) { yy = 15; isOffScreen = true; }
         else if (yy > plotH) { yy = plotH - 15; isOffScreen = true; }
         
-        // Only draw the dashed line if it's actually on screen
         if (!isOffScreen) {
           ctx.strokeStyle = p.side === "buy" ? "#1565c0" : "#c62828";
           ctx.setLineDash([3, 3]);
@@ -227,7 +213,6 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
           ctx.setLineDash([]);
         }
 
-        // Determine label Y, offsetting if it overlaps
         let labelY = yy - 8;
         while (drawnLabelYs.some((ly) => Math.abs(ly - labelY) < 16)) {
           labelY += 16; 
@@ -238,16 +223,13 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         const txt = `${p.side.toUpperCase()} ${p.lots.toFixed(2)}   ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD`;
         const txtWidth = ctx.measureText(txt).width;
         
-        // Draw white background for text
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(4, labelY - 8, txtWidth + 8, 16);
         
-        // Draw text
         ctx.fillStyle = p.side === "buy" ? "#1565c0" : "#c62828";
         ctx.fillText(txt, 8, labelY);
       });
 
-      // ─── BID / ASK BOXES ───
       const drawBox = (p: number, color: string, timerText: string = "") => {
         if (p < smoothLo || p > smoothHi) return;
         const yy = Math.round(y(p)) + 0.5;
