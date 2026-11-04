@@ -1,5 +1,7 @@
-// Simulated MetaTrader-style trading engine.
-// 100% LOCAL FOR BOTH DEMO AND REAL (Backend temporarily disconnected for UI perfection)
+// MetaTrader-style trading engine.
+// Demo: 100% local (localStorage). Real: backed by Supabase wallet API.
+
+import { apiRequest } from "../../utils/api";
 
 export const TIMEFRAMES = { M1: 60, M5: 300, M15: 900, M30: 1800, H1: 3600, H4: 14400 } as const;
 export type TF = keyof typeof TIMEFRAMES;
@@ -63,33 +65,34 @@ export class Engine {
   nextTicket = 100000001;
   version = 0;
 
-  // Separate local state for Demo and Real so they don't mix
+  // Separate local state for Demo (virtual) and Real (backend-synced)
   private _demoBalance = START_BALANCE;
   private _demoPositions: Position[] = [];
   private _demoOrders: PendingOrder[] = [];
   private _demoHistory: Deal[] = [];
 
-  private _realBalance = START_BALANCE; // Simulated real wallet
-  private _realPositions: Position[] = [];
-  private _realOrders: PendingOrder[] = [];
-  private _realHistory: Deal[] = [];
+  // Live state synced from backend wallet API
+  private _liveBalanceKes = 0;      // KES from /forex/account?account_type=live
+  private _livePositions: Position[] = [];
+  private _liveOrders: PendingOrder[] = [];
+  private _liveHistory: Deal[] = [];
 
   exchangeRate = 130; 
 
-  get balance() { return this.mode === "live" ? this._realBalance : this._demoBalance; }
-  set balance(v: number) { if (this.mode === "live") this._realBalance = v; else this._demoBalance = v; }
+  get balance() { return this.mode === "live" ? this._liveBalanceKes / this.exchangeRate : this._demoBalance; }
+  set balance(v: number) { if (this.mode === "live") this._liveBalanceKes = v * this.exchangeRate; else this._demoBalance = v; }
   
   // Map liveBalance to realBalance for UI compatibility
-  get liveBalance() { return this._realBalance; }
-  get liveKesBalance() { return this._realBalance * this.exchangeRate; }
+  get liveBalance() { return this._liveBalanceKes / this.exchangeRate; }
+  get liveKesBalance() { return this._liveBalanceKes; }
   get liveAvailableBalance() { return this.freeMargin * this.exchangeRate; }
 
-  get positions() { return this.mode === "live" ? this._realPositions : this._demoPositions; }
-  set positions(v: Position[]) { if (this.mode === "live") this._realPositions = v; else this._demoPositions = v; }
-  get orders() { return this.mode === "live" ? this._realOrders : this._demoOrders; }
-  set orders(v: PendingOrder[]) { if (this.mode === "live") this._realOrders = v; else this._demoOrders = v; }
-  get history() { return this.mode === "live" ? this._realHistory : this._demoHistory; }
-  set history(v: Deal[]) { if (this.mode === "live") this._realHistory = v; else this._demoHistory = v; }
+  get positions() { return this.mode === "live" ? this._livePositions : this._demoPositions; }
+  set positions(v: Position[]) { if (this.mode === "live") this._livePositions = v; else this._demoPositions = v; }
+  get orders() { return this.mode === "live" ? this._liveOrders : this._demoOrders; }
+  set orders(v: PendingOrder[]) { if (this.mode === "live") this._liveOrders = v; else this._demoOrders = v; }
+  get history() { return this.mode === "live" ? this._liveHistory : this._demoHistory; }
+  set history(v: Deal[]) { if (this.mode === "live") this._liveHistory = v; else this._demoHistory = v; }
 
   private listeners = new Set<() => void>();
   private marginCallWarned = false;
@@ -129,7 +132,6 @@ export class Engine {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ 
         demoBalance: this._demoBalance, demoPositions: this._demoPositions, demoOrders: this._demoOrders, demoHistory: this._demoHistory.slice(0, 500), 
-        realBalance: this._realBalance, realPositions: this._realPositions, realOrders: this._realOrders, realHistory: this._realHistory.slice(0, 500),
         journal: this.journal.slice(0, 300), nextTicket: this.nextTicket, tickCount: this.tickCount, 
         quotePrices: Object.fromEntries(Object.entries(this.quotes).map(([k, v]) => [k, { bid: v.bid, ask: v.ask, high: v.high, low: v.low, open: v.open }])), 
         candles: this.candles 
@@ -142,7 +144,6 @@ export class Engine {
       const raw = localStorage.getItem(STORAGE_KEY); if (!raw) return;
       const d = JSON.parse(raw);
       this._demoBalance = d.demoBalance ?? START_BALANCE; this._demoPositions = d.demoPositions ?? []; this._demoOrders = d.demoOrders ?? []; this._demoHistory = d.demoHistory ?? [];
-      this._realBalance = d.realBalance ?? START_BALANCE; this._realPositions = d.realPositions ?? []; this._realOrders = d.realOrders ?? []; this._realHistory = d.realHistory ?? [];
       
       this.journal = d.journal ?? []; this.nextTicket = d.nextTicket ?? this.nextTicket; this.tickCount = d.tickCount ?? 0;
       if (d.quotePrices) { for (const [symbol, q] of Object.entries(d.quotePrices as Record<string, { bid: number; ask: number; high: number; low: number; open: number }>)) { if (this.quotes[symbol]) { const s = this.spec(symbol); if (s) { this.quotes[symbol].bid = q.bid; this.quotes[symbol].ask = q.ask; this.quotes[symbol].high = q.high; this.quotes[symbol].low = q.low; this.quotes[symbol].open = q.open; } } } }
@@ -189,7 +190,26 @@ export class Engine {
     if (!p) return this.fail(`Position #${ticket} not found`);
     const closeLots = lots ? Math.min(round(lots, 2), p.lots) : p.lots;
     if (closeLots < 0.01) return this.fail("Invalid volume (min 0.01 lots)");
-    
+
+    if (this.mode === "live") {
+      // LIVE MODE: route through backend API (real wallet)
+      if (!p.backendId) return this.fail("Position has no backend ID");
+      try {
+        const res = await apiRequest(`/forex/positions/${p.backendId}/close`, {
+          method: "POST",
+          body: JSON.stringify({ lots: closeLots }),
+        });
+        if (!res.success) return this.fail(res.error || "Close rejected");
+        await this.fetchLiveBalance();
+        await this.fetchLivePositions();
+        this.log(`position #${ticket} closed ${closeLots.toFixed(2)} ${p.symbol} via backend`);
+        this.emit(); return { ok: true };
+      } catch (e: any) {
+        return this.fail(e.message || "Close failed");
+      }
+    }
+
+    // DEMO MODE: 100% local
     const profit = this.profitOf(p, closeLots);
     const price = this.closePriceOf(p);
     this.balance = round(this.balance + profit, 2);
@@ -202,9 +222,50 @@ export class Engine {
     this.save(); this.emit(); return { ok: true };
   }
 
+  // ─── LIVE MODE: BACKEND SYNC ───
+  async fetchLiveBalance(): Promise<void> {
+    try {
+      const data = await apiRequest<{ success: boolean; account: { balance: number; equity: number; used_margin: number } }>(
+        `/forex/account?account_type=live`
+      );
+      if (data.success && data.account) {
+        this._liveBalanceKes = Number(data.account.balance ?? 0);
+      }
+    } catch (e) {
+      console.error("Failed to fetch live balance:", e);
+    }
+  }
+
+  async fetchLivePositions(): Promise<void> {
+    try {
+      const data = await apiRequest<{ success: boolean; positions: any[] }>(
+        `/forex/positions?mode=live`
+      );
+      if (data.success && data.positions) {
+        this._livePositions = data.positions.map((p: any) => ({
+          ticket: Number(p.id) || 0,
+          symbol: p.symbol || "",
+          side: p.side,
+          lots: Number(p.quantity) || Number(p.lots) || 0,
+          openPrice: Number(p.average_entry_price) || Number(p.open_price) || 0,
+          openTime: new Date(p.opened_at).getTime() || Date.now(),
+          sl: Number(p.stop_loss) || 0,
+          tp: Number(p.take_profit) || 0,
+          backendId: p.id,
+        }));
+      }
+    } catch (e) {
+      console.error("Failed to fetch live positions:", e);
+    }
+  }
+
   async setMode(mode: "demo" | "live") {
     this.mode = mode;
     this.log(mode === "live" ? "Live trading enabled" : "Demo trading");
+    if (mode === "live") {
+      await this.fetchLiveBalance();
+      await this.fetchLivePositions();
+    }
     this.emit();
   }
 
@@ -237,7 +298,44 @@ export class Engine {
     if (!(lots >= 0.01 && lots <= 100)) return this.fail("Invalid volume (0.01 - 100 lots)");
     const sl = round(req.sl || 0, s.digits), tp = round(req.tp || 0, s.digits);
     const side: Side = isBuyType(req.type) ? "buy" : "sell";
-    
+
+    if (this.mode === "live") {
+      // LIVE MODE: route through backend API (real wallet)
+      const marginUsd = lots * 100;
+      const marginKes = marginUsd * this.exchangeRate;
+      if (this._liveBalanceKes < marginKes) {
+        return this.fail(`Not enough money: required margin KSh ${marginKes.toFixed(2)}, available KSh ${this._liveBalanceKes.toFixed(2)}`);
+      }
+      const err = this.checkStops(side, side === "buy" ? q.ask : q.bid, sl, tp, req.symbol);
+      if (err) return this.fail(err);
+      try {
+        const res = await apiRequest(`/forex/orders`, {
+          method: "POST",
+          body: JSON.stringify({
+            order_type: req.type,
+            side,
+            quantity: lots,
+            requested_price: side === "buy" ? q.ask : q.bid,
+            executed_price: side === "buy" ? q.ask : q.bid,
+            slippage: 0,
+            status: "filled",
+            stop_loss: sl || null,
+            take_profit: tp || null,
+            idempotency_key: null,
+            account_type: "live",
+          }),
+        });
+        if (!res.success) return this.fail(res.error || "Order rejected");
+        await this.fetchLiveBalance();
+        await this.fetchLivePositions();
+        const newPos = this._livePositions.find((p) => p.symbol === req.symbol && p.side === side && p.lots === lots);
+        return { ok: true, ticket: newPos ? newPos.ticket : this.nextTicket++ };
+      } catch (e: any) {
+        return this.fail(e.message || "Network error placing order");
+      }
+    }
+
+    // DEMO MODE: 100% local
     if (req.type === "buy" || req.type === "sell") {
       const err = this.checkStops(side, side === "buy" ? q.ask : q.bid, sl, tp, req.symbol);
       if (err) return this.fail(err);
