@@ -225,11 +225,12 @@ export class Engine {
   // ─── LIVE MODE: BACKEND SYNC ───
   async fetchLiveBalance(): Promise<void> {
     try {
-      const data = await apiRequest<{ success: boolean; account: { balance: number; equity: number; used_margin: number } }>(
+      const data = await apiRequest<{ success: boolean; account: { balance?: number; walletBalance?: number; equity?: number; used_margin?: number } }>(
         `/forex/account?account_type=live`
       );
       if (data.success && data.account) {
-        this._liveBalanceKes = Number(data.account.balance ?? 0);
+        // Read walletBalance (explicit wallet balance) first, fall back to balance
+        this._liveBalanceKes = Number(data.account.walletBalance ?? data.account.balance ?? 0);
       }
     } catch (e) {
       console.error("Failed to fetch live balance:", e);
