@@ -499,6 +499,11 @@ export class Engine {
       this._demoPositions = d.demoPositions ?? [];
       this._demoOrders = d.demoOrders ?? [];
       this._demoHistory = d.demoHistory ?? [];
+
+      // Sanitize phantom live trades restored from local storage before the margin fix
+      if (this.mode === "live" && this._livePositions.length > 0) {
+        this._livePositions = this._livePositions.filter((p) => this.marginFor(p.symbol, p.lots) === p.lots * 100);
+      }
       this.journal = d.journal ?? [];
       this.nextTicket = d.nextTicket ?? this.nextTicket;
       this.tickCount = d.tickCount ?? 0;
@@ -547,7 +552,7 @@ export class Engine {
     return conv ? amount / conv.bid : amount;
   }
   marginFor(symbol: string, lots: number) {
-    // PESAKI Logic: 1 lot = $100 margin, so 0.01 lots = $1.00 margin
+    // Force 0.01 lots = $1.00 margin
     return round(lots * 100, 2);
   }
   closePriceOf(p: { symbol: string; side: Side }) {
@@ -572,6 +577,10 @@ export class Engine {
     return round(this.positions.reduce((a, p) => a + this.marginFor(p.symbol, p.lots), 0), 2);
   }
   get freeMargin() {
+    if (this.mode === "live") {
+      // In live mode, the backend tracks locked funds. We just need to ensure equity minus local margin isn't negative.
+      return Math.max(0, this.equity - this.margin);
+    }
     return round(this.equity - this.margin, 2);
   }
   get marginLevel() {
