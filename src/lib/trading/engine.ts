@@ -100,6 +100,7 @@ export class Engine {
   private lastTickTime = 0;
   private tickCount = 0;
   private lastSaveTick = 0;
+  private livePollInterval: number | null = null;
 
   constructor() {
     this.load();
@@ -260,12 +261,32 @@ export class Engine {
     }
   }
 
+  private startLiveBalancePolling(): void {
+    if (this.livePollInterval) return;
+    const tick = async () => {
+      await this.fetchLiveBalance();
+      await this.fetchLivePositions();
+    };
+    tick();
+    this.livePollInterval = window.setInterval(tick, 30000);
+  }
+
+  private stopLiveBalancePolling(): void {
+    if (this.livePollInterval) {
+      clearInterval(this.livePollInterval);
+      this.livePollInterval = null;
+    }
+  }
+
   async setMode(mode: "demo" | "live") {
     this.mode = mode;
     this.log(mode === "live" ? "Live trading enabled" : "Demo trading");
     if (mode === "live") {
       await this.fetchLiveBalance();
       await this.fetchLivePositions();
+      this.startLiveBalancePolling();
+    } else {
+      this.stopLiveBalancePolling();
     }
     this.emit();
   }
