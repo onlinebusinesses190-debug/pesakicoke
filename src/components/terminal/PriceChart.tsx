@@ -117,7 +117,10 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         }
       }
 
-      const symbolPositions = engine.positions?.filter((x: any) => x.symbol === symbol) || [];
+      const symbolPositions = engine.positions?.filter((x: any) => {
+        const ps = (x.symbol || "").replace("/", "");
+        return ps === symbol;
+      }) || [];
       for (const p of symbolPositions) {
         if (p.sl) { lo = Math.min(lo, p.sl); hi = Math.max(hi, p.sl); }
         if (p.tp) { lo = Math.min(lo, p.tp); hi = Math.max(hi, p.tp); }
@@ -210,8 +213,9 @@ if (view.current.offset === 0) { lo = Math.min(lo, smoothBid); hi = Math.max(hi,
       const drawnLabelYs: number[] = []; // Track drawn labels to prevent overlap
       
       symbolPositions.forEach((p: any) => {
-        if (p.openPrice < smoothLo || p.openPrice > smoothHi) return;
-        const yy = Math.round(y(p.openPrice)) + 0.5;
+        const openPrice = Number(p.openPrice) || smoothMid;
+        if (openPrice < smoothLo || openPrice > smoothHi) return;
+        const yy = Math.round(y(openPrice)) + 0.5;
         const pnl = engine.profitOf(p);
         
         // Draw dashed line at the exact price
@@ -278,7 +282,7 @@ if (view.current.offset === 0) { lo = Math.min(lo, smoothBid); hi = Math.max(hi,
 
     frameId = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frameId);
-  }, [size.w, size.h, engine, symbol, tf]);
+    }, [size.w, size.h, engine, symbol, tf]);
 
   return (
     <div 
