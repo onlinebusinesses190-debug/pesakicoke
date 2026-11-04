@@ -468,7 +468,8 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
 
   fastify.post("/positions/:id/close", { preHandler: [verifyAuth] }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    return closePosition(request, reply, id, 1);
+    const { lots } = request.body as { lots?: number };
+    return closePosition(request, reply, id, lots);
   });
 
   fastify.post("/positions/:id/partial-close", { preHandler: [verifyAuth] }, async (request, reply) => {
