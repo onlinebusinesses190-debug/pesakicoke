@@ -1,14 +1,11 @@
 // Simulated MetaTrader-style trading engine.
-import { apiFetch } from "@/utils/api";
+// NOW 100% LOCAL FOR BOTH DEMO AND REAL (Backend temporarily disconnected for UI perfection)
 
 export const TIMEFRAMES = { M1: 60, M5: 300, M15: 900, M30: 1800, H1: 3600, H4: 14400 } as const;
 export type TF = keyof typeof TIMEFRAMES;
 export type Side = "buy" | "sell";
 export type OrderType = "buy" | "sell" | "buy_limit" | "sell_limit" | "buy_stop" | "sell_stop";
 export type CloseReason = "manual" | "sl" | "tp" | "stopout";
-
-const KES_PER_QUOTE: Record<string, number> = { USD: 130, EUR: 141, GBP: 168, JPY: 0.88, CHF: 152, AUD: 85, CAD: 95, NZD: 79 };
-export function kesPerQuote(currency: string): number { const code = currency.toUpperCase(); if (code === "KES") return 1; return KES_PER_QUOTE[code] ?? 1; }
 
 export interface SymbolSpec { name: string; desc: string; digits: number; point: number; spread: number; contract: number; start: number; vol: number; }
 export interface Quote { bid: number; ask: number; high: number; low: number; open: number; dir: -1 | 0 | 1; time: number; targetBid?: number; targetAsk?: number; }
@@ -17,9 +14,7 @@ export interface Position { ticket: number; symbol: string; side: Side; lots: nu
 export interface PendingOrder { ticket: number; symbol: string; type: Exclude<OrderType, "buy" | "sell">; lots: number; price: number; sl: number; tp: number; time: number; }
 export interface Deal { ticket: number; symbol: string; side: Side; lots: number; openPrice: number; closePrice: number; openTime: number; closeTime: number; profit: number; reason: CloseReason | "deposit" | "cancel"; }
 export interface JournalEntry { time: number; msg: string; error?: boolean; }
-export type Result = { ok: true; ticket?: number } | { ok: false; error: string };
-
-import { configuredLeverage } from "@/lib/fx/market";
+export type Result = { ok: true; ticket?: number } | { ok: false; error: string; };
 
 const SPREADS: Record<string, number> = { EURUSD: 1, GBPUSD: 2, USDJPY: 1, AUDUSD: 1, USDCAD: 2, USDCHF: 2, NZDUSD: 2, EURJPY: 2, GBPJPY: 3, XAUUSD: 2 };
 function spreadFor(symbol: string): number { return SPREADS[symbol] ?? 2; }
@@ -60,7 +55,7 @@ function genCandles(s: SymbolSpec, tfSec: number, nowSec: number, n = 1000): Can
 export class Engine {
   quotes: Record<string, Quote> = {};
   candles: Record<string, Record<TF, Candle[]>> = {};
-  leverage = configuredLeverage();
+  leverage = 100; // Forced leverage
   currency = "USD";
   mode: "demo" | "live" = "demo";
   journal: JournalEntry[] = [];
@@ -68,39 +63,40 @@ export class Engine {
   nextTicket = 100000001;
   version = 0;
 
+  // We keep separate local state for Demo and Real so they don't mix
   private _demoBalance = START_BALANCE;
   private _demoPositions: Position[] = [];
   private _demoOrders: PendingOrder[] = [];
   private _demoHistory: Deal[] = [];
-  liveKesBalance = 0;
-  liveAvailableBalance = 0;
+
+  private _realBalance = START_BALANCE; // Simulated real wallet for now
+  private _realPositions: Position[] = [];
+  private _realOrders: PendingOrder[] = [];
+  private _realHistory: Deal[] = [];
+
   exchangeRate = 130; 
 
-  get balance() { return this.mode === "live" ? this.liveBalance : this._demoBalance; }
-  set balance(v: number) { if (this.mode === "live") this.liveBalance = v; else this._demoBalance = v; }
-  get liveBalance() { return this.liveKesBalance / this.exchangeRate; }
-  set liveBalance(v: number) { this.liveKesBalance = v * this.exchangeRate; }
-  get positions() { return this.mode === "live" ? this._livePositions : this._demoPositions; }
-  set positions(v: Position[]) { if (this.mode === "live") this._livePositions = v; else this._demoPositions = v; }
-  get orders() { return this.mode === "live" ? this._liveOrders : this._demoOrders; }
-  set orders(v: PendingOrder[]) { if (this.mode === "live") this._liveOrders = v; else this._demoOrders = v; }
-  get history() { return this.mode === "live" ? this._liveHistory : this._demoHistory; }
-  set history(v: Deal[]) { if (this.mode === "live") this._liveHistory = v; else this._demoHistory = v; }
+  get balance() { return this.mode === "live" ? this._realBalance : this._demoBalance; }
+  set balance(v: number) { if (this.mode === "live") this._realBalance = v; else this._demoBalance = v; }
+  
+  // Map liveBalance to realBalance for UI compatibility
+  get liveBalance() { return this._realBalance; }
+  get liveKesBalance() { return this._realBalance * this.exchangeRate; }
+  get liveAvailableBalance() { return this.freeMargin * this.exchangeRate; }
 
-  private _livePositions: Position[] = [];
-  private _liveOrders: PendingOrder[] = [];
-  private _liveHistory: Deal[] = [];
-  private liveBackendToTicket = new Map<string, number>();
-  private nextLiveTicket = 200000001;
+  get positions() { return this.mode === "live" ? this._realPositions : this._demoPositions; }
+  set positions(v: Position[]) { if (this.mode === "live") this._realPositions = v; else this._demoPositions = v; }
+  get orders() { return this.mode === "live" ? this._realOrders : this._demoOrders; }
+  set orders(v: PendingOrder[]) { if (this.mode === "live") this._realOrders = v; else this._demoOrders = v; }
+  get history() { return this.mode === "live" ? this._realHistory : this._demoHistory; }
+  set history(v: Deal[]) { if (this.mode === "live") this._realHistory = v; else this._demoHistory = v; }
+
   private listeners = new Set<() => void>();
   private marginCallWarned = false;
-  public exposureProvider?: (symbol: string) => number;
-  public totalProfitProvider?: (symbol: string) => number;
   private animationFrameId: number | null = null;
   private lastTickTime = 0;
   private tickCount = 0;
   private lastSaveTick = 0;
-  private liveBalanceInterval: number | null = null;
 
   constructor() {
     this.load();
@@ -131,7 +127,13 @@ export class Engine {
   
   private save() {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ demoBalance: this._demoBalance, demoPositions: this._demoPositions, demoOrders: this._demoOrders, demoHistory: this._demoHistory.slice(0, 500), journal: this.journal.slice(0, 300), nextTicket: this.nextTicket, tickCount: this.tickCount, quotePrices: Object.fromEntries(Object.entries(this.quotes).map(([k, v]) => [k, { bid: v.bid, ask: v.ask, high: v.high, low: v.low, open: v.open }])), candles: this.candles }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ 
+        demoBalance: this._demoBalance, demoPositions: this._demoPositions, demoOrders: this._demoOrders, demoHistory: this._demoHistory.slice(0, 500), 
+        realBalance: this._realBalance, realPositions: this._realPositions, realOrders: this._realOrders, realHistory: this._realHistory.slice(0, 500),
+        journal: this.journal.slice(0, 300), nextTicket: this.nextTicket, tickCount: this.tickCount, 
+        quotePrices: Object.fromEntries(Object.entries(this.quotes).map(([k, v]) => [k, { bid: v.bid, ask: v.ask, high: v.high, low: v.low, open: v.open }])), 
+        candles: this.candles 
+      }));
     } catch { /* ignore */ }
   }
   
@@ -140,7 +142,8 @@ export class Engine {
       const raw = localStorage.getItem(STORAGE_KEY); if (!raw) return;
       const d = JSON.parse(raw);
       this._demoBalance = d.demoBalance ?? START_BALANCE; this._demoPositions = d.demoPositions ?? []; this._demoOrders = d.demoOrders ?? []; this._demoHistory = d.demoHistory ?? [];
-      if (this.mode === "live" && this._livePositions.length > 0) this._livePositions = this._livePositions.filter((p) => this.marginFor(p.symbol, p.lots) === p.lots * 100);
+      this._realBalance = d.realBalance ?? START_BALANCE; this._realPositions = d.realPositions ?? []; this._realOrders = d.realOrders ?? []; this._realHistory = d.realHistory ?? [];
+      
       this.journal = d.journal ?? []; this.nextTicket = d.nextTicket ?? this.nextTicket; this.tickCount = d.tickCount ?? 0;
       if (d.quotePrices) { for (const [symbol, q] of Object.entries(d.quotePrices as Record<string, { bid: number; ask: number; high: number; low: number; open: number }>)) { if (this.quotes[symbol]) { const s = this.spec(symbol); if (s) { this.quotes[symbol].bid = q.bid; this.quotes[symbol].ask = q.ask; this.quotes[symbol].high = q.high; this.quotes[symbol].low = q.low; this.quotes[symbol].open = q.open; } } } }
       if (d.candles) this.candles = d.candles;
@@ -156,7 +159,7 @@ export class Engine {
   get floating() { return this.positions.reduce((a, p) => a + this.profitOf(p), 0); }
   get equity() { return round(this.balance + this.floating, 2); }
   get margin() { return round(this.positions.reduce((a, p) => a + this.marginFor(p.symbol, p.lots), 0), 2); }
-  get freeMargin() { if (this.mode === "live") return Math.max(0, this.equity - this.margin); return round(this.equity - this.margin, 2); }
+  get freeMargin() { return Math.max(0, round(this.equity - this.margin, 2)); }
   get marginLevel() { return this.margin > 0 ? (this.equity / this.margin) * 100 : 0; }
 
   private checkStops(side: Side, ref: number, sl: number, tp: number, symbol: string): string | null {
@@ -172,9 +175,7 @@ export class Engine {
   private openPosition(symbol: string, side: Side, lots: number, sl: number, tp: number, fromOrder?: number): Result {
     const s = this.spec(symbol);
     const need = this.marginFor(symbol, lots);
-    const freeMarginRounded = round(this.freeMargin, 2);
-    const needRounded = round(need, 2);
-    if (freeMarginRounded + needRounded < needRounded) return this.fail(`Not enough money: required margin ${needRounded.toFixed(2)} USD`);
+    if (this.freeMargin < need) return this.fail(`Not enough money: required margin ${need.toFixed(2)} USD`);
     const q = this.quotes[symbol];
     const price = side === "buy" ? q.ask : q.bid;
     const ticket = fromOrder ?? this.nextTicket++;
@@ -197,12 +198,6 @@ export class Engine {
     if (closeLots >= p.lots - 1e-9) this.positions = this.positions.filter((x) => x !== p);
     else p.lots = round(p.lots - closeLots, 2);
     
-    if (this.mode === "live") {
-      if (p.backendId) {
-        try { const res = await apiFetch(`/forex/positions/${p.backendId}/close`, { method: "POST", body: JSON.stringify({ lots: closeLots }) }); if (!res.ok && res.status !== 404) { const data = await res.json().catch(() => ({})); this.log(`Backend close rejected: ${data.error || res.status}`, true); } } catch (e) { this.log("Backend close sync failed; local position updated.", true); }
-      }
-      this.fetchLiveBalance();
-    }
     this.log(`position #${ticket} closed ${closeLots.toFixed(2)} ${p.symbol} at ${this.fmt(p.symbol, price)}, profit ${profit.toFixed(2)}`);
     this.save(); this.emit(); return { ok: true };
   }
@@ -210,8 +205,6 @@ export class Engine {
   async setMode(mode: "demo" | "live") {
     this.mode = mode;
     this.log(mode === "live" ? "Live trading enabled" : "Demo trading");
-    if (mode === "live") { await this.fetchLiveBalance(); await this.fetchLivePositions(); await this.fetchLiveHistory(); this.startLiveBalancePolling(); }
-    if (mode === "demo") this.stopLiveBalancePolling();
     this.emit();
   }
 
@@ -220,17 +213,13 @@ export class Engine {
     for (const s of SYMBOLS) {
       const q = this.quotes[s.name];
       const rng = mulberry32(this.tickCount ^ s.name.charCodeAt(0));
-      let houseBias = 0; if (this.exposureProvider) { const netExposure = this.exposureProvider(s.name); if (netExposure !== 0) houseBias = -netExposure * 0.000001; }
       const randomMove = gaussFrom(rng) * s.vol;
-      let proposedBid = q.bid + randomMove + houseBias;
+      let proposedBid = q.bid + randomMove;
       const maxJump = s.vol * 2.5;
       if (Math.abs(proposedBid - q.bid) > maxJump) proposedBid = q.bid + Math.sign(proposedBid - q.bid) * maxJump;
       const prev = q.bid; const bid = round(Math.max(s.point, proposedBid), s.digits);
       const spreadPts = s.spread; const ask = round(bid + spreadPts * s.point, s.digits);
-      if (q.targetBid !== undefined && q.targetAsk !== undefined) {
-        const driftFactor = 0.05; q.bid = round(q.bid + (q.targetBid - q.bid) * driftFactor, s.digits); q.ask = round(q.ask + (q.targetAsk - q.ask) * driftFactor, s.digits);
-        if (Math.abs(q.bid - q.targetBid) <= s.point && Math.abs(q.ask - q.targetAsk) <= s.point) { q.bid = q.targetBid; q.ask = q.targetAsk; q.targetBid = undefined; q.targetAsk = undefined; }
-      } else { q.bid = bid; q.ask = ask; }
+      q.bid = bid; q.ask = ask;
       q.dir = bid > prev ? 1 : bid < prev ? -1 : q.dir; q.high = Math.max(q.high, bid); q.low = Math.min(q.low, bid); q.time = now;
       for (const tf of Object.keys(TIMEFRAMES) as TF[]) {
         const arr = this.candles[s.name][tf]; const bucket = Math.floor(nowSec / TIMEFRAMES[tf]) * TIMEFRAMES[tf]; const last = arr[arr.length - 1];
@@ -242,121 +231,19 @@ export class Engine {
     if (this.tickCount - this.lastSaveTick >= 25) { this.lastSaveTick = this.tickCount; this.save(); }
   }
 
-  async fetchLiveBalance(): Promise<void> {
-    try {
-      const [accRes, ratesRes] = await Promise.all([apiFetch("/forex/account?account_type=live"), apiFetch("/forex/rates")]);
-      if (accRes.ok) {
-        const data = await accRes.json();
-        if (data.success) {
-          this.exchangeRate = ratesRes.ok ? (await ratesRes.json()).usdToKes ?? 130 : 130;
-          const acc = data.account;
-          const walletBal = Number(acc?.walletBalance ?? 0); const acctBal = Number(acc?.balance ?? acc?.equity ?? 0);
-          this.liveKesBalance = walletBal > 0 ? walletBal : (acctBal > 0 ? acctBal : 0);
-          this.liveAvailableBalance = Number(acc?.availableBalance ?? 0);
-          this.emit();
-        }
-      }
-    } catch (e) { console.error("Failed to fetch live balance:", e); }
-  }
-
-  startLiveBalancePolling(): void {
-    if (this.liveBalanceInterval) return;
-    const tick = async () => { await this.fetchLiveBalance(); await this.fetchLivePositions(); await this.fetchLiveHistory(); };
-    tick(); this.liveBalanceInterval = window.setInterval(tick, 30000);
-  }
-  stopLiveBalancePolling(): void { if (this.liveBalanceInterval) { clearInterval(this.liveBalanceInterval); this.liveBalanceInterval = null; } }
-
-  private instrumentsById = new Map<number, string>();
-  private instrumentsLoaded = false;
-  private async ensureInstruments(): Promise<void> {
-    if (this.instrumentsLoaded) return;
-    try { const res = await apiFetch("/forex/instruments"); if (res.ok) { const data = await res.json(); if (data.success && Array.isArray(data.instruments)) { for (const inst of data.instruments) { if (inst.id != null && inst.symbol) this.instrumentsById.set(Number(inst.id), inst.symbol); } } } } catch { /* ignore */ }
-    this.instrumentsLoaded = true;
-  }
-
-  async fetchLivePositions(): Promise<void> {
-    try {
-      await this.ensureInstruments();
-      const res = await apiFetch("/forex/positions?mode=live");
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.positions) {
-          const mapped = data.positions.map((p: any) => {
-            const backendId = String(p.id ?? "");
-            let ticket = this.liveBackendToTicket.get(backendId);
-            if (ticket == null) { ticket = this.nextLiveTicket++; this.liveBackendToTicket.set(backendId, ticket); }
-            const existing = this._livePositions.find(x => x.backendId === backendId);
-            let instrSymbol = "";
-            const fi = p.forex_instruments;
-            if (Array.isArray(fi) && fi.length > 0) instrSymbol = fi[0]?.symbol ?? "";
-            else if (fi && typeof fi === "object") instrSymbol = fi.symbol ?? "";
-            const rawSymbol = p.symbol || instrSymbol || this.instrumentsById.get(Number(p.instrument_id)) || p.instrument?.symbol || "";
-            const finalSymbol = rawSymbol.replace("/", "") || existing?.symbol || "EURUSD"; 
-            return { ticket, symbol: finalSymbol, side: p.side, lots: Number(p.quantity) || Number(p.lots) || existing?.lots || 0, openPrice: Number(p.average_entry_price) || Number(p.open_price) || existing?.openPrice || 0, openTime: new Date(p.opened_at).getTime() || Date.now(), sl: Number(p.stop_loss) || existing?.sl || 0, tp: Number(p.take_profit) || existing?.tp || 0, backendId };
-          });
-          const byBackendId = new Map(this._livePositions.map((x) => [x.backendId ?? "", x]));
-          for (const m of mapped) byBackendId.set(m.backendId, m);
-          this._livePositions = [...byBackendId.values()];
-          this.emit();
-        }
-      }
-    } catch (e) { console.error("Failed to fetch live positions:", e); }
-  }
-
-  async fetchLiveHistory(): Promise<void> {
-    try {
-      const res = await apiFetch("/forex/history?mode=live&limit=100");
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.history) {
-          this._liveHistory = data.history.map((h: any) => ({ ticket: Number(h.id) || h.ticket || 0, symbol: h.symbol, side: h.side, lots: Number(h.quantity) || Number(h.lots) || 0, openPrice: Number(h.entry) || Number(h.openPrice) || 0, closePrice: Number(h.close_price) || Number(h.closePrice) || 0, openTime: new Date(h.opened_at).getTime() || 0, closeTime: new Date(h.closed_at).getTime() || 0, profit: Number(h.profit) || Number(h.realized_pnl) || 0, reason: h.close_reason || "manual" }));
-          this.emit();
-        }
-      }
-    } catch (e) { console.error("Failed to fetch live history:", e); }
-  }
-
-  async placeOrderLive(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }, ticket: number): Promise<Result> {
-    if (this.mode !== "live") return this.fail("Live trading not enabled");
-    try {
-      const spec = this.spec(req.symbol); const q = this.quotes[req.symbol]; const lots = round(req.lots, 2);
-      if (!(lots >= 0.01 && lots <= 100)) return this.fail("Invalid volume (0.01 - 100 lots)");
-      const sl = round(req.sl || 0, this.spec(req.symbol).digits); const tp = round(req.tp || 0, this.spec(req.symbol).digits);
-      const side: Side = isBuyType(req.type) ? "buy" : "sell";
-      const backendSymbol = req.symbol.length === 6 ? `${req.symbol.slice(0, 3)}/${req.symbol.slice(3)}` : req.symbol;
-      const res = await apiFetch("/forex/orders", { method: "POST", body: JSON.stringify({ symbol: backendSymbol, side, lots: req.lots, order_type: "market", stop_loss: req.sl || undefined, take_profit: req.tp || undefined, account_type: "live" }) });
-      const data = await res.json();
-      if (!res.ok) return this.fail(data.error || "Order failed");
-      try {
-        const backendId = data.position?.id || data.order?.id;
-        const p = this.positions.find((x) => x.symbol === req.symbol && x.side === side);
-        if (p && backendId) { p.backendId = String(backendId); this.emit(); }
-      } catch (err) { console.error("Failed to parse backend response", err); }
-      await Promise.all([this.fetchLiveBalance(), this.fetchLivePositions(), this.fetchLiveHistory()]);
-      return { ok: true };
-    } catch (e) { return this.fail("Network error placing order"); }
-  }
-
   async placeOrder(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }): Promise<Result> {
     const s = this.spec(req.symbol); if (!s) return this.fail("Unknown symbol");
     const q = this.quotes[req.symbol]; const lots = round(req.lots, 2);
     if (!(lots >= 0.01 && lots <= 100)) return this.fail("Invalid volume (0.01 - 100 lots)");
     const sl = round(req.sl || 0, s.digits), tp = round(req.tp || 0, s.digits);
     const side: Side = isBuyType(req.type) ? "buy" : "sell";
+    
     if (req.type === "buy" || req.type === "sell") {
       const err = this.checkStops(side, side === "buy" ? q.ask : q.bid, sl, tp, req.symbol);
       if (err) return this.fail(err);
-      const res = this.openPosition(req.symbol, side, lots, sl, tp); if (!res.ok) return res;
-      const ticket = res.ticket!; const p = this.positions.find((x) => x.ticket === ticket)!;
-      if (this.mode === "live") {
-        try {
-          const backendRes = await this.placeOrderLive({ ...req, symbol: req.symbol, lots, price: p.openPrice, sl, tp }, ticket);
-          if (!backendRes.ok) { this.positions = this.positions.filter((x) => x.ticket !== ticket); this.log(`Order rejected: ${backendRes.error}`, true); this.emit(); return backendRes; }
-        } catch (e) { this.positions = this.positions.filter((x) => x.ticket !== ticket); this.log("Order placement failed", true); this.emit(); return this.fail("Network error placing order"); }
-        await Promise.all([this.fetchLiveBalance(), this.fetchLivePositions(), this.fetchLiveHistory()]);
-      }
-      return res;
+      return this.openPosition(req.symbol, side, lots, sl, tp);
     }
+    
     const price = round(req.price || 0, s.digits); if (!price) return this.fail("Invalid price");
     const t = req.type;
     if (t === "buy_limit" && price >= q.ask) return this.fail("Buy Limit must be below Ask");
