@@ -325,8 +325,8 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
       await ensureWalletExists(userId);
       const { data: wallet } = await supabase.from("wallets").select("balance, locked").eq("user_id", userId).maybeSingle();
       const walletBalance = Number(wallet?.balance ?? 0);
-      const walletLocked = Number(wallet?.locked ?? 0);
-      freeMargin = walletBalance - walletLocked;
+      // Match demo mode: use full wallet balance (equity) for margin checks.
+      freeMargin = walletBalance;
       
       await supabase.from("forex_accounts").update({ balance: walletBalance, equity: walletBalance }).eq("id", account.id);
     } else {
