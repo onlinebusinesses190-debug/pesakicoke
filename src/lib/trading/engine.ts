@@ -979,7 +979,12 @@ export class Engine {
               ticket = this.nextLiveTicket++;
               this.liveBackendToTicket.set(backendId, ticket);
             }
-            const rawSymbol = p.symbol || p.forex_instruments?.symbol || this.instrumentsById.get(Number(p.instrument_id)) || p.instrument?.symbol || "";
+            // Resolve symbol: try direct field, Supabase join (object/array/null), then instrument map
+            let instrSymbol = "";
+            const fi = p.forex_instruments;
+            if (Array.isArray(fi) && fi.length > 0) instrSymbol = fi[0]?.symbol ?? "";
+            else if (fi && typeof fi === "object") instrSymbol = fi.symbol ?? "";
+            const rawSymbol = p.symbol || instrSymbol || this.instrumentsById.get(Number(p.instrument_id)) || p.instrument?.symbol || "";
             // Backend stores symbols as "EUR/USD"; frontend SYMBOLS uses "EURUSD".
             const symbol = rawSymbol.replace("/", "");
             return {
