@@ -118,23 +118,6 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         const ps = (x.symbol || "").replace("/", "").toUpperCase();
         return ps === targetSymbol;
       }) || [];
-      // Always include position entry prices so markers appear at their exact level
-      // Cap the expansion so candles don't fully collapse.
-      for (const p of symbolPositions) {
-        const openPx = Number(p.openPrice) || 0;
-        if (openPx > 0) { lo = Math.min(lo, openPx); hi = Math.max(hi, openPx); }
-        if (p.sl) { lo = Math.min(lo, p.sl); hi = Math.max(hi, p.sl); }
-        if (p.tp) { lo = Math.min(lo, p.tp); hi = Math.max(hi, p.tp); }
-      }
-
-      // Cap axis expansion so candles don't collapse completely
-      const currentRange = hi - lo;
-      const maxRange = Math.max(currentRange * 5, spec.point * 1000);
-      if (hi - lo > maxRange) {
-        const mid = (lo + hi) / 2;
-        lo = mid - maxRange / 2;
-        hi = mid + maxRange / 2;
-      }
 
       if (view.current.offset === 0) { lo = Math.min(lo, smoothBid); hi = Math.max(hi, smoothAsk); }
 
