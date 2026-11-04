@@ -573,11 +573,11 @@ async function closePosition(request: FastifyRequest, reply: FastifyReply, posit
 
   if (closeError) {
     const reason = closeError.message ?? "";
+    logger.error({ err: reason, positionId, closeLots, exitPrice, q2k }, "Forex close RPC failed");
     if (reason.includes("POSITION_NOT_FOUND")) return reply.code(404).send({ success: false, error: "Position not found" });
     if (reason.includes("POSITION_ALREADY_CLOSED")) return reply.code(409).send({ success: false, error: "Position already closed" });
     if (reason.includes("OVER_CLOSE")) return bad(reply, "Cannot close more than open position");
-    logger.error({ err: reason }, "Forex close failed");
-    return reply.code(500).send({ success: false, error: "Could not close position.", code: "EXECUTION_FAILED" });
+    return reply.code(500).send({ success: false, error: `Close failed: ${reason}`, code: "EXECUTION_FAILED" });
   }
 
   const { data: updated } = await supabase.from("forex_positions").select("*").eq("id", positionId).maybeSingle();
