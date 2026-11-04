@@ -95,7 +95,8 @@ export async function getAvailable(userId: string, mode: AccountMode): Promise<W
 
   const balance = Number(wallet?.balance ?? 0);
   const locked = Number(wallet?.locked ?? 0);
-  return { available: Math.max(0, balance - locked), locked };
+  // Match demo mode: use full wallet balance for availability, not balance - locked.
+  return { available: Math.max(0, balance), locked };
 }
 
 /** Balance only, for display. */
