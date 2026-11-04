@@ -1,7 +1,4 @@
-﻿// Simulated MetaTrader-style trading engine (demo account).
-// Runs entirely in the browser: live price feed, order execution, margin, SL/TP, stop-out.
-// Supports fetching real historical candles from backend for seamless refresh.
-
+// Simulated MetaTrader-style trading engine.
 import { apiFetch } from "@/utils/api";
 
 export const TIMEFRAMES = { M1: 60, M5: 300, M15: 900, M30: 1800, H1: 3600, H4: 14400 } as const;
@@ -40,7 +37,6 @@ export interface Quote {
   open: number;
   dir: -1 | 0 | 1;
   time: number;
-  // Target prices for smooth drift when backend candles load
   targetBid?: number;
   targetAsk?: number;
 }
@@ -93,11 +89,10 @@ export type Result = { ok: true; ticket?: number } | { ok: false; error: string 
 
 import { configuredLeverage } from "@/lib/fx/market";
 
-// ─── TIGHT MT5-STYLE SPREADS ───
 const SPREADS: Record<string, number> = {
   EURUSD: 1, GBPUSD: 2, USDJPY: 1, AUDUSD: 1,
   USDCAD: 2, USDCHF: 2, NZDUSD: 2, EURJPY: 2,
-  GBPJPY: 3, XAUUSD: 2, // Gold spread is usually very tight (0.02)
+  GBPJPY: 3, XAUUSD: 2, 
 };
 
 function spreadFor(symbol: string): number {
@@ -187,50 +182,6 @@ function genCandles(s: SymbolSpec, tfSec: number, nowSec: number, n = 1000): Can
   }));
 }
 
-// ─── Fetch real historical candles from backend ───
-// Skip symbols not supported by the backend (e.g. XAU/USD gold)
-const BACKEND_UNSUPPORTED_SYMBOLS = new Set(["XAUUSD"]);
-
-async function fetchCandlesFromBackend(symbol: string, tf: TF, count = 400): Promise<Candle[] | null> {
-  // Skip unsupported symbols to avoid 400 Bad Request
-  if (BACKEND_UNSUPPORTED_SYMBOLS.has(symbol)) return null;
-  try {
-    // Convert symbol format: EURUSD -> EUR/USD for backend API
-    const formattedSymbol = symbol.length === 6 ? `${symbol.slice(0, 3)}/${symbol.slice(3)}` : symbol;
-    const interval = TF_TO_INTERVAL[tf] || '5m';
-    const res = await apiFetch(`/forex/candles?symbol=${encodeURIComponent(formattedSymbol)}&interval=${interval}&count=${count}`);
-    if (!res.ok) {
-      if (res.status === 404) {
-        console.debug(`[Engine] Candles endpoint not found for ${formattedSymbol} ${interval}, falling back to generated candles`);
-      } else if (res.status === 400) {
-        console.debug(`[Engine] Backend rejected ${formattedSymbol} ${interval}, falling back to generated candles`);
-      }
-      return null;
-    }
-    const data = await res.json();
-    if (!data.success || !data.candles || !Array.isArray(data.candles)) return null;
-    // Map backend candle format to frontend Candle format
-    // Fix timestamp validation: ensure timestamp is in seconds, handle ms from backend
-    return data.candles.map((c: any) => {
-      const safeTime = Math.floor(Number(c.timestamp) / 1000);
-      if (isNaN(safeTime)) return null;
-      return {
-        t: safeTime,
-        o: c.open,
-        h: c.high,
-        l: c.low,
-        c: c.close,
-      };
-    }).filter((c: Candle | null): c is Candle => c !== null);
-  } catch {
-    return null;
-  }
-}
-
-const TF_TO_INTERVAL: Record<TF, string> = {
-  M1: '1m', M5: '5m', M15: '15m', M30: '30m', H1: '1h', H4: '4h',
-};
-
 export class Engine {
   quotes: Record<string, Quote> = {};
   candles: Record<string, Record<TF, Candle[]>> = {};
@@ -242,18 +193,15 @@ export class Engine {
   nextTicket = 100000001;
   version = 0;
 
-  // Demo mode state (virtual $10,000 account)
   private _demoBalance = START_BALANCE;
   private _demoPositions: Position[] = [];
   private _demoOrders: PendingOrder[] = [];
   private _demoHistory: Deal[] = [];
 
-  // Live mode state (real wallet)
   liveKesBalance = 0;
   liveAvailableBalance = 0;
-  exchangeRate = 130; // KES per USD
+  exchangeRate = 130; 
 
-  // Getters/setters that return/set the active mode's data
   get balance() { return this.mode === "live" ? this.liveBalance : this._demoBalance; }
   set balance(v: number) {
     if (this.mode === "live") this.liveBalance = v;
@@ -280,7 +228,6 @@ export class Engine {
     else this._demoHistory = v;
   }
 
-  // Live positions/orders stored on the backend, tracked locally for UI
   private _livePositions: Position[] = [];
   private _liveOrders: PendingOrder[] = [];
   private _liveHistory: Deal[] = [];
@@ -300,17 +247,11 @@ export class Engine {
 
   private liveBalanceInterval: number | null = null;
 
-  // Cache for historical candle fetch attempts to prevent infinite retries
-  private historicalCandlesFetched = new Set<string>();
-  private historicalCandlesFetching = new Set<string>();
-
   constructor() {
-    // First load from localStorage to restore candles/quotes if available
     this.load();
     
     const now = Date.now() / 1000;
     for (const s of SYMBOLS) {
-      // Only generate candles if not already loaded from localStorage
       if (!this.candles[s.name]) {
         const tfs = {} as Record<TF, Candle[]>;
         (Object.keys(TIMEFRAMES) as TF[]).forEach(
@@ -318,7 +259,6 @@ export class Engine {
         );
         this.candles[s.name] = tfs;
       }
-      // Ensure quotes are initialized (either from load or fresh)
       if (!this.quotes[s.name]) {
         const tfs = this.candles[s.name];
         const day = tfs.H1.slice(-24);
@@ -335,101 +275,8 @@ export class Engine {
         };
       }
     }
-    this.log("Terminal started. Demo account connected to simulated server.");
+    this.log("Terminal started.");
     this.start();
-    // Note: Historical candles from backend are NOT fetched because we use
-    // frontend-generated candles for smooth, deterministic rendering.
-    // Backend is only used for order execution and wallet balances.
-    // this.fetchHistoricalCandles();
-  }
-
-  private async fetchHistoricalCandles(): Promise<void> {
-    for (const s of SYMBOLS) {
-      for (const tf of Object.keys(TIMEFRAMES) as TF[]) {
-        const key = `${s.name}:${tf}`;
-        // Skip if already fetched or currently fetching
-        if (this.historicalCandlesFetched.has(key) || this.historicalCandlesFetching.has(key)) {
-          continue;
-        }
-        this.historicalCandlesFetching.add(key);
-        try {
-          const backendCandles = await fetchCandlesFromBackend(s.name, tf);
-          if (backendCandles && backendCandles.length > 0) {
-            // Sort candles by timestamp to ensure proper order
-            backendCandles.sort((a, b) => a.t - b.t);
-            
-            // Fill gaps in backend candles with flat candles
-            const tfSec = TIMEFRAMES[tf];
-            const filledCandles: Candle[] = [];
-            for (let i = 0; i < backendCandles.length; i++) {
-              const curr = backendCandles[i];
-              filledCandles.push(curr);
-              
-              // Check if there's a gap to the next candle
-              if (i < backendCandles.length - 1) {
-                const next = backendCandles[i + 1];
-                const expectedNextT = curr.t + tfSec;
-                const gap = next.t - expectedNextT;
-                
-                // If there's a gap (more than 1.5x the timeframe), fill with flat candles
-                if (gap > tfSec * 1.5) {
-                  const numMissing = Math.floor(gap / tfSec);
-                  for (let j = 1; j <= numMissing; j++) {
-                    const missingT = curr.t + j * tfSec;
-                    // Flat candle: o = h = l = c = last close
-                    filledCandles.push({
-                      t: missingT,
-                      o: curr.c,
-                      h: curr.c,
-                      l: curr.c,
-                      c: curr.c,
-                    });
-                  }
-                }
-              }
-            }
-            
-            // Merge: replace generated candles with real historical data
-            // but only if the last timestamp aligns reasonably (within 2x timeframe)
-            const now = Date.now() / 1000;
-            const expectedBucket = Math.floor(now / TIMEFRAMES[tf]) * TIMEFRAMES[tf];
-            const lastBackendTs = filledCandles[filledCandles.length - 1].t;
-            const timeDiff = Math.abs(expectedBucket - lastBackendTs);
-            
-            // Only use backend candles if they're recent (within 2 bars)
-            if (timeDiff < TIMEFRAMES[tf] * 2) {
-              const oldCandles = this.candles[s.name][tf];
-              this.candles[s.name][tf] = filledCandles;
-              
-              // Seamless handover: Instead of instantly jumping to backend price,
-              // store the target price and drift towards it over several ticks
-              const lastClose = filledCandles[filledCandles.length - 1].c;
-              const q = this.quotes[s.name];
-              // Store the target price for smooth drift
-              q.targetBid = lastClose;
-              q.targetAsk = round(lastClose + s.spread * s.point, s.digits);
-              
-              q.open = filledCandles[0].o;
-              // Update high/low to encompass both sets
-              q.high = Math.max(
-                Math.max(...filledCandles.map(c => c.h)),
-                ...oldCandles.map(c => c.h)
-              );
-              q.low = Math.min(
-                Math.min(...filledCandles.map(c => c.l)),
-                ...oldCandles.map(c => c.l)
-              );
-              this.historicalCandlesFetched.add(key);
-            }
-          }
-        } catch {
-          // Ignore errors, keep generated candles
-        } finally {
-          this.historicalCandlesFetching.delete(key);
-        }
-      }
-    }
-    this.emit(); // Trigger UI update with real data
   }
 
   public start() {
@@ -479,11 +326,9 @@ export class Engine {
           journal: this.journal.slice(0, 300),
           nextTicket: this.nextTicket,
           tickCount: this.tickCount,
-          // Persist quotePrices so they survive refresh
           quotePrices: Object.fromEntries(
             Object.entries(this.quotes).map(([k, v]) => [k, { bid: v.bid, ask: v.ask, high: v.high, low: v.low, open: v.open }]),
           ),
-          // Persist candles for smooth persistence across refreshes
           candles: this.candles,
         }),
       );
@@ -500,7 +345,6 @@ export class Engine {
       this._demoOrders = d.demoOrders ?? [];
       this._demoHistory = d.demoHistory ?? [];
 
-      // Sanitize phantom live trades restored from local storage before the margin fix
       if (this.mode === "live" && this._livePositions.length > 0) {
         this._livePositions = this._livePositions.filter((p) => this.marginFor(p.symbol, p.lots) === p.lots * 100);
       }
@@ -508,7 +352,6 @@ export class Engine {
       this.nextTicket = d.nextTicket ?? this.nextTicket;
       this.tickCount = d.tickCount ?? 0;
 
-      // Restore quote prices from localStorage
       if (d.quotePrices) {
         for (const [symbol, q] of Object.entries(d.quotePrices as Record<string, { bid: number; ask: number; high: number; low: number; open: number }>)) {
           if (this.quotes[symbol]) {
@@ -524,7 +367,6 @@ export class Engine {
         }
       }
 
-      // Restore candles from localStorage for smooth persistence
       if (d.candles) {
         this.candles = d.candles;
       }
@@ -545,14 +387,7 @@ export class Engine {
     return v.toFixed(this.spec(name).digits);
   }
 
-  toUSD(symbol: string, amount: number) {
-    const q = symbol.slice(3, 6);
-    if (q === "USD") return amount;
-    const conv = this.quotes["USD" + q];
-    return conv ? amount / conv.bid : amount;
-  }
   marginFor(symbol: string, lots: number) {
-    // Force 0.01 lots = $1.00 margin
     return round(lots * 100, 2);
   }
   closePriceOf(p: { symbol: string; side: Side }) {
@@ -578,7 +413,6 @@ export class Engine {
   }
   get freeMargin() {
     if (this.mode === "live") {
-      // In live mode, the backend tracks locked funds. We just need to ensure equity minus local margin isn't negative.
       return Math.max(0, this.equity - this.margin);
     }
     return round(this.equity - this.margin, 2);
@@ -609,11 +443,9 @@ export class Engine {
   private openPosition(symbol: string, side: Side, lots: number, sl: number, tp: number, fromOrder?: number): Result {
     const s = this.spec(symbol);
     const need = this.marginFor(symbol, lots);
-    // Fix floating-point precision: round both values to 2 decimal places before comparing
-    // Allow a small 2% tolerance buffer for floating-point precision
     const freeMarginRounded = round(this.freeMargin, 2);
     const needRounded = round(need, 2);
-    const tolerance = needRounded; // 100% tolerance: backend is source of truth for live margin
+    const tolerance = needRounded; 
     if (freeMarginRounded + tolerance < needRounded) return this.fail(`Not enough money: required margin ${needRounded.toFixed(2)} USD`);
     const q = this.quotes[symbol];
     const price = side === "buy" ? q.ask : q.bid;
@@ -631,7 +463,6 @@ export class Engine {
     const closeLots = lots ? Math.min(round(lots, 2), p.lots) : p.lots;
     if (closeLots < 0.01) return this.fail("Invalid volume (min 0.01 lots)");
     
-    // Identical profit/balance/history logic for both demo and live modes.
     const profit = this.profitOf(p, closeLots);
     const price = this.closePriceOf(p);
     this.balance = round(this.balance + profit, 2);
@@ -646,7 +477,6 @@ export class Engine {
     if (closeLots >= p.lots - 1e-9) this.positions = this.positions.filter((x) => x !== p);
     else p.lots = round(p.lots - closeLots, 2);
     
-    // Keep the backend wallet/source of truth in sync for live mode.
     if (this.mode === "live") {
       if (p.backendId) {
         try {
@@ -669,78 +499,11 @@ export class Engine {
     return { ok: true };
   }
 
-  closeAll(filter?: "profit" | "loss") {
-    [...this.positions].forEach((p) => {
-      const pr = this.profitOf(p);
-      if (!filter || (filter === "profit" && pr > 0) || (filter === "loss" && pr < 0)) this.closePosition(p.ticket);
-    });
-  }
-
-  modifyPosition(ticket: number, sl: number, tp: number): Result {
-    const p = this.positions.find((x) => x.ticket === ticket);
-    if (!p) return this.fail(`Position #${ticket} not found`);
-    const d = this.spec(p.symbol).digits;
-    sl = round(sl || 0, d);
-    tp = round(tp || 0, d);
-    const err = this.checkStops(p.side, this.closePriceOf(p), sl, tp, p.symbol);
-    if (err) return this.fail(err);
-    p.sl = sl;
-    p.tp = tp;
-    this.log(`position #${ticket} modified: sl ${sl || "-"}, tp ${tp || "-"}`);
-    this.save();
-    this.emit();
-    return { ok: true };
-  }
-
-  cancelOrder(ticket: number): Result {
-    const o = this.orders.find((x) => x.ticket === ticket);
-    if (!o) return this.fail(`Order #${ticket} not found`);
-    this.orders = this.orders.filter((x) => x !== o);
-    this.log(`order #${ticket} ${typeLabel(o.type)} ${o.lots.toFixed(2)} ${o.symbol} canceled`);
-    this.save();
-    this.emit();
-    return { ok: true };
-  }
-
-  deposit(amountKes: number): Result {
-    if (!(amountKes > 0 && amountKes <= 1e7)) return this.fail("Invalid deposit amount");
-    const usd = amountKes / kesPerQuote("USD");
-
-    if (this.mode === "live") {
-      // Live deposits go to the real wallet via the backend route.
-      (async () => {
-        try {
-          await apiFetch("/forex/deposit", {
-            method: "POST",
-            body: JSON.stringify({ amount: amountKes, account_type: "live" }),
-          });
-          await this.fetchLiveBalance();
-        } catch (e) {
-          this.log("Live deposit failed", true);
-        }
-      })();
-      return { ok: true };
-    }
-
-    this.balance = round(this.balance + usd, 2);
-    this.history.unshift({
-      ticket: this.nextTicket++, symbol: "", side: "buy", lots: 0,
-      openPrice: 0, closePrice: 0, openTime: Date.now(), closeTime: Date.now(),
-      profit: usd, reason: "deposit",
-    });
-    this.log(`balance deposit ${usd.toFixed(2)} USD (KSh ${amountKes.toFixed(2)})`);
-    this.save();
-    this.emit();
-    return { ok: true };
-  }
-
   async setMode(mode: "demo" | "live") {
     const prev = this.mode;
     this.mode = mode;
     this.log(mode === "live" ? "Live trading enabled" : "Demo trading");
     if (mode === "live") {
-      // Always (re)fetch wallet/positions/history when entering live mode so the
-      // real balance and open trades are shown even if the engine was already live.
       await this.fetchLiveBalance();
       await this.fetchLivePositions();
       await this.fetchLiveHistory();
@@ -749,17 +512,6 @@ export class Engine {
     if (mode === "demo") {
       this.stopLiveBalancePolling();
     }
-    this.emit();
-  }
-
-  resetAccount() {
-    // Only reset demo account, never touch live wallet
-    this._demoBalance = START_BALANCE;
-    this._demoPositions = [];
-    this._demoOrders = [];
-    this._demoHistory = [];
-    this.log(`Demo account reset to ${START_BALANCE.toFixed(2)} USD`);
-    this.save();
     this.emit();
   }
 
@@ -772,20 +524,15 @@ export class Engine {
       const q = this.quotes[s.name];
       const rng = mulberry32(this.tickCount ^ s.name.charCodeAt(0));
 
-      // 1. Calculate Net Exposure & House Bias (B-Book)
       let houseBias = 0;
       if (this.exposureProvider) {
         const netExposure = this.exposureProvider(s.name);
-        if (netExposure !== 0) {
-          houseBias = -netExposure * 0.000001; // Push against the crowd
-        }
+        if (netExposure !== 0) houseBias = -netExposure * 0.000001; 
       }
 
-      // 2. Natural Market Movement
       const randomMove = gaussFrom(rng) * s.vol;
       let proposedBid = q.bid + randomMove + houseBias;
 
-      // 3. HARD SPIKE FILTER (Max 2.5x normal volatility per tick)
       const maxJump = s.vol * 2.5;
       if (Math.abs(proposedBid - q.bid) > maxJump) {
         proposedBid = q.bid + Math.sign(proposedBid - q.bid) * maxJump;
@@ -794,17 +541,14 @@ export class Engine {
       const prev = q.bid;
       const bid = round(Math.max(s.point, proposedBid), s.digits);
       
-      // 4. TIGHT SPREAD (No dynamic spreading)
       const spreadPts = s.spread; 
       const ask = round(bid + spreadPts * s.point, s.digits);
 
-      // Seamless handover: Smoothly drift towards target prices if set (from backend candles)
       if (q.targetBid !== undefined && q.targetAsk !== undefined) {
-        const driftFactor = 0.05; // 5% per tick = smooth drift over ~20 ticks (~4 seconds)
+        const driftFactor = 0.05; 
         q.bid = round(q.bid + (q.targetBid - q.bid) * driftFactor, s.digits);
         q.ask = round(q.ask + (q.targetAsk - q.ask) * driftFactor, s.digits);
         
-        // Check if we've reached the target (within 1 point)
         if (Math.abs(q.bid - q.targetBid) <= s.point && Math.abs(q.ask - q.targetAsk) <= s.point) {
           q.bid = q.targetBid;
           q.ask = q.targetAsk;
@@ -820,7 +564,6 @@ export class Engine {
       q.low = Math.min(q.low, bid);
       q.time = now;
 
-      // 5. Update Candles smoothly
       for (const tf of Object.keys(TIMEFRAMES) as TF[]) {
         const arr = this.candles[s.name][tf];
         const bucket = Math.floor(nowSec / TIMEFRAMES[tf]) * TIMEFRAMES[tf];
@@ -841,69 +584,15 @@ export class Engine {
         }
       }
     }
-    this.processTriggers();
     this.emit();
-    // Persist quote prices periodically so they survive refresh/sign-in.
-    // Saves every ~25 ticks (~5 seconds) to avoid excessive localStorage writes.
     if (this.tickCount - this.lastSaveTick >= 25) {
       this.lastSaveTick = this.tickCount;
       this.save();
     }
   }
 
-  private processTriggers() {
-    // Pending order triggers are simulated client-side even in live mode
-    // (the backend doesn't support pending orders via the API).
-    for (const o of [...this.orders]) {
-      const q = this.quotes[o.symbol];
-      const hit =
-        (o.type === "buy_limit" && q.ask <= o.price) ||
-        (o.type === "sell_limit" && q.bid >= o.price) ||
-        (o.type === "buy_stop" && q.ask >= o.price) ||
-        (o.type === "sell_stop" && q.bid <= o.price);
-      if (!hit) continue;
-      this.orders = this.orders.filter((x) => x !== o);
-      this.log(`order #${o.ticket} ${typeLabel(o.type)} triggered`);
-      const r = this.openPosition(o.symbol, isBuyType(o.type) ? "buy" : "sell", o.lots, o.sl, o.tp, o.ticket);
-      if (!r.ok) this.log(`order #${o.ticket} canceled: ${r.error}`, true);
-    }
-
-    // SL/TP/stopout only apply in demo mode — in live mode, the backend
-    // handles these on real market prices. Simulating them client-side
-    // would cause false triggers and 404 errors when closing.
-    if (this.mode === "live") return;
-
-    for (const p of [...this.positions]) {
-      const c = this.closePriceOf(p);
-      if (p.side === "buy") {
-        if (p.sl && c <= p.sl) this.closePosition(p.ticket, "sl");
-        else if (p.tp && c >= p.tp) this.closePosition(p.ticket, "tp");
-      } else {
-        if (p.sl && c >= p.sl) this.closePosition(p.ticket, "sl");
-        else if (p.tp && c <= p.tp) this.closePosition(p.ticket, "tp");
-      }
-    }
-
-    if (this.positions.length) {
-      const ml = this.marginLevel;
-      if (ml < MARGIN_CALL && !this.marginCallWarned) {
-        this.marginCallWarned = true;
-        this.log(`Margin call: margin level ${ml.toFixed(2)}%`, true);
-      }
-      if (ml >= MARGIN_CALL) this.marginCallWarned = false;
-
-      let guard = 0;
-      while (this.positions.length && this.marginLevel < STOP_OUT && guard++ < 50) {
-        const worst = [...this.positions].sort((a, b) => this.profitOf(a) - this.profitOf(b))[0];
-        this.closePosition(worst.ticket, "stopout");
-      }
-    }
-  }
-
-  // ─── Live Account API Integration ───
   async fetchLiveBalance(): Promise<void> {
     try {
-      // Fetch both account and rates in parallel via apiFetch (handles auth headers + API URL)
       const [accRes, ratesRes] = await Promise.all([
         apiFetch("/forex/account?account_type=live"),
         apiFetch("/forex/rates"),
@@ -913,11 +602,9 @@ export class Engine {
         if (data.success) {
           this.exchangeRate = ratesRes.ok ? (await ratesRes.json()).usdToKes ?? 130 : 130;
           const acc = data.account;
-          // Show the full wallet balance in "LIVE WALLET", not just free margin.
           const walletBal = Number(acc?.walletBalance ?? 0);
           const acctBal = Number(acc?.balance ?? acc?.equity ?? 0);
           this.liveKesBalance = walletBal > 0 ? walletBal : (acctBal > 0 ? acctBal : 0);
-          // Keep free margin available for UI that needs it.
           this.liveAvailableBalance = Number(acc?.availableBalance ?? 0);
           this.emit();
         }
@@ -964,7 +651,6 @@ export class Engine {
     this.instrumentsLoaded = true;
   }
 
-  // Fetch live positions from backend
   async fetchLivePositions(): Promise<void> {
     try {
       await this.ensureInstruments();
@@ -979,27 +665,30 @@ export class Engine {
               ticket = this.nextLiveTicket++;
               this.liveBackendToTicket.set(backendId, ticket);
             }
-            // Resolve symbol: try direct field, Supabase join (object/array/null), then instrument map
+            
+            const existing = this._livePositions.find(x => x.backendId === backendId);
+
             let instrSymbol = "";
             const fi = p.forex_instruments;
             if (Array.isArray(fi) && fi.length > 0) instrSymbol = fi[0]?.symbol ?? "";
             else if (fi && typeof fi === "object") instrSymbol = fi.symbol ?? "";
+            
             const rawSymbol = p.symbol || instrSymbol || this.instrumentsById.get(Number(p.instrument_id)) || p.instrument?.symbol || "";
-            // Backend stores symbols as "EUR/USD"; frontend SYMBOLS uses "EURUSD".
-            const symbol = rawSymbol.replace("/", "");
+            const finalSymbol = rawSymbol.replace("/", "") || existing?.symbol || "EURUSD"; 
+
             return {
               ticket,
-              symbol,
+              symbol: finalSymbol,
               side: p.side,
-              lots: Number(p.quantity) || Number(p.lots) || 0,
-              openPrice: Number(p.average_entry_price) || Number(p.open_price) || 0,
+              lots: Number(p.quantity) || Number(p.lots) || existing?.lots || 0,
+              openPrice: Number(p.average_entry_price) || Number(p.open_price) || existing?.openPrice || 0,
               openTime: new Date(p.opened_at).getTime() || Date.now(),
-              sl: Number(p.stop_loss) || 0,
-              tp: Number(p.take_profit) || 0,
+              sl: Number(p.stop_loss) || existing?.sl || 0,
+              tp: Number(p.take_profit) || existing?.tp || 0,
               backendId,
             };
           });
-          // Merge backend positions with existing local ones (don't wipe local trades)
+          
           const byBackendId = new Map(this._livePositions.map((x) => [x.backendId ?? "", x]));
           for (const m of mapped) byBackendId.set(m.backendId, m);
           this._livePositions = [...byBackendId.values()];
@@ -1011,7 +700,6 @@ export class Engine {
     }
   }
 
-  // Fetch live history from backend
   async fetchLiveHistory(): Promise<void> {
     try {
       const res = await apiFetch("/forex/history?mode=live&limit=100");
@@ -1038,7 +726,6 @@ export class Engine {
     }
   }
 
-  // Place order via backend API in live mode
   async placeOrderLive(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }, ticket: number): Promise<Result> {
     if (this.mode !== "live") return this.fail("Live trading not enabled");
 
@@ -1054,13 +741,9 @@ export class Engine {
       const entry = side === "buy" ? this.quotes[req.symbol].ask : this.quotes[req.symbol].bid;
       const entryPrice = round(entry, this.spec(req.symbol).digits);
 
-      // Calculate trade_amount in KES as MARGIN REQUIRED (not notional):
-      // 0.01 lots = $1.00 margin at 1:100 leverage
-      // marginUsd = lots * 100
       const marginUsd = lots * 100;
       const tradeAmountKes = marginUsd * this.exchangeRate;
 
-      // Convert frontend symbol format (EURUSD) to backend format (EUR/USD)
       const backendSymbol = req.symbol.length === 6
         ? `${req.symbol.slice(0, 3)}/${req.symbol.slice(3)}`
         : req.symbol;
@@ -1070,7 +753,7 @@ export class Engine {
         body: JSON.stringify({
           symbol: backendSymbol,
           side,
-          lots: req.lots, // 👈 SEND LOTS DIRECTLY
+          lots: req.lots, 
           order_type: "market",
           stop_loss: req.sl || undefined,
           take_profit: req.tp || undefined,
@@ -1084,10 +767,8 @@ export class Engine {
       }
 
       try {
-        // Backend returns position.id as a UUID string - use it as backendId
         const backendId = data.position?.id || data.order?.id;
 
-        // Update local position: store backend UUID so we can close it later
         const p = this.positions.find((x) => x.symbol === req.symbol && x.side === side);
         if (p && backendId) {
           p.backendId = String(backendId);
@@ -1097,7 +778,6 @@ export class Engine {
         console.error("Failed to parse backend response, but trade was likely successful", err);
       }
 
-      // Refresh balance after successful order
       await Promise.all([
         this.fetchLiveBalance(),
         this.fetchLivePositions(),
@@ -1109,55 +789,6 @@ export class Engine {
     }
   }
 
-  async closePositionLive(ticket: number, reason: CloseReason = "manual", lots?: number): Promise<Result> {
-    if (this.mode !== "live") return this.fail("Live trading not enabled");
-    const p = this.positions.find((x) => x.ticket === ticket);
-    if (!p) return this.fail(`Position #${ticket} not found`);
-    const closeLots = lots ? Math.min(round(lots, 2), p.lots) : p.lots;
-    if (closeLots < 0.01) return this.fail("Invalid volume (min 0.01 lots)");
-
-    // If we have a backend position ID, close it on the server
-    if (p.backendId) {
-      try {
-        const res = await apiFetch(`/forex/positions/${p.backendId}/close`, { method: "POST", body: JSON.stringify({ lots: closeLots }) });
-        const data = await res.json();
-        if (!res.ok) {
-          // If position already closed on backend, just remove locally
-          if (res.status >= 400 && res.status < 500) {
-            // Backend reject — remove locally anyway if 404 (already closed)
-          } else {
-            return this.fail(data.error || "Close order failed");
-          }
-        }
-      } catch (e) {
-        return this.fail("Network error closing position");
-      }
-    }
-
-    // Always update local state
-    if (closeLots >= p.lots - 1e-9) {
-      this.positions = this.positions.filter((x) => x !== p);
-    } else {
-      p.lots = round(p.lots - closeLots, 2);
-    }
-
-    const profit = this.profitOf(p, closeLots);
-    const closePrice = this.closePriceOf(p);
-    this.history.unshift({
-      ticket: p.ticket, symbol: p.symbol, side: p.side, lots: closeLots,
-      openPrice: p.openPrice, closePrice: closePrice,
-      openTime: p.openTime, closeTime: Date.now(),
-      profit, reason,
-    });
-
-    this.fetchLiveBalance();
-    await Promise.all([
-      this.fetchLivePositions(),
-      this.fetchLiveHistory()
-    ]);
-    this.emit();
-    return { ok: true, ticket };
-  }
   async placeOrder(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }): Promise<Result> {
     const s = this.spec(req.symbol);
     if (!s) return this.fail("Unknown symbol");
@@ -1170,12 +801,12 @@ export class Engine {
     if (req.type === "buy" || req.type === "sell") {
       const err = this.checkStops(side, side === "buy" ? q.ask : q.bid, sl, tp, req.symbol);
       if (err) return this.fail(err);
-      // Identical execution for demo and live: open locally first.
+      
       const res = this.openPosition(req.symbol, side, lots, sl, tp);
       if (!res.ok) return res;
       const ticket = res.ticket!;
       const p = this.positions.find((x) => x.ticket === ticket)!;
-      // Persist to backend for live mode (real money).
+      
       if (this.mode === "live") {
         try {
           const backendRes = await this.placeOrderLive({ ...req, symbol: req.symbol, lots, price: p.openPrice, sl, tp }, ticket);
