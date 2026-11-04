@@ -250,6 +250,7 @@ export class Engine {
 
   // Live mode state (real wallet)
   liveKesBalance = 0;
+  liveAvailableBalance = 0;
   exchangeRate = 130; // KES per USD
 
   // Getters/setters that return/set the active mode's data
@@ -902,12 +903,13 @@ export class Engine {
         const data = await accRes.json();
         if (data.success) {
           this.exchangeRate = ratesRes.ok ? (await ratesRes.json()).usdToKes ?? 130 : 130;
-          // Prefer available (free) balance, fall back to wallet/account balance/equity
           const acc = data.account;
-          const available = Number(acc?.availableBalance ?? 0);
+          // Show the full wallet balance in "LIVE WALLET", not just free margin.
           const walletBal = Number(acc?.walletBalance ?? 0);
           const acctBal = Number(acc?.balance ?? acc?.equity ?? 0);
-          this.liveKesBalance = available > 0 ? available : (walletBal > 0 ? walletBal : acctBal);
+          this.liveKesBalance = walletBal > 0 ? walletBal : (acctBal > 0 ? acctBal : 0);
+          // Keep free margin available for UI that needs it.
+          this.liveAvailableBalance = Number(acc?.availableBalance ?? 0);
           this.emit();
         }
       }

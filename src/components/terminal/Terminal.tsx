@@ -165,7 +165,7 @@ export function Terminal({ mode = "demo" }: { mode?: "demo" | "real" }) {
             <div className="flex justify-between"><span>Balance:</span> <span className="font-mono">{mode === "real" ? `$${money(e.liveBalance)}` : `$${money(e.balance)}`}</span></div>
             <div className="flex justify-between"><span>Equity:</span> <span className="font-mono">{mode === "real" ? `$${money(e.liveBalance + e.floating)}` : `$${money(e.equity)}`}</span></div>
             <div className="flex justify-between"><span>Margin:</span> <span className="font-mono">{mode === "real" ? `$${money(e.margin)}` : `$${money(e.margin)}`}</span></div>
-            <div className="flex justify-between"><span>Free Margin:</span> <span className="font-mono">{mode === "real" ? `$${money(e.liveBalance - e.margin)}` : `$${money(e.freeMargin)}`}</span></div>
+            <div className="flex justify-between"><span>Free Margin:</span> <span className="font-mono">{mode === "real" ? `$${money((e.liveAvailableBalance || 0) / (e.exchangeRate || 130))}` : `$${money(e.freeMargin)}`}</span></div>
           </div>
 
           {mobileTab === "trade" && (
