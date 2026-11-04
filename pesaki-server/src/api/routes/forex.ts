@@ -85,11 +85,10 @@ async function releaseReservation(userId: string, mode: "demo" | "live", margin:
   try { await releaseLockedFunds(userId, margin, true); } catch (err) { logger.error({ err, userId, margin, reason }, "Forex margin release failed"); }
 }
 
-// 👈 FIXED ZOD SCHEMA
 const orderSchema = z.object({
-  symbol: z.string().min(3), // Accepts EURUSD or EUR/USD
+  symbol: z.string().min(3),
   side: z.enum(["buy", "sell"]),
-  trade_amount: z.number().nonnegative().optional(), // Allows 0 if lots are provided
+  trade_amount: z.number().nonnegative().optional(),
   lots: z.number().positive().optional(),
   order_type: z.enum(["market", "limit", "stop", "stop_limit"]).default("market"),
   limit_price: z.number().positive().nullable().optional(),
@@ -103,7 +102,6 @@ const orderSchema = z.object({
 const bad = (reply: FastifyReply, error: string, code = 400) => reply.code(code === 403 ? 403 : 400).send({ success: false, error, code: "REJECTED" });
 
 export const forexRoutes = async (fastify: FastifyInstance) => {
-  // ─── SAFE INSTRUMENTS ───
   fastify.get("/instruments", async () => {
     const { data } = await supabase.from("forex_instruments").select("*").order("symbol");
     const rows = data?.length ? data : Object.values(INSTRUMENTS).map((s) => ({
@@ -114,10 +112,8 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     return { success: true, instruments: rows };
   });
 
-  // ─── SAFE MARKET ───
   fastify.get("/market", async () => ({ success: true, market: getEngine().describe() }));
 
-  // ─── SAFE RATES ───
   fastify.get("/rates", async () => {
     try {
       const rate = kesPerUnit("USD");
@@ -128,19 +124,13 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     }
   });
 
-  // ─── SAFE QUOTES ───
   fastify.get("/quotes", async (request, reply) => {
     const { symbols } = request.query as { symbols?: string };
     const list = (symbols ? symbols.split(",") : SYMBOLS).map((s) => s.toUpperCase());
     const engine = getEngine();
     const quotes: Quote[] = engine.quoteAll(list);
     if (quotes.length === 0) return reply.code(FX_ERRORS.MARKET_UNAVAILABLE).send({ success: false, error: "No supported pairs requested.", code: "MARKET_UNAVAILABLE" });
-    
-    return {
-      success: true, quotes,
-      watch: Object.fromEntries(quotes.map((q) => [q.symbol, engine.dailyChange(q.symbol)])),
-      state: engine.state,
-    };
+    return { success: true, quotes, watch: Object.fromEntries(quotes.map((q) => [q.symbol, engine.dailyChange(q.symbol)])), state: engine.state };
   });
 
   fastify.get("/quote/:symbol", async (request, reply) => {
@@ -150,24 +140,18 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     catch { return reply.code(FX_ERRORS.MARKET_UNAVAILABLE).send({ success: false, error: "Market price unavailable.", code: "MARKET_UNAVAILABLE" }); }
   });
 
-  // ─── SAFE CANDLES ───
   fastify.get("/candles", async (request, reply) => {
     const { symbol, interval, count } = request.query as { symbol?: string; interval?: string; count?: string };
     const sym = (symbol ?? "").toUpperCase();
     if (!sym || !getInstrument(sym)) return bad(reply, "A valid symbol is required.");
-    
     const iv = ((interval ?? "5m") as Interval) in INTERVALS ? ((interval ?? "5m") as Interval) : "5m";
     const n = Math.min(Math.max(Number(count) || 120, 1), 1000);
-
     try {
       const candles: Candle[] = getEngine().getCandles(sym, iv, n);
       return { success: true, symbol: sym, interval: iv, provider: "pesaki-engine", candles: candles.map((c) => ({ time: c.timestamp, timestamp: c.timestamp, open: c.open, high: c.high, low: c.low, close: c.close, tickVolume: c.tickVolume })) };
     } catch { return reply.code(FX_ERRORS.MARKET_UNAVAILABLE).send({ success: false, error: "Chart data unavailable.", code: "MARKET_UNAVAILABLE" }); }
   });
 
-  fastify.get("/candles/*", async (_request, reply) => reply.code(FX_ERRORS.INVALID_ORDER).send({ success: false, error: "Use /forex/candles?symbol=EUR%2FUSD&interval=5m&count=120", code: "INVALID_ORDER" }));
-
-  // ─── SAFE ACCOUNT ───
   fastify.get("/account", { preHandler: [verifyAuth] }, async (request, reply) => {
     const accountType = ((request.query as { account_type?: string }).account_type ?? "demo") as "demo" | "live";
     try {
@@ -213,10 +197,7 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
 
       return {
         success: true,
-        account: {
-          id: account.id, account_type: account.account_type, leverage: Number(account.leverage ?? 1), status: account.status,
-          balanceSource: isLive ? "pesaki_wallet" : "forex_demo_account", walletBalance, walletLocked, unrealized_pnl: unrealised, availableBalance, minTradeAmount: minTradeAmount(), ...state,
-        },
+        account: { id: account.id, account_type: account.account_type, leverage: Number(account.leverage ?? 1), status: account.status, balanceSource: isLive ? "pesaki_wallet" : "forex_demo_account", walletBalance, walletLocked, unrealized_pnl: unrealised, availableBalance, minTradeAmount: minTradeAmount(), ...state },
         positions: enriched, recentTransactions: ledger ?? [], realTradingEnabled: REAL_TRADING_ENABLED,
       };
     } catch (err) {
@@ -226,7 +207,6 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     }
   });
 
-  // ─── SAFE DEPOSIT ───
   fastify.post("/deposit", { preHandler: [verifyAuth] }, async (request, reply) => {
     const parsed = z.object({ amount: z.number().positive(), account_type: z.enum(["demo", "live"]).default("demo") }).safeParse(request.body);
     if (!parsed.success) return bad(reply, "Invalid deposit details");
@@ -255,7 +235,6 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     return { success: true, mode: "live", amount, balance: newBalance };
   });
 
-  // ─── SAFE RISK PREVIEW ───
   fastify.post("/risk/preview", async (request, reply) => {
     const parsed = z.object({ symbol: z.string(), side: z.enum(["buy", "sell"]), balance: z.number().positive(), risk_percent: z.number().positive().max(100), entry_price: z.number().positive(), stop_loss: z.number().positive() }).safeParse(request.body);
     if (!parsed.success) return bad(reply, "Invalid risk inputs");
@@ -274,7 +253,6 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     } catch { return reply.code(503).send({ success: false, error: "Market data unavailable." }); }
   });
 
-  // ─── SAFE ORDER PLACEMENT ───
   fastify.post("/orders", { preHandler: [verifyAuth] }, async (request, reply) => {
     const parsed = orderSchema.safeParse(request.body);
     if (!parsed.success) return bad(reply, "Invalid order details");
@@ -284,7 +262,6 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     let spec = getInstrument(body.symbol);
     if (!spec) return bad(reply, "Instrument not available");
     
-    // 👈 FORCE CONTRACT SIZE
     spec = { ...spec, contractSize: PESAKI_CONTRACT_SIZE };
 
     if (body.account_type === "live" && !REAL_TRADING_ENABLED) return bad(reply, "Live trading unavailable.", 403);
@@ -325,18 +302,15 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
       await ensureWalletExists(userId);
       const { data: wallet } = await supabase.from("wallets").select("balance, locked").eq("user_id", userId).maybeSingle();
       const walletBalance = Number(wallet?.balance ?? 0);
-      // Match demo mode: use full wallet balance (equity) for margin checks.
       freeMargin = walletBalance;
-      
       await supabase.from("forex_accounts").update({ balance: walletBalance, equity: walletBalance }).eq("id", account.id);
     } else {
       freeMargin = Number(account.equity ?? account.balance ?? 0) - Number(account.used_margin ?? 0);
     }
 
-   // 👈 BULLETPROOF MARGIN MATH (Bypasses broken marginForLots function)
    const requestedLots = body.lots || 0.01;
-   const marginUsd = requestedLots * 100; // 0.01 lots = $1.00 USD exactly like Demo
-   const marginKes = marginUsd * q2k;     // Convert to KES
+   const marginUsd = requestedLots * 100; 
+   const marginKes = marginUsd * q2k;     
 
    const sizing = {
      tradeAmount: marginKes,
@@ -371,7 +345,6 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
       reserved = true;
     }
 
-    // 1. Insert the Order
     const { data: orderRow, error: orderError } = await supabase.from("forex_orders").insert({
       user_id: userId,
       account_id: account.id,
@@ -386,7 +359,7 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
       stop_loss: body.stop_loss ?? null,
       take_profit: body.take_profit ?? null,
       idempotency_key: body.idempotency_key ?? null,
-      quote_to_kes: q2k, // Add this
+      quote_to_kes: q2k,
     }).select().single();
 
     if (orderError) {
@@ -397,7 +370,6 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
 
     let positionRow = null;
     if (!isPending) {
-      // 2. Insert the Position
       const { data: posRow, error: posError } = await supabase.from("forex_positions").insert({
         user_id: userId,
         account_id: account.id,
@@ -419,7 +391,6 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
       }
       positionRow = posRow;
 
-      // 3. Update Account Equity/Used Margin (Directly)
       await supabase.from("forex_accounts").update({
         used_margin: Number(account.used_margin ?? 0) + sizing.margin
       }).eq("id", account.id);
@@ -430,21 +401,12 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
     return {
       success: true,
       order: orderRow,
-      position: {
-        ...positionRow,
-        unrealised_pnl: 0, // Mock the PnL so the frontend doesn't crash
-        current_price: executedPrice,
-        quote_to_kes: q2k,
-        opened_at: new Date().toISOString(),
-        side: body.side, // Ensure side is present
-        symbol: body.symbol
-      },
+      position: { ...positionRow, unrealised_pnl: 0, current_price: executedPrice, quote_to_kes: q2k, opened_at: new Date().toISOString(), side: body.side, symbol: body.symbol },
       execution: { requestedPrice: quote.mid, executedPrice, slippage, spreadPips: quote.spreadPips },
       accountType: body.account_type
     };
   });
 
-  // ─── SAFE HISTORY & UTILS ───
   fastify.get("/orders", { preHandler: [verifyAuth] }, async (request) => {
     const { data } = await supabase.from("forex_orders").select("*").eq("user_id", request.user!.id).order("created_at", { ascending: false }).limit(100);
     return { success: true, orders: data ?? [] };
