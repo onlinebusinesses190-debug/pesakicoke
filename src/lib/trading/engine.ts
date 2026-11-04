@@ -244,17 +244,27 @@ export class Engine {
         `/forex/positions?mode=live`
       );
       if (data.success && data.positions) {
-        this._livePositions = data.positions.map((p: any) => ({
-          ticket: Number(p.id) || 0,
-          symbol: p.symbol || "",
-          side: p.side,
-          lots: Number(p.quantity) || Number(p.lots) || 0,
-          openPrice: Number(p.average_entry_price) || Number(p.open_price) || 0,
-          openTime: new Date(p.opened_at).getTime() || Date.now(),
-          sl: Number(p.stop_loss) || 0,
-          tp: Number(p.take_profit) || 0,
-          backendId: p.id,
-        }));
+        this._livePositions = data.positions.map((p: any) => {
+          // Resolve symbol: try direct field, Supabase join (object/array/null), then fallback
+          let instrSymbol = "";
+          const fi = p.forex_instruments;
+          if (Array.isArray(fi) && fi.length > 0) instrSymbol = fi[0]?.symbol ?? "";
+          else if (fi && typeof fi === "object") instrSymbol = fi.symbol ?? "";
+          const rawSymbol = p.symbol || instrSymbol || "";
+          // Backend stores symbols as "EUR/USD"; frontend SYMBOLS uses "EURUSD".
+          const symbol = rawSymbol.replace("/", "");
+          return {
+            ticket: Number(p.id) || 0,
+            symbol,
+            side: p.side,
+            lots: Number(p.quantity) || Number(p.lots) || 0,
+            openPrice: Number(p.average_entry_price) || Number(p.open_price) || 0,
+            openTime: new Date(p.opened_at).getTime() || Date.now(),
+            sl: Number(p.stop_loss) || 0,
+            tp: Number(p.take_profit) || 0,
+            backendId: p.id,
+          };
+        });
       }
     } catch (e) {
       console.error("Failed to fetch live positions:", e);
