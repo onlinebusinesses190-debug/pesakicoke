@@ -100,7 +100,7 @@ export class Engine {
   private lastTickTime = 0;
   private tickCount = 0;
   private lastSaveTick = 0;
-  private livePollInterval: number | null = null;
+  private _liveEntryPrices = new Map<string, number>();
 
   constructor() {
     this.load();
@@ -258,7 +258,10 @@ export class Engine {
             x.backendId === p.id || (x.symbol === symbol && x.side === p.side && Math.abs(x.lots - (Number(p.quantity) || Number(p.lots) || 0)) < 0.001)
           );
           const backendPrice = Number(p.average_entry_price) || Number(p.open_price) || 0;
-          const openPrice = backendPrice > 0 ? backendPrice : (existing?.openPrice || 0);
+          const mapKey = `${symbol}_${p.side}_${Number(p.quantity) || Number(p.lots) || 0}`;
+          const cachedPrice = this._liveEntryPrices.get(mapKey) || 0;
+          const openPrice = backendPrice > 0 ? backendPrice : (existing?.openPrice || cachedPrice || 0);
+          if (openPrice > 0) this._liveEntryPrices.set(mapKey, openPrice);
           
           return {
             ticket: Number(p.id) || 0,
@@ -371,8 +374,9 @@ export class Engine {
         });
         if (!res.success) return this.fail(res.error || "Order rejected");
         // Add optimistically so it shows immediately in UI
-        const newTicket = this.nextTicket++;
-        this._livePositions.push({
+         const newTicket = this.nextTicket++;
+         this._liveEntryPrices.set(`${req.symbol}_${side}_${lots}`, q.ask ?? q.bid);
+         this._livePositions.push({
           ticket: newTicket,
           symbol: req.symbol,
           side,
