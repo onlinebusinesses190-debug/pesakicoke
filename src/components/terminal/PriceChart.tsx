@@ -180,23 +180,6 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       const EAT_OFFSET = 3 * 60 * 60 * 1000;
       const eatDate = (ts: number) => new Date(ts + EAT_OFFSET);
       const p2 = (n: number) => String(n).padStart(2, "0");
-      const fmtLabel = (ts: number): string => {
-        const d = eatDate(ts);
-        const day = p2(d.getDate());
-        const month = d.toLocaleString("en", { month: "short" });
-        const year = d.getFullYear();
-        const hh = p2(d.getHours());
-        const mm = p2(d.getMinutes());
-        switch (tf) {
-          case "M1":
-          case "M5":
-          case "M15": return `${day} ${month} ${hh}:${mm}`;
-          case "H1":
-          case "H4": return `${day} ${month} ${hh}:00`;
-          case "D1": return `${day} ${month} ${year}`;
-          default: return `${day} ${month} ${hh}:${mm}`;
-        }
-      };
 
       ctx.textAlign = "center";
       const every = Math.max(1, Math.round(90 / sp));
@@ -206,6 +189,11 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         const xx = Math.round(xOf(i)) + 0.5;
         ctx.beginPath(); ctx.moveTo(xx, 0); ctx.lineTo(xx, plotH); ctx.stroke();
         const d = eatDate(bars[i].t * 1000);
+        const day = p2(d.getDate());
+        const month = d.toLocaleString("en", { month: "short" });
+        const year = d.getFullYear();
+        const hh = p2(d.getHours());
+        const mm = p2(d.getMinutes());
         const dayKey = `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
         const showDate = dayKey !== lastDay;
         const tooClose = xx > lastLabelX - 70;
