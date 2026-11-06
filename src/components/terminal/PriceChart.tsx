@@ -221,14 +221,30 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         if (yy < 0 || yy > plotH) return; // skip off-screen
         const color = p.side === "buy" ? "#1565c0" : "#c62828";
 
+        // Draw dashed entry line at exact price level
         ctx.strokeStyle = color;
         ctx.setLineDash([4, 3]);
         ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(0, Math.round(yy) + 0.5); ctx.lineTo(plotW, Math.round(yy) + 0.5); ctx.stroke();
         ctx.setLineDash([]);
 
+        // Draw small entry dot at left edge
         ctx.fillStyle = color;
         ctx.beginPath(); ctx.arc(6, Math.round(yy) + 0.5, 3, 0, Math.PI * 2); ctx.fill();
+
+        // Label positioned alongside the line
+        const pnl = engine.profitOf(p);
+        const txt = `${p.side.toUpperCase()} ${p.lots.toFixed(2)} @ ${openPrice.toFixed(spec.digits)}  ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD`;
+        const txtWidth = ctx.measureText(txt).width;
+
+        const labelY = yy;
+        const labelX = 4;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(labelX, labelY - 10, txtWidth + 8, 20);
+        
+        ctx.fillStyle = color;
+        ctx.font = "bold 11px Arial, sans-serif";
+        ctx.fillText(txt, labelX + 4, labelY);
       });
 
       const drawBox = (p: number, color: string, timerText: string = "") => {
