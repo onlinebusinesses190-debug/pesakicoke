@@ -101,6 +101,7 @@ export class Engine {
   private tickCount = 0;
   private lastSaveTick = 0;
   private _liveEntryPrices = new Map<string, number>();
+  _entryPriceMap = new Map<number | string, number>();
 
   constructor() {
     this.load();
@@ -262,6 +263,7 @@ export class Engine {
           const cachedPrice = this._liveEntryPrices.get(mapKey) || 0;
           const openPrice = backendPrice > 0 ? backendPrice : (existing?.openPrice || cachedPrice || 0);
           if (openPrice > 0) this._liveEntryPrices.set(mapKey, openPrice);
+          if (openPrice > 0) this._entryPriceMap.set(Number(p.id) || 0, openPrice);
           
           return {
             ticket: Number(p.id) || 0,
@@ -376,6 +378,7 @@ export class Engine {
         // Add optimistically so it shows immediately in UI
          const newTicket = this.nextTicket++;
          this._liveEntryPrices.set(`${req.symbol}_${side}_${lots}`, q.ask ?? q.bid);
+         this._entryPriceMap.set(newTicket, q.ask ?? q.bid);
          this._livePositions.push({
           ticket: newTicket,
           symbol: req.symbol,

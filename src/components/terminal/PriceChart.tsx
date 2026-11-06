@@ -216,7 +216,9 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
 
       const drawnLabelYs: number[] = []; 
       symbolPositions.forEach((p: any) => {
-        const openPrice = Number(p.openPrice) || 0;
+        const key = p.backendId || p.ticket;
+        const storedPrice = engine._entryPriceMap?.get?.(key);
+        const openPrice = (storedPrice && storedPrice > 0) ? storedPrice : (Number(p.openPrice) || 0);
         if (!openPrice) return;
         const yy = y(openPrice);
         const color = p.side === "buy" ? "#1565c0" : "#c62828";
