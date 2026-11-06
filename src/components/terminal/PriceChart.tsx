@@ -124,6 +124,15 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         return ps === targetSymbol;
       }) || [];
 
+      // Expand range to include position entry prices so markers are visible
+      for (const p of symbolPositions) {
+        const openPx = Number(p.openPrice) || 0;
+        if (openPx > 0) {
+          lo = Math.min(lo, openPx);
+          hi = Math.max(hi, openPx);
+        }
+      }
+
       if (view.current.offset === 0) { lo = Math.min(lo, smoothBid); hi = Math.max(hi, smoothAsk); }
 
       const priceRange = hi - lo;
@@ -218,7 +227,6 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       symbolPositions.forEach((p: any) => {
         const openPrice = Number(p.openPrice) || smoothMid;
         const yy = y(openPrice);
-        if (yy < 0 || yy > plotH) return; // skip off-screen
         const color = p.side === "buy" ? "#1565c0" : "#c62828";
 
         // Draw dashed entry line at exact price level
