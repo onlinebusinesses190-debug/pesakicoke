@@ -133,6 +133,15 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         }
       }
 
+      // Expand range to include position entry prices so markers are visible
+      for (const p of symbolPositions) {
+        const openPx = Number(p.openPrice) || 0;
+        if (openPx > 0) {
+          lo = Math.min(lo, openPx);
+          hi = Math.max(hi, openPx);
+        }
+      }
+
       if (view.current.offset === 0) { lo = Math.min(lo, smoothBid); hi = Math.max(hi, smoothAsk); }
 
       const priceRange = hi - lo;
@@ -225,7 +234,8 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
 
       const drawnLabelYs: number[] = []; 
       symbolPositions.forEach((p: any) => {
-        const openPrice = Number(p.openPrice) || smoothMid;
+        const openPrice = Number(p.openPrice) || 0;
+        if (!openPrice) return;
         const yy = y(openPrice);
         const color = p.side === "buy" ? "#1565c0" : "#c62828";
 
