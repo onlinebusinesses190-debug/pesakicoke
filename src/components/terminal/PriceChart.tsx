@@ -112,6 +112,11 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
           hi = Math.max(hi, b.h); 
         }
       }
+      // Fallback if all bars were filtered out
+      if (!isFinite(lo) || !isFinite(hi) || lo === hi) {
+        lo = smoothMid - spec.point * 100;
+        hi = smoothMid + spec.point * 100;
+      }
 
       const targetSymbol = symbol.replace("/", "").toUpperCase();
       const symbolPositions = engine.positions?.filter((x: any) => {
@@ -138,9 +143,17 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       const rawLo = lo - Math.max(pad, minRange), rawHi = hi + Math.max(pad, minRange);
 
       // Cap axis expansion so candles never fully collapse
-      const maxRange = Math.max(candleRange * 3, spec.point * 500);
-      const cappedLo = Math.max(rawLo, hi - maxRange);
-      const cappedHi = Math.min(rawHi, lo + maxRange);
+      const maxRange = Math.max(priceRange * 3, spec.point * 500);
+      let cappedLo = Math.max(rawLo, hi - maxRange);
+      let cappedHi = Math.min(rawHi, lo + maxRange);
+      // Safety: prevent inverted range
+      if (!isFinite(cappedLo) || !isFinite(cappedHi) || cappedLo >= cappedHi) {
+        cappedLo = rawLo; cappedHi = rawHi;
+      }
+      if (!isFinite(cappedLo) || !isFinite(cappedHi) || cappedLo >= cappedHi) {
+        cappedLo = smoothMid - spec.point * 200;
+        cappedHi = smoothMid + spec.point * 200;
+      }
 
       if (loRef.current === 0 && hiRef.current === 0) {
         loRef.current = cappedLo; hiRef.current = cappedHi;
