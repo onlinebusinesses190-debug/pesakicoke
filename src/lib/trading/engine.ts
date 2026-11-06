@@ -254,7 +254,9 @@ export class Engine {
           const symbol = rawSymbol.replace("/", "");
           
           // Preserve openPrice from existing position if backend returns 0
-          const existing = this._livePositions.find((x: any) => x.backendId === p.id);
+          const existing = this._livePositions.find((x: any) => 
+            x.backendId === p.id || (x.symbol === symbol && x.side === p.side && Math.abs(x.lots - (Number(p.quantity) || Number(p.lots) || 0)) < 0.001)
+          );
           const backendPrice = Number(p.average_entry_price) || Number(p.open_price) || 0;
           const openPrice = backendPrice > 0 ? backendPrice : (existing?.openPrice || 0);
           
