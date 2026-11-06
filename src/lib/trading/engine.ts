@@ -264,6 +264,8 @@ export class Engine {
           const openPrice = backendPrice > 0 ? backendPrice : (existing?.openPrice || cachedPrice || 0);
           if (openPrice > 0) this._liveEntryPrices.set(mapKey, openPrice);
           if (openPrice > 0) this._entryPriceMap.set(Number(p.id) || 0, openPrice);
+          // Always store from optimistic push too
+          this._entryPriceMap.set(Number(p.id) || 0, openPrice || 0);
           
           return {
             ticket: Number(p.id) || 0,
