@@ -30,6 +30,9 @@ const STORAGE_KEY = "mt-terminal-v1";
 const START_BALANCE = 10000;
 const STOP_OUT = 50;
 const MARGIN_CALL = 100;
+// Module-level cache: survives engine recreation
+const ENTRY_PRICE_CACHE = new Map<string, number>();
+export { ENTRY_PRICE_CACHE };
 export const round = (v: number, d: number) => Math.round(v * Math.pow(10, d)) / Math.pow(10, d);
 
 function mulberry32(seed: number): () => number { let a = seed >>> 0; return function () { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -267,6 +270,9 @@ export class Engine {
           if (openPrice > 0) this._entryPriceMap.set(p.id, openPrice);
           this._entryPriceMap.set(Number(p.id), openPrice);
           this._entryPriceMap.set(`${symbol}_${p.side}_${Number(p.quantity) || Number(p.lots) || 0}`, openPrice);
+          ENTRY_PRICE_CACHE.set(p.id, openPrice);
+          ENTRY_PRICE_CACHE.set(Number(p.id), openPrice);
+          ENTRY_PRICE_CACHE.set(`${symbol}_${p.side}_${Number(p.quantity) || Number(p.lots) || 0}`, openPrice);
           
           return {
             ticket: Number(p.id) || 0,
@@ -380,9 +386,12 @@ export class Engine {
         if (!res.success) return this.fail(res.error || "Order rejected");
         // Add optimistically so it shows immediately in UI
          const newTicket = this.nextTicket++;
-         this._liveEntryPrices.set(`${req.symbol}_${side}_${lots}`, q.ask ?? q.bid);
-         this._entryPriceMap.set(newTicket, q.ask ?? q.bid);
-         this._entryPriceMap.set(`${req.symbol}_${side}_${lots}`, q.ask ?? q.bid);
+         const ep = q.ask ?? q.bid;
+         this._liveEntryPrices.set(`${req.symbol}_${side}_${lots}`, ep);
+         this._entryPriceMap.set(newTicket, ep);
+         this._entryPriceMap.set(`${req.symbol}_${side}_${lots}`, ep);
+         ENTRY_PRICE_CACHE.set(newTicket, ep);
+         ENTRY_PRICE_CACHE.set(`${req.symbol}_${side}_${lots}`, ep);
          this._livePositions.push({
           ticket: newTicket,
           symbol: req.symbol,
@@ -422,5 +431,6 @@ export class Engine {
   }
 }
 
+// Module-level cache: survives engine recreation
 let instance: Engine | null = null;
 export function getEngine() { if (!instance) instance = new Engine(); return instance; }

@@ -218,10 +218,14 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       ctx.fillText(spec.desc || "", 8, 30);
 
       const drawnLabelYs: number[] = []; 
-      // Sync engine's persistent entry price map into module-level cache
+      // Sync engine's persistent entry price maps into module-level cache
       const ep = engine?._entryPriceMap;
       if (ep && typeof ep.forEach === "function") {
         ep.forEach((v: number, k: any) => { if (v > 0) MARKER_CACHE.set(k, v); });
+      }
+      const epc = engine?._ENTRY_PRICE_CACHE;
+      if (epc && typeof epc.forEach === "function") {
+        epc.forEach((v: number, k: any) => { if (v > 0) MARKER_CACHE.set(k, v); });
       }
       symbolPositions.forEach((p: any) => {
         const sym = (p.symbol || "").replace("/", "").toUpperCase();

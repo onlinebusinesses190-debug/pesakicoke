@@ -56,7 +56,10 @@ export function Terminal({ mode = "demo" }: { mode?: "demo" | "real" }) {
   }, [q?.bid]);
 
   const open = (d: DialogState) => { setDlgKey(k => k + 1); setDialog(d); };
-  const handleTrade = (direction: "buy" | "sell") => open({ mode: "new", symbol, type: direction, lots }); 
+  const handleTrade = (direction: "buy" | "sell") => {
+    // Execute immediately without showing the order sheet
+    e.placeOrder({ symbol, type: direction, lots });
+  }; 
   
   const totalFloatingPnl = e.positions.reduce((acc, p) => acc + e.profitOf(p), 0);
 
