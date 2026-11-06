@@ -119,6 +119,17 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         return ps === targetSymbol;
       }) || [];
 
+      // Include position entry prices so markers render at exact entry level
+      const candleRange = hi - lo;
+      const positionMargin = Math.max(candleRange * 0.5, spec.point * 100);
+      for (const p of symbolPositions) {
+        const openPx = Number(p.openPrice) || 0;
+        if (openPx > 0) {
+          lo = Math.min(lo, openPx - positionMargin);
+          hi = Math.max(hi, openPx + positionMargin);
+        }
+      }
+
       if (view.current.offset === 0) { lo = Math.min(lo, smoothBid); hi = Math.max(hi, smoothAsk); }
 
       const priceRange = hi - lo;
@@ -126,11 +137,16 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       const pad = priceRange * 0.05 || minRange; 
       const rawLo = lo - Math.max(pad, minRange), rawHi = hi + Math.max(pad, minRange);
 
+      // Cap axis expansion so candles never fully collapse
+      const maxRange = Math.max(candleRange * 3, spec.point * 500);
+      const cappedLo = Math.max(rawLo, hi - maxRange);
+      const cappedHi = Math.min(rawHi, lo + maxRange);
+
       if (loRef.current === 0 && hiRef.current === 0) {
-        loRef.current = rawLo; hiRef.current = rawHi;
+        loRef.current = cappedLo; hiRef.current = cappedHi;
       }
-      loRef.current += (rawLo - loRef.current) * 0.15;
-      hiRef.current += (rawHi - hiRef.current) * 0.15;
+      loRef.current += (cappedLo - loRef.current) * 0.15;
+      hiRef.current += (cappedHi - hiRef.current) * 0.15;
 
       const smoothLo = loRef.current;
       const smoothHi = hiRef.current;
@@ -160,22 +176,46 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         ctx.fillText(p.toFixed(spec.digits), plotW + 4, yy);
       }
 
+      // MT5-style X-axis date/time labels (EAT = UTC+3)
+      const EAT_OFFSET = 3 * 60 * 60 * 1000;
+      const eatDate = (ts: number) => new Date(ts + EAT_OFFSET);
+      const p2 = (n: number) => String(n).padStart(2, "0");
+      const fmtLabel = (ts: number): string => {
+        const d = eatDate(ts);
+        const day = p2(d.getDate());
+        const month = d.toLocaleString("en", { month: "short" });
+        const year = d.getFullYear();
+        const hh = p2(d.getHours());
+        const mm = p2(d.getMinutes());
+        switch (tf) {
+          case "M1":
+          case "M5":
+          case "M15": return `${day} ${month} ${hh}:${mm}`;
+          case "H1":
+          case "H4": return `${day} ${month} ${hh}:00`;
+          case "D1": return `${day} ${month} ${year}`;
+          default: return `${day} ${month} ${hh}:${mm}`;
+        }
+      };
+
       ctx.textAlign = "center";
       const every = Math.max(1, Math.round(90 / sp));
+      let lastDay = -1;
       let lastLabelX = -100;
       for (let i = bars.length - 1; i >= 0; i -= every) {
         const xx = Math.round(xOf(i)) + 0.5;
         ctx.beginPath(); ctx.moveTo(xx, 0); ctx.lineTo(xx, plotH); ctx.stroke();
-        if (lastLabelX - xx > 70) {
-          const d = new Date(bars[i].t * 1000);
-          const p2 = (n: number) => String(n).padStart(2, "0");
-          const day = p2(d.getDate());
-          const month = d.toLocaleString("en", { month: "short" });
-          const lbl = `${day} ${month} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+        const d = eatDate(bars[i].t * 1000);
+        const dayKey = `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
+        const showDate = dayKey !== lastDay;
+        const tooClose = xx > lastLabelX - 70;
+        if (showDate || !tooClose) {
+          const lbl = tf === "D1" ? `${day} ${month} ${year}` : (showDate ? `${day} ${month} ${hh}` : `${hh}:${mm}`);
           ctx.fillStyle = cText; 
-          ctx.fillText(lbl, xx, plotH + 12);
+          ctx.fillText(lbl, xx, plotH + 14);
           lastLabelX = xx;
         }
+        lastDay = dayKey;
       }
       ctx.textAlign = "left";
 
@@ -200,34 +240,39 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       const drawnLabelYs: number[] = []; 
       symbolPositions.forEach((p: any) => {
         const openPrice = Number(p.openPrice) || smoothMid;
-        let yy = y(openPrice);
-        let isOffScreen = false;
-        
-        if (yy < 0) { yy = 15; isOffScreen = true; }
-        else if (yy > plotH) { yy = plotH - 15; isOffScreen = true; }
-        
-        if (!isOffScreen) {
-          ctx.strokeStyle = p.side === "buy" ? "#1565c0" : "#c62828";
-          ctx.setLineDash([3, 3]);
-          ctx.beginPath(); ctx.moveTo(0, Math.round(yy) + 0.5); ctx.lineTo(plotW, Math.round(yy) + 0.5); ctx.stroke();
-          ctx.setLineDash([]);
-        }
+        const yy = y(openPrice);
+        const color = p.side === "buy" ? "#1565c0" : "#c62828";
 
-        let labelY = yy - 8;
-        while (drawnLabelYs.some((ly) => Math.abs(ly - labelY) < 16)) {
-          labelY += 16; 
+        // Draw dashed entry line at exact price level
+        ctx.strokeStyle = color;
+        ctx.setLineDash([4, 3]);
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(0, Math.round(yy) + 0.5); ctx.lineTo(plotW, Math.round(yy) + 0.5); ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Draw small entry dot at left edge
+        ctx.fillStyle = color;
+        ctx.beginPath(); ctx.arc(6, Math.round(yy) + 0.5, 3, 0, Math.PI * 2); ctx.fill();
+
+        // Label positioned alongside the line
+        const pnl = engine.profitOf(p);
+        const txt = `${p.side.toUpperCase()} ${p.lots.toFixed(2)} @ ${openPrice.toFixed(spec.digits)}  ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD`;
+        const txtWidth = ctx.measureText(txt).width;
+        
+        // Avoid label overlap with previous labels
+        let labelY = yy;
+        while (drawnLabelYs.some((ly) => Math.abs(ly - labelY) < 14)) {
+          labelY += 14;
         }
         drawnLabelYs.push(labelY);
 
-        const pnl = engine.profitOf(p);
-        const txt = `${p.side.toUpperCase()} ${p.lots.toFixed(2)}   ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD`;
-        const txtWidth = ctx.measureText(txt).width;
-        
+        const labelX = 4;
         ctx.fillStyle = "#ffffff";
-        ctx.fillRect(4, labelY - 8, txtWidth + 8, 16);
+        ctx.fillRect(labelX, labelY - 10, txtWidth + 8, 20);
         
-        ctx.fillStyle = p.side === "buy" ? "#1565c0" : "#c62828";
-        ctx.fillText(txt, 8, labelY);
+        ctx.fillStyle = color;
+        ctx.font = "bold 11px Arial, sans-serif";
+        ctx.fillText(txt, labelX + 4, labelY);
       });
 
       const drawBox = (p: number, color: string, timerText: string = "") => {
