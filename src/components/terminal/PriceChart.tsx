@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import type { TF } from "@/lib/trading/engine";
 import { TIMEFRAMES } from "@/lib/trading/engine";
 
+// Module-level cache: survives re-mounts and engine resets
+const MARKER_CACHE = new Map<string, number>();
+
 export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, chartType = "candle" }: { engine: any, symbol: string; tf: TF; zoom: number; showCrosshair?: boolean; showIndicators?: boolean; chartType?: "candle" | "line" }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -215,15 +218,18 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       ctx.fillText(spec.desc || "", 8, 30);
 
       const drawnLabelYs: number[] = []; 
+      // Sync engine's persistent entry price map into module-level cache
+      const ep = engine?._entryPriceMap;
+      if (ep && typeof ep.forEach === "function") {
+        ep.forEach((v: number, k: any) => { if (v > 0) MARKER_CACHE.set(k, v); });
+      }
       symbolPositions.forEach((p: any) => {
         const sym = (p.symbol || "").replace("/", "").toUpperCase();
         const lots = Number(p.lots);
-        const key = p.backendId || p.ticket;
-        const storedPrice = engine._entryPriceMap?.get?.(key) 
-          || engine._entryPriceMap?.get?.(Number(key)) 
-          || engine._entryPriceMap?.get?.(`${sym}_${p.side}_${lots}`)
-          || engine._liveEntryPrices?.get?.(`${sym}_${p.side}_${lots}`);
-        const openPrice = (storedPrice && storedPrice > 0) ? storedPrice : (Number(p.openPrice) || 0);
+        const key = `${sym}_${p.side}_${lots}`;
+        const cacheKey = p.backendId || p.ticket;
+        const cached = MARKER_CACHE.get(cacheKey) || MARKER_CACHE.get(key);
+        const openPrice = (cached && cached > 0) ? cached : (Number(p.openPrice) || 0);
         if (!openPrice) return;
         const yy = y(openPrice);
         const color = p.side === "buy" ? "#1565c0" : "#c62828";
