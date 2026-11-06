@@ -124,17 +124,6 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         return ps === targetSymbol;
       }) || [];
 
-      // Include position entry prices so markers render at exact entry level
-      const candleRange = hi - lo;
-      const positionMargin = Math.max(candleRange * 0.5, spec.point * 100);
-      for (const p of symbolPositions) {
-        const openPx = Number(p.openPrice) || 0;
-        if (openPx > 0) {
-          lo = Math.min(lo, openPx - positionMargin);
-          hi = Math.max(hi, openPx + positionMargin);
-        }
-      }
-
       if (view.current.offset === 0) { lo = Math.min(lo, smoothBid); hi = Math.max(hi, smoothAsk); }
 
       const priceRange = hi - lo;
@@ -142,24 +131,11 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       const pad = priceRange * 0.05 || minRange; 
       const rawLo = lo - Math.max(pad, minRange), rawHi = hi + Math.max(pad, minRange);
 
-      // Cap axis expansion so candles never fully collapse
-      const maxRange = Math.max(priceRange * 3, spec.point * 500);
-      let cappedLo = Math.max(rawLo, hi - maxRange);
-      let cappedHi = Math.min(rawHi, lo + maxRange);
-      // Safety: prevent inverted range
-      if (!isFinite(cappedLo) || !isFinite(cappedHi) || cappedLo >= cappedHi) {
-        cappedLo = rawLo; cappedHi = rawHi;
-      }
-      if (!isFinite(cappedLo) || !isFinite(cappedHi) || cappedLo >= cappedHi) {
-        cappedLo = smoothMid - spec.point * 200;
-        cappedHi = smoothMid + spec.point * 200;
-      }
-
       if (loRef.current === 0 && hiRef.current === 0) {
-        loRef.current = cappedLo; hiRef.current = cappedHi;
+        loRef.current = rawLo; hiRef.current = rawHi;
       }
-      loRef.current += (cappedLo - loRef.current) * 0.15;
-      hiRef.current += (cappedHi - hiRef.current) * 0.15;
+      loRef.current += (rawLo - loRef.current) * 0.15;
+      hiRef.current += (rawHi - hiRef.current) * 0.15;
 
       const smoothLo = loRef.current;
       const smoothHi = hiRef.current;
@@ -242,38 +218,17 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       symbolPositions.forEach((p: any) => {
         const openPrice = Number(p.openPrice) || smoothMid;
         const yy = y(openPrice);
+        if (yy < 0 || yy > plotH) return; // skip off-screen
         const color = p.side === "buy" ? "#1565c0" : "#c62828";
 
-        // Draw dashed entry line at exact price level
         ctx.strokeStyle = color;
         ctx.setLineDash([4, 3]);
         ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(0, Math.round(yy) + 0.5); ctx.lineTo(plotW, Math.round(yy) + 0.5); ctx.stroke();
         ctx.setLineDash([]);
 
-        // Draw small entry dot at left edge
         ctx.fillStyle = color;
         ctx.beginPath(); ctx.arc(6, Math.round(yy) + 0.5, 3, 0, Math.PI * 2); ctx.fill();
-
-        // Label positioned alongside the line
-        const pnl = engine.profitOf(p);
-        const txt = `${p.side.toUpperCase()} ${p.lots.toFixed(2)} @ ${openPrice.toFixed(spec.digits)}  ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD`;
-        const txtWidth = ctx.measureText(txt).width;
-        
-        // Avoid label overlap with previous labels
-        let labelY = yy;
-        while (drawnLabelYs.some((ly) => Math.abs(ly - labelY) < 14)) {
-          labelY += 14;
-        }
-        drawnLabelYs.push(labelY);
-
-        const labelX = 4;
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(labelX, labelY - 10, txtWidth + 8, 20);
-        
-        ctx.fillStyle = color;
-        ctx.font = "bold 11px Arial, sans-serif";
-        ctx.fillText(txt, labelX + 4, labelY);
       });
 
       const drawBox = (p: number, color: string, timerText: string = "") => {
