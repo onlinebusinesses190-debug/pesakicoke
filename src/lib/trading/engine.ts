@@ -32,7 +32,8 @@ const STOP_OUT = 50;
 const MARGIN_CALL = 100;
 // Module-level cache: survives engine recreation
 const ENTRY_PRICE_CACHE = new Map<string, number>();
-export { ENTRY_PRICE_CACHE };
+const ENTRY_SIDE_CACHE = new Map<string, string>();
+export { ENTRY_PRICE_CACHE, ENTRY_SIDE_CACHE };
 export const round = (v: number, d: number) => Math.round(v * Math.pow(10, d)) / Math.pow(10, d);
 
 function mulberry32(seed: number): () => number { let a = seed >>> 0; return function () { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -248,7 +249,7 @@ export class Engine {
         `/forex/positions?mode=live`
       );
       if (data.success && data.positions) {
-        this._livePositions = data.positions.map((p: any) => {
+        const backendPositions = data.positions.map((p: any) => {
           // Resolve symbol
           let instrSymbol = "";
           const fi = p.forex_instruments;
@@ -270,9 +271,15 @@ export class Engine {
           if (openPrice > 0) this._entryPriceMap.set(p.id, openPrice);
           this._entryPriceMap.set(Number(p.id), openPrice);
           this._entryPriceMap.set(`${symbol}_${p.side}_${Number(p.quantity) || Number(p.lots) || 0}`, openPrice);
-          ENTRY_PRICE_CACHE.set(p.id, openPrice);
-          ENTRY_PRICE_CACHE.set(Number(p.id), openPrice);
-          ENTRY_PRICE_CACHE.set(`${symbol}_${p.side}_${Number(p.quantity) || Number(p.lots) || 0}`, openPrice);
+          // Only cache non-zero prices — never overwrite a good price with 0
+          if (openPrice > 0) {
+            ENTRY_PRICE_CACHE.set(p.id, openPrice);
+            ENTRY_PRICE_CACHE.set(Number(p.id), openPrice);
+            ENTRY_PRICE_CACHE.set(`${symbol}_${p.side}_${Number(p.quantity) || Number(p.lots) || 0}`, openPrice);
+            ENTRY_SIDE_CACHE.set(p.id, p.side);
+            ENTRY_SIDE_CACHE.set(Number(p.id), p.side);
+            ENTRY_SIDE_CACHE.set(`${symbol}_${p.side}_${Number(p.quantity) || Number(p.lots) || 0}`, p.side);
+          }
           
           return {
             ticket: Number(p.id) || 0,
@@ -286,6 +293,11 @@ export class Engine {
             backendId: p.id,
           };
         });
+        // MERGE: keep optimistic positions without backendId so markers don't vanish
+        // if the backend hasn't processed the order yet (race condition)
+        const backendIds = new Set(backendPositions.map((x: any) => x.backendId));
+        const pending = this._livePositions.filter((x: any) => !x.backendId || !backendIds.has(x.backendId));
+        this._livePositions = [...backendPositions, ...pending];
       }
     } catch (e) {
       console.error("Failed to fetch live positions:", e);
@@ -385,13 +397,15 @@ export class Engine {
         });
         if (!res.success) return this.fail(res.error || "Order rejected");
         // Add optimistically so it shows immediately in UI
-         const newTicket = this.nextTicket++;
-         const ep = q.ask ?? q.bid;
-         this._liveEntryPrices.set(`${req.symbol}_${side}_${lots}`, ep);
-         this._entryPriceMap.set(newTicket, ep);
-         this._entryPriceMap.set(`${req.symbol}_${side}_${lots}`, ep);
-         ENTRY_PRICE_CACHE.set(newTicket, ep);
-         ENTRY_PRICE_CACHE.set(`${req.symbol}_${side}_${lots}`, ep);
+const newTicket = this.nextTicket++;
+          const ep = q.ask ?? q.bid;
+          this._liveEntryPrices.set(`${req.symbol}_${side}_${lots}`, ep);
+          this._entryPriceMap.set(newTicket, ep);
+          this._entryPriceMap.set(`${req.symbol}_${side}_${lots}`, ep);
+          ENTRY_PRICE_CACHE.set(newTicket, ep);
+          ENTRY_PRICE_CACHE.set(`${req.symbol}_${side}_${lots}`, ep);
+          ENTRY_SIDE_CACHE.set(newTicket, side);
+          ENTRY_SIDE_CACHE.set(`${req.symbol}_${side}_${lots}`, side);
          this._livePositions.push({
           ticket: newTicket,
           symbol: req.symbol,

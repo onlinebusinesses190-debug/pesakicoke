@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { TF } from "@/lib/trading/engine";
-import { TIMEFRAMES } from "@/lib/trading/engine";
+import { TIMEFRAMES, ENTRY_PRICE_CACHE, ENTRY_SIDE_CACHE } from "@/lib/trading/engine";
 
 // Module-level cache: survives re-mounts and engine resets
 const MARKER_CACHE = new Map<string, number>();
+const MARKER_SIDE_CACHE = new Map<string, string>();
 
 export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, chartType = "candle" }: { engine: any, symbol: string; tf: TF; zoom: number; showCrosshair?: boolean; showIndicators?: boolean; chartType?: "candle" | "line" }) {
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -223,9 +224,11 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       if (ep && typeof ep.forEach === "function") {
         ep.forEach((v: number, k: any) => { if (v > 0) MARKER_CACHE.set(k, v); });
       }
-      const epc = engine?._ENTRY_PRICE_CACHE;
-      if (epc && typeof epc.forEach === "function") {
-        epc.forEach((v: number, k: any) => { if (v > 0) MARKER_CACHE.set(k, v); });
+      if (ENTRY_PRICE_CACHE && typeof ENTRY_PRICE_CACHE.forEach === "function") {
+        ENTRY_PRICE_CACHE.forEach((v: number, k: any) => { if (v > 0) MARKER_CACHE.set(k, v); });
+      }
+      if (ENTRY_SIDE_CACHE && typeof ENTRY_SIDE_CACHE.forEach === "function") {
+        ENTRY_SIDE_CACHE.forEach((v: string, k: any) => { MARKER_SIDE_CACHE.set(k, v); });
       }
       symbolPositions.forEach((p: any) => {
         const sym = (p.symbol || "").replace("/", "").toUpperCase();
@@ -259,6 +262,33 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(labelX, labelY - 10, txtWidth + 8, 20);
         
+        ctx.fillStyle = color;
+        ctx.font = "bold 11px Arial, sans-serif";
+        ctx.fillText(txt, labelX + 4, labelY);
+      });
+
+      // Also draw cached markers for positions not yet in the array (race condition)
+      MARKER_CACHE.forEach((openPrice, cacheKey) => {
+        if (!openPrice) return;
+        const alreadyDrawn = symbolPositions.some((p: any) => (p.backendId || p.ticket) === cacheKey);
+        if (alreadyDrawn) return;
+        const side = MARKER_SIDE_CACHE.get(cacheKey) || "buy";
+        const color = side === "buy" ? "#1565c0" : "#c62828";
+        const yy = y(openPrice);
+        if (yy < 0 || yy > plotH) return;
+        ctx.strokeStyle = color;
+        ctx.setLineDash([4, 3]);
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(0, Math.round(yy) + 0.5); ctx.lineTo(plotW, Math.round(yy) + 0.5); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = color;
+        ctx.beginPath(); ctx.arc(6, Math.round(yy) + 0.5, 3, 0, Math.PI * 2); ctx.fill();
+        const txt = `${side.toUpperCase()} @ ${openPrice.toFixed(spec.digits)}`;
+        const txtWidth = ctx.measureText(txt).width;
+        const labelY = yy;
+        const labelX = 4;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(labelX, labelY - 10, txtWidth + 8, 20);
         ctx.fillStyle = color;
         ctx.font = "bold 11px Arial, sans-serif";
         ctx.fillText(txt, labelX + 4, labelY);
