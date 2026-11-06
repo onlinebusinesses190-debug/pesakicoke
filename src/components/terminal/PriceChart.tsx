@@ -216,8 +216,8 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
 
       const drawnLabelYs: number[] = []; 
       symbolPositions.forEach((p: any) => {
-        // Use current live price so marker always appears where candlesticks are
-        const openPrice = smoothMid;
+        const openPrice = Number(p.openPrice) || 0;
+        if (!openPrice) return;
         const yy = y(openPrice);
         const color = p.side === "buy" ? "#1565c0" : "#c62828";
 
