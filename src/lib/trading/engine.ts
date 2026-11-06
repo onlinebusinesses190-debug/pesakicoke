@@ -245,20 +245,25 @@ export class Engine {
       );
       if (data.success && data.positions) {
         this._livePositions = data.positions.map((p: any) => {
-          // Resolve symbol: try direct field, Supabase join (object/array/null), then fallback
+          // Resolve symbol
           let instrSymbol = "";
           const fi = p.forex_instruments;
           if (Array.isArray(fi) && fi.length > 0) instrSymbol = fi[0]?.symbol ?? "";
           else if (fi && typeof fi === "object") instrSymbol = fi.symbol ?? "";
           const rawSymbol = p.symbol || instrSymbol || "";
-          // Backend stores symbols as "EUR/USD"; frontend SYMBOLS uses "EURUSD".
           const symbol = rawSymbol.replace("/", "");
+          
+          // Preserve openPrice from existing position if backend returns 0
+          const existing = this._livePositions.find((x: any) => x.backendId === p.id);
+          const backendPrice = Number(p.average_entry_price) || Number(p.open_price) || 0;
+          const openPrice = backendPrice > 0 ? backendPrice : (existing?.openPrice || 0);
+          
           return {
             ticket: Number(p.id) || 0,
             symbol,
             side: p.side,
             lots: Number(p.quantity) || Number(p.lots) || 0,
-            openPrice: Number(p.average_entry_price) || Number(p.open_price) || 0,
+            openPrice,
             openTime: new Date(p.opened_at).getTime() || Date.now(),
             sl: Number(p.stop_loss) || 0,
             tp: Number(p.take_profit) || 0,
