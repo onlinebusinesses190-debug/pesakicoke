@@ -263,9 +263,10 @@ export class Engine {
           const cachedPrice = this._liveEntryPrices.get(mapKey) || 0;
           const openPrice = backendPrice > 0 ? backendPrice : (existing?.openPrice || cachedPrice || 0);
           if (openPrice > 0) this._liveEntryPrices.set(mapKey, openPrice);
-          if (openPrice > 0) this._entryPriceMap.set(Number(p.id) || 0, openPrice);
-          // Always store from optimistic push too
-          this._entryPriceMap.set(Number(p.id) || 0, openPrice || 0);
+          // Store under both string and number keys so chart lookup always matches
+          if (openPrice > 0) this._entryPriceMap.set(p.id, openPrice);
+          this._entryPriceMap.set(Number(p.id), openPrice);
+          this._entryPriceMap.set(`${symbol}_${p.side}_${Number(p.quantity) || Number(p.lots) || 0}`, openPrice);
           
           return {
             ticket: Number(p.id) || 0,
@@ -292,7 +293,7 @@ export class Engine {
       await this.fetchLivePositions();
     };
     tick();
-    this.livePollInterval = window.setInterval(tick, 30000);
+    this.livePollInterval = window.setInterval(tick, 120000); // 2 min — reduces position churn
   }
 
   private stopLiveBalancePolling(): void {
@@ -381,6 +382,7 @@ export class Engine {
          const newTicket = this.nextTicket++;
          this._liveEntryPrices.set(`${req.symbol}_${side}_${lots}`, q.ask ?? q.bid);
          this._entryPriceMap.set(newTicket, q.ask ?? q.bid);
+         this._entryPriceMap.set(`${req.symbol}_${side}_${lots}`, q.ask ?? q.bid);
          this._livePositions.push({
           ticket: newTicket,
           symbol: req.symbol,

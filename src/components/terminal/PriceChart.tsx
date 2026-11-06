@@ -216,9 +216,13 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
 
       const drawnLabelYs: number[] = []; 
       symbolPositions.forEach((p: any) => {
+        const sym = (p.symbol || "").replace("/", "").toUpperCase();
+        const lots = Number(p.lots);
         const key = p.backendId || p.ticket;
         const storedPrice = engine._entryPriceMap?.get?.(key) 
-          || engine._liveEntryPrices?.get?.(`${(p.symbol||"").replace("/","")}_${p.side}_${Number(p.lots)}`);
+          || engine._entryPriceMap?.get?.(Number(key)) 
+          || engine._entryPriceMap?.get?.(`${sym}_${p.side}_${lots}`)
+          || engine._liveEntryPrices?.get?.(`${sym}_${p.side}_${lots}`);
         const openPrice = (storedPrice && storedPrice > 0) ? storedPrice : (Number(p.openPrice) || 0);
         if (!openPrice) return;
         const yy = y(openPrice);
