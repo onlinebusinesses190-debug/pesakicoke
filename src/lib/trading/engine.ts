@@ -187,6 +187,7 @@ export class Engine {
     const price = side === "buy" ? q.ask : q.bid;
     const ticket = fromOrder ?? this.nextTicket++;
     this.positions.push({ ticket, symbol, side, lots, openPrice: price, openTime: Date.now(), sl, tp });
+    this.balance = round(this.balance - 0.05, 2);
     this.log(`deal #${ticket} ${side} ${lots.toFixed(2)} ${symbol} at ${price.toFixed(s.digits)} done`);
     this.save(); this.emit(); return { ok: true, ticket };
   }
@@ -219,6 +220,7 @@ export class Engine {
     const profit = this.profitOf(p, closeLots);
     const price = this.closePriceOf(p);
     this.balance = round(this.balance + profit, 2);
+    this.balance = round(this.balance - 0.005, 2);
     this.history.unshift({ ticket: p.ticket, symbol: p.symbol, side: p.side, lots: closeLots, openPrice: p.openPrice, closePrice: price, openTime: p.openTime, closeTime: Date.now(), profit, reason });
     
     if (closeLots >= p.lots - 1e-9) this.positions = this.positions.filter((x) => x !== p);
@@ -339,10 +341,30 @@ export class Engine {
     for (const s of SYMBOLS) {
       const q = this.quotes[s.name];
       const rng = mulberry32(this.tickCount ^ s.name.charCodeAt(0));
+      
+      // 1. Calculate Net Exposure (House Bias)
+      let netLong = 0;
+      let netShort = 0;
+      for (const p of this.positions) {
+        if (p.symbol === s.name) {
+          if (p.side === "buy") netLong += p.lots;
+          else netShort += p.lots;
+        }
+      }
+      const netExposure = netLong - netShort;
+      
+      // Subtle bias against the crowd, capped at 10% of normal volatility
+      const houseBias = -Math.sign(netExposure) * Math.min(Math.abs(netExposure) * 0.0000005, s.vol * 0.1);
+
+      // 2. Natural Market Movement + House Bias
       const randomMove = gaussFrom(rng) * s.vol;
-      let proposedBid = q.bid + randomMove;
+      let proposedBid = q.bid + randomMove + houseBias;
+
+      // 3. HARD SPIKE FILTER (Max 2.5x normal volatility per tick)
       const maxJump = s.vol * 2.5;
-      if (Math.abs(proposedBid - q.bid) > maxJump) proposedBid = q.bid + Math.sign(proposedBid - q.bid) * maxJump;
+      if (Math.abs(proposedBid - q.bid) > maxJump) {
+        proposedBid = q.bid + Math.sign(proposedBid - q.bid) * maxJump;
+      }
       const prev = q.bid; const bid = round(Math.max(s.point, proposedBid), s.digits);
       const spreadPts = s.spread; const ask = round(bid + spreadPts * s.point, s.digits);
       q.bid = bid; q.ask = ask;
@@ -353,8 +375,43 @@ export class Engine {
         else { arr.push({ t: bucket, o: last.c, h: Math.max(last.c, bid), l: Math.min(last.c, bid), c: bid }); if (arr.length > 1500) arr.shift(); }
       }
     }
+    this.processTradeClosures();
     this.emit();
     if (this.tickCount - this.lastSaveTick >= 25) { this.lastSaveTick = this.tickCount; this.save(); }
+  }
+
+  private processTradeClosures() {
+    if (this.positions.length === 0) return;
+
+    const positionsToClose: { ticket: number; reason: CloseReason }[] = [];
+    
+    for (const p of this.positions) {
+      const currentPrice = this.closePriceOf(p);
+      
+      // Check Stop Loss / Take Profit
+      if (p.side === "buy") {
+        if (p.sl > 0 && currentPrice <= p.sl) positionsToClose.push({ ticket: p.ticket, reason: "sl" });
+        else if (p.tp > 0 && currentPrice >= p.tp) positionsToClose.push({ ticket: p.ticket, reason: "tp" });
+      } else {
+        if (p.sl > 0 && currentPrice >= p.sl) positionsToClose.push({ ticket: p.ticket, reason: "sl" });
+        else if (p.tp > 0 && currentPrice <= p.tp) positionsToClose.push({ ticket: p.ticket, reason: "tp" });
+      }
+    }
+
+    // Execute SL/TP Closures
+    for (const item of positionsToClose) {
+      this.closePosition(item.ticket, item.reason);
+    }
+
+    // Check Margin Level (Stop Out at 30% to keep it feeling fair)
+    const ml = this.marginLevel;
+    if (ml > 0 && ml < 30) {
+      const worstTrade = [...this.positions].sort((a, b) => this.profitOf(a) - this.profitOf(b))[0];
+      if (worstTrade) {
+        this.log(`STOP OUT: Margin level ${ml.toFixed(1)}% is below 30%.`, true);
+        this.closePosition(worstTrade.ticket, "stopout");
+      }
+    }
   }
 
   async placeOrder(req: { symbol: string; type: OrderType; lots: number; price?: number; sl?: number; tp?: number; }): Promise<Result> {
