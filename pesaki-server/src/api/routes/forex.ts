@@ -32,6 +32,7 @@ import { ensureWalletExists, releaseLockedFunds } from "../../wallet/service";
 const DEMO_START_BALANCE = 100_000;
 const COMMISSION_RATE = 0.005; // 0.5% PESAKI Commission
 const PESAKI_CONTRACT_SIZE = 10000; // Custom contract size for $1 margin per 0.01 lot
+const round = (v: number, d: number) => Math.round(v * Math.pow(10, d)) / Math.pow(10, d);
 
 const REAL_TRADING_ENABLED = process.env.PESAKI_FX_REAL_ENABLED === "true";
 
@@ -526,30 +527,72 @@ async function closePosition(request: FastifyRequest, reply: FastifyReply, posit
       return reply.code(503).send({ success: false, error: "Market unavailable.", code: "MARKET_DATA_UNAVAILABLE" }); 
     }
 
-    const { data: result, error: closeError } = await supabase.rpc("forex_close_position", { 
-      p_user_id: userId, 
-      p_position_id: positionId, 
-      p_close_lots: closeLots, 
-      p_exit_price: exitPrice, 
-      p_quote_to_kes: q2k 
-    });
+    // BYPASS BROKEN RPC: do the close directly with Supabase inserts/updates
+    const full = closeLots >= remaining - 1e-9;
+    const delta = position.side === "buy" 
+      ? exitPrice - Number(position.average_entry_price)
+      : Number(position.average_entry_price) - exitPrice;
+    const pnl = round(closeLots * spec.contractSize * delta * q2k, 4);
+    const releasedMargin = full 
+      ? Number(position.margin ?? 0)
+      : round(Number(position.margin ?? 0) * closeLots / remaining, 4);
+    const balance = round(Number(position.balance ?? 0) + pnl, 4);
 
-    if (closeError) {
-      const reason = closeError.message ?? "";
-      logger.error({ err: reason, positionId, closeLots, exitPrice, q2k }, "Forex close RPC failed");
-      if (reason.includes("POSITION_NOT_FOUND")) return reply.code(404).send({ success: false, error: "Position not found" });
-      if (reason.includes("POSITION_ALREADY_CLOSED")) return reply.code(409).send({ success: false, error: "Position already closed" });
-      if (reason.includes("OVER_CLOSE")) return bad(reply, "Cannot close more than open position");
-      return reply.code(500).send({ success: false, error: `Close failed: ${reason}`, code: "EXECUTION_FAILED" });
-    }
+    // Update position
+    const { error: posErr } = await supabase
+      .from("forex_positions")
+      .update({
+        quantity: full ? 0 : round(remaining - closeLots, 4),
+        realized_pnl: round(Number(position.realized_pnl ?? 0) + pnl, 4),
+        closed_at: full ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", positionId);
+    if (posErr) throw posErr;
 
-    const { data: updated } = await supabase.from("forex_positions").select("*").eq("id", positionId).maybeSingle();
-    const { data: accountRow } = await supabase.from("forex_accounts").select("account_type").eq("id", position.account_id).maybeSingle();
+    // Insert transaction
+    const { error: txErr } = await supabase
+      .from("forex_transactions")
+      .insert({
+        user_id: userId,
+        account_id: position.account_id,
+        position_id: positionId,
+        type: "realized_pnl",
+        amount: pnl,
+        balance_after: balance,
+        status: "completed",
+        reference: full ? "close" : "partial_close",
+        note: `${spec.symbol} ${position.side} ${closeLots} lots @ ${exitPrice}`,
+      });
+    if (txErr) throw txErr;
+
+    // Update account
+    const { data: acctRow } = await supabase
+      .from("forex_accounts")
+      .select("balance, used_margin")
+      .eq("id", position.account_id)
+      .maybeSingle();
+    const curBalance = Number(acctRow?.balance ?? 0);
+    const curMargin = Number(acctRow?.used_margin ?? 0);
+    const { error: acctErr } = await supabase
+      .from("forex_accounts")
+      .update({
+        balance: round(curBalance + pnl, 4),
+        used_margin: Math.max(0, round(curMargin - releasedMargin, 4)),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", position.account_id);
+    if (acctErr) throw acctErr;
+
+    // Live settlement
+    const { data: accountRow } = await supabase
+      .from("forex_accounts")
+      .select("account_type")
+      .eq("id", position.account_id)
+      .maybeSingle();
     const positionMode = (accountRow?.account_type === "live" ? "live" : "demo") as "live" | "demo";
 
     if (positionMode === "live") {
-      const closedFraction = closeLots / remaining;
-      const releasedMargin = Number((Number(position.margin ?? 0) * closedFraction).toFixed(4));
       const legs = settlementLegs({ 
         side: position.side, 
         units: closeLots * spec.contractSize,
@@ -558,25 +601,28 @@ async function closePosition(request: FastifyRequest, reply: FastifyReply, posit
         quoteToKes: q2k, 
         margin: releasedMargin 
       });
-      
       const closingCommissionKes = releasedMargin * COMMISSION_RATE; 
       const netProfitAfterCommission = legs.profit - legs.loss - closingCommissionKes;
-      
       const settlement = await settleReal(userId, legs.marginRelease, netProfitAfterCommission, `close:${positionId}`);
-      
       if (!settlement.ok) {
         logger.error({ err: settlement.reason }, "Live settlement failed");
-        return reply.code(502).send({ success: false, error: "Settlement pending.", code: "SETTLEMENT_PENDING", position: updated });
+        return reply.code(502).send({ success: false, error: "Settlement pending.", code: "SETTLEMENT_PENDING" });
       }
     }
+
+    const { data: updated } = await supabase
+      .from("forex_positions")
+      .select("*")
+      .eq("id", positionId)
+      .maybeSingle();
 
     return { 
       success: true, 
       position: updated, 
-      realizedPnl: Number(result?.realized_pnl ?? 0), 
+      realizedPnl: pnl, 
       exitPrice, 
-      balance: Number(result?.balance ?? 0), 
-      partial: !result?.closed 
+      balance, 
+      partial: !full 
     };
   } catch (e: any) {
     logger.error({ err: e?.message, positionId }, "Close position unhandled error");
