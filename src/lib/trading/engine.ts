@@ -209,6 +209,7 @@ export class Engine {
         if (!res.success) return this.fail(res.error || "Close rejected");
         await this.fetchLiveBalance();
         await this.fetchLivePositions();
+        await this.fetchLiveHistory();
         this.log(`position #${ticket} closed ${closeLots.toFixed(2)} ${p.symbol} via backend`);
         this.emit(); return { ok: true };
       } catch (e: any) {
@@ -306,6 +307,30 @@ export class Engine {
     }
   }
 
+  async fetchLiveHistory(): Promise<void> {
+    try {
+      const data = await apiRequest<{ success: boolean; history: any[] }>(
+        `/forex/history?mode=live&limit=100`
+      );
+      if (data.success && data.history) {
+        this._liveHistory = data.history.map((h: any) => ({
+          ticket: Number(h.id) || 0,
+          symbol: (h.symbol || "").replace("/", ""),
+          side: h.side,
+          lots: Number(h.quantity) || 0,
+          openPrice: Number(h.entry) || 0,
+          closePrice: Number(h.entry) || 0,
+          openTime: new Date(h.closedAt).getTime() || Date.now(),
+          closeTime: new Date(h.closedAt).getTime() || Date.now(),
+          profit: Number(h.pnl) || 0,
+          reason: (h.status === "closed" ? "manual" : "cancel") as CloseReason,
+        }));
+      }
+    } catch (e) {
+      console.error("Failed to fetch live history:", e);
+    }
+  }
+
   private startLiveBalancePolling(): void {
     if (this.livePollInterval) return;
     const tick = async () => {
@@ -382,6 +407,8 @@ export class Engine {
 
   private processTradeClosures() {
     if (this.positions.length === 0) return;
+    // Auto-close only runs in demo mode. Live positions are managed by the backend.
+    if (this.mode === "live") return;
 
     const positionsToClose: { ticket: number; reason: CloseReason }[] = [];
     
