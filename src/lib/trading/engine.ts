@@ -187,7 +187,7 @@ export class Engine {
     const price = side === "buy" ? q.ask : q.bid;
     const ticket = fromOrder ?? this.nextTicket++;
     this.positions.push({ ticket, symbol, side, lots, openPrice: price, openTime: Date.now(), sl, tp });
-    this.balance = round(this.balance - 0.05, 2);
+    this.balance = round(this.balance - 0.005, 2);
     this.log(`deal #${ticket} ${side} ${lots.toFixed(2)} ${symbol} at ${price.toFixed(s.digits)} done`);
     this.save(); this.emit(); return { ok: true, ticket };
   }
