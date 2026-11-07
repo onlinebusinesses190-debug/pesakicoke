@@ -404,11 +404,8 @@ export class Engine {
     this.emit();
     if (this.tickCount - this.lastSaveTick >= 25) { this.lastSaveTick = this.tickCount; this.save(); }
   }
-
   private processTradeClosures() {
     if (this.positions.length === 0) return;
-    // Auto-close only runs in demo mode. Live positions are managed by the backend.
-    if (this.mode === "live") return;
 
     const positionsToClose: { ticket: number; reason: CloseReason }[] = [];
     
