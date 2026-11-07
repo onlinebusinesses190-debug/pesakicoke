@@ -491,7 +491,7 @@ async function closePosition(request: FastifyRequest, reply: FastifyReply, posit
     const { data: position } = await supabase.from("forex_positions").select("*").eq("id", positionId).eq("user_id", userId).maybeSingle();
     
     if (!position) return reply.code(404).send({ success: false, error: "Position not found" });
-    if (position.closed_at) return reply.code(409).send({ success: false, error: "Position already closed" });
+    if (position.closed_at) return { success: true, position, realizedPnl: Number(position.realized_pnl ?? 0), exitPrice: Number(position.average_entry_price), balance: 0, partial: false };
 
     const sym = await symbolForInstrument(position.instrument_id);
     const baseSpec = sym ? getInstrument(sym) : undefined;
