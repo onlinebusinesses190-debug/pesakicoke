@@ -267,7 +267,7 @@ export class Engine {
           let ticket = existing ? existing.ticket : this.nextTicket++;
 
           const lots = Number(p.quantity) || Number(p.lots) || existing?.lots || 0;
-          const cached = this._liveEntryPrices.get(`${finalSymbol}_${p.side}_${lots}`) || 0;
+          const cached = (this._liveEntryPrices && typeof this._liveEntryPrices.get === 'function') ? (this._liveEntryPrices.get(`${finalSymbol}_${p.side}_${lots}`) || 0) : 0;
 
           return {
             ticket,
