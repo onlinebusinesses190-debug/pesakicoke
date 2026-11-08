@@ -15,7 +15,12 @@ const BottomTrade = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill=
 const BottomHistory = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 15" /></svg>);
 const BottomMessages = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>);
 
-export function Terminal({ mode = "demo" }: { mode?: "demo" | "real" }) {
+export function Terminal({ mode: initialMode = "demo" }: { mode?: "demo" | "real" }) {
+  const [mode, setModeState] = useState<"demo" | "real">(() => {
+    const saved = typeof window !== "undefined" ? localStorage.getItem("tradingMode") : null;
+    return (saved === "real" || saved === "demo") ? saved : initialMode;
+  });
+  const setMode = (m: "demo" | "real") => { setModeState(m); if (typeof window !== "undefined") localStorage.setItem("tradingMode", m); };
   const e = useEngine();
   const [symbol, setSymbol] = useState("EURUSD");
   const [tf, setTf] = useState<TF>("M5");

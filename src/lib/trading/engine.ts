@@ -104,7 +104,7 @@ export class Engine {
   private lastTickTime = 0;
   private tickCount = 0;
   private lastSaveTick = 0;
-  private _liveEntryPrices = new Map<string, number>();
+  private isTrading = false;
   _entryPriceMap = new Map<number | string, number>();
 
   constructor() {
@@ -233,6 +233,7 @@ export class Engine {
 
   // ─── LIVE MODE: BACKEND SYNC ───
   async fetchLiveBalance(): Promise<void> {
+    if (this.isTrading) return;
     try {
       const data = await apiRequest<{ success: boolean; account: { balance?: number; walletBalance?: number; equity?: number; used_margin?: number } }>(
         `/forex/account?account_type=live`
@@ -296,11 +297,9 @@ export class Engine {
             backendId: p.id,
           };
         });
-        // MERGE: keep optimistic positions without backendId so markers don't vanish
-        // if the backend hasn't processed the order yet (race condition)
-        const backendIds = new Set(backendPositions.map((x: any) => x.backendId));
-        const pending = this._livePositions.filter((x: any) => !x.backendId || !backendIds.has(x.backendId));
-        this._livePositions = [...backendPositions, ...pending];
+        // STRICT REPLACE: Do not merge. The backend is the source of truth for open positions.
+        this._livePositions = backendPositions;
+        this.emit();
       }
     } catch (e) {
       console.error("Failed to fetch live positions:", e);
@@ -406,7 +405,8 @@ export class Engine {
   }
   private processTradeClosures() {
     if (this.positions.length === 0) return;
-
+    if (this.mode === "live") return;
+    
     const positionsToClose: { ticket: number; reason: CloseReason }[] = [];
     
     for (const p of this.positions) {
@@ -454,6 +454,7 @@ export class Engine {
       }
       const err = this.checkStops(side, side === "buy" ? q.ask : q.bid, sl, tp, req.symbol);
       if (err) return this.fail(err);
+      this.isTrading = true;
       try {
         const backendSymbol = req.symbol.length === 6 && !req.symbol.includes("/")
           ? `${req.symbol.slice(0, 3)}/${req.symbol.slice(3)}`
@@ -500,9 +501,11 @@ const newTicket = this.nextTicket++;
         await this.fetchLiveBalance();
         await this.fetchLivePositions();
         return { ok: true, ticket: newTicket };
-      } catch (e: any) {
-        return this.fail(e.message || "Network error placing order");
-      }
+       } catch (e: any) {
+         return this.fail(e.message || "Network error placing order");
+       } finally {
+         this.isTrading = false;
+       }
     }
 
     // DEMO MODE: 100% local
