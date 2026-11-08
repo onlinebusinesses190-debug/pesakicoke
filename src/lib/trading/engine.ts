@@ -253,56 +253,35 @@ export class Engine {
         `/forex/positions?mode=live`
       );
       if (data.success && data.positions) {
-        const backendPositions = data.positions.map((p: any) => {
-          // Resolve symbol
+        const mapped = data.positions.map((p: any) => {
+          const backendId = String(p.id ?? "");
+          const existing = this._livePositions.find((x: any) => x.backendId === backendId);
+          let ticket = existing ? existing.ticket : this.nextTicket++;
+
           let instrSymbol = "";
           const fi = p.forex_instruments;
           if (Array.isArray(fi) && fi.length > 0) instrSymbol = fi[0]?.symbol ?? "";
           else if (fi && typeof fi === "object") instrSymbol = fi.symbol ?? "";
           const rawSymbol = p.symbol || instrSymbol || "";
-          const symbol = rawSymbol.replace("/", "");
-          
-          // Preserve openPrice from existing position if backend returns 0
-          const existing = this._livePositions.find((x: any) => 
-            x.backendId === p.id || (x.symbol === symbol && x.side === p.side && Math.abs(x.lots - (Number(p.quantity) || Number(p.lots) || 0)) < 0.001)
-          );
-          const backendPrice = Number(p.average_entry_price) || Number(p.open_price) || 0;
-          const mapKey = `${symbol}_${p.side}_${Number(p.quantity) || Number(p.lots) || 0}`;
-          const cachedPrice = this._liveEntryPrices.get(mapKey) || 0;
-          const openPrice = backendPrice > 0 ? backendPrice : (existing?.openPrice || cachedPrice || 0);
-          if (openPrice > 0) this._liveEntryPrices.set(mapKey, openPrice);
-          // Store under both string and number keys so chart lookup always matches
-          if (openPrice > 0) this._entryPriceMap.set(p.id, openPrice);
-          this._entryPriceMap.set(Number(p.id), openPrice);
-          this._entryPriceMap.set(`${symbol}_${p.side}_${Number(p.quantity) || Number(p.lots) || 0}`, openPrice);
-          // Only cache non-zero prices — never overwrite a good price with 0
-          if (openPrice > 0) {
-            ENTRY_PRICE_CACHE.set(p.id, openPrice);
-            ENTRY_PRICE_CACHE.set(Number(p.id), openPrice);
-            ENTRY_PRICE_CACHE.set(`${symbol}_${p.side}_${Number(p.quantity) || Number(p.lots) || 0}`, openPrice);
-            ENTRY_SIDE_CACHE.set(p.id, p.side);
-            ENTRY_SIDE_CACHE.set(Number(p.id), p.side);
-            ENTRY_SIDE_CACHE.set(`${symbol}_${p.side}_${Number(p.quantity) || Number(p.lots) || 0}`, p.side);
-          }
-          
+          const finalSymbol = rawSymbol.replace("/", "") || existing?.symbol || "EURUSD";
+
           return {
-            ticket: Number(p.id) || 0,
-            symbol,
+            ticket,
+            symbol: finalSymbol,
             side: p.side,
-            lots: Number(p.quantity) || Number(p.lots) || 0,
-            openPrice,
+            lots: Number(p.quantity) || Number(p.lots) || existing?.lots || 0,
+            openPrice: Number(p.average_entry_price) || Number(p.open_price) || existing?.openPrice || 0,
             openTime: new Date(p.opened_at).getTime() || Date.now(),
-            sl: Number(p.stop_loss) || 0,
-            tp: Number(p.take_profit) || 0,
-            backendId: p.id,
+            sl: Number(p.stop_loss) || existing?.sl || 0,
+            tp: Number(p.take_profit) || existing?.tp || 0,
+            backendId,
           };
         });
-        // STRICT REPLACE: Do not merge. The backend is the source of truth for open positions.
-        this._livePositions = backendPositions;
+        this._livePositions = mapped;
         this.emit();
       }
     } catch (e) {
-      console.error("Failed to fetch live positions:", e);
+      console.error("Failed to fetch live positions (Server might be down):", e);
     }
   }
 
@@ -335,6 +314,7 @@ export class Engine {
     const tick = async () => {
       await this.fetchLiveBalance();
       await this.fetchLivePositions();
+      await this.fetchLiveHistory();
     };
     tick();
     this.livePollInterval = window.setInterval(tick, 120000); // 2 min — reduces position churn
@@ -353,6 +333,7 @@ export class Engine {
     if (mode === "live") {
       await this.fetchLiveBalance();
       await this.fetchLivePositions();
+      await this.fetchLiveHistory();
       this.startLiveBalancePolling();
     } else {
       this.stopLiveBalancePolling();
