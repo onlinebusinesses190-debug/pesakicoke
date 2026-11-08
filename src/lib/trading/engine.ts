@@ -255,15 +255,16 @@ export class Engine {
       if (data.success && data.positions) {
         const mapped = data.positions.map((p: any) => {
           const backendId = String(p.id ?? "");
-          const existing = this._livePositions.find((x: any) => x.backendId === backendId);
-          let ticket = existing ? existing.ticket : this.nextTicket++;
 
           let instrSymbol = "";
           const fi = p.forex_instruments;
           if (Array.isArray(fi) && fi.length > 0) instrSymbol = fi[0]?.symbol ?? "";
           else if (fi && typeof fi === "object") instrSymbol = fi.symbol ?? "";
           const rawSymbol = p.symbol || instrSymbol || "";
-          const finalSymbol = rawSymbol.replace("/", "") || existing?.symbol || "EURUSD";
+          const finalSymbol = rawSymbol.replace("/", "") || "EURUSD";
+
+          const existing = this._livePositions.find((x: any) => x.backendId === backendId || (x.symbol === finalSymbol && x.side === p.side && Math.abs(x.lots - (Number(p.quantity) || Number(p.lots) || 0)) < 0.001));
+          let ticket = existing ? existing.ticket : this.nextTicket++;
 
           return {
             ticket,
