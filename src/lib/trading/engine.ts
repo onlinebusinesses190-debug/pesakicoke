@@ -266,12 +266,15 @@ export class Engine {
           const existing = this._livePositions.find((x: any) => x.backendId === backendId || (x.symbol === finalSymbol && x.side === p.side && Math.abs(x.lots - (Number(p.quantity) || Number(p.lots) || 0)) < 0.001));
           let ticket = existing ? existing.ticket : this.nextTicket++;
 
+          const lots = Number(p.quantity) || Number(p.lots) || existing?.lots || 0;
+          const cached = this._liveEntryPrices.get(`${finalSymbol}_${p.side}_${lots}`) || 0;
+
           return {
             ticket,
             symbol: finalSymbol,
             side: p.side,
-            lots: Number(p.quantity) || Number(p.lots) || existing?.lots || 0,
-            openPrice: Number(p.average_entry_price) || Number(p.open_price) || existing?.openPrice || 0,
+            lots,
+            openPrice: Number(p.average_entry_price) || Number(p.open_price) || existing?.openPrice || cached || 0,
             openTime: new Date(p.opened_at).getTime() || Date.now(),
             sl: Number(p.stop_loss) || existing?.sl || 0,
             tp: Number(p.take_profit) || existing?.tp || 0,
