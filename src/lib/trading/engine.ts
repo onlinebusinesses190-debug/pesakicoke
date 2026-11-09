@@ -16,7 +16,7 @@ export interface Position { ticket: number; symbol: string; side: Side; lots: nu
 export interface PendingOrder { ticket: number; symbol: string; type: Exclude<OrderType, "buy" | "sell">; lots: number; price: number; sl: number; tp: number; time: number; }
 export interface Deal { ticket: number; symbol: string; side: Side; lots: number; openPrice: number; closePrice: number; openTime: number; closeTime: number; profit: number; reason: CloseReason | "deposit" | "cancel"; }
 export interface JournalEntry { time: number; msg: string; error?: boolean; }
-export type Result = { ok: true; ticket?: number } | { ok: false; error: string; };
+export type Result = { ok: true; ticket?: number; backendId?: string } | { ok: false; error: string; };
 
 const SPREADS: Record<string, number> = { EURUSD: 1, GBPUSD: 2, USDJPY: 1, AUDUSD: 1, USDCAD: 2, USDCHF: 2, NZDUSD: 2, EURJPY: 2, GBPJPY: 3, XAUUSD: 2 };
 function spreadFor(symbol: string): number { return SPREADS[symbol] ?? 2; }
@@ -105,6 +105,8 @@ export class Engine {
   private tickCount = 0;
   private lastSaveTick = 0;
   private isTrading = false;
+  private _liveEntryPrices = new Map<string, number>();
+  private livePollInterval: number | null = null;
   _entryPriceMap = new Map<number | string, number>();
 
   constructor() {
@@ -282,6 +284,20 @@ export class Engine {
           };
         });
         this._livePositions = mapped;
+        // Persist entry prices so chart markers reconstruct after refresh.
+        for (const m of mapped) {
+          const key = `${m.symbol}_${m.side}_${m.lots}`;
+          if (m.openPrice > 0) {
+            const idKey = String(m.backendId || m.ticket);
+            ENTRY_PRICE_CACHE.set(idKey, m.openPrice);
+            ENTRY_PRICE_CACHE.set(key, m.openPrice);
+            ENTRY_SIDE_CACHE.set(idKey, m.side);
+            ENTRY_SIDE_CACHE.set(key, m.side);
+            this._entryPriceMap.set(idKey, m.openPrice);
+            this._entryPriceMap.set(key, m.openPrice);
+            this._liveEntryPrices.set(key, m.openPrice);
+          }
+        }
         this.emit();
       }
     } catch (e) {
@@ -464,16 +480,17 @@ export class Engine {
         });
         if (!res.success) return this.fail(res.error || "Order rejected");
         // Add optimistically so it shows immediately in UI
-const newTicket = this.nextTicket++;
-          const ep = q.ask ?? q.bid;
-          this._liveEntryPrices.set(`${req.symbol}_${side}_${lots}`, ep);
-          this._entryPriceMap.set(newTicket, ep);
-          this._entryPriceMap.set(`${req.symbol}_${side}_${lots}`, ep);
-          ENTRY_PRICE_CACHE.set(newTicket, ep);
-          ENTRY_PRICE_CACHE.set(`${req.symbol}_${side}_${lots}`, ep);
-          ENTRY_SIDE_CACHE.set(newTicket, side);
-          ENTRY_SIDE_CACHE.set(`${req.symbol}_${side}_${lots}`, side);
-         this._livePositions.push({
+        const newTicket = this.nextTicket++;
+        const backendId = res.position?.id ?? res.order?.id ?? String(newTicket);
+        const ep = q.ask ?? q.bid;
+        this._liveEntryPrices.set(`${req.symbol}_${side}_${lots}`, ep);
+        this._entryPriceMap.set(newTicket, ep);
+        this._entryPriceMap.set(`${req.symbol}_${side}_${lots}`, ep);
+        ENTRY_PRICE_CACHE.set(String(newTicket), ep);
+        ENTRY_PRICE_CACHE.set(`${req.symbol}_${side}_${lots}`, ep);
+        ENTRY_SIDE_CACHE.set(String(newTicket), side);
+        ENTRY_SIDE_CACHE.set(`${req.symbol}_${side}_${lots}`, side);
+        this._livePositions.push({
           ticket: newTicket,
           symbol: req.symbol,
           side,
@@ -482,10 +499,11 @@ const newTicket = this.nextTicket++;
           openTime: Date.now(),
           sl: sl || 0,
           tp: tp || 0,
+          backendId,
         });
         await this.fetchLiveBalance();
         await this.fetchLivePositions();
-        return { ok: true, ticket: newTicket };
+        return { ok: true, ticket: newTicket, backendId };
        } catch (e: any) {
          return this.fail(e.message || "Network error placing order");
        } finally {

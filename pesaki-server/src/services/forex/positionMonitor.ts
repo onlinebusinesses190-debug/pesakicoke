@@ -19,8 +19,7 @@ import { supabase } from "../../lib/supabase";
 import { logger } from "../../utils/logger";
 import { getEngine } from "./marketEngine";
 import { getInstrument, type InstrumentSpec } from "./instruments";
-import { computePnl } from "./risk";
-import { kesPerUnit } from "./kesRates";
+import { closePosition } from "./settlement";
 
 let running = false;
 
@@ -35,49 +34,31 @@ async function symbolForInstrument(instrumentId: number): Promise<string | undef
   return data?.symbol ?? undefined;
 }
 
-/** Settle one position through the atomic RPC, recording the trigger reason. */
+/** Stop-out threshold as a percent of used margin. */
+const STOP_OUT_PCT = Number(process.env.PESAKI_FX_STOP_OUT_PCT ?? "30");
+
+/** Settle one position through the shared authoritative close path. */
 async function settle(
   positionId: string,
   userId: string,
   lots: number,
   exitPrice: number,
-  quoteToKes: number,
-  reason: "stop_loss" | "take_profit",
-) {
-  const { data, error } = await supabase.rpc("forex_close_position", {
-    p_user_id: userId,
-    p_position_id: positionId,
-    p_close_lots: lots,
-    p_exit_price: exitPrice,
-    p_quote_to_kes: quoteToKes,
-  });
-
-  if (error) {
+  reason: "stop_loss" | "take_profit" | "stop_out",
+): Promise<boolean> {
+  try {
+    const result = await closePosition({ positionId, userId, lots: lots, reason: reason as any });
+    logger.info(
+      { positionId, userId, reason, exitPrice, realizedPnl: result.netPnlUsd, balance: result.accountBalanceKes },
+      "Forex position closed by monitor",
+    );
+    return true;
+  } catch (err) {
     logger.error(
-      { positionId, userId, reason, err: error.message },
+      { positionId, userId, reason, err: (err as Error).message },
       "Forex SL/TP settlement failed",
     );
     return false;
   }
-
-  logger.info(
-    {
-      positionId,
-      userId,
-      reason,
-      exitPrice,
-      realizedPnl: data?.realized_pnl,
-      balance: data?.balance,
-    },
-    "Forex position closed by monitor",
-  );
-
-  await supabase
-    .from("forex_positions")
-    .update({ close_reason: reason })
-    .eq("id", positionId);
-
-  return true;
 }
 
 async function scanOnce() {
@@ -86,7 +67,7 @@ async function scanOnce() {
 
   const { data: positions, error } = await supabase
     .from("forex_positions")
-    .select("id,user_id,instrument_id,side,quantity,average_entry_price,stop_loss,take_profit")
+    .select("id,user_id,instrument_id,side,quantity,average_entry_price,stop_loss,take_profit,margin")
     .is("closed_at", null)
     .gt("quantity", 0)
     .limit(500);
@@ -97,13 +78,16 @@ async function scanOnce() {
   }
   if (!positions?.length) return;
 
+  // Load margin config for stop-out threshold.
+  const { data: config } = await supabase.from("forex_market_config").select("liquidation_threshold_pct").maybeSingle();
+  const stopOutPct = config?.liquidation_threshold_pct != null ? Number(config.liquidation_threshold_pct) : STOP_OUT_PCT;
+
   for (const p of positions) {
     const symbol = await symbolForInstrument(p.instrument_id);
     if (!symbol) continue;
     const spec: InstrumentSpec | undefined = getInstrument(symbol);
     if (!spec) continue;
 
-    // A long is hit by a fall to the stop; a short by a rise.
     const quote = engine.quote(symbol);
     const exitPrice = p.side === "buy" ? quote.bid : quote.ask;
 
@@ -117,24 +101,36 @@ async function scanOnce() {
     if (!stopHit && !targetHit) continue;
 
     const lots = Number(p.quantity);
-    const pnl = computePnl({
-      side: p.side,
-      lots,
-      entryPrice: Number(p.average_entry_price),
-      exitPrice,
-      instrument: spec,
-      quoteToKes: kesPerUnit(spec.quote),
-    });
+    await settle(p.id, p.user_id, lots, exitPrice, stopHit ? "stop_loss" : "take_profit");
+  }
 
-    await settle(
-      p.id,
-      p.user_id,
-      lots,
-      exitPrice,
-      kesPerUnit(spec.quote),
-      stopHit ? "stop_loss" : "take_profit",
-    );
-    logger.info({ positionId: p.id, pnl }, "SL/TP triggered");
+  // Stop-out liquidation: close losers until margin level recovers above threshold.
+  const { data: accounts } = await supabase.from("forex_accounts").select("id,user_id,balance,used_margin,equity,account_type").eq("account_type", "live").gt("used_margin", 0).maybeSingle();
+  if (accounts && Number(accounts.used_margin) > 0) {
+    const equity = Number(accounts.equity ?? accounts.balance);
+    const marginLevel = equity / Number(accounts.used_margin) * 100;
+    if (marginLevel <= stopOutPct) {
+      const { data: losers } = await supabase
+        .from("forex_positions")
+        .select("id,user_id,quantity,side,average_entry_price,margin,instrument_id")
+        .eq("account_id", accounts.id)
+        .is("closed_at", null)
+        .gt("quantity", 0)
+        .order("realized_pnl", { ascending: true })
+        .limit(10);
+      for (const p of losers ?? []) {
+        const symbol = await symbolForInstrument(p.instrument_id);
+        const spec: InstrumentSpec | undefined = symbol ? getInstrument(symbol) : undefined;
+        const quote = spec && symbol ? engine.quote(symbol) : undefined;
+        const exitPrice = p.side === "buy" ? (quote?.bid ?? 0) : (quote?.ask ?? 0);
+        await settle(p.id, p.user_id, Number(p.quantity), exitPrice, "stop_out");
+        // Re-check margin level after each close.
+        const { data: acct2 } = await supabase.from("forex_accounts").select("balance,used_margin,equity").eq("id", accounts.id).maybeSingle();
+        const eq2 = Number(acct2?.equity ?? acct2?.balance);
+        const lvl2 = eq2 / Number(acct2?.used_margin ?? 1) * 100;
+        if (lvl2 > stopOutPct) break;
+      }
+    }
   }
 }
 
