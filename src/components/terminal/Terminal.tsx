@@ -30,13 +30,16 @@ export function Terminal({ mode: initialMode = "demo" }: { mode?: "demo" | "real
   
   const [lots, setLots] = useState(0.01); 
   const [mobileTab, setMobileTab] = useState<"chart" | "market" | "trade" | "history" | "messages">("chart");
-  
+   
   const [showRadial, setShowRadial] = useState(false);
   const [showBulkMenu, setShowBulkMenu] = useState(false);
-  
+   
   const [depositOpen, setDepositOpen] = useState(false);
   const [depositAmount, setDepositAmount] = useState("");
   const [depositErr, setDepositErr] = useState("");
+
+  // Trade closure notification (toast)
+  const [closeToast, setCloseToast] = useState<{ side: string; lots: number; pnl: number; reason: string; time: number } | null>(null);
 
   const s = e.spec(symbol);
   const q = e.quotes[symbol];
@@ -45,6 +48,13 @@ export function Terminal({ mode: initialMode = "demo" }: { mode?: "demo" | "real
     const engineMode = mode === "real" ? "live" : "demo";
     e.setMode(engineMode);
   }, [mode]);
+
+  // Auto-dismiss close toast after 1 second
+  useEffect(() => {
+    if (!closeToast) return;
+    const t = setTimeout(() => setCloseToast(null), 1000);
+    return () => clearTimeout(t);
+  }, [closeToast]);
 
   const [flash, setFlash] = useState<"up" | "down" | "none">("none");
   const prevBid = useRef(q?.bid);
@@ -68,13 +78,16 @@ export function Terminal({ mode: initialMode = "demo" }: { mode?: "demo" | "real
   
   const totalFloatingPnl = e.positions.reduce((acc, p) => acc + e.profitOf(p), 0);
 
-  const handleBulkClose = (type: 'all' | 'profit' | 'loss') => {
-    e.positions.forEach((p) => {
+  const handleBulkClose = async (type: 'all' | 'profit' | 'loss') => {
+    for (const p of e.positions) {
       const pnl = e.profitOf(p);
       if (type === 'all' || (type === 'profit' && pnl > 0) || (type === 'loss' && pnl < 0)) {
-        e.closePosition(p.ticket, "manual", p.lots);
+        const res = await e.closePosition(p.ticket, "manual", p.lots);
+        if (res.ok) {
+          setCloseToast({ side: p.side, lots: p.lots, pnl: e.profitOf(p), reason: "manual", time: Date.now() });
+        }
       }
-    });
+    }
     setShowBulkMenu(false);
   };
 
@@ -138,6 +151,33 @@ export function Terminal({ mode: initialMode = "demo" }: { mode?: "demo" | "real
           </button>
         </div>
       </div>
+
+      {closeToast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 rounded-lg border shadow-lg">
+          {closeToast.pnl >= 0
+            ? <div className="bg-green-50 border-green-200 text-green-700">
+                <div className="font-bold text-sm">TRADE CLOSED</div>
+                <div className="text-xs font-mono">Profit: +${closeToast.pnl.toFixed(2)}</div>
+              </div>
+            : <div className="bg-red-50 border-red-200 text-red-700">
+                <div className="font-bold text-sm">TRADE CLOSED</div>
+                <div className="text-xs font-mono">Loss: -$${Math.abs(closeToast.pnl).toFixed(2)}</div>
+              </div>
+          }
+        </div>
+      )}
+
+      {mode === "real" && e.liveSync.error && (
+        <div className="fixed top-4 right-4 z-50 px-4 py-2 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-xs font-mono">
+          ⚠ {e.liveSync.error}
+        </div>
+      )}
+
+      {mode === "real" && e.liveSync.loading && (
+        <div className="fixed top-4 right-4 z-50 px-4 py-2 rounded-lg border border-blue-200 bg-blue-50 text-blue-800 text-xs font-mono">
+          ↻ Syncing live account…
+        </div>
+      )}
 
       <div className="flex bg-white border-b border-gray-300 select-none z-10 shrink-0">
         <button onClick={() => handleTrade("sell")} className={`flex-1 ${sellBg} text-white py-0.5 flex flex-col items-center justify-center transition-colors duration-150`}>
@@ -206,7 +246,12 @@ export function Terminal({ mode: initialMode = "demo" }: { mode?: "demo" | "real
                       </div>
                       <div className="flex justify-between items-center text-[10px] text-gray-500 font-mono">
                         <div>{p.openPrice.toFixed(digits)} → {closePrice.toFixed(digits)}</div>
-                        <button onClick={() => e.closePosition(p.ticket, "manual", p.lots)} className="bg-red-50 text-red-600 px-2 py-0.5 rounded text-[10px] font-bold hover:bg-red-100">Close</button>
+                        <button onClick={async () => {
+                          const res = await e.closePosition(p.ticket, "manual", p.lots);
+                          if (res.ok) {
+                            setCloseToast({ side: p.side, lots: p.lots, pnl: e.profitOf(p), reason: "manual", time: Date.now() });
+                          }
+                        }} className="bg-red-50 text-red-600 px-2 py-0.5 rounded text-[10px] font-bold hover:bg-red-100">Close</button>
                       </div>
                     </div>
                   );

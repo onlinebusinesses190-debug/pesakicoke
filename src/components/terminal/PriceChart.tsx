@@ -218,7 +218,7 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       ctx.font = "11px Arial, sans-serif";
       ctx.fillText(spec.desc || "", 8, 30);
 
-      const drawnLabelYs: number[] = []; 
+      const drawnLabelYs: number[] = [];
       // Sync engine's persistent entry price maps into module-level cache
       const ep = engine?._entryPriceMap;
       if (ep && typeof ep.forEach === "function") {
@@ -230,46 +230,76 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
       if (ENTRY_SIDE_CACHE && typeof ENTRY_SIDE_CACHE.forEach === "function") {
         ENTRY_SIDE_CACHE.forEach((v: string, k: any) => { MARKER_SIDE_CACHE.set(k, v); });
       }
-      symbolPositions.forEach((p: any) => {
+      symbolPositions.forEach((p: any, idx: number) => {
         const sym = (p.symbol || "").replace("/", "").toUpperCase();
         const lots = Number(p.lots);
         const key = `${sym}_${p.side}_${lots}`;
         const cacheKey = p.backendId || p.ticket;
         const cached = MARKER_CACHE.get(cacheKey) || MARKER_CACHE.get(key);
         const openPrice = (cached && cached > 0) ? cached : (Number(p.openPrice) || 0);
-        if (!openPrice) return;
-        const yy = y(openPrice);
-        const color = p.side === "buy" ? "#1565c0" : "#c62828";
+        if (!openPrice || openPrice <= 0) return;
 
-        // Draw dashed entry line at exact price level
+        const color = p.side === "buy" ? "#1565c0" : "#c62828";
+        const yy = y(openPrice);
+        if (yy < 0 || yy > plotH) return;
+
+        // Draw horizontal entry line across the plot area
         ctx.strokeStyle = color;
         ctx.setLineDash([4, 3]);
         ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(0, Math.round(yy) + 0.5); ctx.lineTo(plotW, Math.round(yy) + 0.5); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, Math.round(yy) + 0.5);
+        ctx.lineTo(plotW, Math.round(yy) + 0.5);
+        ctx.stroke();
         ctx.setLineDash([]);
 
         // Draw small entry dot at left edge
         ctx.fillStyle = color;
-        ctx.beginPath(); ctx.arc(6, Math.round(yy) + 0.5, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath();
+        ctx.arc(6, Math.round(yy) + 0.5, 3, 0, Math.PI * 2);
+        ctx.fill();
 
-        // Label positioned alongside the line
+        // Calculate floating P/L for the label
         const pnl = engine.profitOf(p);
-        const txt = `${p.side.toUpperCase()} ${p.lots.toFixed(2)} @ ${openPrice.toFixed(spec.digits)}  ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD`;
+
+        // Compact MT5-style label: SELL 0.01 | +$0.08
+        const pnlStr = pnl >= 0 ? `+$${pnl.toFixed(2)}` : `-$${Math.abs(pnl).toFixed(2)}`;
+        const txt = `${p.side.toUpperCase()} ${lots.toFixed(2)} | ${pnlStr}`;
+
+        // Label offsetting: if multiple markers share similar Y, stack labels vertically
+        let labelY = yy;
+        const labelStep = 14;
+        for (let i = 0; i < drawnLabelYs.length; i++) {
+          if (Math.abs(drawnLabelYs[i] - yy) < labelStep * 2) {
+            labelY = yy + labelStep;
+          }
+        }
+        drawnLabelYs.push(labelY);
+
+        const labelX = 8;
         const txtWidth = ctx.measureText(txt).width;
 
-        const labelY = yy;
-        const labelX = 4;
+        // Label background
         ctx.fillStyle = "#ffffff";
-        ctx.fillRect(labelX, labelY - 10, txtWidth + 8, 20);
-        
+        ctx.fillRect(labelX, labelY - 7, txtWidth + 6, 14);
+
+        // Label text
         ctx.fillStyle = color;
-        ctx.font = "bold 11px Arial, sans-serif";
-        ctx.fillText(txt, labelX + 4, labelY);
+        ctx.font = "bold 10px Arial, sans-serif";
+        ctx.fillText(txt, labelX + 3, labelY + 2);
+
+        // Entry price on right-hand price scale (small tag)
+        const rightLabel = openPrice.toFixed(spec.digits);
+        const rightTxtWidth = ctx.measureText(rightLabel).width;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(plotW + 4, yy - 7, rightTxtWidth + 6, 14);
+        ctx.fillStyle = color;
+        ctx.fillText(rightLabel, plotW + 7, yy + 2);
       });
 
       // Also draw cached markers for positions not yet in the array (race condition)
       MARKER_CACHE.forEach((openPrice, cacheKey) => {
-        if (!openPrice) return;
+        if (!openPrice || openPrice <= 0) return;
         const alreadyDrawn = symbolPositions.some((p: any) => (p.backendId || p.ticket) === cacheKey);
         if (alreadyDrawn) return;
         const side = MARKER_SIDE_CACHE.get(cacheKey) || "buy";
@@ -279,19 +309,24 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
         ctx.strokeStyle = color;
         ctx.setLineDash([4, 3]);
         ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(0, Math.round(yy) + 0.5); ctx.lineTo(plotW, Math.round(yy) + 0.5); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, Math.round(yy) + 0.5);
+        ctx.lineTo(plotW, Math.round(yy) + 0.5);
+        ctx.stroke();
         ctx.setLineDash([]);
         ctx.fillStyle = color;
-        ctx.beginPath(); ctx.arc(6, Math.round(yy) + 0.5, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath();
+        ctx.arc(6, Math.round(yy) + 0.5, 3, 0, Math.PI * 2);
+        ctx.fill();
         const txt = `${side.toUpperCase()} @ ${openPrice.toFixed(spec.digits)}`;
         const txtWidth = ctx.measureText(txt).width;
         const labelY = yy;
         const labelX = 4;
         ctx.fillStyle = "#ffffff";
-        ctx.fillRect(labelX, labelY - 10, txtWidth + 8, 20);
+        ctx.fillRect(labelX, labelY - 7, txtWidth + 6, 14);
         ctx.fillStyle = color;
-        ctx.font = "bold 11px Arial, sans-serif";
-        ctx.fillText(txt, labelX + 4, labelY);
+        ctx.font = "bold 10px Arial, sans-serif";
+        ctx.fillText(txt, labelX + 3, labelY + 2);
       });
 
       const drawBox = (p: number, color: string, timerText: string = "") => {

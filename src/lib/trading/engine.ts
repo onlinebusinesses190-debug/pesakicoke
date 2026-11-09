@@ -18,6 +18,13 @@ export interface Deal { ticket: number; symbol: string; side: Side; lots: number
 export interface JournalEntry { time: number; msg: string; error?: boolean; }
 export type Result = { ok: true; ticket?: number; backendId?: string } | { ok: false; error: string; };
 
+export interface LiveSyncState {
+  loading: boolean;
+  error: string | null;
+  lastSuccessfulPositions: Position[];
+  lastFetchTime: number | null;
+}
+
 const SPREADS: Record<string, number> = { EURUSD: 1, GBPUSD: 2, USDJPY: 1, AUDUSD: 1, USDCAD: 2, USDCHF: 2, NZDUSD: 2, EURJPY: 2, GBPJPY: 3, XAUUSD: 2 };
 function spreadFor(symbol: string): number { return SPREADS[symbol] ?? 2; }
 
@@ -36,7 +43,7 @@ const ENTRY_SIDE_CACHE = new Map<string, string>();
 export { ENTRY_PRICE_CACHE, ENTRY_SIDE_CACHE };
 export const round = (v: number, d: number) => Math.round(v * Math.pow(10, d)) / Math.pow(10, d);
 
-function mulberry32(seed: number): () => number { let a = seed >>> 0; return function () { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function mulberry32(seed: number): () => number { let a = seed >>> 0; return function () { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (a >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 function seededRNG(symbol: string, timestamp: number): () => number { const str = symbol + ":" + timestamp; let h = 0; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0; return mulberry32((h ^ timestamp) >>> 0); }
 function gaussFrom(rng: () => number) { let u = 0, v = 0; while (u === 0) u = rng(); while (v === 0) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
 
@@ -81,15 +88,26 @@ export class Engine {
   private _liveOrders: PendingOrder[] = [];
   private _liveHistory: Deal[] = [];
 
-  exchangeRate = 130; 
+  exchangeRate = 130;
+
+  // Live sync status for UI
+  private _liveSync: LiveSyncState = {
+    loading: false,
+    error: null,
+    lastSuccessfulPositions: [],
+    lastFetchTime: null,
+  };
 
   get balance() { return this.mode === "live" ? this._liveBalanceKes / this.exchangeRate : this._demoBalance; }
   set balance(v: number) { if (this.mode === "live") this._liveBalanceKes = v * this.exchangeRate; else this._demoBalance = v; }
-  
+
   // Map liveBalance to realBalance for UI compatibility
   get liveBalance() { return this._liveBalanceKes / this.exchangeRate; }
   get liveKesBalance() { return this._liveBalanceKes; }
   get liveAvailableBalance() { return this.freeMargin * this.exchangeRate; }
+
+  // Live sync status exposed to UI
+  get liveSync() { return { ...this._liveSync }; }
 
   get positions() { return this.mode === "live" ? this._livePositions : this._demoPositions; }
   set positions(v: Position[]) { if (this.mode === "live") this._livePositions = v; else this._demoPositions = v; }
@@ -135,7 +153,12 @@ export class Engine {
   subscribe = (fn: () => void) => { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; };
   getVersion = () => this.version;
   private emit() { this.version++; this.listeners.forEach((l) => l()); }
-  
+
+  private setLiveSync(partial: Partial<LiveSyncState>) {
+    this._liveSync = { ...this._liveSync, ...partial };
+    this.emit();
+  }
+
   private save() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ 
@@ -146,7 +169,7 @@ export class Engine {
       }));
     } catch { /* ignore */ }
   }
-  
+
   private load() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY); if (!raw) return;
@@ -158,7 +181,7 @@ export class Engine {
       if (d.candles) this.candles = d.candles;
     } catch { /* ignore */ }
   }
-  
+
   private log(msg: string, error = false) { const e = { time: Date.now(), msg, error }; this.journal.unshift(e); if (this.journal.length > 300) this.journal.length = 300; this.notice = e; }
   spec(name: string) { return SYMBOLS.find((s) => s.name === name)!; }
   fmt(name: string, v: number) { return v.toFixed(this.spec(name).digits); }
@@ -178,7 +201,7 @@ export class Engine {
     else { if (sl && sl < ref + minDist) return "Invalid S/L: must be above price"; if (tp && tp > ref - minDist) return "Invalid T/P: must be below price"; }
     return null;
   }
-  
+
   private fail(msg: string): Result { this.log(msg, true); this.emit(); return { ok: false, error: msg }; }
 
   private openPosition(symbol: string, side: Side, lots: number, sl: number, tp: number, fromOrder?: number): Result {
@@ -189,7 +212,7 @@ export class Engine {
     const price = side === "buy" ? q.ask : q.bid;
     const ticket = fromOrder ?? this.nextTicket++;
     this.positions.push({ ticket, symbol, side, lots, openPrice: price, openTime: Date.now(), sl, tp });
-    this.balance = round(this.balance - 0.005, 2);
+    this.balance = round(this.balance - 0.02, 2);
     this.log(`deal #${ticket} ${side} ${lots.toFixed(2)} ${symbol} at ${price.toFixed(s.digits)} done`);
     this.save(); this.emit(); return { ok: true, ticket };
   }
@@ -223,12 +246,12 @@ export class Engine {
     const profit = this.profitOf(p, closeLots);
     const price = this.closePriceOf(p);
     this.balance = round(this.balance + profit, 2);
-    this.balance = round(this.balance - 0.005, 2);
+    this.balance = round(this.balance - 0.02, 2);
     this.history.unshift({ ticket: p.ticket, symbol: p.symbol, side: p.side, lots: closeLots, openPrice: p.openPrice, closePrice: price, openTime: p.openTime, closeTime: Date.now(), profit, reason });
-    
+
     if (closeLots >= p.lots - 1e-9) this.positions = this.positions.filter((x) => x !== p);
     else p.lots = round(p.lots - closeLots, 2);
-    
+
     this.log(`position #${ticket} closed ${closeLots.toFixed(2)} ${p.symbol} at ${this.fmt(p.symbol, price)}, profit ${profit.toFixed(2)}`);
     this.save(); this.emit(); return { ok: true };
   }
@@ -237,6 +260,7 @@ export class Engine {
   async fetchLiveBalance(): Promise<void> {
     if (this.isTrading) return;
     try {
+      this.setLiveSync({ loading: true, error: null });
       const data = await apiRequest<{ success: boolean; account: { balance?: number; walletBalance?: number; equity?: number; used_margin?: number } }>(
         `/forex/account?account_type=live`
       );
@@ -244,64 +268,93 @@ export class Engine {
         // Read walletBalance (explicit wallet balance) first, fall back to balance
         this._liveBalanceKes = Number(data.account.walletBalance ?? data.account.balance ?? 0);
       }
-    } catch (e) {
+      this.setLiveSync({ loading: false, lastFetchTime: Date.now() });
+    } catch (e: any) {
+      this.setLiveSync({ loading: false, error: e?.message || "Failed to load live account" });
       console.error("Failed to fetch live balance:", e);
     }
   }
 
   async fetchLivePositions(): Promise<void> {
     try {
+      this.setLiveSync({ loading: true, error: null });
       const data = await apiRequest<{ success: boolean; positions: any[] }>(
         `/forex/positions?mode=live`
       );
-      if (data.success && data.positions) {
-        const mapped = data.positions.map((p: any) => {
-          const backendId = String(p.id ?? "");
+      if (data.success) {
+        // Never treat a failed request as an empty list. Only replace when the
+        // backend explicitly returns a (possibly empty) positions array.
+        if (Array.isArray(data.positions)) {
+          const mapped = data.positions.map((p: any) => {
+            const backendId = String(p.id ?? "");
 
-          let instrSymbol = "";
-          const fi = p.forex_instruments;
-          if (Array.isArray(fi) && fi.length > 0) instrSymbol = fi[0]?.symbol ?? "";
-          else if (fi && typeof fi === "object") instrSymbol = fi.symbol ?? "";
-          const rawSymbol = p.symbol || instrSymbol || "";
-          const finalSymbol = rawSymbol.replace("/", "") || "EURUSD";
+            let instrSymbol = "";
+            const fi = p.forex_instruments;
+            if (Array.isArray(fi) && fi.length > 0) instrSymbol = fi[0]?.symbol ?? "";
+            else if (fi && typeof fi === "object") instrSymbol = fi.symbol ?? "";
+            const rawSymbol = p.symbol || instrSymbol || "";
+            const finalSymbol = rawSymbol.replace("/", "") || "EURUSD";
 
-          const existing = this._livePositions.find((x: any) => x.backendId === backendId || (x.symbol === finalSymbol && x.side === p.side && Math.abs(x.lots - (Number(p.quantity) || Number(p.lots) || 0)) < 0.001));
-          let ticket = existing ? existing.ticket : this.nextTicket++;
+            // Match existing position by backendId first (preserves entry price),
+            // then by symbol/side/lots as fallback for positions synced before
+            // a backendId was assigned.
+            const existing = this._livePositions.find((x: any) => 
+              x.backendId === backendId || 
+              (x.symbol === finalSymbol && x.side === p.side && Math.abs(x.lots - (Number(p.quantity) || Number(p.lots) || 0)) < 0.001)
+            );
+            let ticket = existing ? existing.ticket : this.nextTicket++;
 
-          const lots = Number(p.quantity) || Number(p.lots) || existing?.lots || 0;
-          const cached = (this._liveEntryPrices && typeof this._liveEntryPrices.get === 'function') ? (this._liveEntryPrices.get(`${finalSymbol}_${p.side}_${lots}`) || 0) : 0;
+            const lots = Number(p.quantity) || Number(p.lots) || existing?.lots || 0;
 
-          return {
-            ticket,
-            symbol: finalSymbol,
-            side: p.side,
-            lots,
-            openPrice: Number(p.average_entry_price) || Number(p.open_price) || existing?.openPrice || cached || 0,
-            openTime: new Date(p.opened_at).getTime() || Date.now(),
-            sl: Number(p.stop_loss) || existing?.sl || 0,
-            tp: Number(p.take_profit) || existing?.tp || 0,
-            backendId,
-          };
-        });
-        this._livePositions = mapped;
-        // Persist entry prices so chart markers reconstruct after refresh.
-        for (const m of mapped) {
-          const key = `${m.symbol}_${m.side}_${m.lots}`;
-          if (m.openPrice > 0) {
-            const idKey = String(m.backendId || m.ticket);
-            ENTRY_PRICE_CACHE.set(idKey, m.openPrice);
-            ENTRY_PRICE_CACHE.set(key, m.openPrice);
-            ENTRY_SIDE_CACHE.set(idKey, m.side);
-            ENTRY_SIDE_CACHE.set(key, m.side);
-            this._entryPriceMap.set(idKey, m.openPrice);
-            this._entryPriceMap.set(key, m.openPrice);
-            this._liveEntryPrices.set(key, m.openPrice);
+            // Entry price: backend average_entry_price takes precedence, then
+            // existing frontend entry price, then cached entry price. Never fall
+            // back to 0 — that would create fictitious P/L.
+            const backendPrice = Number(p.average_entry_price) || Number(p.open_price) || 0;
+            const cached = (this._liveEntryPrices && typeof this._liveEntryPrices.get === 'function') 
+              ? (this._liveEntryPrices.get(`${finalSymbol}_${p.side}_${lots}`) || 0) 
+              : 0;
+            const openPrice = backendPrice > 0 ? backendPrice : (existing?.openPrice || cached || 0);
+
+            return {
+              ticket,
+              symbol: finalSymbol,
+              side: p.side,
+              lots,
+              openPrice,
+              openTime: new Date(p.opened_at).getTime() || Date.now(),
+              sl: Number(p.stop_loss) || existing?.sl || 0,
+              tp: Number(p.take_profit) || existing?.tp || 0,
+              backendId,
+            };
+          });
+          this._livePositions = mapped;
+          this._liveSync.lastSuccessfulPositions = [...mapped];
+          this._liveSync.lastFetchTime = Date.now();
+
+          // Persist entry prices so chart markers reconstruct after refresh.
+          for (const m of mapped) {
+            const key = `${m.symbol}_${m.side}_${m.lots}`;
+            if (m.openPrice > 0) {
+              const idKey = String(m.backendId || m.ticket);
+              ENTRY_PRICE_CACHE.set(idKey, m.openPrice);
+              ENTRY_PRICE_CACHE.set(key, m.openPrice);
+              ENTRY_SIDE_CACHE.set(idKey, m.side);
+              ENTRY_SIDE_CACHE.set(key, m.side);
+              this._entryPriceMap.set(idKey, m.openPrice);
+              this._entryPriceMap.set(key, m.openPrice);
+              this._liveEntryPrices.set(key, m.openPrice);
+            }
           }
+          this.setLiveSync({ loading: false, error: null });
+          this.emit();
         }
-        this.emit();
       }
-    } catch (e) {
-      console.error("Failed to fetch live positions (Server might be down):", e);
+    } catch (e: any) {
+      // IMPORTANT: Never treat a failed request as an empty list. Keep the
+      // last known good positions so trades don't disappear on transient
+      // network failures. Only surface a warning to the user.
+      this.setLiveSync({ loading: false, error: e?.message || "Failed to load live positions" });
+      console.error("Failed to fetch live positions:", e);
     }
   }
 
@@ -324,9 +377,26 @@ export class Engine {
           reason: (h.status === "closed" ? "manual" : "cancel") as CloseReason,
         }));
       }
-    } catch (e) {
+    } catch (e: any) {
+      this.setLiveSync({ error: e?.message || "Failed to load live history" });
       console.error("Failed to fetch live history:", e);
     }
+  }
+
+  private async fetchLiveWithRetry(fn: () => Promise<void>, maxRetries = 3, baseDelay = 1000): Promise<void> {
+    let lastError: any = null;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        await fn();
+        return; // success
+      } catch (e: any) {
+        lastError = e;
+        if (attempt < maxRetries - 1) {
+          await new Promise((resolve) => setTimeout(resolve, baseDelay * Math.pow(2, attempt)));
+        }
+      }
+    }
+    this.setLiveSync({ loading: false, error: lastError?.message || "Sync failed after retries" });
   }
 
   private startLiveBalancePolling(): void {
@@ -366,7 +436,7 @@ export class Engine {
     for (const s of SYMBOLS) {
       const q = this.quotes[s.name];
       const rng = mulberry32(this.tickCount ^ s.name.charCodeAt(0));
-      
+
       // 1. Calculate Net Exposure (House Bias)
       let netLong = 0;
       let netShort = 0;
@@ -377,7 +447,7 @@ export class Engine {
         }
       }
       const netExposure = netLong - netShort;
-      
+
       // Subtle bias against the crowd, capped at 10% of normal volatility
       const houseBias = -Math.sign(netExposure) * Math.min(Math.abs(netExposure) * 0.0000005, s.vol * 0.1);
 
@@ -404,15 +474,16 @@ export class Engine {
     this.emit();
     if (this.tickCount - this.lastSaveTick >= 25) { this.lastSaveTick = this.tickCount; this.save(); }
   }
+
   private processTradeClosures() {
     if (this.positions.length === 0) return;
     if (this.mode === "live") return;
-    
+
     const positionsToClose: { ticket: number; reason: CloseReason }[] = [];
-    
+
     for (const p of this.positions) {
       const currentPrice = this.closePriceOf(p);
-      
+
       // Check Stop Loss / Take Profit
       if (p.side === "buy") {
         if (p.sl > 0 && currentPrice <= p.sl) positionsToClose.push({ ticket: p.ticket, reason: "sl" });
@@ -517,7 +588,7 @@ export class Engine {
       if (err) return this.fail(err);
       return this.openPosition(req.symbol, side, lots, sl, tp);
     }
-    
+
     const price = round(req.price || 0, s.digits); if (!price) return this.fail("Invalid price");
     const t = req.type;
     if (t === "buy_limit" && price >= q.ask) return this.fail("Buy Limit must be below Ask");
