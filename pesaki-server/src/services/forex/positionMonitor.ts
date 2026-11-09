@@ -46,7 +46,7 @@ async function settle(
   reason: "stop_loss" | "take_profit" | "stop_out",
 ): Promise<boolean> {
   try {
-    const result = await closePosition({ positionId, userId, lots: lots, reason: reason as any });
+    const result = await closePosition({ positionId, userId, lots: lots, reason: reason as any, idempotencyKey: `monitor:${reason}:${positionId}:${Date.now()}` });
     logger.info(
       { positionId, userId, reason, exitPrice, realizedPnl: result.netPnlUsd, balance: result.accountBalanceKes },
       "Forex position closed by monitor",

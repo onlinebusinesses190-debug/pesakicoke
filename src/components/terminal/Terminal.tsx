@@ -56,8 +56,21 @@ export function Terminal({ mode: initialMode = "demo" }: { mode?: "demo" | "real
     return () => clearTimeout(t);
   }, [closeToast]);
 
-  const [flash, setFlash] = useState<"up" | "down" | "none">("none");
+  // Set position-closed callback so SL/TP/stop-out closures from backend
+  // also show the toast notification.
+  useEffect(() => {
+    if (mode !== "real") return;
+    e.setPositionClosedCallback((side, lots, pnl, reason) => {
+      setCloseToast({ side, lots, pnl, reason, time: Date.now() });
+    });
+    return () => {
+      e.setPositionClosedCallback(() => {});
+    };
+  }, [mode, e]);
+
   const prevBid = useRef(q?.bid);
+
+  const [flash, setFlash] = useState<"up" | "down" | "none">("none");
 
   useEffect(() => {
     if (!q) return;
@@ -80,11 +93,11 @@ export function Terminal({ mode: initialMode = "demo" }: { mode?: "demo" | "real
 
   const handleBulkClose = async (type: 'all' | 'profit' | 'loss') => {
     for (const p of e.positions) {
-      const pnl = e.profitOf(p);
-      if (type === 'all' || (type === 'profit' && pnl > 0) || (type === 'loss' && pnl < 0)) {
+      const pnlBefore = e.profitOf(p);
+      if (type === 'all' || (type === 'profit' && pnlBefore > 0) || (type === 'loss' && pnlBefore < 0)) {
         const res = await e.closePosition(p.ticket, "manual", p.lots);
         if (res.ok) {
-          setCloseToast({ side: p.side, lots: p.lots, pnl: e.profitOf(p), reason: "manual", time: Date.now() });
+          setCloseToast({ side: p.side, lots: p.lots, pnl: pnlBefore, reason: "manual", time: Date.now() });
         }
       }
     }
@@ -247,9 +260,10 @@ export function Terminal({ mode: initialMode = "demo" }: { mode?: "demo" | "real
                       <div className="flex justify-between items-center text-[10px] text-gray-500 font-mono">
                         <div>{p.openPrice.toFixed(digits)} → {closePrice.toFixed(digits)}</div>
                         <button onClick={async () => {
+                          const pnlBefore = e.profitOf(p);
                           const res = await e.closePosition(p.ticket, "manual", p.lots);
                           if (res.ok) {
-                            setCloseToast({ side: p.side, lots: p.lots, pnl: e.profitOf(p), reason: "manual", time: Date.now() });
+                            setCloseToast({ side: p.side, lots: p.lots, pnl: pnlBefore, reason: "manual", time: Date.now() });
                           }
                         }} className="bg-red-50 text-red-600 px-2 py-0.5 rounded text-[10px] font-bold hover:bg-red-100">Close</button>
                       </div>

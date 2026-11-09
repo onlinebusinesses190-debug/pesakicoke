@@ -430,15 +430,15 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
 
   fastify.post("/positions/:id/close", { preHandler: [verifyAuth] }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const { lots } = request.body as { lots?: number };
-    return closePosition(request, reply, id, lots);
+    const { lots, idempotency_key } = request.body as { lots?: number; idempotency_key?: string };
+    return closePosition(request, reply, id, lots, idempotency_key);
   });
 
   fastify.post("/positions/:id/partial-close", { preHandler: [verifyAuth] }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const parsed = z.object({ lots: z.number().positive() }).safeParse(request.body);
+    const parsed = z.object({ lots: z.number().positive(), idempotency_key: z.string().min(8).max(120).optional() }).safeParse(request.body);
     if (!parsed.success) return bad(reply, "Invalid close size");
-    return closePosition(request, reply, id, parsed.data.lots);
+    return closePosition(request, reply, id, parsed.data.lots, parsed.data.idempotency_key);
   });
 
   fastify.get("/transactions", { preHandler: [verifyAuth] }, async (request) => {
@@ -484,10 +484,13 @@ export const forexRoutes = async (fastify: FastifyInstance) => {
   fastify.get("/health", async () => ({ success: true, market: getEngine().describe(), realTradingEnabled: REAL_TRADING_ENABLED, symbols: SYMBOLS.length }));
 };
 
-async function closePosition(request: FastifyRequest, reply: FastifyReply, positionId: string, lotsToClose?: number) {
+async function closePosition(request: FastifyRequest, reply: FastifyReply, positionId: string, lotsToClose?: number, idempotencyKey?: string) {
   const userId = request.user!.id;
   try {
-    const result = await settlePosition({ positionId, userId, lots: lotsToClose });
+    const result = await settlePosition({ positionId, userId, lots: lotsToClose, idempotencyKey });
+    if (result.alreadyClosed) {
+      return { success: true, position: { id: result.positionId }, realizedPnl: 0, exitPrice: result.exitPrice, balance: result.accountBalanceKes, partial: false };
+    }
     return { 
       success: true, 
       position: { id: result.positionId },

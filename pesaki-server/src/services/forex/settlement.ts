@@ -6,6 +6,11 @@
  * fee and wallet-settlement semantics. It never trusts a client-supplied P/L;
  * everything is recomputed from the stored entry price, direction, size and the
  * engine's live executable quote at close time.
+ *
+ * The close is executed through a PostgreSQL transaction (forex_close_position_txn
+ * RPC) so position update, account adjustment, fee recording and idempotency
+ * tracking all happen atomically. Wallet settlement (margin release + P/L
+ * movement) happens after the DB transaction succeeds.
  */
 
 import { supabase } from "../../lib/supabase";
@@ -25,6 +30,7 @@ export interface CloseInput {
   userId: string;
   lots?: number; // undefined = full close
   reason?: "manual" | "stop_loss" | "take_profit" | "stop_out";
+  idempotencyKey?: string; // prevents duplicate close on retry
 }
 
 interface CloseResult {
@@ -42,15 +48,19 @@ interface CloseResult {
   accountBalanceKes: number;
   usedMargin: number;
   fullClose: boolean;
+  alreadyClosed?: boolean;
 }
 
-/** Authoritative close. Returns the settled result; caller persists it. */
+/** Authoritative close. Atomic via PostgreSQL transaction RPC. */
 export async function closePosition(input: CloseInput): Promise<CloseResult> {
-  const { positionId, userId, lots: lotsToClose, reason = "manual" } = input;
+  const { positionId, userId, lots: lotsToClose, reason = "manual", idempotencyKey } = input;
 
+  const idemKey = idempotencyKey ?? `close:${positionId}:${Date.now()}`;
+
+  // Fetch position to validate and get current state before the txn.
   const { data: position, error: posErr } = await supabase
     .from("forex_positions")
-    .select("*")
+    .select("*, forex_instruments(symbol, quote_currency)")
     .eq("id", positionId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -60,7 +70,11 @@ export async function closePosition(input: CloseInput): Promise<CloseResult> {
     throw new Error("Position already closed");
   }
 
-  const sym = await symbolForInstrument(position.instrument_id);
+  const sym = position.forex_instruments?.symbol
+    || (await (async () => {
+      const { data } = await supabase.from("forex_instruments").select("symbol").eq("id", position.instrument_id).maybeSingle();
+      return data?.symbol;
+    })());
   if (!sym) throw new Error("Unknown instrument");
   const baseSpec = getInstrument(sym);
   if (!baseSpec) throw new Error("Unknown instrument");
@@ -76,122 +90,67 @@ export async function closePosition(input: CloseInput): Promise<CloseResult> {
   }
   const closeLots = Number((remaining * fraction).toFixed(2));
   if (closeLots <= 0) throw new Error("Close amount must be > 0");
-  const full = closeLots >= remaining - 1e-9;
 
   const quote = getEngine().quote(spec.symbol);
   const exitPrice = position.side === "buy" ? quote.bid : quote.ask;
   const q2k = kesPerUnit(spec.quote);
 
-  // Recompute P/L from stored entry — never trust client P/L.
-  const delta = position.side === "buy" ? exitPrice - Number(position.average_entry_price)
-    : Number(position.average_entry_price) - exitPrice;
-  const realizedPnlUsd = closeLots * spec.contractSize * delta;
+  // Execute the atomic close transaction in PostgreSQL.
+  const { data: txnResult, error: txnError } = await supabase.rpc("forex_close_position_txn", {
+    p_position_id: positionId,
+    p_user_id: userId,
+    p_close_lots: closeLots,
+    p_exit_price: exitPrice,
+    p_quote_to_kes: q2k,
+    p_close_reason: reason,
+    p_idempotency_key: idemKey,
+  });
 
-  const openingFeeUsd = OPEN_FEE_USD;
-  const closingFeeUsd = CLOSE_FEE_USD;
-  const netPnlUsd = round(realizedPnlUsd - openingFeeUsd - closingFeeUsd, 4);
+  if (txnError) {
+    logger.error({ err: txnError.message, positionId }, "Forex close transaction failed");
+    throw new Error(txnError.message || "Close transaction failed");
+  }
 
-  const releasedMargin = full
-    ? Number(position.margin ?? 0)
-    : round(Number(position.margin ?? 0) * closeLots / remaining, 4);
+  const result = txnResult as any;
+  if (!result || !result.success) {
+    if (result?.already_closed) {
+      return {
+        success: true, positionId, side: position.side, lots: closeLots,
+        exitPrice: result.exit_price ?? 0, realizedPnlUsd: Number(result.realized_pnl_usd ?? 0),
+        realizedPnlKes: 0, openingFeeUsd: 0, closingFeeUsd: 0, netPnlUsd: 0,
+        releasedMargin: 0, accountBalanceKes: 0, usedMargin: 0, fullClose: false,
+        alreadyClosed: true,
+      };
+    }
+    throw new Error(result?.error || "Close rejected");
+  }
 
-  // Persist position close / partial-close.
-  const { error: updateErr } = await supabase
-    .from("forex_positions")
-    .update({
-      quantity: full ? 0 : round(remaining - closeLots, 4),
-      realized_pnl: round(Number(position.realized_pnl ?? 0) + realizedPnlUsd, 4),
-      closing_price: exitPrice,
-      close_reason: reason,
-      closed_at: full ? new Date().toISOString() : null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", positionId);
-  if (updateErr) throw updateErr;
-
-  // Record commission fees as transactions.
-  const acctId = position.account_id;
+  // Live wallet settlement (margin release + P/L wallet movement) happens
+  // outside the DB transaction since it calls external wallet RPCs.
+  // Determine live/demo from account type.
   const { data: acctRow } = await supabase
     .from("forex_accounts")
-    .select("balance, used_margin")
-    .eq("id", acctId)
-    .maybeSingle();
-  const curBalanceKes = Number(acctRow?.balance ?? 0);
-  const curMarginKes = Number(acctRow?.used_margin ?? 0);
-
-  const netPnlKes = round(netPnlUsd * q2k, 4);
-  const newBalanceKes = round(curBalanceKes + netPnlKes, 4);
-  const newMarginKes = Math.max(0, round(curMarginKes - releasedMargin, 4));
-
-  const { error: acctErr } = await supabase
-    .from("forex_accounts")
-    .update({
-      balance: newBalanceKes,
-      used_margin: newMarginKes,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", acctId);
-  if (acctErr) throw acctErr;
-
-  // Record transaction lines for the P/L and both fees.
-  await supabase.from("forex_transactions").insert([
-    {
-      user_id: userId,
-      account_id: acctId,
-      position_id: positionId,
-      type: "realized_pnl",
-      amount: round(realizedPnlUsd * q2k, 4),
-      balance_after: newBalanceKes,
-      status: "completed",
-      reference: full ? "close" : "partial_close",
-      note: `${spec.symbol} ${position.side} ${closeLots} lots @ ${exitPrice}`,
-    },
-    {
-      user_id: userId,
-      account_id: acctId,
-      position_id: positionId,
-      type: "commission",
-      amount: round(openingFeeUsd * q2k, 4),
-      balance_after: newBalanceKes,
-      status: "completed",
-      reference: `open-fee:${positionId}`,
-      note: `Opening commission ${spec.symbol} ${position.side}`,
-    },
-    {
-      user_id: userId,
-      account_id: acctId,
-      position_id: positionId,
-      type: "commission",
-      amount: round(-closingFeeUsd * q2k, 4),
-      balance_after: newBalanceKes,
-      status: "completed",
-      reference: `close-fee:${positionId}`,
-      note: `Closing commission ${spec.symbol} ${position.side}`,
-    },
-  ]);
-
-  // Live wallet settlement (margin release + P/L wallet movement).
-  const accountRow = await supabase
-    .from("forex_accounts")
     .select("account_type")
-    .eq("id", acctId)
+    .eq("id", position.account_id)
     .maybeSingle();
-  const isLive = accountRow?.data?.account_type === "live";
-  if (isLive) {
+  const isLiveAccount = acctRow?.account_type === "live";
+
+  if (isLiveAccount) {
     const legs = settlementLegs({
       side: position.side as "buy" | "sell",
       units: closeLots * spec.contractSize,
       entryPrice: Number(position.average_entry_price),
       exitPrice,
       quoteToKes: q2k,
-      margin: releasedMargin,
+      margin: Number(result.releasedMargin ?? 0),
     });
-    const closingCommissionKes = closingFeeUsd * q2k;
+    const closingCommissionKes = Number(result.closingFeeUsd ?? 0) * q2k;
     const netProfitAfterCommission = legs.profit - legs.loss - closingCommissionKes;
-    const settlement = await settleReal(userId, releasedMargin, netProfitAfterCommission, `close:${positionId}`);
+    const settlement = await settleReal(userId, Number(result.releasedMargin ?? 0), netProfitAfterCommission, `close:${positionId}`);
     if (!settlement.ok) {
-      logger.error({ err: settlement.reason, positionId }, "Live settlement failed");
-      throw new Error("Settlement pending");
+      logger.error({ err: settlement.reason, positionId }, "Live wallet settlement failed — needs reconciliation");
+      // DB transaction already committed; surface the error so it can be reconciled.
+      throw new Error("Settlement pending — DB updated, wallet needs reconciliation");
     }
   }
 
@@ -200,28 +159,15 @@ export async function closePosition(input: CloseInput): Promise<CloseResult> {
     positionId,
     side: position.side,
     lots: closeLots,
-    exitPrice,
-    realizedPnlUsd: round(realizedPnlUsd, 4),
-    realizedPnlKes: round(realizedPnlUsd * q2k, 4),
-    openingFeeUsd,
-    closingFeeUsd,
-    netPnlUsd,
-    releasedMargin,
-    accountBalanceKes: newBalanceKes,
-    usedMargin: newMarginKes,
-    fullClose: full,
+    exitPrice: Number(result.exitPrice ?? exitPrice),
+    realizedPnlUsd: Number(result.realizedPnlUsd ?? 0),
+    realizedPnlKes: Number(result.realizedPnlKes ?? 0),
+    openingFeeUsd: Number(result.openingFeeUsd ?? 0),
+    closingFeeUsd: Number(result.closingFeeUsd ?? 0),
+    netPnlUsd: Number(result.netPnlUsd ?? 0),
+    releasedMargin: Number(result.releasedMargin ?? 0),
+    accountBalanceKes: Number(result.accountBalanceKes ?? 0),
+    usedMargin: Number(result.usedMargin ?? 0),
+    fullClose: Boolean(result.fullClose),
   };
-}
-
-async function symbolForInstrument(instrumentId: number): Promise<string | undefined> {
-  const { data } = await supabase
-    .from("forex_instruments")
-    .select("symbol")
-    .eq("id", instrumentId)
-    .maybeSingle();
-  return data?.symbol ?? undefined;
-}
-
-function round(v: number, d: number): number {
-  return Math.round(v * Math.pow(10, d)) / Math.pow(10, d);
 }

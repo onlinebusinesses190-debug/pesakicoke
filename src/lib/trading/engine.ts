@@ -2,6 +2,7 @@
 // Demo: 100% local (localStorage). Real: backed by Supabase wallet API.
 
 import { apiRequest } from "../../utils/api";
+import { supabase } from "../../utils/supabase/client";
 
 export const TIMEFRAMES = { M1: 60, M5: 300, M15: 900, M30: 1800, H1: 3600, H4: 14400 } as const;
 export type TF = keyof typeof TIMEFRAMES;
@@ -125,6 +126,9 @@ export class Engine {
   private isTrading = false;
   private _liveEntryPrices = new Map<string, number>();
   private livePollInterval: number | null = null;
+  private _realtimeChannels: Map<string, any> = new Map();
+  private _liveUserId: string | null = null;
+  private _onPositionClosed: ((side: string, lots: number, pnl: number, reason: string) => void) | null = null;
   _entryPriceMap = new Map<number | string, number>();
 
   constructor() {
@@ -417,6 +421,84 @@ export class Engine {
     }
   }
 
+  // ─── REALTIME SUBSCRIPTIONS ───
+  /** Set a callback fired when a position is closed (by SL/TP/stop-out/manual via backend). */
+  setPositionClosedCallback(cb: (side: string, lots: number, pnl: number, reason: string) => void): void {
+    this._onPositionClosed = cb;
+  }
+
+  private startRealtimeSubscriptions(userId: string): void {
+    this._liveUserId = userId;
+
+    // Subscribe to position changes (closes, SL/TP triggers, stop-outs).
+    const positionsChannel = supabase
+      .channel(`forex-positions:${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "forex_positions",
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload: any) => {
+          const p = payload.new as any;
+          const old = payload.old as any;
+          // Position was closed (closed_at went from null to a timestamp).
+          if (!old.closed_at && p.closed_at) {
+            const reason = p.close_reason || "manual";
+            const lots = Number(p.quantity ?? 0);
+            const side = p.side;
+            // Compute P/L from stored entry vs closing price.
+            const entry = Number(p.average_entry_price ?? 0);
+            const close = Number(p.closing_price ?? 0);
+            const spec = this.spec((p.symbol || "EURUSD").replace("/", ""));
+            const contract = spec?.contract ?? 10000;
+            const delta = side === "buy" ? close - entry : entry - close;
+            const pnl = round(lots * contract * delta, 2);
+            if (this._onPositionClosed) {
+              this._onPositionClosed(side, lots, pnl, reason);
+            }
+            // Refresh positions from backend to stay in sync.
+            void this.fetchLivePositions();
+          }
+        }
+      )
+      .subscribe();
+    this._realtimeChannels.set("positions", positionsChannel);
+
+    // Subscribe to account balance changes.
+    const accountsChannel = supabase
+      .channel(`forex-accounts:${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "forex_accounts",
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload: any) => {
+          const acct = payload.new as any;
+          if (acct.account_type === "live") {
+            this._liveBalanceKes = Number(acct.balance ?? 0);
+            this.setLiveSync({ loading: false, error: null, lastFetchTime: Date.now() });
+            this.emit();
+          }
+        }
+      )
+      .subscribe();
+    this._realtimeChannels.set("accounts", accountsChannel);
+  }
+
+  private stopRealtimeSubscriptions(): void {
+    this._realtimeChannels.forEach((ch) => {
+      supabase.removeChannel(ch);
+    });
+    this._realtimeChannels.clear();
+    this._liveUserId = null;
+  }
+
   async setMode(mode: "demo" | "live") {
     this.mode = mode;
     this.log(mode === "live" ? "Live trading enabled" : "Demo trading");
@@ -425,8 +507,18 @@ export class Engine {
       await this.fetchLivePositions();
       await this.fetchLiveHistory();
       this.startLiveBalancePolling();
+      // Start realtime subscriptions; userId is needed — fetch from session.
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+          this.startRealtimeSubscriptions(session.user.id);
+        }
+      } catch (e) {
+        console.error("Failed to start realtime subscriptions:", e);
+      }
     } else {
       this.stopLiveBalancePolling();
+      this.stopRealtimeSubscriptions();
     }
     this.emit();
   }
