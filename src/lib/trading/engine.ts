@@ -127,6 +127,7 @@ export class Engine {
   private _liveEntryPrices = new Map<string, number>();
   private livePollInterval: number | null = null;
   private _realtimeChannels: Map<string, any> = new Map();
+  private _realtimeStarted = false;
   private _liveUserId: string | null = null;
   private _onPositionClosed: ((side: string, lots: number, pnl: number, reason: string) => void) | null = null;
   _entryPriceMap = new Map<number | string, number>();
@@ -428,7 +429,10 @@ export class Engine {
   }
 
   private startRealtimeSubscriptions(userId: string): void {
+    // Prevent duplicate subscriptions on the same channel.
+    if (this._realtimeStarted) return;
     this._liveUserId = userId;
+    this._realtimeStarted = true;
 
     // Subscribe to position changes (closes, SL/TP triggers, stop-outs).
     const positionsChannel = supabase
@@ -492,6 +496,7 @@ export class Engine {
   }
 
   private stopRealtimeSubscriptions(): void {
+    this._realtimeStarted = false;
     this._realtimeChannels.forEach((ch) => {
       supabase.removeChannel(ch);
     });
