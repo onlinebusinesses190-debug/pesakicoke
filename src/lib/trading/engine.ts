@@ -281,7 +281,7 @@ export class Engine {
   }
 
   async fetchLivePositions(): Promise<void> {
-    try {
+    await this.fetchLiveWithRetry(async () => {
       this.setLiveSync({ loading: true, error: null });
       const data = await apiRequest<{ success: boolean; positions: any[] }>(
         `/forex/positions?mode=live`
@@ -354,12 +354,24 @@ export class Engine {
           this.emit();
         }
       }
-    } catch (e: any) {
-      // IMPORTANT: Never treat a failed request as an empty list. Keep the
-      // last known good positions so trades don't disappear on transient
-      // network failures. Only surface a warning to the user.
-      this.setLiveSync({ loading: false, error: e?.message || "Failed to load live positions" });
-      console.error("Failed to fetch live positions:", e);
+    });
+  }
+
+  /** Public entry point to (re)sync live state. Safe to call multiple times. */
+  async syncLive(): Promise<void> {
+    if (this.mode !== "live") return;
+    await this.fetchLiveBalance();
+    await this.fetchLivePositions();
+    await this.fetchLiveHistory();
+    if (!this._realtimeStarted) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+          this.startRealtimeSubscriptions(session.user.id);
+        }
+      } catch (e) {
+        console.error("Failed to start realtime subscriptions:", e);
+      }
     }
   }
 
@@ -508,19 +520,7 @@ export class Engine {
     this.mode = mode;
     this.log(mode === "live" ? "Live trading enabled" : "Demo trading");
     if (mode === "live") {
-      await this.fetchLiveBalance();
-      await this.fetchLivePositions();
-      await this.fetchLiveHistory();
-      this.startLiveBalancePolling();
-      // Start realtime subscriptions; userId is needed — fetch from session.
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user?.id) {
-          this.startRealtimeSubscriptions(session.user.id);
-        }
-      } catch (e) {
-        console.error("Failed to start realtime subscriptions:", e);
-      }
+      await this.syncLive();
     } else {
       this.stopLiveBalancePolling();
       this.stopRealtimeSubscriptions();
