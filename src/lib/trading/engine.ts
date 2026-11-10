@@ -168,6 +168,7 @@ export class Engine {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ 
         demoBalance: this._demoBalance, demoPositions: this._demoPositions, demoOrders: this._demoOrders, demoHistory: this._demoHistory.slice(0, 500), 
+        liveBalanceKes: this._liveBalanceKes, livePositions: this._livePositions, liveEntryPrices: Array.from(this._liveEntryPrices.entries()), entryPriceMap: Array.from(this._entryPriceMap.entries()),
         journal: this.journal.slice(0, 300), nextTicket: this.nextTicket, tickCount: this.tickCount, 
         quotePrices: Object.fromEntries(Object.entries(this.quotes).map(([k, v]) => [k, { bid: v.bid, ask: v.ask, high: v.high, low: v.low, open: v.open }])), 
         candles: this.candles 
@@ -180,6 +181,11 @@ export class Engine {
       const raw = localStorage.getItem(STORAGE_KEY); if (!raw) return;
       const d = JSON.parse(raw);
       this._demoBalance = d.demoBalance ?? START_BALANCE; this._demoPositions = d.demoPositions ?? []; this._demoOrders = d.demoOrders ?? []; this._demoHistory = d.demoHistory ?? [];
+      this._liveBalanceKes = Number(d.liveBalanceKes ?? 0);
+      this._livePositions = d.livePositions ?? [];
+      // Restore entry price maps so chart markers survive refresh without backend round-trip.
+      if (Array.isArray(d.liveEntryPrices)) { for (const [k, v] of d.liveEntryPrices) { this._liveEntryPrices.set(String(k), Number(v)); } }
+      if (Array.isArray(d.entryPriceMap)) { for (const [k, v] of d.entryPriceMap) { this._entryPriceMap.set(k, Number(v)); } }
       
       this.journal = d.journal ?? []; this.nextTicket = d.nextTicket ?? this.nextTicket; this.tickCount = d.tickCount ?? 0;
       if (d.quotePrices) { for (const [symbol, q] of Object.entries(d.quotePrices as Record<string, { bid: number; ask: number; high: number; low: number; open: number }>)) { if (this.quotes[symbol]) { const s = this.spec(symbol); if (s) { this.quotes[symbol].bid = q.bid; this.quotes[symbol].ask = q.ask; this.quotes[symbol].high = q.high; this.quotes[symbol].low = q.low; this.quotes[symbol].open = q.open; } } } }
@@ -240,6 +246,7 @@ export class Engine {
         await this.fetchLiveBalance();
         await this.fetchLivePositions();
         await this.fetchLiveHistory();
+        this.save();
         this.log(`position #${ticket} closed ${closeLots.toFixed(2)} ${p.symbol} via backend`);
         this.emit(); return { ok: true };
       } catch (e: any) {
@@ -351,6 +358,7 @@ export class Engine {
             }
           }
           this.setLiveSync({ loading: false, error: null });
+          this.save();
           this.emit();
         }
       }
@@ -669,6 +677,7 @@ export class Engine {
           tp: tp || 0,
           backendId,
         });
+        this.save();
         await this.fetchLiveBalance();
         await this.fetchLivePositions();
         return { ok: true, ticket: newTicket, backendId };
