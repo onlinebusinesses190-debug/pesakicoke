@@ -169,3 +169,124 @@ export const sasaPayWithdrawToMobile = async (
 
   return data;
 };
+
+// ─── Helper: top up PayHero wallet ─────────────────────────────────
+export interface PayHeroTopUpRequest {
+  amount: number;
+  phone_number: string;
+}
+
+export interface PayHeroTopUpResponse {
+  success: boolean;
+  reference_id?: string;
+  status?: string;
+  message?: string;
+  [key: string]: any;
+}
+
+export const topUpWallet = async (
+  amount: number,
+  phone_number: string
+): Promise<PayHeroTopUpResponse> => {
+  const baseUrl = env.PAYHERO_BASE_URL?.replace(/\/$/, '');
+  const topupPath = env.PAYHERO_TOPUP_ENDPOINT || '/api/v2/topup';
+
+  if (!baseUrl) {
+    throw new Error('PAYHERO_BASE_URL environment variable is not set');
+  }
+
+  const endpoint = `${baseUrl}${topupPath}`;
+
+  const payload: PayHeroTopUpRequest = {
+    amount,
+    phone_number,
+  };
+
+  const authHeader = getPayHeroBasicAuth();
+
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  let response!: Response;
+  let responseText = '';
+  let attempts = 0;
+  const maxAttempts = 3;
+
+  while (attempts < maxAttempts) {
+    attempts += 1;
+
+    logger.info(
+      {
+        url: endpoint,
+        auth: authHeader.slice(0, 20) + '...',
+        body: payload,
+        attempt: attempts,
+      },
+      'PAYHERO_TOPUP_REQUEST'
+    );
+
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: authHeader,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    responseText = await response.text();
+
+    logger.info(
+      {
+        status: response.status,
+        body: responseText,
+        attempt: attempts,
+      },
+      'PAYHERO_TOPUP_RESPONSE'
+    );
+
+    if (response.status !== 404) {
+      break;
+    }
+
+    if (attempts < maxAttempts) {
+      logger.warn(
+        { status: response.status, attempt: attempts },
+        'PAYHERO_TOPUP_404_RETRY'
+      );
+      await sleep(1000);
+    }
+  }
+
+  let data: any;
+
+  try {
+    data = JSON.parse(responseText);
+  } catch {
+    logger.error(
+      { status: response.status, responseText },
+      'Invalid JSON from PayHero top-up'
+    );
+    const err = new Error('Invalid response from PayHero');
+    (err as any).status = response.status;
+    (err as any).responseBody = responseText;
+    throw err;
+  }
+
+  if (!response.ok || data.success === false) {
+    const providerCode = data?.code || data?.error_code;
+    const providerMessage =
+      data?.message || data?.error_message || data?.description || 'PayHero top-up failed';
+    logger.error(
+      { status: response.status, providerCode, providerMessage, data },
+      'PayHero top-up failed'
+    );
+    const err = new Error(providerMessage);
+    (err as any).status = response.status;
+    (err as any).providerCode = providerCode;
+    (err as any).providerMessage = providerMessage;
+    (err as any).responseBody = data;
+    throw err;
+  }
+
+  return data;
+};

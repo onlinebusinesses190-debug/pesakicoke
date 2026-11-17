@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { supabase } from '../lib/supabase';
 import { verifyAdmin } from '../middleware/adminAuth';
 import { logger } from '../utils/logger';
+import { topUpWallet } from '../payhero/service';
 
 type QueryParams = Record<string, string | undefined>;
 
@@ -2481,6 +2482,138 @@ export default async function adminRoutes(server: FastifyInstance) {
         return reply.send({ success: false, error: 'Failed to reject deposit' });
       }
     },
+  );
+
+  // ─── POST /api/admin/payhero/topup ───────────────────────────────────
+  server.post(
+    '/api/admin/payhero/topup',
+    { preHandler: [verifyAdmin] },
+    async (request, reply) => {
+      try {
+        const adminId = request.adminUser!.id;
+        const { amount, phone_number } = request.body as {
+          amount: number;
+          phone_number: string;
+        };
+
+        if (!amount || amount <= 0) {
+          return reply.status(400).send({
+            success: false,
+            error: 'Invalid amount',
+          });
+        }
+
+        if (!phone_number || !/^254\d{9}$/.test(phone_number)) {
+          return reply.status(400).send({
+            success: false,
+            error: 'Phone number must be in format 2547XXXXXXXX',
+          });
+        }
+
+        // Record the top-up attempt as PENDING
+        const { data: topUpRecord, error: insertError } = await supabase
+          .from('wallet_top_ups')
+          .insert({
+            admin_id: adminId,
+            amount,
+            phone_number,
+            status: 'PENDING',
+            metadata: { source: 'admin_dashboard' },
+          })
+          .select('id')
+          .single();
+
+        if (insertError || !topUpRecord) {
+          logger.error({ insertError, adminId }, 'Failed to create top-up record');
+          return reply.status(500).send({
+            success: false,
+            error: 'Failed to initialize top-up',
+          });
+        }
+
+        let payHeroResponse: any;
+        try {
+          payHeroResponse = await topUpWallet(amount, phone_number);
+        } catch (apiError: any) {
+          await supabase
+            .from('wallet_top_ups')
+            .update({
+              status: 'FAILED',
+              provider_response: {
+                error: apiError.message,
+                provider_code: apiError.providerCode,
+                provider_message: apiError.providerMessage,
+                http_status: apiError.status,
+                response_body: apiError.responseBody,
+              },
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', topUpRecord.id);
+
+          logger.error(
+            {
+              topUpId: topUpRecord.id,
+              adminId,
+              amount,
+              phone_number,
+              error: apiError.message,
+              providerCode: apiError.providerCode,
+              providerMessage: apiError.providerMessage,
+            },
+            'PAYHERO_TOPUP_FAILED'
+          );
+
+          return reply.status(500).send({
+            success: false,
+            error: 'PayHero top-up rejected the payout',
+            status: apiError.status,
+            providerCode: apiError.providerCode,
+            providerMessage: apiError.providerMessage,
+            responseBody: apiError.responseBody,
+          });
+        }
+
+        await supabase
+          .from('wallet_top_ups')
+          .update({
+            status: 'QUEUED',
+            reference_id: payHeroResponse?.reference_id || payHeroResponse?.referenceId || null,
+            provider_response: payHeroResponse,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', topUpRecord.id);
+
+        await logAction(adminId, 'payhero_topup', topUpRecord.id, 'wallet_top_up', {
+          amount,
+          phone_number,
+          reference_id: payHeroResponse?.reference_id || payHeroResponse?.referenceId || null,
+        });
+
+        logger.info(
+          {
+            topUpId: topUpRecord.id,
+            adminId,
+            amount,
+            phone_number,
+            referenceId: payHeroResponse?.reference_id || payHeroResponse?.referenceId,
+          },
+          'PAYHERO_TOPUP_INITIATED'
+        );
+
+        return reply.send({
+          success: true,
+          data: {
+            topUpId: topUpRecord.id,
+            status: 'QUEUED',
+            message: 'PayHero wallet top-up initiated. Check your phone for the M-Pesa STK Push.',
+            referenceId: payHeroResponse?.reference_id || payHeroResponse?.referenceId || null,
+          },
+        });
+      } catch (error) {
+        logger.error(error, 'Error in POST /api/admin/payhero/topup');
+        return reply.status(500).send({ success: false, error: 'Internal server error' });
+      }
+    }
   );
 
   logger.info('✅ All admin routes registered');
