@@ -61,6 +61,7 @@ export const sasaPayWithdrawToMobile = async (
 ): Promise<PayHeroSasaPayResponse> => {
   const baseUrl = env.PAYHERO_BASE_URL?.replace(/\/$/, '');
   const accountId = env.PAYHERO_ACCOUNT_ID;
+  const withdrawPath = env.PAYHERO_WITHDRAW_ENDPOINT || '/sasa-pay/withdraw';
 
   if (!baseUrl) {
     throw new Error('PAYHERO_BASE_URL environment variable is not set');
@@ -69,7 +70,7 @@ export const sasaPayWithdrawToMobile = async (
     throw new Error('PAYHERO_ACCOUNT_ID environment variable is not set');
   }
 
-  const endpoint = `${baseUrl}/sasa-pay/withdraw`;
+  const endpoint = `${baseUrl}${withdrawPath}`;
 
   const payload: PayHeroSasaPayRequest = {
     amount,
