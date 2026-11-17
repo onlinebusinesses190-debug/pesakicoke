@@ -3,7 +3,7 @@ import { logger } from '../utils/logger';
 
 export interface PayHeroSasaPayRequest {
   amount: number;
-  phone: string;
+  phone_number: string;
   network_code: string;
   external_reference: string;
   callback_url: string;
@@ -61,7 +61,7 @@ export const sasaPayWithdrawToMobile = async (
 ): Promise<PayHeroSasaPayResponse> => {
   const baseUrl = env.PAYHERO_BASE_URL?.replace(/\/$/, '');
   const accountId = env.PAYHERO_ACCOUNT_ID;
-  const withdrawPath = env.PAYHERO_WITHDRAW_ENDPOINT || '/sasa-pay/withdraw';
+  const withdrawPath = env.PAYHERO_WITHDRAW_ENDPOINT || '/api/v2/withdraw';
 
   if (!baseUrl) {
     throw new Error('PAYHERO_BASE_URL environment variable is not set');
@@ -74,7 +74,7 @@ export const sasaPayWithdrawToMobile = async (
 
   const payload: PayHeroSasaPayRequest = {
     amount,
-    phone,
+    phone_number: phone,
     network_code,
     external_reference,
     callback_url,
@@ -82,34 +82,59 @@ export const sasaPayWithdrawToMobile = async (
 
   const authHeader = getPayHeroBasicAuth();
 
-  logger.info(
-    {
-      url: endpoint,
-      auth: authHeader.slice(0, 20) + '...',
-      body: payload,
-    },
-    'PAYHERO_SASAPAY_WITHDRAW_REQUEST'
-  );
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: authHeader,
-    },
-    body: JSON.stringify(payload),
-  });
+  let response!: Response;
+  let responseText = '';
+  let attempts = 0;
+  const maxAttempts = 3;
 
-  const responseText = await response.text();
+  while (attempts < maxAttempts) {
+    attempts += 1;
 
-  logger.info(
-    {
-      status: response.status,
-      body: responseText,
-      reference: external_reference,
-    },
-    'PAYHERO_SASAPAY_WITHDRAW_RESPONSE'
-  );
+    logger.info(
+      {
+        url: endpoint,
+        auth: authHeader.slice(0, 20) + '...',
+        body: payload,
+        attempt: attempts,
+      },
+      'PAYHERO_SASAPAY_WITHDRAW_REQUEST'
+    );
+
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: authHeader,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    responseText = await response.text();
+
+    logger.info(
+      {
+        status: response.status,
+        body: responseText,
+        reference: external_reference,
+        attempt: attempts,
+      },
+      'PAYHERO_SASAPAY_WITHDRAW_RESPONSE'
+    );
+
+    if (response.status !== 404) {
+      break;
+    }
+
+    if (attempts < maxAttempts) {
+      logger.warn(
+        { status: response.status, reference: external_reference, attempt: attempts },
+        'PAYHERO_SASAPAY_WITHDRAW_404_RETRY'
+      );
+      await sleep(1000);
+    }
+  }
 
   let data: any;
 
