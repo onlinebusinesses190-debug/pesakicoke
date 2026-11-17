@@ -21,6 +21,7 @@ import kaziRoutes from './routes/kazi';
 import { mpesaRoutes } from './routes/mpesa';
 import { palplussRoutes } from './routes/palpluss';
 import { bankingRoutes } from './routes/banking';
+import { payheroRoutes } from './routes/payhero';
 import referralRoutes from './routes/referrals';
 import adminRoutes from './routes/admin';
 import userRoutes from './routes/user';
@@ -105,6 +106,7 @@ const startServer = async () => {
     server.register(mpesaRoutes);
     server.register(palplussRoutes);
     server.register(bankingRoutes);
+    server.register(payheroRoutes);
     server.register(referralRoutes);
     server.register(adminRoutes);
     server.register(userRoutes);

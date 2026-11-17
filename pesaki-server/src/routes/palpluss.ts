@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { env } from '../config/env';
 import { getBalance, reserveLockedFunds, releaseLockedFunds } from '../wallet/service';
 import { calculateWithdrawalFee, MIN_WITHDRAWAL } from '../utils/fees';
+import { sasaPayWithdrawToMobile, networkCodeForPhone } from '../payhero/service';
 
 const MIN_WITHDRAWAL_AMOUNT = MIN_WITHDRAWAL;
 
@@ -374,11 +375,50 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
         );
 
         const callbackBase = env.MPESA_CALLBACK_URL || 'https://pesaki-server.onrender.com';
-        const callbackUrl = `${callbackBase.replace(/\/$/, '')}/api/webhooks/palpluss`;
+        const providerPath = env.USE_PAYHERO_FOR_WITHDRAWALS ? 'payhero' : 'palpluss';
+        const callbackUrl = `${callbackBase.replace(/\/$/, '')}/api/webhooks/${providerPath}`;
 
-        let palplussResponse: any;
+        let providerResponse: any;
+        let providerTransactionId: string | null = null;
+        let providerCheckoutId: string | null = null;
+        let providerMetadataKey: string;
+
         try {
-          palplussResponse = await callPalplussB2C(payoutAmount, cleanPhone, reference, callbackUrl);
+          if (env.USE_PAYHERO_FOR_WITHDRAWALS) {
+            const networkCode = networkCodeForPhone(cleanPhone);
+            providerResponse = await sasaPayWithdrawToMobile(
+              payoutAmount,
+              cleanPhone,
+              networkCode,
+              reference,
+              callbackUrl
+            );
+            providerTransactionId =
+              providerResponse?.transaction_id ||
+              providerResponse?.transactionId ||
+              null;
+            providerCheckoutId =
+              providerResponse?.provider_checkout_id ||
+              providerResponse?.providerCheckoutId ||
+              null;
+            providerMetadataKey = 'payhero_response';
+
+            logger.info(
+              {
+                reference,
+                userId: user.id,
+                networkCode,
+                transactionId: providerTransactionId,
+                response: providerResponse,
+              },
+              'WITHDRAWAL_REQUESTED | PAYHERO_RESPONSE'
+            );
+          } else {
+            providerResponse = await callPalplussB2C(payoutAmount, cleanPhone, reference, callbackUrl);
+            providerTransactionId = providerResponse?.transactionId || null;
+            providerCheckoutId = providerResponse?.providerCheckoutId || null;
+            providerMetadataKey = 'palpluss_response';
+          }
         } catch (apiError: any) {
           await releaseLockedFunds(user.id, amount, true);
 
@@ -407,7 +447,7 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
               status: apiError.status,
               responseBody: apiError.responseBody,
             },
-            'WITHDRAWAL_FAILED | PALPLUSS_REQUEST_FAILED'
+            'WITHDRAWAL_FAILED | WITHDRAWAL_PROVIDER_REQUEST_FAILED'
           );
 
           return reply.status(500).send({
@@ -450,15 +490,19 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
           .from('b2c_withdrawals')
           .update({
             status: 'completed',
-            provider_transaction_id: palplussResponse?.transactionId || null,
-            provider_checkout_id: palplussResponse?.providerCheckoutId || null,
-            metadata: { palpluss_response: palplussResponse, fee, payout_amount: payoutAmount },
+            provider_transaction_id: providerTransactionId,
+            provider_checkout_id: providerCheckoutId,
+            metadata: {
+              [providerMetadataKey]: providerResponse,
+              fee,
+              payout_amount: payoutAmount,
+            },
             completed_at: new Date().toISOString(),
           })
           .eq('id', withdrawal.id);
 
         logger.info(
-          { reference, userId: user.id, amount, fee, payoutAmount, transactionId: palplussResponse?.transactionId },
+          { reference, userId: user.id, amount, fee, payoutAmount, transactionId: providerTransactionId },
           'WITHDRAWAL_COMPLETED'
         );
 

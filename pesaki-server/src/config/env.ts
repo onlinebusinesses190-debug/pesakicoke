@@ -16,6 +16,13 @@ const envSchema = z.object({
   MPESA_CALLBACK_URL: z.string().url().optional(),
   PALPLUSS_API_KEY: z.string().optional(),
   PALPLUSS_API_URL: z.string().url().optional(),
+
+  PAYHERO_API_USERNAME: z.string().optional(),
+  PAYHERO_API_PASSWORD: z.string().optional(),
+  PAYHERO_ACCOUNT_ID: z.string().optional(),
+  PAYHERO_BASE_URL: z.string().url().optional(),
+
+  USE_PAYHERO_FOR_WITHDRAWALS: z.string().optional().transform((val) => val === 'true'),
 });
 
 const parsed = envSchema.safeParse(process.env);

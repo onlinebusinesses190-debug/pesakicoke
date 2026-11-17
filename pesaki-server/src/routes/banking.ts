@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { logger } from '../utils/logger';
 import { env } from '../config/env';
 import { calculateWithdrawalFee, MIN_DEPOSIT, MIN_WITHDRAWAL } from '../utils/fees';
+import { sasaPayWithdrawToMobile, networkCodeForPhone } from '../payhero/service';
 
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -858,9 +859,35 @@ export const bankingRoutes = async (fastify: FastifyInstance) => {
       if (payoutAmount < 10) return reply.status(400).send({ error: 'After fee deduction, payout must be at least KES 10', fee, payoutAmount, minimum: 10 });
       const reference = `WD-BANK-${user.id.slice(0, 8)}-${Date.now()}`;
       const callbackBase = env.MPESA_CALLBACK_URL || 'https://pesaki-server.onrender.com';
-      const callbackUrl = `${callbackBase.replace(/\/$/, '')}/api/webhooks/palpluss`;
+      const providerPath = env.USE_PAYHERO_FOR_WITHDRAWALS ? 'payhero' : 'palpluss';
+      const callbackUrl = `${callbackBase.replace(/\/$/, '')}/api/webhooks/${providerPath}`;
+
       try {
-        await callPalplussB2C(payoutAmount, digits, reference, callbackUrl);
+        if (env.USE_PAYHERO_FOR_WITHDRAWALS) {
+          const normalizePhone = (value: string) => {
+            const d = value.replace(/\D/g, '');
+            if (!d) return '';
+            if (d.startsWith('254') && d.length === 12) return d;
+            if (d.startsWith('0') && d.length === 10) return `254${d.slice(1)}`;
+            if (d.length === 9) return `254${d}`;
+            return d;
+          };
+          const payHeroPhone = normalizePhone(digits);
+          const networkCode = networkCodeForPhone(payHeroPhone);
+          await sasaPayWithdrawToMobile(
+            payoutAmount,
+            payHeroPhone,
+            networkCode,
+            reference,
+            callbackUrl
+          );
+          logger.info(
+            { reference, userId: user.id, networkCode, phone: payHeroPhone },
+            'BANKING_WITHDRAWAL_REQUESTED | PAYHERO'
+          );
+        } else {
+          await callPalplussB2C(payoutAmount, digits, reference, callbackUrl);
+        }
       } catch (apiError: any) {
         return reply.status(500).send({
           success: false,
