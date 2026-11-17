@@ -22,7 +22,7 @@ const envSchema = z.object({
   PAYHERO_ACCOUNT_ID: z.string().optional(),
   PAYHERO_BASE_URL: z.string().url().optional(),
 
-  USE_PAYHERO_FOR_WITHDRAWALS: z.string().optional().transform((val) => val === 'true'),
+  USE_PAYHERO_FOR_WITHDRAWALS: z.string().optional().transform((val) => val !== 'false'),
 });
 
 const parsed = envSchema.safeParse(process.env);
