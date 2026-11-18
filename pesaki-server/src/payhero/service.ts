@@ -101,7 +101,7 @@ export const sasaPayWithdrawToMobile = async (
     external_reference,
     callback_url,
     channel: 'mobile',
-    channel_id: channelId,
+    channel_id: Number(channelId),
     payment_service: 'b2c',
   };
 
