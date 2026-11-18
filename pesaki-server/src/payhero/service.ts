@@ -55,7 +55,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const fetchWithTimeout = (
   url: string,
   options: RequestInit,
-  timeoutMs: number = 30000
+  timeoutMs: number = 120000
 ): Promise<Response> => {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -123,7 +123,7 @@ export const sasaPayWithdrawToMobile = async (
           Authorization: authHeader,
         },
         body: JSON.stringify(payload),
-      }, 30000);
+      }, 120000);
 
       responseText = await response.text();
 
@@ -258,7 +258,7 @@ export const topUpWallet = async (
           Authorization: authHeader,
         },
         body: JSON.stringify(payload),
-      }, 30000);
+      }, 120000);
 
       responseText = await response.text();
 
