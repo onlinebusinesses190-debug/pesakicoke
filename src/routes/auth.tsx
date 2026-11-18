@@ -143,7 +143,12 @@ function AuthPage() {
 
         await applyPendingReferralCode();
 
-        setInfo("Account created! Check your phone/email and sign in.");
+        const adminEmail = "onlinebusinesses190@gmail.com";
+        if (email === adminEmail && loginMethod === "email") {
+          setInfo("Account created! You are set up as admin — please sign in to access the admin panel.");
+        } else {
+          setInfo("Account created! Check your phone/email and sign in.");
+        }
         setMode("signin");
       } else {
         const result =
@@ -151,8 +156,15 @@ function AuthPage() {
             ? await supabase.auth.signInWithPassword({ email, password })
             : await supabase.auth.signInWithPassword({ phone: formatPhoneNumber(phone), password });
         if (result.error) throw result.error;
-        const target = redirectParam.startsWith("/") ? redirectParam : "/";
-        navigate({ to: target });
+
+        const adminEmail = "onlinebusinesses190@gmail.com";
+        const signedInEmail = loginMethod === "email" ? email : result.data.user?.email;
+        if (signedInEmail === adminEmail) {
+          navigate({ to: "/admin" });
+        } else {
+          const target = redirectParam.startsWith("/") ? redirectParam : "/";
+          navigate({ to: target });
+        }
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "";
