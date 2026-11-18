@@ -23,6 +23,7 @@ const envSchema = z.object({
   PAYHERO_BASE_URL: z.string().url().optional(),
   PAYHERO_WITHDRAW_ENDPOINT: z.string().optional(),
   PAYHERO_TOPUP_ENDPOINT: z.string().optional(),
+  PAYHERO_CHANNEL_ID: z.string().optional(),
 
   USE_PAYHERO_FOR_WITHDRAWALS: z.string().optional().transform((val) => val !== 'false'),
 });

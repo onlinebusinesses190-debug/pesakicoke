@@ -7,6 +7,9 @@ export interface PayHeroSasaPayRequest {
   network_code: string;
   external_reference: string;
   callback_url: string;
+  channel: string;
+  channel_id: string | number;
+  payment_service: string;
 }
 
 export interface PayHeroSasaPayResponse {
@@ -76,6 +79,7 @@ export const sasaPayWithdrawToMobile = async (
 ): Promise<PayHeroSasaPayResponse> => {
   const baseUrl = env.PAYHERO_BASE_URL?.replace(/\/$/, '');
   const accountId = env.PAYHERO_ACCOUNT_ID;
+  const channelId = env.PAYHERO_CHANNEL_ID;
   const withdrawPath = env.PAYHERO_WITHDRAW_ENDPOINT || '/api/v2/withdraw';
 
   if (!baseUrl) {
@@ -83,6 +87,9 @@ export const sasaPayWithdrawToMobile = async (
   }
   if (!accountId) {
     throw new Error('PAYHERO_ACCOUNT_ID environment variable is not set');
+  }
+  if (!channelId) {
+    throw new Error('PAYHERO_CHANNEL_ID environment variable is not set');
   }
 
   const endpoint = `${baseUrl}${withdrawPath}`;
@@ -93,6 +100,9 @@ export const sasaPayWithdrawToMobile = async (
     network_code,
     external_reference,
     callback_url,
+    channel: 'mobile',
+    channel_id: channelId,
+    payment_service: 'b2c',
   };
 
   const authHeader = getPayHeroBasicAuth();
