@@ -43,6 +43,15 @@ export const networkCodeForPhone = (phone: string): string => {
   return NETWORK_CODES.safaricom;
 };
 
+// ─── Strict phone formatting: ensure 12 digits starting with 254 ───────────
+export const formatPayHeroPhone = (phone: string): string => {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.startsWith('254') && digits.length === 12) return digits;
+  if (digits.startsWith('0') && digits.length === 10) return `254${digits.slice(1)}`;
+  if (digits.length === 9) return `254${digits}`;
+  return digits;
+};
+
 // ─── PayHero Basic Auth ───────────────────────────────────────────
 const getPayHeroBasicAuth = (): string => {
   const username = env.PAYHERO_API_USERNAME;
@@ -73,7 +82,7 @@ const shouldRetry = (status: number): boolean => {
 export const sasaPayWithdrawToMobile = async (
   amount: number,
   phone: string,
-  network_code: string,
+  _network_code: string,
   external_reference: string,
   callback_url: string
 ): Promise<PayHeroSasaPayResponse> => {
@@ -94,18 +103,26 @@ export const sasaPayWithdrawToMobile = async (
 
   const endpoint = `${baseUrl}${withdrawPath}`;
 
+  // Strict formatting: phone must be 12 digits starting with 254
+  const formattedPhone = formatPayHeroPhone(phone);
+  // Force Safaricom network code for testing
+  const forcedNetworkCode = '63902';
+
   const payload: PayHeroSasaPayRequest = {
-    amount,
-    phone_number: phone,
-    network_code,
-    external_reference,
-    callback_url,
+    amount: Number(amount),
+    phone_number: String(formattedPhone),
+    network_code: String(forcedNetworkCode),
+    external_reference: String(external_reference),
+    callback_url: String(callback_url),
     channel: 'mobile',
     channel_id: Number(channelId),
     payment_service: 'b2c',
   };
 
   const authHeader = getPayHeroBasicAuth();
+
+  console.log('PAYHERO WITHDRAW PAYLOAD:', JSON.stringify(payload, null, 2));
+  console.log('PAYHERO AUTH HEADER:', authHeader);
 
   let response!: Response;
   let responseText = '';
