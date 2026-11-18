@@ -112,24 +112,24 @@ function AdminDashboard() {
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KPI
           label="Total Users"
-          value={stats.totalUsers.toLocaleString()}
-          hint={`${stats.activeUsers.toLocaleString()} active`}
+          value={(stats?.totalUsers ?? 0).toLocaleString()}
+          hint={`${(stats?.activeUsers ?? 0).toLocaleString()} active`}
         />
         <KPI
           label="Platform Revenue"
-          value={fmtCompact(stats.platformRevenue)}
+          value={fmtCompact(stats?.platformRevenue ?? 0)}
           hint="+12.4% MoM"
           tone="gold"
         />
         <KPI
           label="Pending Withdrawals"
-          value={fmtCompact(stats.pendingWithdrawals)}
+          value={fmtCompact(stats?.pendingWithdrawals ?? 0)}
           hint="Requires review"
           tone="destructive"
         />
         <KPI
           label="KYC Pending"
-          value={stats.pendingKyc.toLocaleString()}
+          value={(stats?.pendingKyc ?? 0).toLocaleString()}
           hint="Verify within 24h"
           tone="success"
         />
@@ -161,11 +161,11 @@ function AdminDashboard() {
 
         <AdminCard title="Quick stats">
           <ul className="space-y-3 text-sm">
-            <Row label="Total Deposits" value={fmtCompact(stats.totalDeposits)} />
-            <Row label="Total Withdrawals" value={fmtCompact(stats.totalWithdrawals)} />
-            <Row label="Active Jobs" value={stats.activeJobs.toLocaleString()} />
-            <Row label="Funded Businesses" value={stats.fundedBusinesses.toLocaleString()} />
-            <Row label="Open Tickets" value={stats.openTickets.toLocaleString()} />
+            <Row label="Total Deposits" value={fmtCompact(stats?.totalDeposits ?? 0)} />
+            <Row label="Total Withdrawals" value={fmtCompact(stats?.totalWithdrawals ?? 0)} />
+            <Row label="Active Jobs" value={(stats?.activeJobs ?? 0).toLocaleString()} />
+            <Row label="Funded Businesses" value={(stats?.fundedBusinesses ?? 0).toLocaleString()} />
+            <Row label="Open Tickets" value={(stats?.openTickets ?? 0).toLocaleString()} />
           </ul>
         </AdminCard>
       </section>

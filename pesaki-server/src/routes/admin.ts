@@ -1893,6 +1893,132 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
+  // ─── GET /admin/finance/stats ────────────────────────────────────────────────
+  server.get('/admin/finance/stats', { preHandler: [verifyAdmin] }, async (_request, reply) => {
+    try {
+      const { data: depLedger } = await supabase
+        .from('wallet_ledger')
+        .select('amount')
+        .eq('type', 'deposit')
+        .eq('mode', 'credit')
+        .eq('is_demo', false);
+      const totalDeposits = (depLedger || []).reduce((s: number, r: { amount: number }) => s + safeNumber(r.amount), 0);
+
+      const { data: wdLedger } = await supabase
+        .from('wallet_ledger')
+        .select('amount')
+        .eq('type', 'withdrawal')
+        .eq('mode', 'debit')
+        .eq('is_demo', false);
+      const totalWithdrawals = (wdLedger || []).reduce((s: number, r: { amount: number }) => s + safeNumber(r.amount), 0);
+
+      const { count: pendingWithdrawals } = await supabase
+        .from('b2c_withdrawals')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'pending');
+
+      const revSeries = await supabase.rpc('admin_revenue_series_daily', {
+        p_from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+        p_to: new Date().toISOString(),
+      });
+      const platformRevenue = (revSeries.data || []).reduce((s: number, r: { v: number }) => s + safeNumber(r.v), 0);
+
+      return reply.send({
+        success: true,
+        data: {
+          totalDeposits,
+          totalWithdrawals,
+          pendingWithdrawals: pendingWithdrawals || 0,
+          platformRevenue,
+        },
+      });
+    } catch (error) {
+      logger.error(error, 'Error in GET /admin/finance/stats');
+      return reply.send({
+        success: true,
+        data: { totalDeposits: 0, totalWithdrawals: 0, pendingWithdrawals: 0, platformRevenue: 0 },
+      });
+    }
+  });
+
+  // ─── GET /admin/finance/withdrawals ─────────────────────────────────────────
+  server.get('/admin/finance/withdrawals', { preHandler: [verifyAdmin] }, async (request, reply) => {
+    try {
+      const q = request.query as QueryParams;
+      const limit = Math.min(Number(q.limit) || 50, 200);
+      const offset = Number(q.offset) || 0;
+
+      const { data, error } = await supabase
+        .from('b2c_withdrawals')
+        .select('id, user_id, amount, phone, reference, status, created_at')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (error) throw error;
+
+      const userIds = Array.from(new Set((data || []).map((w: { user_id: string }) => w.user_id).filter(Boolean)));
+      const profileMap = await getProfileMap(userIds);
+
+      const withdrawals = (data || []).map((w: {
+        id: string; user_id: string; amount: number; phone: string;
+        reference: string; status: string; created_at: string;
+      }) => ({
+        id: w.id,
+        user_id: w.user_id,
+        amount: Number(w.amount),
+        phone: w.phone,
+        reference: w.reference,
+        status: w.status,
+        user: profileMap.get(w.user_id) ? profileDisplayName(profileMap.get(w.user_id)!) : 'Unknown',
+        created_at: w.created_at,
+      }));
+
+      return reply.send({ success: true, data: withdrawals });
+    } catch (error) {
+      logger.error(error, 'Error in GET /admin/finance/withdrawals');
+      return reply.send({ success: true, data: [] });
+    }
+  });
+
+  // ─── GET /admin/finance/transactions ────────────────────────────────────────
+  server.get('/admin/finance/transactions', { preHandler: [verifyAdmin] }, async (request, reply) => {
+    try {
+      const q = request.query as QueryParams;
+      const limit = Math.min(Number(q.limit) || 50, 200);
+      const offset = Number(q.offset) || 0;
+
+      const { data, error } = await supabase
+        .from('wallet_ledger')
+        .select('id, user_id, type, mode, amount, description, is_demo, created_at')
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (error) throw error;
+
+      const userIds = Array.from(new Set((data || []).map((t: { user_id: string }) => t.user_id).filter(Boolean)));
+      const profileMap = await getProfileMap(userIds);
+
+      const transactions = (data || []).map((t: {
+        id: string; user_id: string; type: string; mode: string;
+        amount: number; description: string; is_demo: boolean; created_at: string;
+      }) => ({
+        id: t.id,
+        user: profileMap.get(t.user_id) ? profileDisplayName(profileMap.get(t.user_id)!) : 'Unknown',
+        type: t.type,
+        amount: Number(t.amount),
+        method: t.mode,
+        status: t.is_demo ? 'demo' : 'completed',
+        date: t.created_at,
+      }));
+
+      return reply.send({ success: true, data: transactions });
+    } catch (error) {
+      logger.error(error, 'Error in GET /admin/finance/transactions');
+      return reply.send({ success: true, data: [] });
+    }
+  });
+
   // ─── GET /admin/dashboard ──────────────────────────────────────────────────────
   server.get('/admin/dashboard', { preHandler: [verifyAdmin] }, async (_request, reply) => {
     try {
