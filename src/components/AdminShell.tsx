@@ -37,6 +37,7 @@ const nav: { to: LinkProps["to"]; label: string; icon: React.ElementType }[] = [
   { to: "/admin/support", label: "Support", icon: LifeBuoy },
   { to: "/admin/reports", label: "Reports", icon: BarChart3 },
   { to: "/admin/actions", label: "Audit Log", icon: FileText },
+  { to: "/admin/payhero/topup", label: "PayHero Top-Up", icon: Wallet },
 ];
 
 export function AdminShell({ children }: { children: ReactNode }) {

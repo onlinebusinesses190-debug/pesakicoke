@@ -2616,5 +2616,96 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   );
 
+  // ─── GET /api/admin/payhero/topups ───────────────────────────────────
+  server.get(
+    '/api/admin/payhero/topups',
+    { preHandler: [verifyAdmin] },
+    async (request, reply) => {
+      try {
+        const q = request.query as QueryParams;
+        const limit = Math.min(Number(q.limit) || 50, 200);
+        const offset = Number(q.offset) || 0;
+        const status = q.status || '';
+
+        let query = supabase
+          .from('wallet_top_ups')
+          .select('id, admin_id, amount, phone_number, reference_id, status, provider_response, metadata, created_at, updated_at')
+          .order('created_at', { ascending: false })
+          .range(offset, offset + limit - 1);
+
+        if (status) query = query.eq('status', status);
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        const adminIds = Array.from(new Set((data || []).map((t: { admin_id: string }) => t.admin_id).filter(Boolean)));
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', adminIds);
+
+        const profileMap = new Map<string, { email: string; full_name: string | null }>();
+        for (const p of profiles || []) {
+          profileMap.set(p.id, { email: p.email || '', full_name: p.full_name });
+        }
+
+        const topups = (data || []).map((t: any) => {
+          const p = profileMap.get(t.admin_id);
+          return {
+            id: t.id,
+            admin_email: p?.email || 'Unknown',
+            admin_name: p?.full_name || 'Unknown',
+            amount: Number(t.amount),
+            phone_number: t.phone_number,
+            reference_id: t.reference_id,
+            status: t.status,
+            provider_response: t.provider_response,
+            created_at: t.created_at,
+            updated_at: t.updated_at,
+          };
+        });
+
+        return reply.send({ success: true, data: { topups, count: topups.length } });
+      } catch (error) {
+        logger.error(error, 'Error in GET /api/admin/payhero/topups');
+        return reply.send({ success: true, data: { topups: [], count: 0 } });
+      }
+    }
+  );
+
+  // ─── GET /api/admin/payhero/topup/stats ──────────────────────────────
+  server.get(
+    '/api/admin/payhero/topup/stats',
+    { preHandler: [verifyAdmin] },
+    async (_request, reply) => {
+      try {
+        const { data: all } = await supabase
+          .from('wallet_top_ups')
+          .select('amount, status');
+
+        const totalAmount = (all || []).reduce((s: number, t: { amount: number }) => s + Number(t.amount || 0), 0);
+        const pendingAmount = (all || [])
+          .filter((t: { status: string }) => t.status === 'PENDING')
+          .reduce((s: number, t: { amount: number }) => s + Number(t.amount || 0), 0);
+        const completedAmount = (all || [])
+          .filter((t: { status: string }) => t.status === 'QUEUED' || t.status === 'COMPLETED')
+          .reduce((s: number, t: { amount: number }) => s + Number(t.amount || 0), 0);
+
+        return reply.send({
+          success: true,
+          data: {
+            totalTopups: (all || []).length,
+            totalAmount,
+            pendingAmount,
+            completedAmount,
+          },
+        });
+      } catch (error) {
+        logger.error(error, 'Error in GET /api/admin/payhero/topup/stats');
+        return reply.send({ success: true, data: { totalTopups: 0, totalAmount: 0, pendingAmount: 0, completedAmount: 0 } });
+      }
+    }
+  );
+
   logger.info('✅ All admin routes registered');
 }
