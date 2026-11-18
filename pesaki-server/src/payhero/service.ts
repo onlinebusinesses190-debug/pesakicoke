@@ -18,7 +18,6 @@ export interface PayHeroSasaPayResponse {
 }
 
 // ─── Network code mapping (Kenya) ─────────────────────────────────
-// PayHero SasaPay requires a network code per carrier. Safaricom = "63902".
 const NETWORK_CODES: Record<string, string> = {
   safaricom: '63902',
   airtel: '63903',
@@ -49,6 +48,22 @@ const getPayHeroBasicAuth = (): string => {
     throw new Error('PAYHERO_API_USERNAME / PAYHERO_API_PASSWORD environment variables are not set');
   }
   return `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`;
+};
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const fetchWithTimeout = (
+  url: string,
+  options: RequestInit,
+  timeoutMs: number = 30000
+): Promise<Response> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timeoutId));
+};
+
+const shouldRetry = (status: number): boolean => {
+  return status === 404 || (status >= 500 && status < 600);
 };
 
 // ─── Helper: call PayHero SasaPay B2C withdrawal ──────────────────
@@ -82,8 +97,6 @@ export const sasaPayWithdrawToMobile = async (
 
   const authHeader = getPayHeroBasicAuth();
 
-  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
   let response!: Response;
   let responseText = '';
   let attempts = 0;
@@ -92,45 +105,60 @@ export const sasaPayWithdrawToMobile = async (
   while (attempts < maxAttempts) {
     attempts += 1;
 
-    logger.info(
-      {
-        url: endpoint,
-        auth: authHeader.slice(0, 20) + '...',
-        body: payload,
-        attempt: attempts,
-      },
-      'PAYHERO_SASAPAY_WITHDRAW_REQUEST'
-    );
+    try {
+      logger.info(
+        {
+          url: endpoint,
+          auth: authHeader.slice(0, 20) + '...',
+          body: payload,
+          attempt: attempts,
+        },
+        'PAYHERO_SASAPAY_WITHDRAW_REQUEST'
+      );
 
-    response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: authHeader,
-      },
-      body: JSON.stringify(payload),
-    });
+      response = await fetchWithTimeout(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: authHeader,
+        },
+        body: JSON.stringify(payload),
+      }, 30000);
 
-    responseText = await response.text();
+      responseText = await response.text();
 
-    logger.info(
-      {
-        status: response.status,
-        body: responseText,
-        reference: external_reference,
-        attempt: attempts,
-      },
-      'PAYHERO_SASAPAY_WITHDRAW_RESPONSE'
-    );
+      logger.info(
+        {
+          status: response.status,
+          body: responseText,
+          reference: external_reference,
+          attempt: attempts,
+        },
+        'PAYHERO_SASAPAY_WITHDRAW_RESPONSE'
+      );
 
-    if (response.status !== 404) {
-      break;
-    }
+      if (!shouldRetry(response.status)) {
+        break;
+      }
 
-    if (attempts < maxAttempts) {
+      if (attempts < maxAttempts) {
+        logger.warn(
+          { status: response.status, reference: external_reference, attempt: attempts },
+          'PAYHERO_SASAPAY_WITHDRAW_RETRY'
+        );
+        await sleep(1000);
+      }
+    } catch (fetchError: any) {
+      if (attempts >= maxAttempts) {
+        const err = new Error('PayHero request failed after retries');
+        (err as any).status = 504;
+        (err as any).providerMessage = fetchError.message || 'Request timed out or failed';
+        (err as any).responseBody = null;
+        throw err;
+      }
       logger.warn(
-        { status: response.status, reference: external_reference, attempt: attempts },
-        'PAYHERO_SASAPAY_WITHDRAW_404_RETRY'
+        { reference: external_reference, attempt: attempts, error: fetchError.message },
+        'PAYHERO_SASAPAY_WITHDRAW_FETCH_ERROR_RETRY'
       );
       await sleep(1000);
     }
@@ -204,8 +232,6 @@ export const topUpWallet = async (
 
   const authHeader = getPayHeroBasicAuth();
 
-  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
   let response!: Response;
   let responseText = '';
   let attempts = 0;
@@ -214,44 +240,59 @@ export const topUpWallet = async (
   while (attempts < maxAttempts) {
     attempts += 1;
 
-    logger.info(
-      {
-        url: endpoint,
-        auth: authHeader.slice(0, 20) + '...',
-        body: payload,
-        attempt: attempts,
-      },
-      'PAYHERO_TOPUP_REQUEST'
-    );
+    try {
+      logger.info(
+        {
+          url: endpoint,
+          auth: authHeader.slice(0, 20) + '...',
+          body: payload,
+          attempt: attempts,
+        },
+        'PAYHERO_TOPUP_REQUEST'
+      );
 
-    response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: authHeader,
-      },
-      body: JSON.stringify(payload),
-    });
+      response = await fetchWithTimeout(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: authHeader,
+        },
+        body: JSON.stringify(payload),
+      }, 30000);
 
-    responseText = await response.text();
+      responseText = await response.text();
 
-    logger.info(
-      {
-        status: response.status,
-        body: responseText,
-        attempt: attempts,
-      },
-      'PAYHERO_TOPUP_RESPONSE'
-    );
+      logger.info(
+        {
+          status: response.status,
+          body: responseText,
+          attempt: attempts,
+        },
+        'PAYHERO_TOPUP_RESPONSE'
+      );
 
-    if (response.status !== 404) {
-      break;
-    }
+      if (!shouldRetry(response.status)) {
+        break;
+      }
 
-    if (attempts < maxAttempts) {
+      if (attempts < maxAttempts) {
+        logger.warn(
+          { status: response.status, attempt: attempts },
+          'PAYHERO_TOPUP_RETRY'
+        );
+        await sleep(1000);
+      }
+    } catch (fetchError: any) {
+      if (attempts >= maxAttempts) {
+        const err = new Error('PayHero request failed after retries');
+        (err as any).status = 504;
+        (err as any).providerMessage = fetchError.message || 'Request timed out or failed';
+        (err as any).responseBody = null;
+        throw err;
+      }
       logger.warn(
-        { status: response.status, attempt: attempts },
-        'PAYHERO_TOPUP_404_RETRY'
+        { attempt: attempts, error: fetchError.message },
+        'PAYHERO_TOPUP_FETCH_ERROR_RETRY'
       );
       await sleep(1000);
     }
