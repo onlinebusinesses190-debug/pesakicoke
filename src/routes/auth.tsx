@@ -158,8 +158,11 @@ function AuthPage() {
         if (result.error) throw result.error;
 
         const adminEmail = "onlinebusinesses190@gmail.com";
-        const signedInEmail = loginMethod === "email" ? email : result.data.user?.email;
-        if (signedInEmail === adminEmail) {
+        const signedInEmail =
+          loginMethod === "email" ? email : result.data.user?.email;
+        const isAdminEmail =
+          signedInEmail?.toLowerCase().trim() === adminEmail.toLowerCase().trim();
+        if (isAdminEmail) {
           navigate({ to: "/admin" });
         } else {
           const target = redirectParam.startsWith("/") ? redirectParam : "/";
