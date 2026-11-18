@@ -39,6 +39,7 @@ import { Route as AdminDepositsRouteImport } from './routes/admin.deposits'
 import { Route as AdminFinanceRouteImport } from './routes/admin.finance'
 import { Route as AdminKaziRouteImport } from './routes/admin.kazi'
 import { Route as AdminNotificationsRouteImport } from './routes/admin.notifications'
+import { Route as AdminPayHeroTopUpRouteImport } from './routes/admin.payhero.topup'
 import { Route as AdminReferralsRouteImport } from './routes/admin.referrals'
 import { Route as AdminReportsRouteImport } from './routes/admin.reports'
 import { Route as AdminSupportRouteImport } from './routes/admin.support'
@@ -199,6 +200,11 @@ const AdminFinanceRoute = AdminFinanceRouteImport.update({
   path: '/finance',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminPayHeroTopUpRoute = AdminPayHeroTopUpRouteImport.update({
+  id: '/payhero/topup',
+  path: '/payhero/topup',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminKaziRoute = AdminKaziRouteImport.update({
   id: '/kazi',
   path: '/kazi',
@@ -339,6 +345,7 @@ export interface FileRoutesByFullPath {
   '/admin/finance': typeof AdminFinanceRoute
   '/admin/kazi': typeof AdminKaziRoute
   '/admin/notifications': typeof AdminNotificationsRoute
+  '/admin/payhero/topup': typeof AdminPayHeroTopUpRoute
   '/admin/referrals': typeof AdminReferralsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/support': typeof AdminSupportRoute
@@ -388,6 +395,7 @@ export interface FileRoutesByTo {
   '/admin/finance': typeof AdminFinanceRoute
   '/admin/kazi': typeof AdminKaziRoute
   '/admin/notifications': typeof AdminNotificationsRoute
+  '/admin/payhero/topup': typeof AdminPayHeroTopUpRoute
   '/admin/referrals': typeof AdminReferralsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/support': typeof AdminSupportRoute
@@ -441,6 +449,7 @@ export interface FileRoutesById {
   '/admin/finance': typeof AdminFinanceRoute
   '/admin/kazi': typeof AdminKaziRoute
   '/admin/notifications': typeof AdminNotificationsRoute
+  '/admin/payhero/topup': typeof AdminPayHeroTopUpRoute
   '/admin/referrals': typeof AdminReferralsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/support': typeof AdminSupportRoute
@@ -492,6 +501,7 @@ export interface FileRouteTypes {
     | '/admin/commissions'
     | '/admin/deposits'
     | '/admin/finance'
+| '/admin/payhero/topup'
     | '/admin/kazi'
     | '/admin/notifications'
     | '/admin/referrals'
@@ -541,6 +551,7 @@ export interface FileRouteTypes {
     | '/admin/commissions'
     | '/admin/deposits'
     | '/admin/finance'
+| '/admin/payhero/topup'
     | '/admin/kazi'
     | '/admin/notifications'
     | '/admin/referrals'
@@ -593,6 +604,7 @@ export interface FileRouteTypes {
     | '/admin/commissions'
     | '/admin/deposits'
     | '/admin/finance'
+| '/admin/payhero/topup'
     | '/admin/kazi'
     | '/admin/notifications'
     | '/admin/referrals'
@@ -842,6 +854,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminFinanceRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/payhero/topup': {
+      id: '/admin/payhero/topup'
+      path: '/payhero/topup'
+      fullPath: '/admin/payhero/topup'
+      preLoaderRoute: typeof AdminPayHeroTopUpRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/kazi': {
       id: '/admin/kazi'
       path: '/kazi'
@@ -1031,6 +1050,7 @@ interface AdminRouteChildren {
   AdminFinanceRoute: typeof AdminFinanceRoute
   AdminKaziRoute: typeof AdminKaziRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
+  AdminPayHeroTopUpRoute: typeof AdminPayHeroTopUpRoute
   AdminReferralsRoute: typeof AdminReferralsRoute
   AdminReportsRoute: typeof AdminReportsRoute
   AdminSupportRoute: typeof AdminSupportRoute
@@ -1050,6 +1070,8 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminFinanceRoute: AdminFinanceRoute,
   AdminKaziRoute: AdminKaziRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,
+  AdminPayHeroTopUpRoute: AdminPayHeroTopUpRoute,
+  AdminPayHeroTopUpRoute: AdminPayHeroTopUpRoute,
   AdminReferralsRoute: AdminReferralsRoute,
   AdminReportsRoute: AdminReportsRoute,
   AdminSupportRoute: AdminSupportRoute,

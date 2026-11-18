@@ -35,6 +35,10 @@ function PayHeroTopUpPage() {
   const [topups, setTopups] = useState<TopUp[]>([]);
   const [stats, setStats] = useState<TopUpStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [topupLoading, setTopupLoading] = useState(false);
+  const [topupAmount, setTopupAmount] = useState("");
+  const [topupPhone, setTopupPhone] = useState("");
+  const [topupError, setTopupError] = useState<string | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -66,13 +70,53 @@ function PayHeroTopUpPage() {
   const completed = topups.filter((t) => t.status === "QUEUED" || t.status === "COMPLETED");
   const failed = topups.filter((t) => t.status === "FAILED");
 
+  const handleTopUpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTopupError(null);
+
+    const amount = Number(topupAmount);
+    if (!amount || amount <= 0) {
+      setTopupError("Enter a valid amount");
+      return;
+    }
+    if (!/^254\d{9}$/.test(topupPhone)) {
+      setTopupError("Phone must be 2547XXXXXXXX");
+      return;
+    }
+
+    setTopupLoading(true);
+    try {
+      await apiRequest("/api/admin/payhero/topup", {
+        method: "POST",
+        body: JSON.stringify({ amount, phone_number: topupPhone }),
+      });
+      setTopupAmount("");
+      setTopupPhone("");
+      toast.success("Top-up initiated — check your phone for STK Push");
+      const [topupsRes, statsRes] = await Promise.all([
+        apiRequest<{ success: boolean; data: { topups: TopUp[] } }>("/api/admin/payhero/topups"),
+        apiRequest<{ success: boolean; data: TopUpStats }>("/api/admin/payhero/topup/stats"),
+      ]);
+      if (topupsRes.success) setTopups(topupsRes.data?.topups || []);
+      if (statsRes.success) setStats(statsRes.data || null);
+    } catch (err: any) {
+      setTopupError(err.message || "Top-up failed");
+      toast.error(err.message || "Top-up failed");
+    } finally {
+      setTopupLoading(false);
+    }
+  };
+
   return (
     <>
       <AdminPageHeader
         title="PayHero Wallet Top-Up"
         subtitle="Fund the PayHero payout wallet via M-Pesa STK Push."
         actions={
-          <button className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow hover:bg-primary/90">
+          <button
+            onClick={() => document.getElementById("topup-form")?.scrollIntoView({ behavior: "smooth" })}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow hover:bg-primary/90"
+          >
             New Top-Up
           </button>
         }
@@ -106,6 +150,56 @@ function PayHeroTopUpPage() {
           />
         </section>
       )}
+
+      <AdminCard title="Fund PayHero Wallet" action={
+        <span className="text-[10px] text-muted-foreground">
+          M-Pesa STK Push required
+        </span>
+      }>
+        <form onSubmit={handleTopUpSubmit} className="space-y-3" id="topup-form">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground block mb-1">
+                Amount (KES)
+              </label>
+              <input
+                type="number"
+                value={topupAmount}
+                onChange={(e) => setTopupAmount(e.target.value)}
+                placeholder="e.g. 5000"
+                className="input"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground block mb-1">
+                M-Pesa Phone Number
+              </label>
+              <input
+                type="tel"
+                value={topupPhone}
+                onChange={(e) => setTopupPhone(e.target.value)}
+                placeholder="2547XXXXXXXX"
+                className="input"
+              />
+            </div>
+          </div>
+          {topupError && (
+            <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
+              {topupError}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={topupLoading}
+            className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-br from-primary to-primary/70 text-sm font-semibold text-primary-foreground shadow hover:opacity-95 disabled:opacity-60"
+          >
+            {topupLoading ? "Initiating…" : "Initiate Top-Up"}
+          </button>
+          <p className="text-[10px] text-muted-foreground">
+            After submitting, your phone will receive an M-Pesa STK Push. Enter your PIN to complete the top-up.
+          </p>
+        </form>
+      </AdminCard>
 
       <section className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
         <AdminCard title="Pending Top-Ups" className="lg:col-span-2">
