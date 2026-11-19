@@ -858,7 +858,9 @@ export const bankingRoutes = async (fastify: FastifyInstance) => {
       const payoutAmount = Math.max(0, amount - fee);
       if (payoutAmount < 10) return reply.status(400).send({ error: 'After fee deduction, payout must be at least KES 10', fee, payoutAmount, minimum: 10 });
       const reference = `WD-BANK-${user.id.slice(0, 8)}-${Date.now()}`;
-      const callbackBase = env.MPESA_CALLBACK_URL || 'https://pesaki-server.onrender.com';
+      const callbackBase = env.USE_PAYHERO_FOR_WITHDRAWALS
+        ? (env.PAYHERO_CALLBACK_URL || env.MPESA_CALLBACK_URL || 'https://pesaki-server.onrender.com')
+        : (env.MPESA_CALLBACK_URL || 'https://pesaki-server.onrender.com');
       const providerPath = env.USE_PAYHERO_FOR_WITHDRAWALS ? 'payhero' : 'palpluss';
       const callbackUrl = `${callbackBase.replace(/\/$/, '')}/api/webhooks/${providerPath}`;
 

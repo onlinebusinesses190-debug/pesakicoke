@@ -374,7 +374,9 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
           'WITHDRAWAL_REQUESTED | FUNDS_RESERVED'
         );
 
-        const callbackBase = env.MPESA_CALLBACK_URL || 'https://pesaki-server.onrender.com';
+        const callbackBase = env.USE_PAYHERO_FOR_WITHDRAWALS
+          ? (env.PAYHERO_CALLBACK_URL || env.MPESA_CALLBACK_URL || 'https://pesaki-server.onrender.com')
+          : (env.MPESA_CALLBACK_URL || 'https://pesaki-server.onrender.com');
         const providerPath = env.USE_PAYHERO_FOR_WITHDRAWALS ? 'payhero' : 'palpluss';
         const callbackUrl = `${callbackBase.replace(/\/$/, '')}/api/webhooks/${providerPath}`;
 
