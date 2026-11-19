@@ -78,40 +78,42 @@ const shouldRetry = (status: number): boolean => {
   return status === 404 || (status >= 500 && status < 600);
 };
 
+export const buildPayHeroCallbackUrl = (configuredBase: string): string => {
+  const trimmed = configuredBase.replace(/\/+$/, '');
+  if (trimmed.endsWith('/api/webhooks/payhero')) return trimmed;
+  return `${trimmed}/api/webhooks/payhero`;
+};
+
 // ─── Helper: call PayHero SasaPay B2C withdrawal ──────────────────
 export const sasaPayWithdrawToMobile = async (
   amount: number,
   phone: string,
-  _network_code: string,
+  network_code: string,
   external_reference: string,
   callback_url: string
 ): Promise<PayHeroSasaPayResponse> => {
   const baseUrl = env.PAYHERO_BASE_URL?.replace(/\/$/, '');
-  const accountId = env.PAYHERO_ACCOUNT_ID;
   const channelId = env.PAYHERO_CHANNEL_ID;
   const withdrawPath = env.PAYHERO_WITHDRAW_ENDPOINT || '/api/v2/withdraw';
 
   if (!baseUrl) {
     throw new Error('PAYHERO_BASE_URL environment variable is not set');
   }
-  if (!accountId) {
-    throw new Error('PAYHERO_ACCOUNT_ID environment variable is not set');
-  }
   if (!channelId) {
     throw new Error('PAYHERO_CHANNEL_ID environment variable is not set');
   }
 
-  const endpoint = `${baseUrl}${withdrawPath}`;
+  const endpoint = `${baseUrl}${withdrawPath.startsWith('/') ? withdrawPath : `/${withdrawPath}`}`;
 
-  // Strict formatting: phone must be 12 digits starting with 254
   const formattedPhone = formatPayHeroPhone(phone);
-  // Force Safaricom network code for testing
-  const forcedNetworkCode = '63902';
+  if (!/^254\d{9}$/.test(formattedPhone)) {
+    throw new Error('Invalid phone number: PayHero requires 254 followed by 9 digits');
+  }
 
   const payload: PayHeroSasaPayRequest = {
     amount: Number(amount),
-    phone_number: String(formattedPhone),
-    network_code: String(forcedNetworkCode),
+    phone_number: formattedPhone,
+    network_code: String(network_code || '63902'),
     external_reference: String(external_reference),
     callback_url: String(callback_url),
     channel: 'mobile',
@@ -120,9 +122,6 @@ export const sasaPayWithdrawToMobile = async (
   };
 
   const authHeader = getPayHeroBasicAuth();
-
-  console.log('PAYHERO WITHDRAW PAYLOAD:', JSON.stringify(payload, null, 2));
-  console.log('PAYHERO AUTH HEADER:', authHeader);
 
   let response!: Response;
   let responseText = '';
@@ -136,7 +135,6 @@ export const sasaPayWithdrawToMobile = async (
       logger.info(
         {
           url: endpoint,
-          auth: authHeader.slice(0, 20) + '...',
           body: payload,
           attempt: attempts,
         },
@@ -271,7 +269,6 @@ export const topUpWallet = async (
       logger.info(
         {
           url: endpoint,
-          auth: authHeader.slice(0, 20) + '...',
           body: payload,
           attempt: attempts,
         },

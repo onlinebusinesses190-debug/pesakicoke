@@ -2,7 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { logger } from '../utils/logger';
 import { env } from '../config/env';
 import { calculateWithdrawalFee, MIN_DEPOSIT, MIN_WITHDRAWAL } from '../utils/fees';
-import { sasaPayWithdrawToMobile, networkCodeForPhone } from '../payhero/service';
+import { sasaPayWithdrawToMobile, networkCodeForPhone, buildPayHeroCallbackUrl } from '../payhero/service';
 
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -862,7 +862,9 @@ export const bankingRoutes = async (fastify: FastifyInstance) => {
         ? (env.PAYHERO_CALLBACK_URL || env.MPESA_CALLBACK_URL || 'https://pesaki-server.onrender.com')
         : (env.MPESA_CALLBACK_URL || 'https://pesaki-server.onrender.com');
       const providerPath = env.USE_PAYHERO_FOR_WITHDRAWALS ? 'payhero' : 'palpluss';
-      const callbackUrl = `${callbackBase.replace(/\/$/, '')}/api/webhooks/${providerPath}`;
+      const callbackUrl = env.USE_PAYHERO_FOR_WITHDRAWALS
+        ? buildPayHeroCallbackUrl(callbackBase)
+        : `${callbackBase.replace(/\/+$/, '')}/api/webhooks/${providerPath}`;
 
       try {
         if (env.USE_PAYHERO_FOR_WITHDRAWALS) {
