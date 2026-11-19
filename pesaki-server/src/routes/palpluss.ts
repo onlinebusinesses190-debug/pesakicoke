@@ -17,106 +17,7 @@ const normalizePhone = (value: string) => {
   return digits;
 };
 
-const formatPhoneForPalpluss = (value: string) => {
-  const digits = value.replace(/\D/g, '');
-  if (!digits) return '';
-  if (digits.startsWith('254') && digits.length === 12) return `0${digits.slice(3)}`;
-  if (digits.startsWith('0') && digits.length === 10) return digits;
-  if (digits.length === 9) return `0${digits}`;
-  return digits;
-};
-
-// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Helper: call Palpluss B2C API Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-const callPalplussB2C = async (
-  amount: number,
-  phone: string,
-  reference: string,
-  callbackUrl: string
-) => {
-  const apiKey = env.PALPLUSS_API_KEY;
-  const apiUrl = env.PALPLUSS_API_URL || 'https://api.palplus.com/v1';
-
-  if (!apiKey) {
-    throw new Error('PALPLUSS_API_KEY environment variable is not set');
-  }
-
-  const baseUrl = apiUrl.replace(/\/$/, '');
-  const endpoint = `${baseUrl}/b2c/payouts`;
-
-  const palplussPhone = formatPhoneForPalpluss(phone);
-
-  const payload = {
-    amount,
-    phone: palplussPhone,
-    reference,
-    description: 'Received from PESAKI',
-    callbackUrl,
-  };
-
-  const authHeader = `Basic ${Buffer.from(`${apiKey}:`).toString('base64')}`;
-
-  logger.info(
-    {
-      url: endpoint,
-      auth: authHeader.slice(0, 20) + '...',
-      body: payload,
-    },
-    'PALPLUSS_B2C_REQUEST'
-  );
-
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': authHeader,
-      'Idempotency-Key': reference,
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const responseText = await response.text();
-
-  logger.info(
-    {
-      status: response.status,
-      body: responseText,
-    },
-    'PALPLUSS_B2C_RESPONSE'
-  );
-
-  let data: any;
-
-  try {
-    data = JSON.parse(responseText);
-  } catch {
-    logger.error(
-      { status: response.status, responseText, reference },
-      'Invalid JSON from Palpluss B2C'
-    );
-    const err = new Error('Invalid response from Palpluss');
-    (err as any).status = response.status;
-    (err as any).responseBody = responseText;
-    throw err;
-  }
-
-  if (!response.ok || !data.success) {
-    const providerCode = data?.code || data?.error_code;
-    const providerMessage = data?.message || data?.error_description || data?.description;
-    logger.error(
-      { status: response.status, reference, providerCode, providerMessage, data },
-      'Palpluss B2C request failed'
-    );
-    const err = new Error(providerMessage || 'Palpluss B2C request failed');
-    (err as any).status = response.status;
-    (err as any).providerCode = providerCode;
-    (err as any).providerMessage = providerMessage;
-    (err as any).responseBody = data;
-    throw err;
-  }
-
-  return data.data;
-};
-
+// ── Palpluss Webhook ──
 export const palplussRoutes = async (fastify: FastifyInstance) => {
   // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Webhook Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   fastify.post(
@@ -388,28 +289,29 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
         let providerMetadataKey: string;
 
         try {
-          if (env.USE_FINOQ_FOR_WITHDRAWALS && !!env.FINOQ_KEY && !!env.FINOQ_SECRET && !!env.FINOQ_BASE_URL) {
-            const networkCode = networkCodeForPhone(cleanPhone);
-            providerResponse = await finoqWithdrawToMobile(
-              payoutAmount,
-              cleanPhone,
-              reference,
-              callbackUrl
-            );
-            providerTransactionId = providerResponse?.transactionId || providerResponse?.transaction_id || null;
-            providerCheckoutId = providerResponse?.providerCheckoutId || providerResponse?.provider_checkout_id || null;
-            providerMetadataKey = 'finoq_response';
-
-            logger.info(
-              { reference, userId: user.id, networkCode, transactionId: providerTransactionId, response: providerResponse },
-              'WITHDRAWAL_REQUESTED | FINOQ_RESPONSE'
-            );
-          } else {
-            providerResponse = await callPalplussB2C(payoutAmount, cleanPhone, reference, callbackUrl);
-            providerTransactionId = providerResponse?.transactionId || null;
-            providerCheckoutId = providerResponse?.providerCheckoutId || null;
-            providerMetadataKey = 'palpluss_response';
+          if (!env.USE_FINOQ_FOR_WITHDRAWALS || !env.FINOQ_KEY || !env.FINOQ_SECRET || !env.FINOQ_BASE_URL) {
+            return reply.status(500).send({
+              success: false,
+              error: 'Finoq withdrawal provider is not configured',
+              message: 'Set FINOQ_KEY, FINOQ_SECRET, FINOQ_BASE_URL on Render and redeploy',
+            });
           }
+
+          const networkCode = networkCodeForPhone(cleanPhone);
+          providerResponse = await finoqWithdrawToMobile(
+            payoutAmount,
+            cleanPhone,
+            reference,
+            callbackUrl
+          );
+          providerTransactionId = providerResponse?.transactionId || providerResponse?.transaction_id || null;
+          providerCheckoutId = providerResponse?.providerCheckoutId || providerResponse?.provider_checkout_id || null;
+          providerMetadataKey = 'finoq_response';
+
+          logger.info(
+            { reference, userId: user.id, networkCode, transactionId: providerTransactionId, response: providerResponse },
+            'WITHDRAWAL_REQUESTED | FINOQ_RESPONSE'
+          );
         } catch (apiError: any) {
           await releaseLockedFunds(user.id, amount, true);
 

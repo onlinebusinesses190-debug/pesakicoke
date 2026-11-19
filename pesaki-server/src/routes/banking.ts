@@ -177,61 +177,7 @@ const initiateBankingSTKPush = async (
 };
 
 // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Palpluss Helper (duplicated for banking isolation) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-const callPalplussB2C = async (
-  amount: number,
-  phone: string,
-  reference: string,
-  callbackUrl: string
-) => {
-  const apiKey = env.PALPLUSS_API_KEY;
-  const apiUrl = env.PALPLUSS_API_URL || 'https://api.palplus.com/v1';
-  if (!apiKey) throw new Error('PALPLUSS_API_KEY environment variable is not set');
-  const baseUrl = apiUrl.replace(/\/$/, '');
-  const endpoint = `${baseUrl}/b2c/payouts`;
-  const payload = {
-    amount,
-    phone,
-    reference,
-    description: 'Received from PESAKI',
-    callbackUrl,
-  };
-  const authHeader = `Basic ${Buffer.from(`${apiKey}:`).toString('base64')}`;
-  logger.info({ url: endpoint, auth: authHeader.slice(0, 20) + '...', body: payload }, 'PALPLUSS_B2C_REQUEST');
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: authHeader,
-      'Idempotency-Key': reference,
-    },
-    body: JSON.stringify(payload),
-  });
-  const responseText = await response.text();
-  logger.info({ status: response.status, body: responseText }, 'PALPLUSS_B2C_RESPONSE');
-  let data: any;
-  try {
-    data = JSON.parse(responseText);
-  } catch {
-    const err = new Error('Invalid response from Palpluss');
-    (err as any).status = response.status;
-    (err as any).responseBody = responseText;
-    throw err;
-  }
-  if (!response.ok || !data.success) {
-    const providerCode = data?.code || data?.error_code;
-    const providerMessage = data?.message || data?.error_description || data?.description;
-    logger.error({ status: response.status, reference, providerCode, providerMessage, data }, 'Palpluss B2C request failed');
-    const err = new Error(providerMessage || 'Palpluss B2C request failed');
-    (err as any).status = response.status;
-    (err as any).providerCode = providerCode;
-    (err as any).providerMessage = providerMessage;
-    (err as any).responseBody = data;
-    throw err;
-  }
-  return data.data;
-};
-
-// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Banking Routes Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── Banking Routes ──
 export const bankingRoutes = async (fastify: FastifyInstance) => {
   const ensureBankingWallet = async (userId: string) => {
     const { data, error } = await adminSupabase
@@ -867,17 +813,21 @@ export const bankingRoutes = async (fastify: FastifyInstance) => {
         : `${callbackBase.replace(/\/+$/, '')}/api/webhooks/${providerPath}`;
 
       try {
-        if (env.USE_FINOQ_FOR_WITHDRAWALS && !!env.FINOQ_KEY && !!env.FINOQ_SECRET && !!env.FINOQ_BASE_URL) {
-          const finoqPhone = digits.startsWith('254') ? digits : digits.startsWith('0') ? `254${digits.slice(1)}` : `254${digits}`;
-          const networkCode = networkCodeForPhone(finoqPhone);
-          await finoqWithdrawToMobile(payoutAmount, finoqPhone, reference, callbackUrl);
-          logger.info(
-            { reference, userId: user.id, networkCode, phone: finoqPhone },
-            'BANKING_WITHDRAWAL_REQUESTED | FINOQ'
-          );
-        } else {
-          await callPalplussB2C(payoutAmount, digits, reference, callbackUrl);
+        if (!env.USE_FINOQ_FOR_WITHDRAWALS || !env.FINOQ_KEY || !env.FINOQ_SECRET || !env.FINOQ_BASE_URL) {
+          return reply.status(500).send({
+            success: false,
+            error: 'Finoq withdrawal provider is not configured',
+            message: 'Set FINOQ_KEY, FINOQ_SECRET, FINOQ_BASE_URL on Render and redeploy',
+          });
         }
+
+        const finoqPhone = digits.startsWith('254') ? digits : digits.startsWith('0') ? `254${digits.slice(1)}` : `254${digits}`;
+        const networkCode = networkCodeForPhone(finoqPhone);
+        await finoqWithdrawToMobile(payoutAmount, finoqPhone, reference, callbackUrl);
+        logger.info(
+          { reference, userId: user.id, networkCode, phone: finoqPhone },
+          'BANKING_WITHDRAWAL_REQUESTED | FINOQ'
+        );
       } catch (apiError: any) {
         return reply.status(500).send({
           success: false,
