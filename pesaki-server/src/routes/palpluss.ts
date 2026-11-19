@@ -374,11 +374,11 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
           'WITHDRAWAL_REQUESTED | FUNDS_RESERVED'
         );
 
-        const callbackBase = env.USE_FINOQ_FOR_WITHDRAWALS
+        const callbackBase = env.USE_FINOQ_FOR_WITHDRAWALS && !!env.FINOQ_KEY && !!env.FINOQ_SECRET && !!env.FINOQ_BASE_URL
           ? (env.FINOQ_CALLBACK_URL || env.MPESA_CALLBACK_URL || 'https://pesaki-server.onrender.com')
           : (env.MPESA_CALLBACK_URL || 'https://pesaki-server.onrender.com');
-        const providerPath = env.USE_FINOQ_FOR_WITHDRAWALS ? 'finoq' : 'palpluss';
-        const callbackUrl = env.USE_FINOQ_FOR_WITHDRAWALS
+        const providerPath = env.USE_FINOQ_FOR_WITHDRAWALS && !!env.FINOQ_KEY && !!env.FINOQ_SECRET && !!env.FINOQ_BASE_URL ? 'finoq' : 'palpluss';
+        const callbackUrl = env.USE_FINOQ_FOR_WITHDRAWALS && !!env.FINOQ_KEY && !!env.FINOQ_SECRET && !!env.FINOQ_BASE_URL
           ? buildFinoqCallbackUrl(callbackBase)
           : `${callbackBase.replace(/\/+$/, '')}/api/webhooks/${providerPath}`;
 
@@ -388,7 +388,7 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
         let providerMetadataKey: string;
 
         try {
-          if (env.USE_FINOQ_FOR_WITHDRAWALS) {
+          if (env.USE_FINOQ_FOR_WITHDRAWALS && !!env.FINOQ_KEY && !!env.FINOQ_SECRET && !!env.FINOQ_BASE_URL) {
             const networkCode = networkCodeForPhone(cleanPhone);
             providerResponse = await finoqWithdrawToMobile(
               payoutAmount,

@@ -33,9 +33,15 @@ export const buildFinoqCallbackUrl = (configuredBase: string): string => {
 };
 
 const getHeaders = (): Record<string, string> => {
-  const apiKey = env.FINOQ_API_KEY;
-  if (!apiKey) throw new Error('FINOQ_API_KEY environment variable is not set');
-  return { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` };
+  const key = env.FINOQ_KEY;
+  const secret = env.FINOQ_SECRET;
+  if (!key || !secret) {
+    throw new Error('FINOQ_KEY / FINOQ_SECRET environment variables are not set');
+  }
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Basic ${Buffer.from(`${key}:${secret}`).toString('base64')}`,
+  };
 };
 
 const postToFinoq = async (endpoint: string, payload: any, operation: string): Promise<FinoqResponse> => {
@@ -45,7 +51,7 @@ const postToFinoq = async (endpoint: string, payload: any, operation: string): P
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 120000);
+      const timeout = setTimeout(() => controller.abort(), 30000);
       try {
         logger.info({ url: endpoint, reference: payload.externalReference, attempt }, `${operation}_REQUEST`);
         response = await fetch(endpoint, { method: 'POST', headers: getHeaders(), body: JSON.stringify(payload), signal: controller.signal });
@@ -59,8 +65,11 @@ const postToFinoq = async (endpoint: string, payload: any, operation: string): P
     } catch (error: any) {
       if (attempt >= 3) {
         const err = new Error('Finoq request failed after retries') as any;
-        err.status = 504;
-        err.providerMessage = error.message || 'Request timed out or failed';
+        err.status = 502;
+        err.providerMessage = error?.message === 'fetch failed'
+          ? 'Unable to reach Finoq. Verify FINOQ_BASE_URL and outbound network access.'
+          : error?.message || 'Request timed out or failed';
+        err.providerCode = 'FINOQ_NETWORK_ERROR';
         throw err;
       }
       await sleep(1000);
@@ -90,9 +99,17 @@ const postToFinoq = async (endpoint: string, payload: any, operation: string): P
 export const finoqWithdrawToMobile = async (amount: number, phone: string, externalReference: string, callbackUrl: string): Promise<FinoqResponse> => {
   const baseUrl = env.FINOQ_BASE_URL?.replace(/\/$/, '');
   if (!baseUrl) throw new Error('FINOQ_BASE_URL environment variable is not set');
-  const withdrawPath = env.FINOQ_WITHDRAW_ENDPOINT || '/api/v1/withdrawals';
+  const withdrawPath = env.FINOQ_WITHDRAW_ENDPOINT || '/v1/payments';
   const endpoint = `${baseUrl}${withdrawPath.startsWith('/') ? withdrawPath : `/${withdrawPath}`}`;
-  return postToFinoq(endpoint, { amount: Number(amount), phoneNumber: formatFinoqPhone(phone), externalReference, callbackUrl }, 'FINOQ_WITHDRAW');
+  const formattedPhone = formatFinoqPhone(phone);
+  return postToFinoq(endpoint, {
+    amount: Number(amount),
+    currency: 'KES',
+    channel: 'mpesa',
+    phone: `+${formattedPhone}`,
+    reference: externalReference,
+    callback_url: callbackUrl,
+  }, 'FINOQ_WITHDRAW');
 };
 
 export const finoqTopUpWallet = async (amount: number, phone: string): Promise<FinoqResponse> => {

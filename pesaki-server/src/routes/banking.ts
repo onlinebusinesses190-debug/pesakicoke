@@ -858,16 +858,16 @@ export const bankingRoutes = async (fastify: FastifyInstance) => {
       const payoutAmount = Math.max(0, amount - fee);
       if (payoutAmount < 10) return reply.status(400).send({ error: 'After fee deduction, payout must be at least KES 10', fee, payoutAmount, minimum: 10 });
       const reference = `WD-BANK-${user.id.slice(0, 8)}-${Date.now()}`;
-      const callbackBase = env.USE_FINOQ_FOR_WITHDRAWALS
+      const callbackBase = env.USE_FINOQ_FOR_WITHDRAWALS && !!env.FINOQ_KEY && !!env.FINOQ_SECRET && !!env.FINOQ_BASE_URL
         ? (env.FINOQ_CALLBACK_URL || env.MPESA_CALLBACK_URL || 'https://pesaki-server.onrender.com')
         : (env.MPESA_CALLBACK_URL || 'https://pesaki-server.onrender.com');
-      const providerPath = env.USE_FINOQ_FOR_WITHDRAWALS ? 'finoq' : 'palpluss';
-      const callbackUrl = env.USE_FINOQ_FOR_WITHDRAWALS
+      const providerPath = env.USE_FINOQ_FOR_WITHDRAWALS && !!env.FINOQ_KEY && !!env.FINOQ_SECRET && !!env.FINOQ_BASE_URL ? 'finoq' : 'palpluss';
+      const callbackUrl = env.USE_FINOQ_FOR_WITHDRAWALS && !!env.FINOQ_KEY && !!env.FINOQ_SECRET && !!env.FINOQ_BASE_URL
         ? buildFinoqCallbackUrl(callbackBase)
         : `${callbackBase.replace(/\/+$/, '')}/api/webhooks/${providerPath}`;
 
       try {
-        if (env.USE_FINOQ_FOR_WITHDRAWALS) {
+        if (env.USE_FINOQ_FOR_WITHDRAWALS && !!env.FINOQ_KEY && !!env.FINOQ_SECRET && !!env.FINOQ_BASE_URL) {
           const finoqPhone = digits.startsWith('254') ? digits : digits.startsWith('0') ? `254${digits.slice(1)}` : `254${digits}`;
           const networkCode = networkCodeForPhone(finoqPhone);
           await finoqWithdrawToMobile(payoutAmount, finoqPhone, reference, callbackUrl);
