@@ -1,5 +1,5 @@
 /**
- * PESAKI — "Install PESAKI" prompt.
+ * PESAKI Ã¢â‚¬â€ "Install PESAKI" prompt.
  *
  * Two distinct behaviours, because the platform genuinely differs:
  *
@@ -77,7 +77,7 @@ export function InstallPESAKI({
     }
   };
 
-  // ── Small optional entry point ──────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Small optional entry point Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   // Rendered only when installation is genuinely possible, so a permanently
   // visible button never appears on browsers that cannot install. Hidden while
   // the popup is open to avoid a duplicate affordance.
@@ -182,7 +182,7 @@ export function InstallPESAKI({
               disabled={busy}
               className="flex-1 rounded-full bg-brand-gold py-2.5 text-[12px] font-bold text-brand-deep transition-opacity hover:opacity-95 disabled:opacity-70"
             >
-              {busy ? "Installing…" : "Install PESAKI"}
+              {busy ? "InstallingÃ¢â‚¬Â¦" : "Install PESAKI"}
             </button>
           )}
         </div>

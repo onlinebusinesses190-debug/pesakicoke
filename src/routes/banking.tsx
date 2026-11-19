@@ -16,8 +16,8 @@ import { calculateWithdrawalFee, MIN_DEPOSIT, MIN_WITHDRAWAL } from "@/utils/fee
 export const Route = createFileRoute("/banking")({
   head: () => ({
     meta: [
-      { title: "Banking Hub — PESAKI" },
-      { name: "description", content: "Deposit, withdraw, invest and borrow – your PESAKI bank in one place." },
+      { title: "Banking Hub Ã¢â‚¬â€ PESAKI" },
+      { name: "description", content: "Deposit, withdraw, invest and borrow Ã¢â‚¬â€œ your PESAKI bank in one place." },
     ],
   }),
   component: BankingPage,
@@ -96,7 +96,7 @@ function BankingPage() {
     <AppShell>
       <PageHeader title="Banking Hub" subtitle="Your PESAKI bank" right={<Badge tone="success"><CheckCircle2 className="h-2.5 w-2.5" /> Insured</Badge>} />
 
-      {/* Section 1 — Balance Card */}
+      {/* Section 1 Ã¢â‚¬â€ Balance Card */}
       <section className="px-5 pt-5">
         <div className="relative overflow-hidden rounded-2xl gradient-primary p-5 text-primary-foreground">
           <PiggyBank className="absolute -right-3 -top-3 h-28 w-28 opacity-15" />
@@ -115,7 +115,7 @@ function BankingPage() {
         </div>
       </section>
 
-      {/* Section 2 — Action Row */}
+      {/* Section 2 Ã¢â‚¬â€ Action Row */}
       <section className="-mt-3 px-5">
         <Card className="grid grid-cols-4 gap-2">
           {[
@@ -132,14 +132,14 @@ function BankingPage() {
         </Card>
       </section>
 
-      {/* Section 3 — KPI Row */}
+      {/* Section 3 Ã¢â‚¬â€ KPI Row */}
       <section className="mt-5 grid grid-cols-3 gap-3 px-5">
         <Stat label="Locked" value={fmt(summary.lockedTotal)} tone="primary" />
         <Stat label="Available" value={fmt(summary.availableBalance)} tone="success" />
         <Stat label="Avg. APY" value={`${summary.avgApy}%`} tone="gold" />
       </section>
 
-      {/* Section 4 — Deposit History */}
+      {/* Section 4 Ã¢â‚¬â€ Deposit History */}
       <section className="mt-6 px-5">
         <SectionTitle title="Deposit History" />
         <div className="space-y-2.5">
@@ -163,13 +163,13 @@ function BankingPage() {
         </div>
       </section>
 
-      {/* Section 5 — Lock Funds & Earn */}
+      {/* Section 5 Ã¢â‚¬â€ Lock Funds & Earn */}
       <section className="mt-6 px-5">
         <SectionTitle title="Lock Funds & Earn" />
         <LockSavingsForm available={summary.availableBalance} onSuccess={refresh} />
       </section>
 
-      {/* Section 6 — Active Locked Savings */}
+      {/* Section 6 Ã¢â‚¬â€ Active Locked Savings */}
       <section className="mt-6 px-5">
         <SectionTitle title="Active Locked Savings" />
         <div className="space-y-2.5">
@@ -180,7 +180,7 @@ function BankingPage() {
         </div>
       </section>
 
-      {/* Section 7 — My Investments */}
+      {/* Section 7 Ã¢â‚¬â€ My Investments */}
       <section className="mt-6 px-5">
         <SectionTitle title="My Investments" />
         <div className="space-y-2.5">
@@ -191,7 +191,7 @@ function BankingPage() {
         </div>
       </section>
 
-      {/* Section 8 — Financial Goals */}
+      {/* Section 8 Ã¢â‚¬â€ Financial Goals */}
       <section className="mt-6 px-5">
         <SectionTitle
           title="Financial Goals"
@@ -225,7 +225,7 @@ function BankingPage() {
         </div>
       </section>
 
-      {/* Section 9 — Instant Loans */}
+      {/* Section 9 Ã¢â‚¬â€ Instant Loans */}
       <section className="mt-6 px-5">
         <SectionTitle title="Instant Loans" />
         <Card className="!p-4 mb-4">
@@ -234,7 +234,7 @@ function BankingPage() {
             <div className="min-w-0">
               <p className="text-sm font-semibold">You qualify for up to</p>
               <p className="text-lg font-bold text-primary">{fmt(150000)}</p>
-              <p className="text-[11px] text-muted-foreground">20% p.a. · Repay in 3–24 months</p>
+              <p className="text-[11px] text-muted-foreground">20% p.a. Ã‚Â· Repay in 3Ã¢â‚¬â€œ24 months</p>
             </div>
             <button onClick={() => setModal('loan')} className="rounded-full gradient-primary px-3 py-1.5 text-[11px] font-semibold text-primary-foreground">Get loan</button>
           </div>
@@ -246,7 +246,7 @@ function BankingPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-semibold">Loan Application</p>
-                  <p className="text-[11px] text-muted-foreground">{new Date(loan.applied_at).toLocaleDateString()} · {loan.duration_months} months</p>
+                  <p className="text-[11px] text-muted-foreground">{new Date(loan.applied_at).toLocaleDateString()} Ã‚Â· {loan.duration_months} months</p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-bold">{fmt(loan.amount)}</p>
@@ -263,7 +263,7 @@ function BankingPage() {
       </section>
 
       <p className="my-8 px-5 text-center text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-        Funds insured · Secured by PESAKI
+        Funds insured Ã‚Â· Secured by PESAKI
       </p>
 
       {modal && <BankingSheet action={modal} onClose={() => setModal(null)} onSuccess={refresh} />}
@@ -271,7 +271,7 @@ function BankingPage() {
   );
 }
 
-// ─── Lock Savings Form (inline) ──────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Lock Savings Form (inline) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function LockSavingsForm({ available, onSuccess }: { available: number; onSuccess: () => void }) {
   const { requireAuth } = useRequireAuth();
   const [amount, setAmount] = useState(50000);
@@ -334,14 +334,14 @@ function LockSavingsForm({ available, onSuccess }: { available: number; onSucces
         </div>
         <p className="text-[11px] text-muted-foreground">Funds are locked for the full duration. No early withdrawal.</p>
         <button onClick={handleLock} disabled={loading || amount < 1000 || amount > available} className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50">
-          {loading ? 'Processing...' : '🔒 Lock Now'}
+          {loading ? 'Processing...' : 'Ã°Å¸â€â€™ Lock Now'}
         </button>
       </div>
     </Card>
   );
 }
 
-// ─── Locked Savings Card with countdown ─────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Locked Savings Card with countdown Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function LockedSavingsCard({ lock }: { lock: any }) {
   const [timeLeft, setTimeLeft] = useState('');
   useEffect(() => {
@@ -367,7 +367,7 @@ function LockedSavingsCard({ lock }: { lock: any }) {
           <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary"><Lock className="h-5 w-5" /></span>
           <div>
             <p className="text-sm font-semibold">{lock.duration_months}-Month Lock</p>
-            <p className="text-[11px] text-muted-foreground">{fmt(lock.amount)} · earns {fmt(interest)}</p>
+            <p className="text-[11px] text-muted-foreground">{fmt(lock.amount)} Ã‚Â· earns {fmt(interest)}</p>
           </div>
         </div>
         <Badge tone="gold">10% APY</Badge>
@@ -381,7 +381,7 @@ function LockedSavingsCard({ lock }: { lock: any }) {
   );
 }
 
-// ─── Investment Card with countdown ─────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Investment Card with countdown Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function InvestmentCard({ investment }: { investment: any }) {
   const [timeLeft, setTimeLeft] = useState('');
   useEffect(() => {
@@ -407,7 +407,7 @@ function InvestmentCard({ investment }: { investment: any }) {
           <span className="grid h-10 w-10 place-items-center rounded-xl bg-gold/15 text-gold-foreground"><TrendingUp className="h-5 w-5" /></span>
           <div>
             <p className="text-sm font-semibold">{investment.duration_months}-Month Investment</p>
-            <p className="text-[11px] text-muted-foreground">{fmt(investment.amount)} · earns {fmt(interest)}</p>
+            <p className="text-[11px] text-muted-foreground">{fmt(investment.amount)} Ã‚Â· earns {fmt(interest)}</p>
           </div>
         </div>
         <Badge tone="gold">12% APY</Badge>
@@ -421,7 +421,7 @@ function InvestmentCard({ investment }: { investment: any }) {
   );
 }
 
-// ─── Banking Sheet (modals) ──────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Banking Sheet (modals) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function BankingSheet({ action, onClose, onSuccess }: { action: ActionKey; onClose: () => void; onSuccess: () => void }) {
   if (action === 'deposit') return <DepositSheet onClose={onClose} onSuccess={onSuccess} />;
   if (action === 'withdraw') return <WithdrawSheet onClose={onClose} onSuccess={onSuccess} />;
@@ -724,7 +724,7 @@ function LoanSheet({ onClose, onSuccess }: { onClose: () => void; onSuccess: () 
   );
 }
 
-// ─── Shared UI helpers ───────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Shared UI helpers Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function SheetShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-end sm:place-items-center">

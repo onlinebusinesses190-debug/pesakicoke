@@ -82,7 +82,7 @@ function AdminDashboard() {
   if (authLoading || loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <p className="text-muted-foreground">Loading dashboard…</p>
+        <p className="text-muted-foreground">Loading dashboardÃ¢â‚¬Â¦</p>
       </div>
     );
   }

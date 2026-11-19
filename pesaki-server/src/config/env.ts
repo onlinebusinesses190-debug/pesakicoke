@@ -17,22 +17,19 @@ const envSchema = z.object({
   PALPLUSS_API_KEY: z.string().optional(),
   PALPLUSS_API_URL: z.string().url().optional(),
 
-  PAYHERO_API_USERNAME: z.string().optional(),
-  PAYHERO_API_PASSWORD: z.string().optional(),
-  PAYHERO_ACCOUNT_ID: z.string().optional(),
-  PAYHERO_BASE_URL: z.string().url().optional(),
-  PAYHERO_WITHDRAW_ENDPOINT: z.string().optional(),
-  PAYHERO_TOPUP_ENDPOINT: z.string().optional(),
-  PAYHERO_CHANNEL_ID: z.string().optional(),
-  PAYHERO_CALLBACK_URL: z.string().url().optional(),
+  FINOQ_API_KEY: z.string().optional(),
+  FINOQ_BASE_URL: z.string().url().optional(),
+  FINOQ_WITHDRAW_ENDPOINT: z.string().optional(),
+  FINOQ_TOPUP_ENDPOINT: z.string().optional(),
+  FINOQ_CALLBACK_URL: z.string().url().optional(),
 
-  USE_PAYHERO_FOR_WITHDRAWALS: z.string().optional().transform((val) => val !== 'false'),
+  USE_FINOQ_FOR_WITHDRAWALS: z.string().optional().transform((val) => val !== 'false'),
 });
 
 const parsed = envSchema.safeParse(process.env);
 
 if (!parsed.success) {
-  console.error('❌ Invalid environment variables:', parsed.error.format());
+  console.error('Ã¢ÂÅ’ Invalid environment variables:', parsed.error.format());
   process.exit(1);
 }
 

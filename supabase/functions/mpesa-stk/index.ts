@@ -2,7 +2,7 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
-// ─── Secrets (names without "SUPABASE_" prefix) ────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Secrets (names without "SUPABASE_" prefix) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 const CONSUMER_KEY = Deno.env.get("DARAJA_CONSUMER_KEY")!;
 const CONSUMER_SECRET = Deno.env.get("DARAJA_CONSUMER_SECRET")!;
 const PASSKEY = Deno.env.get("DARAJA_PASSKEY")!;
@@ -10,14 +10,14 @@ const SHORTCODE = Deno.env.get("DARAJA_SHORTCODE")!;
 const CALLBACK_URL = Deno.env.get("DARAJA_CALLBACK_URL")!;
 const ENV = Deno.env.get("DARAJA_ENV") || "sandbox";
 
-// ✅ Use automatically provided SUPABASE_URL
+// Ã¢Å“â€¦ Use automatically provided SUPABASE_URL
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-// ✅ Custom secret name – not starting with "SUPABASE_"
+// Ã¢Å“â€¦ Custom secret name Ã¢â‚¬â€œ not starting with "SUPABASE_"
 const supabaseServiceKey = Deno.env.get("SERVICE_ROLE_KEY")!;
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// ─── Daraja API endpoints ────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Daraja API endpoints Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 const getTokenUrl = ENV === "production"
   ? "https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
   : "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials";
@@ -26,7 +26,7 @@ const stkPushUrl = ENV === "production"
   ? "https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
   : "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest";
 
-// ─── Helper: Get OAuth Token ────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Helper: Get OAuth Token Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 async function getAccessToken(): Promise<string> {
   const auth = btoa(`${CONSUMER_KEY}:${CONSUMER_SECRET}`);
   const res = await fetch(getTokenUrl, {
@@ -37,7 +37,7 @@ async function getAccessToken(): Promise<string> {
   return data.access_token;
 }
 
-// ─── Main handler ────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Main handler Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 serve(async (req) => {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });

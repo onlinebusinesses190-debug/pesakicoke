@@ -28,7 +28,7 @@ function Shell({
         <div className="flex items-center justify-between bg-[#1565c0] px-3 py-2 text-white">
           <span className="text-sm font-bold tracking-wide">{title}</span>
           <button onClick={onClose} aria-label="Close" className="px-2 text-lg leading-none hover:opacity-80 font-bold">
-            ✕
+            Ã¢Å“â€¢
           </button>
         </div>
         <div className="p-4 space-y-4">{children}</div>
@@ -70,7 +70,7 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
 
   const num = (v: string) => parseFloat(v) || 0;
 
-  // ─── ASYNC HANDLERS (Fixes the error bug) ───
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ ASYNC HANDLERS (Fixes the error bug) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const handleTrade = async (direction: "buy" | "sell") => {
     setErr("");
     setLoading(true);
@@ -133,7 +133,7 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
     }
   };
 
-  // ─── MODIFY POSITION MODE ───
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ MODIFY POSITION MODE Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   if (state.mode === "modify") {
     if (!pos)
       return (
@@ -213,7 +213,7 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
     );
   }
 
-  // ─── NEW ORDER MODE ───
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ NEW ORDER MODE Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const s = e.spec(symbol);
   const q = e.quotes[symbol];
   
@@ -333,7 +333,7 @@ export function OrderDialog({ state, onClose }: { state: DialogState; onClose: (
         
         <div className="flex justify-between text-[11px] text-gray-600 mt-1">
           <span>Margin Required:</span>
-          <span className="font-mono font-bold text-black">${marginUsd.toFixed(2)} USD <span className="text-gray-400">(≈ KSh {totalRequiredKes.toFixed(0)})</span></span>
+          <span className="font-mono font-bold text-black">${marginUsd.toFixed(2)} USD <span className="text-gray-400">(Ã¢â€°Ë† KSh {totalRequiredKes.toFixed(0)})</span></span>
         </div>
         <div className="flex justify-between text-[11px] text-gray-600">
           <span>Opening Fee (0.5%):</span>

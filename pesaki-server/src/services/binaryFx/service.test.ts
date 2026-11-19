@@ -20,32 +20,32 @@ vi.mock("../../wallet/service", () => ({
 import { determineOutcome } from "./service";
 import { BFX } from "./config";
 
-describe("determineOutcome — fairness rules", () => {
-  it("BUY, price UP by 0.00005 → WIN", () => {
+describe("determineOutcome Ã¢â‚¬â€ fairness rules", () => {
+  it("BUY, price UP by 0.00005 Ã¢â€ â€™ WIN", () => {
     const entry = 1.12980;
     const exit = 1.12985; // +0.00005
     expect(determineOutcome("up", entry, exit)).toBe("win");
   });
 
-  it("BUY, price DOWN by 0.00005 → LOSS", () => {
+  it("BUY, price DOWN by 0.00005 Ã¢â€ â€™ LOSS", () => {
     const entry = 1.12985;
     const exit = 1.12980; // -0.00005
     expect(determineOutcome("up", entry, exit)).toBe("loss");
   });
 
-  it("BUY, price exactly the same → LOSS (tie = loss)", () => {
+  it("BUY, price exactly the same Ã¢â€ â€™ LOSS (tie = loss)", () => {
     const entry = 1.12980;
     const exit = 1.12980;
     expect(determineOutcome("up", entry, exit)).toBe("loss");
   });
 
-  it("SELL, price DOWN by 0.00005 → WIN", () => {
+  it("SELL, price DOWN by 0.00005 Ã¢â€ â€™ WIN", () => {
     const entry = 1.12985;
     const exit = 1.12980; // -0.00005
     expect(determineOutcome("down", entry, exit)).toBe("win");
   });
 
-  it("SELL, price UP by 0.00005 → LOSS", () => {
+  it("SELL, price UP by 0.00005 Ã¢â€ â€™ LOSS", () => {
     const entry = 1.12980;
     const exit = 1.12985; // +0.00005
     expect(determineOutcome("down", entry, exit)).toBe("loss");
@@ -53,13 +53,13 @@ describe("determineOutcome — fairness rules", () => {
 
   it("floating-point near-equal below EPS does not flip outcome", () => {
     const entry = 1.12980;
-    const exit = 1.12980 + 1e-13; // below EPS (1e-12) → treated as equal → LOSS
+    const exit = 1.12980 + 1e-13; // below EPS (1e-12) Ã¢â€ â€™ treated as equal Ã¢â€ â€™ LOSS
     expect(determineOutcome("up", entry, exit)).toBe("loss");
   });
 
-  it("move just above EPS → WIN (respects tiny differences)", () => {
+  it("move just above EPS Ã¢â€ â€™ WIN (respects tiny differences)", () => {
     const entry = 1.12980;
-    const exit = 1.12980 + 0.000001; // above EPS → WIN
+    const exit = 1.12980 + 0.000001; // above EPS Ã¢â€ â€™ WIN
     expect(determineOutcome("up", entry, exit)).toBe("win");
   });
 

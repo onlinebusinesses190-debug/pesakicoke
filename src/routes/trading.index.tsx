@@ -20,11 +20,11 @@ import { tradingProducts } from "@/lib/mock";
 export const Route = createFileRoute("/trading/")({
   head: () => ({
     meta: [
-      { title: "Trading — PESAKI" },
+      { title: "Trading Ã¢â‚¬â€ PESAKI" },
       {
         name: "description",
         content:
-          "Forex, Binary FX, Up & Down, Avimarket, Invest Prediction and Market Spin — all PESAKI trading products in one place.",
+          "Forex, Binary FX, Up & Down, Avimarket, Invest Prediction and Market Spin Ã¢â‚¬â€ all PESAKI trading products in one place.",
       },
     ],
   }),
@@ -78,12 +78,12 @@ function TradingPage() {
         <div className="gradient-primary rounded-2xl p-5 text-primary-foreground">
           <p className="text-xs uppercase tracking-widest opacity-80">Today's P&L</p>
           <p className="mt-1 font-display text-3xl font-bold">+ KES 3,420</p>
-          <p className="mt-1 text-xs opacity-80">12 active trades · 8 winning</p>
+          <p className="mt-1 text-xs opacity-80">12 active trades Ã‚Â· 8 winning</p>
         </div>
       </section>
 
       <section className="mt-6 space-y-3 px-5">
-        {/* Forex — live spot currency trading, demo available now */}
+        {/* Forex Ã¢â‚¬â€ live spot currency trading, demo available now */}
         <Card className="!p-4">
           <div className="flex items-start gap-3">
             <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl gradient-gold text-gold-foreground">

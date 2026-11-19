@@ -34,7 +34,7 @@ export function MarketWatch({
               return (
                 <tr
                   key={s.name}
-                  title={`${s.desc} — double-click to trade`}
+                  title={`${s.desc} Ã¢â‚¬â€ double-click to trade`}
                   onClick={() => onSelect(s.name)}
                   onDoubleClick={() => onTrade(s.name)}
                   className={`cursor-default select-none ${sel ? "bg-primary text-primary-foreground" : "hover:bg-accent"}`}
@@ -54,7 +54,7 @@ export function MarketWatch({
         </table>
       </div>
       <div className="border-t border-border bg-chrome px-2 py-1 text-muted-foreground">
-        Click to view chart · Double-click for New Order
+        Click to view chart Ã‚Â· Double-click for New Order
       </div>
     </div>
   );

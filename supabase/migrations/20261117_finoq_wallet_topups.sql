@@ -1,5 +1,5 @@
--- PayHero wallet top-up tracking table
--- Used by admin POST /api/admin/payhero/topup to record top-up attempts
+-- Finoq wallet top-up tracking table
+-- Used by admin POST /api/admin/finoq/topup to record top-up attempts
 
 CREATE TABLE IF NOT EXISTS public.wallet_top_ups (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

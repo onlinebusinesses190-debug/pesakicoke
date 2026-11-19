@@ -81,7 +81,7 @@ export function FxChart({ pair, tf, now, trades }: { pair: Pair; tf: TF; now: nu
         ctx.fillStyle = "#fff"; ctx.fillText(label, 11, yy);
       }
     };
-    for (const t of mine) line(t.entry, col(t.side === "buy" ? "--chart-bull" : "--chart-bear"), `${t.side.toUpperCase()} · ${t.mode}`, [5, 4]);
+    for (const t of mine) line(t.entry, col(t.side === "buy" ? "--chart-bull" : "--chart-bear"), `${t.side.toUpperCase()} Ã‚Â· ${t.mode}`, [5, 4]);
     line(q.bid, col("--chart-line"), "");
   }, [pair, tf, now, trades, size]);
 

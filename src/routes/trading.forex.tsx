@@ -9,13 +9,13 @@ export const Route = createFileRoute("/trading/forex")({
   }),
   head: () => ({
     meta: [
-      { title: "MetaTrader Web — Forex Trading Terminal" },
+      { title: "MetaTrader Web Ã¢â‚¬â€ Forex Trading Terminal" },
       {
         name: "description",
         content:
           "MT4/MT5-style forex trading terminal with live quotes, charts, market and pending orders, SL/TP and margin.",
       },
-      { property: "og:title", content: "MetaTrader Web — Forex Trading Terminal" },
+      { property: "og:title", content: "MetaTrader Web Ã¢â‚¬â€ Forex Trading Terminal" },
       {
         property: "og:description",
         content:
@@ -47,7 +47,7 @@ function ForexPage() {
   if (!ready) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        Loading…
+        LoadingÃ¢â‚¬Â¦
       </div>
     );
   }
@@ -55,7 +55,7 @@ function ForexPage() {
   if (mode === "real" && !user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        Redirecting to sign-in…
+        Redirecting to sign-inÃ¢â‚¬Â¦
       </div>
     );
   }
@@ -64,7 +64,7 @@ function ForexPage() {
     <ClientOnly
       fallback={
         <div className="flex min-h-screen items-center justify-center bg-background">
-          Loading the terminal…
+          Loading the terminalÃ¢â‚¬Â¦
         </div>
       }
     >

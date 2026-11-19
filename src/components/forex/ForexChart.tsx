@@ -1,5 +1,5 @@
 /**
- * PESAKI Forex — candlestick chart with fullscreen viewing.
+ * PESAKI Forex Ã¢â‚¬â€ candlestick chart with fullscreen viewing.
  *
  * Separate from components/fx/TradingChart, which renders the binary
  * prediction game's trade markers and countdown overlays. Those markers mean
@@ -84,7 +84,7 @@ export function ForexChart({
   /** When provided, the pair is switchable from inside fullscreen. */
   symbols?: string[];
   onSymbolChange?: (s: string) => void;
-  /** Indicative price text, e.g. "Bid 1.12969 · Ask 1.12973". */
+  /** Indicative price text, e.g. "Bid 1.12969 Ã‚Â· Ask 1.12973". */
   priceLabel?: string;
   /** Open position summary, e.g. "BUY 0.68 lots @ 1.12971". */
   positionLabel?: string;
@@ -285,7 +285,7 @@ export function ForexChart({
     setEntryBadgeY(y == null ? null : y);
   }, [lines?.entry, full]);
 
-  // ── Fullscreen ─────────────────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Fullscreen Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
   /**
    * Whether this browser can do real fullscreen. iOS Safari notably cannot, so
@@ -414,7 +414,7 @@ export function ForexChart({
       }
     >
       {full ? (
-        /* ── Fullscreen bar: compact, so it does not eat the chart ───────────── */
+        /* Ã¢â€â‚¬Ã¢â€â‚¬ Fullscreen bar: compact, so it does not eat the chart Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
         <div className="flex shrink-0 items-center gap-2 border-b border-border bg-background/95 px-2 py-1.5 backdrop-blur">
           <button
             onClick={() => void exitFullscreen()}
@@ -485,7 +485,7 @@ export function ForexChart({
           )}
         </div>
       ) : (
-        /* ── Normal view: intervals and the fullscreen trigger, top-right ────── */
+        /* Ã¢â€â‚¬Ã¢â€â‚¬ Normal view: intervals and the fullscreen trigger, top-right Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
         <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
           <div className="flex gap-1 rounded-full bg-background/90 p-0.5">
             {INTERVALS.map((i) => (
@@ -560,7 +560,7 @@ export function ForexChart({
 
       {full && (
         <p className="shrink-0 px-3 pb-2 pt-1 text-center text-[10px] text-muted-foreground">
-          Drag to pan · scroll or pinch to zoom
+          Drag to pan Ã‚Â· scroll or pinch to zoom
         </p>
       )}
     </div>

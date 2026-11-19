@@ -39,7 +39,6 @@ import { Route as AdminDepositsRouteImport } from './routes/admin.deposits'
 import { Route as AdminFinanceRouteImport } from './routes/admin.finance'
 import { Route as AdminKaziRouteImport } from './routes/admin.kazi'
 import { Route as AdminNotificationsRouteImport } from './routes/admin.notifications'
-import { Route as AdminPayHeroTopUpRouteImport } from './routes/admin.payhero.topup'
 import { Route as AdminReferralsRouteImport } from './routes/admin.referrals'
 import { Route as AdminReportsRouteImport } from './routes/admin.reports'
 import { Route as AdminSupportRouteImport } from './routes/admin.support'
@@ -57,6 +56,7 @@ import { Route as TradingFxRouteImport } from './routes/trading.fx'
 import { Route as TradingInvestRouteImport } from './routes/trading.invest'
 import { Route as TradingSpinRouteImport } from './routes/trading.spin'
 import { Route as TradingUpDownRouteImport } from './routes/trading.up-down'
+import { Route as AdminFinoqTopupRouteImport } from './routes/admin.finoq.topup'
 import { Route as AdminUsersUserIdRouteImport } from './routes/admin.users.$userId'
 import { Route as KaziMSlugRouteImport } from './routes/kazi.m.$slug'
 import { Route as KaziPublicUserIdRouteImport } from './routes/kazi_.public.$userId'
@@ -200,11 +200,6 @@ const AdminFinanceRoute = AdminFinanceRouteImport.update({
   path: '/finance',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminPayHeroTopUpRoute = AdminPayHeroTopUpRouteImport.update({
-  id: '/payhero/topup',
-  path: '/payhero/topup',
-  getParentRoute: () => AdminRoute,
-} as any)
 const AdminKaziRoute = AdminKaziRouteImport.update({
   id: '/kazi',
   path: '/kazi',
@@ -300,6 +295,11 @@ const TradingUpDownRoute = TradingUpDownRouteImport.update({
   path: '/up-down',
   getParentRoute: () => TradingRoute,
 } as any)
+const AdminFinoqTopupRoute = AdminFinoqTopupRouteImport.update({
+  id: '/finoq/topup',
+  path: '/finoq/topup',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminUsersUserIdRoute = AdminUsersUserIdRouteImport.update({
   id: '/$userId',
   path: '/$userId',
@@ -345,7 +345,6 @@ export interface FileRoutesByFullPath {
   '/admin/finance': typeof AdminFinanceRoute
   '/admin/kazi': typeof AdminKaziRoute
   '/admin/notifications': typeof AdminNotificationsRoute
-  '/admin/payhero/topup': typeof AdminPayHeroTopUpRoute
   '/admin/referrals': typeof AdminReferralsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/support': typeof AdminSupportRoute
@@ -364,6 +363,7 @@ export interface FileRoutesByFullPath {
   '/trading/up-down': typeof TradingUpDownRoute
   '/admin/': typeof AdminIndexRoute
   '/trading/': typeof TradingIndexRoute
+  '/admin/finoq/topup': typeof AdminFinoqTopupRoute
   '/admin/users/$userId': typeof AdminUsersUserIdRoute
   '/kazi/m/$slug': typeof KaziMSlugRoute
   '/kazi/public/$userId': typeof KaziPublicUserIdRoute
@@ -395,7 +395,6 @@ export interface FileRoutesByTo {
   '/admin/finance': typeof AdminFinanceRoute
   '/admin/kazi': typeof AdminKaziRoute
   '/admin/notifications': typeof AdminNotificationsRoute
-  '/admin/payhero/topup': typeof AdminPayHeroTopUpRoute
   '/admin/referrals': typeof AdminReferralsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/support': typeof AdminSupportRoute
@@ -414,6 +413,7 @@ export interface FileRoutesByTo {
   '/trading/up-down': typeof TradingUpDownRoute
   '/admin': typeof AdminIndexRoute
   '/trading': typeof TradingIndexRoute
+  '/admin/finoq/topup': typeof AdminFinoqTopupRoute
   '/admin/users/$userId': typeof AdminUsersUserIdRoute
   '/kazi/m/$slug': typeof KaziMSlugRoute
   '/kazi/public/$userId': typeof KaziPublicUserIdRoute
@@ -449,7 +449,6 @@ export interface FileRoutesById {
   '/admin/finance': typeof AdminFinanceRoute
   '/admin/kazi': typeof AdminKaziRoute
   '/admin/notifications': typeof AdminNotificationsRoute
-  '/admin/payhero/topup': typeof AdminPayHeroTopUpRoute
   '/admin/referrals': typeof AdminReferralsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/support': typeof AdminSupportRoute
@@ -468,6 +467,7 @@ export interface FileRoutesById {
   '/trading/up-down': typeof TradingUpDownRoute
   '/admin/': typeof AdminIndexRoute
   '/trading/': typeof TradingIndexRoute
+  '/admin/finoq/topup': typeof AdminFinoqTopupRoute
   '/admin/users/$userId': typeof AdminUsersUserIdRoute
   '/kazi/m/$slug': typeof KaziMSlugRoute
   '/kazi_/public/$userId': typeof KaziPublicUserIdRoute
@@ -501,7 +501,6 @@ export interface FileRouteTypes {
     | '/admin/commissions'
     | '/admin/deposits'
     | '/admin/finance'
-| '/admin/payhero/topup'
     | '/admin/kazi'
     | '/admin/notifications'
     | '/admin/referrals'
@@ -522,6 +521,7 @@ export interface FileRouteTypes {
     | '/trading/up-down'
     | '/admin/'
     | '/trading/'
+    | '/admin/finoq/topup'
     | '/admin/users/$userId'
     | '/kazi/m/$slug'
     | '/kazi/public/$userId'
@@ -551,7 +551,6 @@ export interface FileRouteTypes {
     | '/admin/commissions'
     | '/admin/deposits'
     | '/admin/finance'
-| '/admin/payhero/topup'
     | '/admin/kazi'
     | '/admin/notifications'
     | '/admin/referrals'
@@ -572,6 +571,7 @@ export interface FileRouteTypes {
     | '/trading/up-down'
     | '/admin'
     | '/trading'
+    | '/admin/finoq/topup'
     | '/admin/users/$userId'
     | '/kazi/m/$slug'
     | '/kazi/public/$userId'
@@ -604,7 +604,6 @@ export interface FileRouteTypes {
     | '/admin/commissions'
     | '/admin/deposits'
     | '/admin/finance'
-| '/admin/payhero/topup'
     | '/admin/kazi'
     | '/admin/notifications'
     | '/admin/referrals'
@@ -625,6 +624,7 @@ export interface FileRouteTypes {
     | '/trading/up-down'
     | '/admin/'
     | '/trading/'
+    | '/admin/finoq/topup'
     | '/admin/users/$userId'
     | '/kazi/m/$slug'
     | '/kazi_/public/$userId'
@@ -854,13 +854,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminFinanceRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/payhero/topup': {
-      id: '/admin/payhero/topup'
-      path: '/payhero/topup'
-      fullPath: '/admin/payhero/topup'
-      preLoaderRoute: typeof AdminPayHeroTopUpRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin/kazi': {
       id: '/admin/kazi'
       path: '/kazi'
@@ -994,6 +987,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TradingUpDownRouteImport
       parentRoute: typeof TradingRoute
     }
+    '/admin/finoq/topup': {
+      id: '/admin/finoq/topup'
+      path: '/finoq/topup'
+      fullPath: '/admin/finoq/topup'
+      preLoaderRoute: typeof AdminFinoqTopupRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/users/$userId': {
       id: '/admin/users/$userId'
       path: '/$userId'
@@ -1050,7 +1050,6 @@ interface AdminRouteChildren {
   AdminFinanceRoute: typeof AdminFinanceRoute
   AdminKaziRoute: typeof AdminKaziRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
-  AdminPayHeroTopUpRoute: typeof AdminPayHeroTopUpRoute
   AdminReferralsRoute: typeof AdminReferralsRoute
   AdminReportsRoute: typeof AdminReportsRoute
   AdminSupportRoute: typeof AdminSupportRoute
@@ -1059,6 +1058,7 @@ interface AdminRouteChildren {
   AdminUsersRoute: typeof AdminUsersRouteWithChildren
   AdminWithdrawalsRoute: typeof AdminWithdrawalsRoute
   AdminIndexRoute: typeof AdminIndexRoute
+  AdminFinoqTopupRoute: typeof AdminFinoqTopupRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
@@ -1070,8 +1070,6 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminFinanceRoute: AdminFinanceRoute,
   AdminKaziRoute: AdminKaziRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,
-  AdminPayHeroTopUpRoute: AdminPayHeroTopUpRoute,
-  AdminPayHeroTopUpRoute: AdminPayHeroTopUpRoute,
   AdminReferralsRoute: AdminReferralsRoute,
   AdminReportsRoute: AdminReportsRoute,
   AdminSupportRoute: AdminSupportRoute,
@@ -1080,6 +1078,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminUsersRoute: AdminUsersRouteWithChildren,
   AdminWithdrawalsRoute: AdminWithdrawalsRoute,
   AdminIndexRoute: AdminIndexRoute,
+  AdminFinoqTopupRoute: AdminFinoqTopupRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)

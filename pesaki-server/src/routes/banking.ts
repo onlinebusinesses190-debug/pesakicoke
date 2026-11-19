@@ -2,13 +2,13 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { logger } from '../utils/logger';
 import { env } from '../config/env';
 import { calculateWithdrawalFee, MIN_DEPOSIT, MIN_WITHDRAWAL } from '../utils/fees';
-import { sasaPayWithdrawToMobile, networkCodeForPhone, buildPayHeroCallbackUrl } from '../payhero/service';
+import { finoqWithdrawToMobile, networkCodeForPhone, buildFinoqCallbackUrl } from '../finoq/service';
 
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const adminSupabase = require('@supabase/supabase-js').createClient(supabaseUrl, supabaseServiceKey);
 
-// ─── M-Pesa Helpers (duplicated for banking isolation) ──────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ M-Pesa Helpers (duplicated for banking isolation) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 interface AccessTokenResponse {
   access_token: string;
   expires_in: number;
@@ -176,7 +176,7 @@ const initiateBankingSTKPush = async (
   }
 };
 
-// ─── Palpluss Helper (duplicated for banking isolation) ─────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Palpluss Helper (duplicated for banking isolation) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 const callPalplussB2C = async (
   amount: number,
   phone: string,
@@ -231,7 +231,7 @@ const callPalplussB2C = async (
   return data.data;
 };
 
-// ─── Banking Routes ─────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Banking Routes Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 export const bankingRoutes = async (fastify: FastifyInstance) => {
   const ensureBankingWallet = async (userId: string) => {
     const { data, error } = await adminSupabase
@@ -858,36 +858,22 @@ export const bankingRoutes = async (fastify: FastifyInstance) => {
       const payoutAmount = Math.max(0, amount - fee);
       if (payoutAmount < 10) return reply.status(400).send({ error: 'After fee deduction, payout must be at least KES 10', fee, payoutAmount, minimum: 10 });
       const reference = `WD-BANK-${user.id.slice(0, 8)}-${Date.now()}`;
-      const callbackBase = env.USE_PAYHERO_FOR_WITHDRAWALS
-        ? (env.PAYHERO_CALLBACK_URL || env.MPESA_CALLBACK_URL || 'https://pesaki-server.onrender.com')
+      const callbackBase = env.USE_FINOQ_FOR_WITHDRAWALS
+        ? (env.FINOQ_CALLBACK_URL || env.MPESA_CALLBACK_URL || 'https://pesaki-server.onrender.com')
         : (env.MPESA_CALLBACK_URL || 'https://pesaki-server.onrender.com');
-      const providerPath = env.USE_PAYHERO_FOR_WITHDRAWALS ? 'payhero' : 'palpluss';
-      const callbackUrl = env.USE_PAYHERO_FOR_WITHDRAWALS
-        ? buildPayHeroCallbackUrl(callbackBase)
+      const providerPath = env.USE_FINOQ_FOR_WITHDRAWALS ? 'finoq' : 'palpluss';
+      const callbackUrl = env.USE_FINOQ_FOR_WITHDRAWALS
+        ? buildFinoqCallbackUrl(callbackBase)
         : `${callbackBase.replace(/\/+$/, '')}/api/webhooks/${providerPath}`;
 
       try {
-        if (env.USE_PAYHERO_FOR_WITHDRAWALS) {
-          const normalizePhone = (value: string) => {
-            const d = value.replace(/\D/g, '');
-            if (!d) return '';
-            if (d.startsWith('254') && d.length === 12) return d;
-            if (d.startsWith('0') && d.length === 10) return `254${d.slice(1)}`;
-            if (d.length === 9) return `254${d}`;
-            return d;
-          };
-          const payHeroPhone = normalizePhone(digits);
-          const networkCode = networkCodeForPhone(payHeroPhone);
-          await sasaPayWithdrawToMobile(
-            payoutAmount,
-            payHeroPhone,
-            networkCode,
-            reference,
-            callbackUrl
-          );
+        if (env.USE_FINOQ_FOR_WITHDRAWALS) {
+          const finoqPhone = digits.startsWith('254') ? digits : digits.startsWith('0') ? `254${digits.slice(1)}` : `254${digits}`;
+          const networkCode = networkCodeForPhone(finoqPhone);
+          await finoqWithdrawToMobile(payoutAmount, finoqPhone, reference, callbackUrl);
           logger.info(
-            { reference, userId: user.id, networkCode, phone: payHeroPhone },
-            'BANKING_WITHDRAWAL_REQUESTED | PAYHERO'
+            { reference, userId: user.id, networkCode, phone: finoqPhone },
+            'BANKING_WITHDRAWAL_REQUESTED | FINOQ'
           );
         } else {
           await callPalplussB2C(payoutAmount, digits, reference, callbackUrl);

@@ -73,4 +73,4 @@ Uses real-time Forex data (Frankfurter API) and NSE stock data. Users predict th
 The `/health` endpoint is available for uptime monitoring and to keep the server alive on free-tier hosting providers (like Render).
 
 ---
-© 2026 Pesaki Platform Team. All rights reserved.
+Ã‚Â© 2026 Pesaki Platform Team. All rights reserved.

@@ -8,7 +8,7 @@ export const Route = createFileRoute("/kazi/google-card-help")({
   getParentRoute: () => rootRouteId,
   head: () => ({
     meta: [
-      { title: "Add Yourself to Google Search — KAZI Link Help" },
+      { title: "Add Yourself to Google Search Ã¢â‚¬â€ KAZI Link Help" },
       {
         name: "description",
         content: "Step-by-step guide to create a Google People Card and appear in search results.",
@@ -53,7 +53,7 @@ const STEPS = [
 ];
 
 const TIPS = [
-  "Use a clear, recent photo of your face — this helps people recognize you.",
+  "Use a clear, recent photo of your face Ã¢â‚¬â€ this helps people recognize you.",
   "Keep your bio concise (under 500 characters) and highlight your key skills.",
   "Your KAZI profile link lets potential employers see your full portfolio, reviews, and contact options.",
   "You can edit your People Card anytime by searching \"add me to search\" again.",
@@ -65,7 +65,7 @@ function GoogleCardHelp() {
   const [activeStep, setActiveStep] = useState(0);
 
   useEffect(() => {
-    document.title = "Add Yourself to Google Search — KAZI Link Help";
+    document.title = "Add Yourself to Google Search Ã¢â‚¬â€ KAZI Link Help";
   }, []);
 
   return (

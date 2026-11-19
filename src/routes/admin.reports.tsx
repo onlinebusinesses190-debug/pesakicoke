@@ -53,7 +53,7 @@ function AdminReports() {
   if (authLoading || loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <p className="text-muted-foreground">Loading reports…</p>
+        <p className="text-muted-foreground">Loading reportsÃ¢â‚¬Â¦</p>
       </div>
     );
   }
@@ -85,7 +85,7 @@ function AdminReports() {
             tone="success"
           />
           <KPI label="Active Users" value={metrics.activeUsers.toLocaleString()} hint="MAU" />
-          <KPI label="Conversion" value="6.8%" hint="Signup → Verified" />
+          <KPI label="Conversion" value="6.8%" hint="Signup Ã¢â€ â€™ Verified" />
         </section>
       )}
 

@@ -12,7 +12,7 @@ const WEBSITE = "https://pesaki.co.ke";
 export const Route = createFileRoute("/contact")({
   head: () => ({
     meta: [
-      { title: "Contact PESAKI — Help Center" },
+      { title: "Contact PESAKI Ã¢â‚¬â€ Help Center" },
       {
         name: "description",
         content:
@@ -39,7 +39,7 @@ function ContactPage() {
     ].join("\n");
 
     window.location.href = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(
-      subject ? `PESAKI enquiry — ${subject}` : "PESAKI enquiry",
+      subject ? `PESAKI enquiry Ã¢â‚¬â€ ${subject}` : "PESAKI enquiry",
     )}&body=${encodeURIComponent(body)}`;
   }
 
@@ -123,7 +123,7 @@ function ContactPage() {
                     Along Tom Mboya Street, Nairobi
                   </p>
                   <p className="mt-1 text-[11px] text-muted-foreground">
-                    Currently under renovation — contact the Help Center before visiting.
+                    Currently under renovation Ã¢â‚¬â€ contact the Help Center before visiting.
                   </p>
                 </div>
               </div>
@@ -152,7 +152,7 @@ function ContactPage() {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold">Who you are contacting</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    PESAKI MARKETING · BN-6ASR2E26 · Business Registration Service (BRS), Kenya
+                    PESAKI MARKETING Ã‚Â· BN-6ASR2E26 Ã‚Â· Business Registration Service (BRS), Kenya
                   </p>
                 </div>
               </div>
@@ -259,7 +259,7 @@ function ContactPage() {
         </section>
 
         <p className="mt-8 text-center text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-          PESAKI MARKETING · BN-6ASR2E26
+          PESAKI MARKETING Ã‚Â· BN-6ASR2E26
         </p>
       </div>
     </AppShell>

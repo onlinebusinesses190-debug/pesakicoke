@@ -1,5 +1,5 @@
 /**
- * PESAKI Forex — persistence adapter for the market engine.
+ * PESAKI Forex Ã¢â‚¬â€ persistence adapter for the market engine.
  *
  * The in-memory engine is deterministic: given a seed and a tick counter it
  * always produces the same price. But if the counter and last mid price are lost
@@ -32,7 +32,7 @@ export class ForexPersistence implements EnginePersistence {
     if (error) {
       logger.warn(
         { error: error.message },
-        "Forex: could not load symbol state — using seed values",
+        "Forex: could not load symbol state Ã¢â‚¬â€ using seed values",
       );
       return {};
     }

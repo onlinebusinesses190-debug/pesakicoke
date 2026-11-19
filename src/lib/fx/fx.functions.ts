@@ -43,7 +43,7 @@ export const getAccount = createServerFn({ method: "GET" })
       .eq("user_id", userId)
       .maybeSingle();
 
-    // Fetch open real trades — if any exist, their margin is already deducted
+    // Fetch open real trades Ã¢â‚¬â€ if any exist, their margin is already deducted
     // from pesaki_fx_wallets.real_balance, so we must NOT top up the forex wallet.
     const { data: openReal } = await supabase
       .from("pesaki_fx_trades")
@@ -54,14 +54,14 @@ export const getAccount = createServerFn({ method: "GET" })
     const hasOpenReal = openReal && openReal.length > 0;
 
     if (!w) {
-      // First access — initialize from main wallet so real mode works immediately.
+      // First access Ã¢â‚¬â€ initialize from main wallet so real mode works immediately.
       await supabaseAdmin.from("pesaki_fx_wallets").upsert(
         { user_id: userId, real_balance: mainRealBalance },
         { onConflict: "user_id", ignoreDuplicates: true },
       );
       w = { demo_balance: DEMO_START, real_balance: mainRealBalance };
     } else if (Number(w.real_balance) < mainRealBalance && !hasOpenReal) {
-      // User deposited more since the last sync and no open real trades — top up.
+      // User deposited more since the last sync and no open real trades Ã¢â‚¬â€ top up.
       await supabaseAdmin
         .from("pesaki_fx_wallets")
         .update({ real_balance: mainRealBalance, updated_at: new Date().toISOString() })

@@ -9,7 +9,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { kesPerUnit, isConvertible, resetKesRates } from "./kesRates";
 
-describe("kesRates — default USD rate", () => {
+describe("kesRates Ã¢â‚¬â€ default USD rate", () => {
   afterEach(() => resetKesRates());
 
   it("returns 130 KES per USD by default", () => {
@@ -23,7 +23,7 @@ describe("kesRates — default USD rate", () => {
   });
 });
 
-describe("kesRates — isConvertible", () => {
+describe("kesRates Ã¢â‚¬â€ isConvertible", () => {
   afterEach(() => resetKesRates());
 
   it("recognises KES itself", () => {
@@ -41,7 +41,7 @@ describe("kesRates — isConvertible", () => {
   });
 });
 
-describe("kesRates — env override", () => {
+describe("kesRates Ã¢â‚¬â€ env override", () => {
   afterEach(() => resetKesRates());
 
   it("overrides the USD rate from PESAKI_FX_KES_RATES", () => {

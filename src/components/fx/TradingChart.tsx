@@ -1,7 +1,7 @@
 import { createChart, ColorType, IChartApi, ISeriesApi, SeriesMarker } from "lightweight-charts";
 import { useEffect, useRef, useState } from "react";
 
-// ─── Pocket Option–style marker supplied by the Binary FX page ──────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Pocket OptionÃ¢â‚¬â€œstyle marker supplied by the Binary FX page Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 export type FxMarker = {
   id: string;
   time: number; // unix seconds
@@ -99,7 +99,7 @@ export const TradingChart = ({
     }
   }, [backgroundColor, textColor, data]);
 
-  // ── Update candle data ──
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Update candle data Ã¢â€â‚¬Ã¢â€â‚¬
   useEffect(() => {
     if (seriesRef.current && data && data.length > 0) {
       seriesRef.current.setData(data);
@@ -109,7 +109,7 @@ export const TradingChart = ({
     }
   }, [data]);
 
-  // ── Permanent markers (one per trade, coloured by outcome) ──
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Permanent markers (one per trade, coloured by outcome) Ã¢â€â‚¬Ã¢â€â‚¬
   useEffect(() => {
     if (seriesRef.current && markers && markers.length > 0) {
       seriesRef.current.setMarkers(buildLcMarkers(markers));
@@ -118,8 +118,8 @@ export const TradingChart = ({
     }
   }, [markers]);
 
-  // ── Frame loop: locate every marker so the parent can overlay the
-  //    stake label + live countdown + horizontal price line in HTML. ──
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Frame loop: locate every marker so the parent can overlay the
+  //    stake label + live countdown + horizontal price line in HTML. Ã¢â€â‚¬Ã¢â€â‚¬
   useEffect(() => {
     if (markers.length === 0 || !chartRef.current || !seriesRef.current) return;
 

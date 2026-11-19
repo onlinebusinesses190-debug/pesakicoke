@@ -6,7 +6,7 @@ import { Shield, Lock, Key, Smartphone, Eye, CheckCircle2, Globe } from "lucide-
 export const Route = createFileRoute("/security")({
   head: () => ({
     meta: [
-      { title: "Security — PESAKI" },
+      { title: "Security Ã¢â‚¬â€ PESAKI" },
       {
         name: "description",
         content:
@@ -113,7 +113,7 @@ function SecurityPage() {
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 text-success shrink-0" />
                 <span>
-                  Use a unique password and do not share your password, PIN, or OTP with anyone —
+                  Use a unique password and do not share your password, PIN, or OTP with anyone Ã¢â‚¬â€
                   PESAKI will never call or email asking for these.
                 </span>
               </li>
@@ -162,7 +162,7 @@ function SecurityPage() {
         </section>
 
         <p className="mt-8 text-center text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-          PESAKI · Work. Grow. Bank.
+          PESAKI Ã‚Â· Work. Grow. Bank.
         </p>
       </div>
     </AppShell>

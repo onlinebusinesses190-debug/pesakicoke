@@ -23,7 +23,7 @@ export function MarketList({ selected, onSelect, now }: { selected: string; onSe
                 className={`grid w-full grid-cols-[1fr_auto_auto] items-center gap-x-3 rounded-md px-2 py-2 text-left transition-colors ${sel ? "bg-accent ring-2 ring-primary" : "hover:bg-muted"}`}>
                 <span>
                   <span className="block font-bold">{p.label}</span>
-                  <span className={`block text-xs ${ch >= 0 ? "text-up" : "text-down"}`}>{ch >= 0 ? "▲" : "▼"} {Math.abs(ch).toFixed(2)}% today</span>
+                  <span className={`block text-xs ${ch >= 0 ? "text-up" : "text-down"}`}>{ch >= 0 ? "Ã¢â€“Â²" : "Ã¢â€“Â¼"} {Math.abs(ch).toFixed(2)}% today</span>
                 </span>
                 <span className={`num text-right font-semibold ${tick}`}>{q.bid.toFixed(p.digits)}</span>
                 <span className={`num text-right font-semibold ${tick}`}>{q.ask.toFixed(p.digits)}</span>

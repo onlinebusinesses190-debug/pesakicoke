@@ -1,5 +1,5 @@
 /**
- * PESAKI Forex — KES conversion rates.
+ * PESAKI Forex Ã¢â‚¬â€ KES conversion rates.
  *
  * The internal market engine quotes prices in each pair's quote currency, but
  * every account is denominated in KES. Conversions therefore happen here rather

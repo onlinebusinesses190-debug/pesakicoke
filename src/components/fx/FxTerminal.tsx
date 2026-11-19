@@ -106,7 +106,7 @@ export function FxTerminal() {
   return (
     <div className="flex min-h-screen flex-col gap-2 p-2 pb-20">
       <header className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card px-2 py-2">
-        <button onClick={back} className="rounded-md border border-border px-3 py-1.5 font-semibold hover:bg-muted">← Back</button>
+        <button onClick={back} className="rounded-md border border-border px-3 py-1.5 font-semibold hover:bg-muted">Ã¢â€ Â Back</button>
         <span className="px-1 text-xl font-extrabold tracking-tight text-primary">Pesaki FX</span>
         <div className="flex rounded-full bg-muted p-1" role="tablist" aria-label="Account mode">
           <button onClick={() => setMode("demo")} className={`rounded-full px-4 py-1 font-bold ${mode === "demo" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>Demo</button>
@@ -121,7 +121,7 @@ export function FxTerminal() {
 
       {mode === "real" && data && data.wallet.real <= 0 && (
         <div className="rounded-lg border border-real bg-real/15 px-3 py-2 text-sm">
-          Your real wallet is empty. Fund it from your main wallet to place real trades — or switch to <button className="font-bold underline" onClick={() => setMode("demo")}>Demo</button> to practise with virtual money.
+          Your real wallet is empty. Fund it from your main wallet to place real trades Ã¢â‚¬â€ or switch to <button className="font-bold underline" onClick={() => setMode("demo")}>Demo</button> to practise with virtual money.
         </div>
       )}
       {error && <div className="rounded-lg bg-destructive px-3 py-2 text-destructive-foreground">Could not load your account. Please refresh.</div>}
@@ -132,7 +132,7 @@ export function FxTerminal() {
             <div className="sticky top-0 z-20 flex flex-col gap-2 rounded-lg border border-border bg-card p-2">
               <div className="flex items-center gap-2">
                 <button onClick={() => setView("markets")} className="text-left">
-                  <span className="block text-lg font-extrabold">{pair.label} ▾</span>
+                  <span className="block text-lg font-extrabold">{pair.label} Ã¢â€“Â¾</span>
                   <span className="block text-xs text-muted-foreground">{pair.name}</span>
                 </button>
                 <span className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-up"><span className="h-2 w-2 animate-pulse rounded-full bg-up" />LIVE</span>
@@ -144,7 +144,7 @@ export function FxTerminal() {
                 {(Object.keys(TIMEFRAMES) as TF[]).map((t) => (
                   <button key={t} onClick={() => setTf(t)} className={`rounded px-2 py-1 text-xs font-bold ${tf === t ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}>{t}</button>
                 ))}
-                <button onClick={toggleFs} className="ml-auto rounded border border-border px-2 py-1 text-xs font-bold hover:bg-muted">{fs ? "Exit full screen" : "⛶ Full screen"}</button>
+                <button onClick={toggleFs} className="ml-auto rounded border border-border px-2 py-1 text-xs font-bold hover:bg-muted">{fs ? "Exit full screen" : "Ã¢â€ºÂ¶ Full screen"}</button>
               </div>
               <div className={fs ? "h-[80vh]" : "h-[45vh] lg:h-[60vh]"}>
                 <FxChart pair={pair} tf={tf} now={now} trades={open} />
@@ -152,7 +152,7 @@ export function FxTerminal() {
             </div>
           </section>
           <aside>
-            {isLoading ? <div className="rounded-lg border border-border bg-card p-4">Loading your wallet…</div> :
+            {isLoading ? <div className="rounded-lg border border-border bg-card p-4">Loading your walletÃ¢â‚¬Â¦</div> :
               <TradePanel pair={pair} raw={raw} setRaw={setRaw} mode={mode} balance={balance} />}
           </aside>
         </div>

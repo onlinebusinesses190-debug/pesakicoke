@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { supabase } from '../lib/supabase';
 import { verifyAdmin } from '../middleware/adminAuth';
 import { logger } from '../utils/logger';
-import { topUpWallet } from '../payhero/service';
+import { finoqTopUpWallet } from '../finoq/service';
 
 type QueryParams = Record<string, string | undefined>;
 
@@ -48,9 +48,9 @@ function profileDisplayName(p: { email: string; full_name: string | null }): str
 }
 
 export default async function adminRoutes(server: FastifyInstance) {
-  logger.info('✅ adminRoutes loaded');
+  logger.info('Ã¢Å“â€¦ adminRoutes loaded');
 
-  // ─── GET /admin/me ──────────────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/me Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/me', { preHandler: [verifyAdmin] }, async (request, reply) => {
     return reply.send({
       success: true,
@@ -62,10 +62,10 @@ export default async function adminRoutes(server: FastifyInstance) {
     });
   });
 
-  // ─── GET /admin/stats ───────────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/stats Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/stats', { preHandler: [verifyAdmin] }, async (_request, reply) => {
     try {
-      // ─── Users stats ───
+      // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Users stats Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
       const { count: totalUsers } = await supabase
         .from('profiles')
         .select('id', { count: 'exact', head: true });
@@ -93,7 +93,7 @@ export default async function adminRoutes(server: FastifyInstance) {
       // Flagged users
       let flaggedUsers = 0;
 
-      // ─── Money stats ───
+      // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Money stats Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
       const { data: walletData } = await supabase.from('wallets').select('balance, locked');
       const totalWalletBalance = (walletData || []).reduce((s: number, w: { balance: number }) => s + safeNumber(w.balance), 0);
       const totalLocked = (walletData || []).reduce((s: number, w: { locked: number }) => s + safeNumber(w.locked), 0);
@@ -160,7 +160,7 @@ export default async function adminRoutes(server: FastifyInstance) {
         .select('id', { count: 'exact', head: true })
         .eq('status', 'pending');
 
-      // ─── KAZI stats ───
+      // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ KAZI stats Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
       const { count: totalJobs } = await supabase.from('jobs').select('id', { count: 'exact', head: true });
       const { count: openJobs } = await supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'open');
       const { count: hiredJobs } = await supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('status', 'hired');
@@ -177,7 +177,7 @@ export default async function adminRoutes(server: FastifyInstance) {
         .eq('worker_accepted', true)
         .eq('job_done', false);
 
-      // ─── Business stats ───
+      // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Business stats Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
       const { count: totalBusinessApps } = await supabase
         .from('business_applications')
         .select('id', { count: 'exact', head: true });
@@ -199,7 +199,7 @@ export default async function adminRoutes(server: FastifyInstance) {
         .in('status', ['Approved', 'Disbursed']);
       const totalFundedAmount = (fundedAmounts || []).reduce((s: number, a: { amount_requested: number }) => s + safeNumber(a.amount_requested), 0);
 
-      // ─── Banking stats ───
+      // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Banking stats Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
       const { data: lockedSavingsData } = await supabase
         .from('locked_savings')
         .select('amount')
@@ -223,7 +223,7 @@ export default async function adminRoutes(server: FastifyInstance) {
       const totalSavingsAmount = (savingsGoalsData || []).reduce((s: number, g: { saved_amount: number }) => s + safeNumber(g.saved_amount), 0);
       const totalInvestedAmount = totalInvestments;
 
-      // ─── Referrals stats ───
+      // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Referrals stats Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
       const { count: totalReferrals } = await supabase.from('referrals').select('id', { count: 'exact', head: true });
       const { count: qualifiedReferrals } = await supabase
         .from('referrals')
@@ -236,7 +236,7 @@ export default async function adminRoutes(server: FastifyInstance) {
       const { data: totalPayoutsData } = await supabase.from('referral_earnings_log').select('amount');
       const totalReferralPayouts = (totalPayoutsData || []).reduce((s: number, r: { amount: number }) => s + safeNumber(r.amount), 0);
 
-      // ─── Trading stats ───
+      // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Trading stats Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
       const { count: realFxTrades } = await supabase
         .from('fx_trades')
         .select('id', { count: 'exact', head: true })
@@ -367,7 +367,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/users ───────────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/users Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/users', { preHandler: [verifyAdmin] }, async (request, reply) => {
     try {
       const q = request.query as QueryParams;
@@ -401,7 +401,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/users/:id ───────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/users/:id Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get<{ Params: { id: string } }>('/admin/users/:id', { preHandler: [verifyAdmin] }, async (request, reply) => {
     try {
       const { id } = request.params;
@@ -544,7 +544,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── POST /admin/users/:id/adjust-balance ───────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ POST /admin/users/:id/adjust-balance Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.post<{ Params: { id: string }; Body: { amount: number; mode: string; reason: string } }>(
     '/admin/users/:id/adjust-balance',
     { preHandler: [verifyAdmin] },
@@ -588,7 +588,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     },
   );
 
-  // ─── POST /admin/users/:id/ban ──────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ POST /admin/users/:id/ban Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.post<{ Params: { id: string }; Body: { reason?: string } }>(
     '/admin/users/:id/ban',
     { preHandler: [verifyAdmin] },
@@ -613,7 +613,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     },
   );
 
-  // ─── POST /admin/users/:id/unban ───────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ POST /admin/users/:id/unban Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.post<{ Params: { id: string } }>(
     '/admin/users/:id/unban',
     { preHandler: [verifyAdmin] },
@@ -635,7 +635,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     },
   );
 
-  // ─── POST /admin/users/:id/flag ─────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ POST /admin/users/:id/flag Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.post<{ Params: { id: string }; Body: { reason?: string } }>(
     '/admin/users/:id/flag',
     { preHandler: [verifyAdmin] },
@@ -653,7 +653,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     },
   );
 
-  // ─── POST /admin/users/:id/unflag ───────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ POST /admin/users/:id/unflag Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.post<{ Params: { id: string } }>(
     '/admin/users/:id/unflag',
     { preHandler: [verifyAdmin] },
@@ -670,7 +670,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     },
   );
 
-  // ─── DELETE /admin/users/:id ────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ DELETE /admin/users/:id Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.delete<{ Params: { id: string } }>(
     '/admin/users/:id',
     { preHandler: [verifyAdmin] },
@@ -689,7 +689,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     },
   );
 
-  // ─── GET /admin/transactions ────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/transactions Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/transactions', { preHandler: [verifyAdmin] }, async (request, reply) => {
     try {
       const q = request.query as QueryParams;
@@ -731,7 +731,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/deposits ────────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/deposits Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/deposits', { preHandler: [verifyAdmin] }, async (request, reply) => {
     try {
       const q = request.query as QueryParams;
@@ -770,7 +770,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/withdrawals ─────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/withdrawals Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/withdrawals', { preHandler: [verifyAdmin] }, async (request, reply) => {
     try {
       const q = request.query as QueryParams;
@@ -809,7 +809,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── POST /admin/withdrawals/:id/approve ────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ POST /admin/withdrawals/:id/approve Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.post<{ Params: { id: string }; Body: { notes?: string } }>(
     '/admin/withdrawals/:id/approve',
     { preHandler: [verifyAdmin] },
@@ -839,7 +839,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     },
   );
 
-  // ─── POST /admin/withdrawals/:id/reject ─────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ POST /admin/withdrawals/:id/reject Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.post<{ Params: { id: string }; Body: { reason?: string } }>(
     '/admin/withdrawals/:id/reject',
     { preHandler: [verifyAdmin] },
@@ -877,7 +877,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     },
   );
 
-  // ─── GET /admin/transfers ───────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/transfers Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/transfers', { preHandler: [verifyAdmin] }, async (request, reply) => {
     try {
       const q = request.query as QueryParams;
@@ -912,7 +912,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/referrals ───────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/referrals Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/referrals', { preHandler: [verifyAdmin] }, async (request, reply) => {
     try {
       const q = request.query as QueryParams;
@@ -952,7 +952,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/referrals/leaderboard ───────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/referrals/leaderboard Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/referrals/leaderboard', { preHandler: [verifyAdmin] }, async (_request, reply) => {
     try {
       const { data, error } = await supabase
@@ -996,7 +996,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/kazi/jobs ───────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/kazi/jobs Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/kazi/jobs', { preHandler: [verifyAdmin] }, async (request, reply) => {
     try {
       const q = request.query as QueryParams;
@@ -1066,7 +1066,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/kazi/applications ───────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/kazi/applications Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/kazi/applications', { preHandler: [verifyAdmin] }, async (request, reply) => {
     try {
       const q = request.query as QueryParams;
@@ -1106,7 +1106,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/kazi/contracts ──────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/kazi/contracts Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/kazi/contracts', { preHandler: [verifyAdmin] }, async (request, reply) => {
     try {
       const q = request.query as QueryParams;
@@ -1162,7 +1162,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/business/applications ───────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/business/applications Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/business/applications', { preHandler: [verifyAdmin] }, async (request, reply) => {
     try {
       const q = request.query as QueryParams;
@@ -1201,7 +1201,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── POST /admin/business/applications/:id/status ───────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ POST /admin/business/applications/:id/status Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.post<{ Params: { id: string }; Body: { status: string; notes?: string } }>(
     '/admin/business/applications/:id/status',
     { preHandler: [verifyAdmin] },
@@ -1233,7 +1233,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     },
   );
 
-  // ─── GET /admin/business/stats ─────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/business/stats Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/business/stats', { preHandler: [verifyAdmin] }, async (_request, reply) => {
     try {
       const { count: totalApplications } = await supabase
@@ -1283,7 +1283,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/banking/locked-savings ──────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/banking/locked-savings Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/banking/locked-savings', { preHandler: [verifyAdmin] }, async (request, reply) => {
     try {
       const q = request.query as QueryParams;
@@ -1318,7 +1318,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/banking/investments ─────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/banking/investments Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/banking/investments', { preHandler: [verifyAdmin] }, async (request, reply) => {
     try {
       const q = request.query as QueryParams;
@@ -1353,7 +1353,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/banking/goals ───────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/banking/goals Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/banking/goals', { preHandler: [verifyAdmin] }, async (request, reply) => {
     try {
       const q = request.query as QueryParams;
@@ -1387,7 +1387,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/banking/loans ───────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/banking/loans Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/banking/loans', { preHandler: [verifyAdmin] }, async (request, reply) => {
     try {
       const q = request.query as QueryParams;
@@ -1426,7 +1426,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── POST /admin/banking/loans/:id/status ───────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ POST /admin/banking/loans/:id/status Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.post<{ Params: { id: string }; Body: { status: string; notes?: string } }>(
     '/admin/banking/loans/:id/status',
     { preHandler: [verifyAdmin] },
@@ -1458,7 +1458,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     },
   );
 
-  // ─── GET /admin/trading/summary ─────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/trading/summary Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/trading/summary', { preHandler: [verifyAdmin] }, async (_request, reply) => {
     try {
       const { count: realFxTrades } = await supabase
@@ -1535,7 +1535,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/trading/fx-trades ───────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/trading/fx-trades Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/trading/fx-trades', { preHandler: [verifyAdmin] }, async (request, reply) => {
     try {
       const q = request.query as QueryParams;
@@ -1571,7 +1571,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/trading/game-bets ───────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/trading/game-bets Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/trading/game-bets', { preHandler: [verifyAdmin] }, async (request, reply) => {
     try {
       const q = request.query as QueryParams;
@@ -1656,7 +1656,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── POST /admin/notifications ──────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ POST /admin/notifications Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.post<{ Body: { title: string; message: string; audience: string; channel: string } }>(
     '/admin/notifications',
     { preHandler: [verifyAdmin] },
@@ -1692,7 +1692,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     },
   );
 
-  // ─── GET /admin/notifications ───────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/notifications Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/notifications', { preHandler: [verifyAdmin] }, async (_request, reply) => {
     try {
       const { data, error } = await supabase
@@ -1722,7 +1722,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/support/tickets ─────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/support/tickets Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/support/tickets', { preHandler: [verifyAdmin] }, async (request, reply) => {
     try {
       const q = request.query as QueryParams;
@@ -1762,7 +1762,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── POST /admin/support/tickets/:id/respond ────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ POST /admin/support/tickets/:id/respond Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.post<{ Params: { id: string }; Body: { response: string; status: string } }>(
     '/admin/support/tickets/:id/respond',
     { preHandler: [verifyAdmin] },
@@ -1791,7 +1791,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     },
   );
 
-  // ─── GET /admin/actions ─────────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/actions Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/actions', { preHandler: [verifyAdmin] }, async (request, reply) => {
     try {
       const q = request.query as QueryParams;
@@ -1825,7 +1825,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/reports/revenue ─────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/reports/revenue Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/reports/revenue', { preHandler: [verifyAdmin] }, async (request, reply) => {
     try {
       const q = request.query as QueryParams;
@@ -1842,7 +1842,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/reports/users ───────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/reports/users Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/reports/users', { preHandler: [verifyAdmin] }, async (request, reply) => {
     try {
       const q = request.query as QueryParams;
@@ -1859,7 +1859,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/reports/deposits ────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/reports/deposits Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/reports/deposits', { preHandler: [verifyAdmin] }, async (request, reply) => {
     try {
       const q = request.query as QueryParams;
@@ -1876,7 +1876,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/reports/withdrawals ─────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/reports/withdrawals Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/reports/withdrawals', { preHandler: [verifyAdmin] }, async (request, reply) => {
     try {
       const q = request.query as QueryParams;
@@ -1893,7 +1893,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/finance/stats ────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/finance/stats Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/finance/stats', { preHandler: [verifyAdmin] }, async (_request, reply) => {
     try {
       const { data: depLedger } = await supabase
@@ -1941,7 +1941,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/finance/withdrawals ─────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/finance/withdrawals Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/finance/withdrawals', { preHandler: [verifyAdmin] }, async (request, reply) => {
     try {
       const q = request.query as QueryParams;
@@ -1981,7 +1981,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/finance/transactions ────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/finance/transactions Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/finance/transactions', { preHandler: [verifyAdmin] }, async (request, reply) => {
     try {
       const q = request.query as QueryParams;
@@ -2019,7 +2019,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/dashboard ──────────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/dashboard Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/dashboard', { preHandler: [verifyAdmin] }, async (_request, reply) => {
     try {
       const { count: totalUsers } = await supabase.from('profiles').select('id', { count: 'exact', head: true });
@@ -2125,7 +2125,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/users/stats ────────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/users/stats Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/users/stats', { preHandler: [verifyAdmin] }, async (_request, reply) => {
     try {
       const { count: totalUsers } = await supabase.from('profiles').select('id', { count: 'exact', head: true });
@@ -2171,7 +2171,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/transactions/stats ─────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/transactions/stats Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/transactions/stats', { preHandler: [verifyAdmin] }, async (_request, reply) => {
     try {
       const depSeries = await supabase.rpc('admin_deposits_series', {
@@ -2210,7 +2210,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/deposits/stats ─────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/deposits/stats Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/deposits/stats', { preHandler: [verifyAdmin] }, async (_request, reply) => {
     try {
       const depSeries = await supabase.rpc('admin_deposits_series', {
@@ -2247,7 +2247,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/withdrawals/stats ──────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/withdrawals/stats Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/withdrawals/stats', { preHandler: [verifyAdmin] }, async (_request, reply) => {
     try {
       const wdSeries = await supabase.rpc('admin_withdrawals_series', {
@@ -2284,7 +2284,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/referrals/stats ────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/referrals/stats Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/referrals/stats', { preHandler: [verifyAdmin] }, async (_request, reply) => {
     try {
       const { count: totalReferrals } = await supabase.from('referrals').select('id', { count: 'exact', head: true });
@@ -2322,7 +2322,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/referrals/affiliates ───────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/referrals/affiliates Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/referrals/affiliates', { preHandler: [verifyAdmin] }, async (request, reply) => {
     try {
       const q = request.query as QueryParams;
@@ -2377,7 +2377,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/referrals/links ────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/referrals/links Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/referrals/links', { preHandler: [verifyAdmin] }, async (request, reply) => {
     try {
       const q = request.query as QueryParams;
@@ -2424,7 +2424,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/reports/metrics ────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/reports/metrics Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/reports/metrics', { preHandler: [verifyAdmin] }, async (_request, reply) => {
     try {
       const { count: totalUsers } = await supabase.from('profiles').select('id', { count: 'exact', head: true });
@@ -2471,7 +2471,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/commissions/referrals ──────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/commissions/referrals Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/commissions/referrals', { preHandler: [verifyAdmin] }, async (_request, reply) => {
     try {
       const { data: earningsData } = await supabase.from('referral_earnings_log').select('amount');
@@ -2495,7 +2495,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/banking/summary ────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/banking/summary Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/admin/banking/summary', { preHandler: [verifyAdmin] }, async (_request, reply) => {
     try {
       const { data: lockedData } = await supabase
@@ -2520,7 +2520,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /admin/users/:id/activity ─────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/users/:id/activity Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get<{ Params: { id: string } }>('/admin/users/:id/activity', { preHandler: [verifyAdmin] }, async (request, reply) => {
     try {
       const { id } = request.params;
@@ -2551,7 +2551,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── POST /admin/deposits/:id/approve ─────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ POST /admin/deposits/:id/approve Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.post<{ Params: { id: string } }>(
     '/admin/deposits/:id/approve',
     { preHandler: [verifyAdmin] },
@@ -2580,7 +2580,7 @@ export default async function adminRoutes(server: FastifyInstance) {
     },
   );
 
-  // ─── POST /admin/deposits/:id/reject ──────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ POST /admin/deposits/:id/reject Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.post<{ Params: { id: string }; Body: { reason?: string } }>(
     '/admin/deposits/:id/reject',
     { preHandler: [verifyAdmin] },
@@ -2610,9 +2610,9 @@ export default async function adminRoutes(server: FastifyInstance) {
     },
   );
 
-  // ─── POST /api/admin/payhero/topup ───────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ POST /api/admin/finoq/topup Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.post(
-    '/api/admin/payhero/topup',
+    '/api/admin/finoq/topup',
     { preHandler: [verifyAdmin] },
     async (request, reply) => {
       try {
@@ -2657,9 +2657,9 @@ export default async function adminRoutes(server: FastifyInstance) {
           });
         }
 
-        let payHeroResponse: any;
+        let finoqResponse: any;
         try {
-          payHeroResponse = await topUpWallet(amount, phone_number);
+          finoqResponse = await finoqTopUpWallet(amount, phone_number);
         } catch (apiError: any) {
           await supabase
             .from('wallet_top_ups')
@@ -2686,12 +2686,12 @@ export default async function adminRoutes(server: FastifyInstance) {
               providerCode: apiError.providerCode,
               providerMessage: apiError.providerMessage,
             },
-            'PAYHERO_TOPUP_FAILED'
+            'FINOQ_TOPUP_FAILED'
           );
 
           return reply.status(500).send({
             success: false,
-            error: 'PayHero top-up rejected the payout',
+            error: 'Finoq top-up rejected the payout',
             status: apiError.status,
             providerCode: apiError.providerCode,
             providerMessage: apiError.providerMessage,
@@ -2703,16 +2703,16 @@ export default async function adminRoutes(server: FastifyInstance) {
           .from('wallet_top_ups')
           .update({
             status: 'QUEUED',
-            reference_id: payHeroResponse?.reference_id || payHeroResponse?.referenceId || null,
-            provider_response: payHeroResponse,
+            reference_id: finoqResponse?.reference_id || finoqResponse?.referenceId || null,
+            provider_response: finoqResponse,
             updated_at: new Date().toISOString(),
           })
           .eq('id', topUpRecord.id);
 
-        await logAction(adminId, 'payhero_topup', topUpRecord.id, 'wallet_top_up', {
+        await logAction(adminId, 'finoq_topup', topUpRecord.id, 'wallet_top_up', {
           amount,
           phone_number,
-          reference_id: payHeroResponse?.reference_id || payHeroResponse?.referenceId || null,
+          reference_id: finoqResponse?.reference_id || finoqResponse?.referenceId || null,
         });
 
         logger.info(
@@ -2721,9 +2721,9 @@ export default async function adminRoutes(server: FastifyInstance) {
             adminId,
             amount,
             phone_number,
-            referenceId: payHeroResponse?.reference_id || payHeroResponse?.referenceId,
+            referenceId: finoqResponse?.reference_id || finoqResponse?.referenceId,
           },
-          'PAYHERO_TOPUP_INITIATED'
+          'FINOQ_TOPUP_INITIATED'
         );
 
         return reply.send({
@@ -2731,20 +2731,20 @@ export default async function adminRoutes(server: FastifyInstance) {
           data: {
             topUpId: topUpRecord.id,
             status: 'QUEUED',
-            message: 'PayHero wallet top-up initiated. Check your phone for the M-Pesa STK Push.',
-            referenceId: payHeroResponse?.reference_id || payHeroResponse?.referenceId || null,
+            message: 'Finoq wallet top-up initiated. Check your phone for the M-Pesa STK Push.',
+            referenceId: finoqResponse?.reference_id || finoqResponse?.referenceId || null,
           },
         });
       } catch (error) {
-        logger.error(error, 'Error in POST /api/admin/payhero/topup');
+        logger.error(error, 'Error in POST /api/admin/finoq/topup');
         return reply.status(500).send({ success: false, error: 'Internal server error' });
       }
     }
   );
 
-  // ─── GET /api/admin/payhero/topups ───────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /api/admin/finoq/topups Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get(
-    '/api/admin/payhero/topups',
+    '/api/admin/finoq/topups',
     { preHandler: [verifyAdmin] },
     async (request, reply) => {
       try {
@@ -2793,15 +2793,15 @@ export default async function adminRoutes(server: FastifyInstance) {
 
         return reply.send({ success: true, data: { topups, count: topups.length } });
       } catch (error) {
-        logger.error(error, 'Error in GET /api/admin/payhero/topups');
+        logger.error(error, 'Error in GET /api/admin/finoq/topups');
         return reply.send({ success: true, data: { topups: [], count: 0 } });
       }
     }
   );
 
-  // ─── GET /api/admin/payhero/topup/stats ──────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /api/admin/finoq/topup/stats Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get(
-    '/api/admin/payhero/topup/stats',
+    '/api/admin/finoq/topup/stats',
     { preHandler: [verifyAdmin] },
     async (_request, reply) => {
       try {
@@ -2827,11 +2827,11 @@ export default async function adminRoutes(server: FastifyInstance) {
           },
         });
       } catch (error) {
-        logger.error(error, 'Error in GET /api/admin/payhero/topup/stats');
+        logger.error(error, 'Error in GET /api/admin/finoq/topup/stats');
         return reply.send({ success: true, data: { totalTopups: 0, totalAmount: 0, pendingAmount: 0, completedAmount: 0 } });
       }
     }
   );
 
-  logger.info('✅ All admin routes registered');
+  logger.info('Ã¢Å“â€¦ All admin routes registered');
 }

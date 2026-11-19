@@ -1,4 +1,4 @@
-﻿import { supabase } from "@/utils/supabase/client";
+import { supabase } from "@/utils/supabase/client";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ArrowUp, ArrowDown, Loader2, TrendingUp, ArrowLeft, PlusCircle } from "lucide-react";
@@ -108,7 +108,7 @@ function UpDownGame() {
   const currentRoundIdRef = useRef<string | null>(null);
   const isDemo = mode === "demo";
 
-  // ── Demo balance ──────────────────────────────────────────────────────────
+  // â”€â”€ Demo balance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [demoBalance, setDemoBalance] = useState<number>(() => {
     const saved = localStorage.getItem(DEMO_BALANCE_KEY);
     return saved ? parseFloat(saved) : INITIAL_DEMO_BALANCE;
@@ -119,7 +119,7 @@ function UpDownGame() {
     localStorage.setItem(DEMO_BALANCE_KEY, String(newBalance));
   };
 
-  // ── Auth check ─────────────────────────────────────────────────────────────
+  // â”€â”€ Auth check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     const checkAuth = async () => {
       const {
@@ -130,7 +130,7 @@ function UpDownGame() {
     checkAuth();
   }, [navigate]);
 
-  // ── Fetch real balance ──────────────────────────────────────────────────
+  // â”€â”€ Fetch real balance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const fetchRealBalance = async () => {
     if (mode !== "real") return;
     try {
@@ -154,7 +154,7 @@ function UpDownGame() {
     if (mode === "real") fetchRealBalance();
   }, [mode]);
 
-  // ── WebSocket connection (using WS_URL) ──────────────────────────────────
+  // â”€â”€ WebSocket connection (using WS_URL) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     let socket: Socket;
 
@@ -164,7 +164,7 @@ function UpDownGame() {
       } = await supabase.auth.getSession();
       if (!session?.access_token) return;
 
-      // ✅ Use WS_URL for WebSocket
+      // âœ… Use WS_URL for WebSocket
       socket = io(`${WS_URL}/updown`, {
         transports: ["websocket"],
         auth: { token: session.access_token },
@@ -243,7 +243,7 @@ function UpDownGame() {
           profit: profit ?? null,
         });
 
-        // ✅ Update demo balance if in demo mode
+        // âœ… Update demo balance if in demo mode
         if (isDemo && myPosition) {
           const newBalance = demoBalance + (userWon ? profit || 0 : 0);
           updateDemoBalance(newBalance);
@@ -288,7 +288,7 @@ function UpDownGame() {
     return () => socket?.disconnect();
   }, [mode]);
 
-  // ── Handle order ──────────────────────────────────────────────────────────
+  // â”€â”€ Handle order â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleOrder = useCallback(
     (direction: "up" | "down") => {
       if (!socketRef.current || !round || round.state !== "open" || myPosition || executingOrder)
@@ -336,7 +336,7 @@ function UpDownGame() {
 
   const canPlaceOrder = round?.state === "open" && !myPosition && !executingOrder && connected;
 
-  // ── Toggle mode ────────────────────────────────────────────────────────────
+  // â”€â”€ Toggle mode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const setMode = (newMode: "demo" | "real") => {
     navigate({
       search: (prev: any) => ({ ...prev, mode: newMode }),
@@ -405,7 +405,7 @@ function UpDownGame() {
               <span className="font-bold text-white">
                 {currentBalance !== null ? currentBalance.toFixed(2) : "0.00"} KES
               </span>
-              {updatingBalance && <span className="text-gray-400 text-[8px] animate-pulse">⋯</span>}
+              {updatingBalance && <span className="text-gray-400 text-[8px] animate-pulse">â‹¯</span>}
             </div>
             {!isDemo && (
               <button
@@ -416,7 +416,7 @@ function UpDownGame() {
               </button>
             )}
             <span className="text-[8px] md:text-[10px] text-gray-400 hidden sm:inline">
-              {isDemo ? "🎮 FUN" : "🔴 REAL"}
+              {isDemo ? "ðŸŽ® FUN" : "ðŸ”´ REAL"}
             </span>
             {/* Connection status dot */}
             <div
@@ -444,7 +444,7 @@ function UpDownGame() {
                       : "bg-zinc-500/20 border-zinc-500/50 text-zinc-400"
                 }`}
               >
-                {h.direction === "up" ? "↑" : h.direction === "down" ? "↓" : "–"}
+                {h.direction === "up" ? "â†‘" : h.direction === "down" ? "â†“" : "â€“"}
               </div>
             ))}
         </div>
@@ -462,12 +462,12 @@ function UpDownGame() {
             }`}
           >
             {round?.state === "open"
-              ? "🟢 Accepting orders"
+              ? "ðŸŸ¢ Accepting orders"
               : round?.state === "locked"
-                ? "🔒 Locked — fetching result..."
+                ? "ðŸ”’ Locked â€” fetching result..."
                 : round?.state === "result"
-                  ? "📊 Round result"
-                  : "⏳ Waiting for round..."}
+                  ? "ðŸ“Š Round result"
+                  : "â³ Waiting for round..."}
           </div>
 
           {/* Price + Timer */}
@@ -477,7 +477,7 @@ function UpDownGame() {
             </div>
 
             <div className="text-5xl font-black text-white tabular-nums tracking-tighter">
-              {round?.entryPrice != null ? round.entryPrice.toFixed(4) : "—"}
+              {round?.entryPrice != null ? round.entryPrice.toFixed(4) : "â€”"}
             </div>
 
             {round?.state === "result" && lastResult && (
@@ -496,11 +496,11 @@ function UpDownGame() {
                   ) : lastResult.direction === "down" ? (
                     <ArrowDown size={48} strokeWidth={3} />
                   ) : (
-                    <span className="text-2xl">—</span>
+                    <span className="text-2xl">â€”</span>
                   )}
                 </div>
                 <div className="text-sm font-mono">
-                  {lastResult.entryPrice.toFixed(4)} → {lastResult.closePrice.toFixed(4)}
+                  {lastResult.entryPrice.toFixed(4)} â†’ {lastResult.closePrice.toFixed(4)}
                   {priceChange && <span className="ml-1 opacity-60">({priceChange}%)</span>}
                 </div>
                 {lastResult.userWon !== null && (
@@ -512,8 +512,8 @@ function UpDownGame() {
                     }`}
                   >
                     {lastResult.userWon
-                      ? `🎉 Profit: KES ${lastResult.profit?.toFixed(2) || "0"}`
-                      : `😔 Loss: KES ${myPosition?.amount || 0}`}
+                      ? `ðŸŽ‰ Profit: KES ${lastResult.profit?.toFixed(2) || "0"}`
+                      : `ðŸ˜” Loss: KES ${myPosition?.amount || 0}`}
                   </div>
                 )}
               </div>
@@ -538,7 +538,7 @@ function UpDownGame() {
                     : "bg-red-500/10 border-red-500/50 text-red-400"
                 }`}
               >
-                ✓ Position placed: {myPosition.direction.toUpperCase()} — KES {myPosition.amount}
+                âœ“ Position placed: {myPosition.direction.toUpperCase()} â€” KES {myPosition.amount}
               </div>
             )}
           </div>

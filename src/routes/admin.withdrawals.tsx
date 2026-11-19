@@ -85,7 +85,7 @@ function AdminWithdrawals() {
   if (authLoading || loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <p className="text-muted-foreground">Loading withdrawals…</p>
+        <p className="text-muted-foreground">Loading withdrawalsÃ¢â‚¬Â¦</p>
       </div>
     );
   }
@@ -100,7 +100,7 @@ function AdminWithdrawals() {
             <form onSubmit={handleSearch} className="relative">
               <input
                 type="text"
-                placeholder="Search withdrawals…"
+                placeholder="Search withdrawalsÃ¢â‚¬Â¦"
                 className="h-9 w-56 rounded-lg border border-border bg-card pl-9 pr-3 text-sm outline-none focus:border-primary"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -171,14 +171,14 @@ function AdminWithdrawals() {
                   withdrawals.map((w) => (
                     <tr key={w.id} className="border-b border-border/60 last:border-0">
                       <td className="py-3 pr-3 font-mono text-xs text-muted-foreground">
-                        {w.id.slice(0, 8)}…
+                        {w.id.slice(0, 8)}Ã¢â‚¬Â¦
                       </td>
                       <td className="py-3 pr-3 font-medium">{w.user_email}</td>
                       <td className="py-3 pr-3 text-right font-semibold text-destructive">
                         -{fmtKES(w.amount)}
                       </td>
                       <td className="py-3 pr-3 text-muted-foreground">{w.method}</td>
-                      <td className="py-3 pr-3 font-mono text-xs">{w.reference || "—"}</td>
+                      <td className="py-3 pr-3 font-mono text-xs">{w.reference || "Ã¢â‚¬â€"}</td>
                       <td className="py-3 pr-3">
                         <StatusPill status={w.status} />
                       </td>

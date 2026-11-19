@@ -62,14 +62,14 @@ export function Toolbox({ onModify }: { onModify: (ticket: number | string) => v
                         onClick={() => onModify(p.ticket)}
                         aria-label="Modify"
                       >
-                        ✎
+                        Ã¢Å“Å½
                       </button>
                       <button
                         className="px-1 hover:text-destructive"
                         onClick={() => e.closePosition(p.ticket)}
                         aria-label="Close position"
                       >
-                        ✕
+                        Ã¢Å“â€¢
                       </button>
                     </td>
                   </tr>
@@ -79,7 +79,7 @@ export function Toolbox({ onModify }: { onModify: (ticket: number | string) => v
                 <td className="mt-td" colSpan={9}>
                   Balance: {money(e.balance)} USD&nbsp;&nbsp; Equity: {money(e.equity)}&nbsp;&nbsp;
                   Margin: {money(e.margin)}&nbsp;&nbsp; Free margin: {money(e.freeMargin)}
-                  &nbsp;&nbsp; Margin level: {e.margin ? `${e.marginLevel.toFixed(2)}%` : "—"}
+                  &nbsp;&nbsp; Margin level: {e.margin ? `${e.marginLevel.toFixed(2)}%` : "Ã¢â‚¬â€"}
                 </td>
                 <td className={`mt-td text-right font-mono ${pnlCls(e.floating)}`}>
                   {money(e.floating)}
@@ -108,7 +108,7 @@ export function Toolbox({ onModify }: { onModify: (ticket: number | string) => v
                       onClick={() => e.cancelOrder(o.ticket)}
                       aria-label="Cancel order"
                     >
-                      ✕
+                      Ã¢Å“â€¢
                     </button>
                   </td>
                 </tr>

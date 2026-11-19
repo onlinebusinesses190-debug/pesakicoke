@@ -37,7 +37,7 @@ export const OFFICES = [
 ] as const;
 
 /**
- * Referral rules as implemented and published in the app (Profile → Referral
+ * Referral rules as implemented and published in the app (Profile Ã¢â€ â€™ Referral
  * programme). Backed by migration 20260920_update_referral_rewards.sql, which
  * credits the referrer 10% of the referred user's first qualifying deposit and
  * the referred user a KES 10 welcome bonus.
@@ -54,7 +54,7 @@ export const REFERRAL = {
 
 /**
  * Business Hub funding model. The agreed return is a share of monthly business
- * profit under contract — it is NOT an equity or shareholding interest, and must
+ * profit under contract Ã¢â‚¬â€ it is NOT an equity or shareholding interest, and must
  * never be described as company ownership unless the signed contract says so.
  */
 export const BUSINESS_FUNDING = {
@@ -157,7 +157,7 @@ export const DATA_PROTECTION_STATEMENT =
   "PESAKI is implementing its data protection compliance requirements and will update this page with applicable registration information when available.";
 
 /**
- * Organization structured data. Only verified fields — no ratings, reviews,
+ * Organization structured data. Only verified fields Ã¢â‚¬â€ no ratings, reviews,
  * awards or government affiliations.
  */
 export function organizationJsonLd() {

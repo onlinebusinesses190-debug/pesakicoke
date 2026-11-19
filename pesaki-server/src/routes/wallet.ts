@@ -7,14 +7,14 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export default async function walletRoutes(server: FastifyInstance) {
-  console.log('✅ walletRoutes loaded');
+  console.log('Ã¢Å“â€¦ walletRoutes loaded');
 
-  // ─── Test route ────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Test route Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/wallet/ping', async (_request: FastifyRequest, reply: FastifyReply) => {
     return reply.send({ pong: true });
   });
 
-  // ─── GET /wallet/balance ──────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /wallet/balance Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/wallet/balance', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -47,7 +47,7 @@ export default async function walletRoutes(server: FastifyInstance) {
         return reply.status(500).send({ error: 'Database error' });
       }
 
-      // ─── Fetch referral earnings for dashboard ──────────────────────
+      // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Fetch referral earnings for dashboard Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
       let referralEarnings = 0;
       try {
         const { data: referralRows } = await supabase
@@ -72,7 +72,7 @@ export default async function walletRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /wallet/transactions ─────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /wallet/transactions Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/wallet/transactions', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -103,7 +103,7 @@ export default async function walletRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /wallet/stats ────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /wallet/stats Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/wallet/stats', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -173,7 +173,7 @@ export default async function walletRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── POST /wallet/withdraw ────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ POST /wallet/withdraw Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.post('/wallet/withdraw', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -216,7 +216,7 @@ export default async function walletRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── GET /wallet/available-balance ────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ GET /wallet/available-balance Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.get('/wallet/available-balance', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -266,10 +266,10 @@ export default async function walletRoutes(server: FastifyInstance) {
     }
   });
 
-  // ─── POST /wallet/transfer ────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ POST /wallet/transfer Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   server.post('/wallet/transfer', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      console.log('📌 Transfer route HIT');
+      console.log('Ã°Å¸â€œÅ’ Transfer route HIT');
       const token = request.headers.authorization?.replace('Bearer ', '');
       if (!token) {
         return reply.status(401).send({ error: 'Unauthorized' });
@@ -294,10 +294,10 @@ export default async function walletRoutes(server: FastifyInstance) {
         });
       }
 
-      // ─── Normalize recipient lookup ──────────────────────────────────
+      // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Normalize recipient lookup Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
       const trimmed = recipient.trim();
 
-      // Normalize phone: 0712... → 254712..., +254712... → 254712...
+      // Normalize phone: 0712... Ã¢â€ â€™ 254712..., +254712... Ã¢â€ â€™ 254712...
       const normalizedPhone = (() => {
         const digits = trimmed.replace(/\D/g, '');
         if (digits.startsWith('254') && digits.length === 12) return digits;
@@ -306,7 +306,7 @@ export default async function walletRoutes(server: FastifyInstance) {
         return digits;
       })();
 
-      // ─── Fetch sender and recipient profiles ───────────────────────────
+      // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Fetch sender and recipient profiles Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
       const { data: senderProfile } = await supabase
         .from('profiles')
         .select('full_name, phone, email')
@@ -350,7 +350,7 @@ export default async function walletRoutes(server: FastifyInstance) {
       const recipientName = recipientProfile?.full_name || recipientProfile?.email?.split('@')[0] || 'PESAKI member';
       const recipientPhone = recipientProfile?.phone || '';
 
-      // ─── Get sender balance ────────────────────────────────────────────
+      // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Get sender balance Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
       const { data: senderWallet, error: senderError } = await supabase
         .from('wallets')
         .select('balance')
@@ -365,13 +365,13 @@ export default async function walletRoutes(server: FastifyInstance) {
       const fee = calculateTransferFee(amount);
       const recipientGets = Math.max(0, amount - fee);
 
-      // ─── Deduct from sender ────────────────────────────────────────────
+      // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Deduct from sender Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
       await supabase
         .from('wallets')
         .update({ balance: senderWallet.balance - amount })
         .eq('user_id', user.id);
 
-      // ─── Credit recipient ───────────────────────────────────────────────
+      // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Credit recipient Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
       const { data: recipientWallet, error: recipError } = await supabase
         .from('wallets')
         .select('balance')
@@ -385,10 +385,10 @@ export default async function walletRoutes(server: FastifyInstance) {
         .update({ balance: (recipientWallet.balance || 0) + recipientGets })
         .eq('user_id', recipientUser.id);
 
-      // ─── Generate shared transfer reference ────────────────────────────
+      // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Generate shared transfer reference Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
       const transferRef = crypto.randomUUID();
 
-      // ─── Ledger entries with shared transfer reference ───────────────
+      // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Ledger entries with shared transfer reference Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
       const receiverDisplay = recipientPhone || recipientName;
       const senderDisplay = senderPhone || senderEmail || senderName;
 

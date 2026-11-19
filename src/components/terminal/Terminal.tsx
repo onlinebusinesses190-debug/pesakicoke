@@ -105,7 +105,7 @@ export function Terminal({ mode: initialMode = "demo" }: { mode?: "demo" | "real
   };
 
   const renderPrice = (price: number | undefined, digits: number) => {
-    if (!price) return "—";
+    if (!price) return "Ã¢â‚¬â€";
     const str = price.toFixed(digits);
     return (
       <span className="flex items-start justify-center leading-none font-mono">
@@ -151,7 +151,7 @@ export function Terminal({ mode: initialMode = "demo" }: { mode?: "demo" | "real
                   KSh {money(e.liveKesBalance)}
                 </div>
                 <div className="text-[10px] font-mono text-gray-500 font-bold">
-                  ≈ ${money(e.liveBalance)}
+                  Ã¢â€°Ë† ${money(e.liveBalance)}
                 </div>
               </>
             ) : (
@@ -182,13 +182,13 @@ export function Terminal({ mode: initialMode = "demo" }: { mode?: "demo" | "real
 
       {mode === "real" && e.liveSync.error && (
         <div className="fixed top-4 right-4 z-50 px-4 py-2 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-xs font-mono">
-          ⚠ {e.liveSync.error}
+          Ã¢Å¡Â  {e.liveSync.error}
         </div>
       )}
 
       {mode === "real" && e.liveSync.loading && (
         <div className="fixed top-4 right-4 z-50 px-4 py-2 rounded-lg border border-blue-200 bg-blue-50 text-blue-800 text-xs font-mono">
-          ↻ Syncing live account…
+          Ã¢â€ Â» Syncing live accountÃ¢â‚¬Â¦
         </div>
       )}
 
@@ -234,7 +234,7 @@ export function Terminal({ mode: initialMode = "demo" }: { mode?: "demo" | "real
               <div className="p-2 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
                 <h3 className="text-xs font-bold text-gray-700">Open Positions</h3>
                  {e.positions.length > 0 && (
-                  <button onClick={() => setShowBulkMenu(true)} className="text-gray-500 hover:text-gray-700 text-xl leading-none font-bold py-0.5 px-1">⋮</button>
+                  <button onClick={() => setShowBulkMenu(true)} className="text-gray-500 hover:text-gray-700 text-xl leading-none font-bold py-0.5 px-1">Ã¢â€¹Â®</button>
                 )}
               </div>
               <div className="divide-y divide-gray-100">
@@ -258,7 +258,7 @@ export function Terminal({ mode: initialMode = "demo" }: { mode?: "demo" | "real
                         <div className={`font-mono text-xs font-bold ${pnl >= 0 ? "text-[#1565c0]" : "text-[#c62828]"}`}>{pnl.toFixed(2)} USD</div>
                       </div>
                       <div className="flex justify-between items-center text-[10px] text-gray-500 font-mono">
-                        <div>{p.openPrice.toFixed(digits)} → {closePrice.toFixed(digits)}</div>
+                        <div>{p.openPrice.toFixed(digits)} Ã¢â€ â€™ {closePrice.toFixed(digits)}</div>
                         <button onClick={async () => {
                           const pnlBefore = e.profitOf(p);
                           const res = await e.closePosition(p.ticket, "manual", p.lots);
@@ -343,7 +343,7 @@ export function Terminal({ mode: initialMode = "demo" }: { mode?: "demo" | "real
           <div className="w-full max-w-sm border border-gray-300 bg-white shadow-2xl rounded-sm overflow-hidden flex flex-col">
             <div className="flex items-center justify-between bg-[#1565c0] px-3 py-2 text-white">
               <span className="text-sm font-bold">Deposit Demo Funds</span>
-              <button onClick={() => setDepositOpen(false)} className="text-lg leading-none font-bold">✕</button>
+              <button onClick={() => setDepositOpen(false)} className="text-lg leading-none font-bold">Ã¢Å“â€¢</button>
             </div>
             <div className="p-4 space-y-4">
               <input className="w-full border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#1565c0]" type="number" placeholder="Amount in USD" value={depositAmount} onChange={(v) => setDepositAmount(v.target.value)} />

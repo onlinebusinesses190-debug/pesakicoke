@@ -1,5 +1,5 @@
 /**
- * PESAKI Forex — settlement bridge to the existing PESAKI wallet.
+ * PESAKI Forex Ã¢â‚¬â€ settlement bridge to the existing PESAKI wallet.
  *
  * PESAKI already has a wallet with real and demo balances, atomic debit/credit
  * and a locked-funds concept. Forex must not grow a second, drifting balance,
@@ -219,7 +219,7 @@ export async function settleReal(
       if (!r.success) {
         logger.error(
           { userId, pnl, reference, err: r.error },
-          "Forex realised loss could not be debited — needs reconciliation",
+          "Forex realised loss could not be debited Ã¢â‚¬â€ needs reconciliation",
         );
         return { ok: false, reason: r.error ?? "Could not debit loss" };
       }

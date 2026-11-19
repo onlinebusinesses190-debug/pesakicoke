@@ -285,7 +285,7 @@ describe("KES/USD instrument", () => {
 
   it("seeds from a sensible initial price", () => {
     const e = new MarketEngine(baseConfig(), NOW);
-    // 1 / 130 KES/USD ≈ 0.00769
+    // 1 / 130 KES/USD Ã¢â€°Ë† 0.00769
     expect(e.quote("KES/USD").mid).toBeCloseTo(1 / 130, 5);
   });
 });
@@ -303,7 +303,7 @@ describe("state persistence", () => {
     b.hydrateCounter("EUR/USD", snap.tickCount);
 
     // After restoring 10 ticks, the 11th must match because the PRNG is keyed
-    // by the counter — the walk is continuous, not restarted.
+    // by the counter Ã¢â‚¬â€ the walk is continuous, not restarted.
     const nextA = a.advance("EUR/USD", NOW + 10_000);
     const nextB = b.advance("EUR/USD", NOW + 10_000);
     expect(nextB.mid).toBe(nextA.mid);

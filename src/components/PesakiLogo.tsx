@@ -40,7 +40,7 @@ export function PesakiLogo({
 }
 
 export function PesakiWordmark({
-  tagline = "WORK • GROW • BANK",
+  tagline = "WORK Ã¢â‚¬Â¢ GROW Ã¢â‚¬Â¢ BANK",
   size = "md",
   tone = "light",
   className = "",

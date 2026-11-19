@@ -1,5 +1,5 @@
 /**
- * PESAKI Forex — market data provider abstraction.
+ * PESAKI Forex Ã¢â‚¬â€ market data provider abstraction.
  *
  * The Forex module owns its own data engine and does not read the shared
  * `market:*` Redis keys used by the prediction games (those add random jitter
@@ -59,7 +59,7 @@ export class MarketDataUnavailableError extends Error {
 /**
  * Frankfurter (ECB reference rates). Free, keyless, and backed by real central
  * bank data. It publishes once per working day, so it is a genuine reference
- * rate rather than a tick feed — quotes from it are labelled with their date.
+ * rate rather than a tick feed Ã¢â‚¬â€ quotes from it are labelled with their date.
  */
 export class FrankfurterProvider implements MarketDataProvider {
   readonly name = "frankfurter";
@@ -284,7 +284,7 @@ export async function getQuotes(symbols: string[]): Promise<Quote[]> {
 
 /**
  * Candles for charting, derived from real historical closes. Gaps between
- * published closes are interpolated linearly — never randomly — so the series
+ * published closes are interpolated linearly Ã¢â‚¬â€ never randomly Ã¢â‚¬â€ so the series
  * stays honest about where data was sparse.
  */
 export async function getCandles(symbol: string, count = 60): Promise<Candle[]> {

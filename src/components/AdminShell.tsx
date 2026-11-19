@@ -37,7 +37,7 @@ const nav: { to: LinkProps["to"]; label: string; icon: React.ElementType }[] = [
   { to: "/admin/support", label: "Support", icon: LifeBuoy },
   { to: "/admin/reports", label: "Reports", icon: BarChart3 },
   { to: "/admin/actions", label: "Audit Log", icon: FileText },
-  { to: "/admin/payhero/topup", label: "PayHero Top-Up", icon: Wallet },
+  { to: "/admin/finoq/topup", label: "Finoq Top-Up", icon: Wallet },
 ];
 
 export function AdminShell({ children }: { children: ReactNode }) {
@@ -132,7 +132,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
               className="h-9 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-sm outline-none transition focus:border-primary"
-              placeholder="Search users, transactions, tickets…"
+              placeholder="Search users, transactions, ticketsÃ¢â‚¬Â¦"
             />
           </div>
           <div className="ml-auto flex items-center gap-3">
@@ -140,7 +140,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
               to="/"
               className="hidden text-xs font-medium text-muted-foreground hover:text-foreground sm:inline"
             >
-              ← Back to app
+              Ã¢â€ Â Back to app
             </Link>
             <span className="grid h-9 w-9 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
               AD

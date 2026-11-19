@@ -27,7 +27,7 @@ function getDurationInMonths(duration: string): number {
   return map[duration] || 1;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Helpers Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 async function notifyUser(
   userId: string,
   title: string,
@@ -49,9 +49,9 @@ async function notifyUser(
   }
 }
 
-// KAZI Link is now completely FREE — no fees, no escrow, no payments
+// KAZI Link is now completely FREE Ã¢â‚¬â€ no fees, no escrow, no payments
 
-// ─── KAZI Profile helpers ─────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ KAZI Profile helpers Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 // Every profile endpoint answers with { success: true, data } or
 // { success: false, error } and never with a 5xx, so a missing table or a
 // storage failure degrades to a readable message instead of breaking the page.
@@ -486,7 +486,7 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
       return reply.status(500).send({ error: 'Internal server error' });
     }
   });
-  // POST /kazi/apply — accepts photoFile (multipart) OR photoUrl + additionalDescription
+  // POST /kazi/apply Ã¢â‚¬â€ accepts photoFile (multipart) OR photoUrl + additionalDescription
   server.post('/kazi/apply', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -617,7 +617,7 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
       return reply.status(500).send({ error: err.message || 'Internal server error' });
     }
   });
-  // POST /kazi/hire — employer hires an applicant; KAZI Link is FREE (no payments)
+  // POST /kazi/hire Ã¢â‚¬â€ employer hires an applicant; KAZI Link is FREE (no payments)
   server.post('/kazi/hire', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -645,7 +645,7 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
         .update({ status: 'Hired' })
         .eq('id', applicationId);
 
-      // Move job to hired state — this immediately removes it from Find Work
+      // Move job to hired state Ã¢â‚¬â€ this immediately removes it from Find Work
       const { error: jobUpdateError } = await supabase
         .from('jobs')
         .update({ status: 'hired', hired_worker_id: app.worker_id })
@@ -681,7 +681,7 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
         }
       }
 
-      // Create contract (no escrow, no payments — KAZI Link is free)
+      // Create contract (no escrow, no payments Ã¢â‚¬â€ KAZI Link is free)
       const durationMonths = getDurationInMonths(app.jobs.duration);
       const endDate = new Date();
       endDate.setMonth(endDate.getMonth() + durationMonths);
@@ -708,7 +708,7 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
 
       if (contractError) {
         console.error('[kazi/hire] contract creation failed:', contractError.message);
-        // Job is still updated to hired — that's the important part
+        // Job is still updated to hired Ã¢â‚¬â€ that's the important part
       }
 
       await notifyUser(
@@ -731,7 +731,7 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
     }
   });
 
-  // POST /kazi/accept-job — worker accepts the hire; no escrow needed (free)
+  // POST /kazi/accept-job Ã¢â‚¬â€ worker accepts the hire; no escrow needed (free)
   server.post('/kazi/accept-job', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -751,7 +751,7 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
         return reply.status(403).send({ error: 'Unauthorized: not the hired worker' });
       }
 
-      // No escrow lock needed — KAZI Link is free
+      // No escrow lock needed Ã¢â‚¬â€ KAZI Link is free
       await supabase
         .from('job_contracts')
         .update({ worker_accepted: true, start_date: new Date().toISOString() })
@@ -771,7 +771,7 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
       return reply.status(500).send({ error: err.message || 'Internal server error' });
     }
   });
-  // POST /kazi/confirm-done — employer confirms job done; no payments (free)
+  // POST /kazi/confirm-done Ã¢â‚¬â€ employer confirms job done; no payments (free)
   server.post('/kazi/confirm-done', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -791,7 +791,7 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
         return reply.status(403).send({ error: 'Unauthorized: not the employer' });
       }
 
-      // No escrow, no wallet credit — KAZI Link is free
+      // No escrow, no wallet credit Ã¢â‚¬â€ KAZI Link is free
       await supabase
         .from('job_contracts')
         .update({ job_done: true, status: 'completed', amount_released: 0 })
@@ -816,7 +816,7 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
     }
   });
 
-  // POST /kazi/start-job — employer starts the job; no escrow needed (free)
+  // POST /kazi/start-job Ã¢â‚¬â€ employer starts the job; no escrow needed (free)
   server.post('/kazi/start-job', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -850,7 +850,7 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
         return reply.status(400).send({ error: 'Contract must be active' });
       }
 
-      // No escrow check — KAZI Link is free
+      // No escrow check Ã¢â‚¬â€ KAZI Link is free
       await supabase
         .from('job_contracts')
         .update({ start_date: new Date().toISOString() })
@@ -870,17 +870,17 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
     }
   });
 
-  // POST /kazi/withdraw — KAZI Link is free, no withdrawals
+  // POST /kazi/withdraw Ã¢â‚¬â€ KAZI Link is free, no withdrawals
   server.post('/kazi/withdraw', (_request: FastifyRequest, reply: FastifyReply) => {
-    return reply.send({ success: true, message: 'KAZI Link is free — no withdrawals needed' });
+    return reply.send({ success: true, message: 'KAZI Link is free Ã¢â‚¬â€ no withdrawals needed' });
   });
 
-  // POST /kazi/request-refund — KAZI Link is free, no refunds needed
+  // POST /kazi/request-refund Ã¢â‚¬â€ KAZI Link is free, no refunds needed
   server.post('/kazi/request-refund', (_request: FastifyRequest, reply: FastifyReply) => {
-    return reply.send({ success: true, message: 'KAZI Link is free — no refunds needed' });
+    return reply.send({ success: true, message: 'KAZI Link is free Ã¢â‚¬â€ no refunds needed' });
   });
 
-  // POST /kazi/dispute/:id/respond — worker responds to dispute (free, no payments)
+  // POST /kazi/dispute/:id/respond Ã¢â‚¬â€ worker responds to dispute (free, no payments)
   server.post('/kazi/dispute/:id/respond', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -920,7 +920,7 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
         .eq('id', id);
 
       if (response === 'accepted') {
-        // Worker accepted the refund — just cancel the job
+        // Worker accepted the refund Ã¢â‚¬â€ just cancel the job
         await supabase
           .from('jobs')
           .update({ status: 'cancelled' })
@@ -933,7 +933,7 @@ export default async function kaziRoutes(server: FastifyInstance) {  // GET /kaz
           { jobId: dispute.job_id, type: 'dispute_resolved' }
         );
       } else {
-        // Worker declined — notify employer
+        // Worker declined Ã¢â‚¬â€ notify employer
         await notifyUser(
           dispute.employer_id,
           'Cancellation declined',
@@ -1016,7 +1016,7 @@ return reply.send(disputes || []);
     }
   });
 
-  // GET /kazi/messages — fetch chat messages for a job
+  // GET /kazi/messages Ã¢â‚¬â€ fetch chat messages for a job
   server.get('/kazi/messages', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -1065,7 +1065,7 @@ return reply.send(disputes || []);
     }
   });
 
-  // GET /kazi/unread-counts — get unread message counts per job
+  // GET /kazi/unread-counts Ã¢â‚¬â€ get unread message counts per job
   server.get('/kazi/unread-counts', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -1092,7 +1092,7 @@ return reply.send(disputes || []);
     }
   });
 
-  // POST /kazi/messages/:jobId/mark-read — mark all messages in a job as read
+  // POST /kazi/messages/:jobId/mark-read Ã¢â‚¬â€ mark all messages in a job as read
   server.post('/kazi/messages/:jobId/mark-read', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -1116,7 +1116,7 @@ return reply.send(disputes || []);
     }
   });
 
-  // POST /kazi/send-message — send a chat message
+  // POST /kazi/send-message Ã¢â‚¬â€ send a chat message
   server.post('/kazi/send-message', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -1198,7 +1198,7 @@ return reply.send(disputes || []);
     }
   });
 
-  // POST /kazi/send-media — upload image/video/audio/file and send as message
+  // POST /kazi/send-media Ã¢â‚¬â€ upload image/video/audio/file and send as message
   server.post('/kazi/send-media', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -1307,12 +1307,12 @@ return reply.send(disputes || []);
     }
   });
 
-  // GET /kazi/escrow/:jobId — always returns null (KAZI Link is free, no escrow)
+  // GET /kazi/escrow/:jobId Ã¢â‚¬â€ always returns null (KAZI Link is free, no escrow)
   server.get('/kazi/escrow/:jobId', (_request: FastifyRequest, reply: FastifyReply) => {
     return reply.send(null);
   });
 
-  // POST /kazi/post-job — creates a job listing (KAZI Link is completely free)
+  // POST /kazi/post-job Ã¢â‚¬â€ creates a job listing (KAZI Link is completely free)
   server.post('/kazi/post-job', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -1385,7 +1385,7 @@ return reply.send(disputes || []);
       });
     }
   });
-// POST /kazi/mpesa/job-payment-callback â€” M-Pesa callback for KAZI job payments
+// POST /kazi/mpesa/job-payment-callback ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â M-Pesa callback for KAZI job payments
   server.post('/kazi/mpesa/job-payment-callback', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const body: any = request.body;
@@ -1447,7 +1447,7 @@ return reply.send(disputes || []);
         return reply.status(200).send({ ResultCode: 0, ResultDesc: 'Accepted' });
       }
 
-      // KAZI Link is free — no escrow needed
+      // KAZI Link is free Ã¢â‚¬â€ no escrow needed
       // Just mark the deposit as completed
       await supabase
         .from('mpesa_deposits')
@@ -1461,7 +1461,7 @@ return reply.send(disputes || []);
     }
   });
 
-  // GET /kazi/mpesa/job-status/:checkoutRequestId — check kazi job payment status
+  // GET /kazi/mpesa/job-status/:checkoutRequestId Ã¢â‚¬â€ check kazi job payment status
   server.get('/kazi/mpesa/job-status/:checkoutRequestId', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const token = request.headers.authorization?.replace('Bearer ', '');
@@ -1488,12 +1488,12 @@ return reply.send(disputes || []);
     }
   });
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // KAZI PROFILE — public worker / service provider profile
+  // Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+  // KAZI PROFILE Ã¢â‚¬â€ public worker / service provider profile
   // Added after the existing endpoints above; nothing above is modified.
-  // ═══════════════════════════════════════════════════════════════════════════
+  // Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
 
-  // GET /kazi/profile/me — own profile, auto-created on first call
+  // GET /kazi/profile/me Ã¢â‚¬â€ own profile, auto-created on first call
   server.get('/kazi/profile/me', async (request: FastifyRequest, reply: FastifyReply) => {
     const user = await requireKaziUser(request, reply);
     if (!user) return;
@@ -1518,7 +1518,7 @@ return reply.send(disputes || []);
     }
   });
 
-  // PUT /kazi/profile/me — update the basic fields
+  // PUT /kazi/profile/me Ã¢â‚¬â€ update the basic fields
   server.put('/kazi/profile/me', async (request: FastifyRequest, reply: FastifyReply) => {
     const user = await requireKaziUser(request, reply);
     if (!user) return;
@@ -1602,7 +1602,7 @@ return reply.send(disputes || []);
     }
   });
 
-  // GET /kazi/profile/by-slug/:slug — public, read-only profile by slug
+  // GET /kazi/profile/by-slug/:slug Ã¢â‚¬â€ public, read-only profile by slug
   server.get('/kazi/profile/by-slug/:slug', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const { slug } = request.params as { slug: string };
@@ -1638,7 +1638,7 @@ return reply.send(disputes || []);
     }
   });
 
-  // GET /kazi/profile/:userId — public, read-only profile
+  // GET /kazi/profile/:userId Ã¢â‚¬â€ public, read-only profile
   server.get('/kazi/profile/:userId', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const { userId } = request.params as { userId: string };
@@ -1664,7 +1664,7 @@ return reply.send(disputes || []);
     }
   });
 
-  // POST /kazi/upload-cv — multipart PDF/DOC/DOCX into kazi-cvs
+  // POST /kazi/upload-cv Ã¢â‚¬â€ multipart PDF/DOC/DOCX into kazi-cvs
   server.post('/kazi/upload-cv', async (request: FastifyRequest, reply: FastifyReply) => {
     const user = await requireKaziUser(request, reply);
     if (!user) return;
@@ -1685,7 +1685,7 @@ return reply.send(disputes || []);
     }
   });
 
-  // POST /kazi/upload-photo — multipart image into kazi-photos
+  // POST /kazi/upload-photo Ã¢â‚¬â€ multipart image into kazi-photos
   server.post('/kazi/upload-photo', async (request: FastifyRequest, reply: FastifyReply) => {
     const user = await requireKaziUser(request, reply);
     if (!user) return;
@@ -1706,7 +1706,7 @@ return reply.send(disputes || []);
     }
   });
 
-  // POST /kazi/upload-portfolio — multipart image into kazi-portfolio
+  // POST /kazi/upload-portfolio Ã¢â‚¬â€ multipart image into kazi-portfolio
   server.post('/kazi/upload-portfolio', async (request: FastifyRequest, reply: FastifyReply) => {
     const user = await requireKaziUser(request, reply);
     if (!user) return;
@@ -1982,7 +1982,7 @@ return reply.send(disputes || []);
     }
   });
 
-  // POST /kazi/review — only between two users who completed a contract
+  // POST /kazi/review Ã¢â‚¬â€ only between two users who completed a contract
   server.post('/kazi/review', async (request: FastifyRequest, reply: FastifyReply) => {
     const user = await requireKaziUser(request, reply);
     if (!user) return;
@@ -2056,7 +2056,7 @@ return reply.send(disputes || []);
     }
   });
 
-  // GET /kazi/reviews/:userId — reviews written about a user
+  // GET /kazi/reviews/:userId Ã¢â‚¬â€ reviews written about a user
   server.get('/kazi/reviews/:userId', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const { userId } = request.params as { userId: string };
@@ -2103,7 +2103,7 @@ return reply.send(disputes || []);
     }
   });
 
-  // GET /kazi/search-profiles — people / skills / category search
+  // GET /kazi/search-profiles Ã¢â‚¬â€ people / skills / category search
   //
   // kazi_profiles.user_id has no foreign key to public.profiles, so the names
   // are looked up in a second query rather than a PostgREST embed (an unresolvable
@@ -2280,7 +2280,7 @@ return reply.send(disputes || []);
     }
   });
 
-  // GET /kazi/sitemap — public sitemap for KAZI profiles (no auth required)
+  // GET /kazi/sitemap Ã¢â‚¬â€ public sitemap for KAZI profiles (no auth required)
   server.get('/kazi/sitemap', async (_request: FastifyRequest, reply: FastifyReply) => {
     try {
       const { data: profiles, error } = await supabase

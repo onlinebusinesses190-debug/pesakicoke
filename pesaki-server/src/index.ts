@@ -2,7 +2,7 @@ import 'dotenv/config';
 import fastify from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
-import { createClient } from '@supabase/supabase-js'; // 👈 Added Supabase for backend queries
+import { createClient } from '@supabase/supabase-js'; // Ã°Å¸â€˜Ë† Added Supabase for backend queries
 import { env } from './config/env';
 import { logger } from './utils/logger';
 import { initSocket } from './socket';
@@ -21,26 +21,26 @@ import kaziRoutes from './routes/kazi';
 import { mpesaRoutes } from './routes/mpesa';
 import { palplussRoutes } from './routes/palpluss';
 import { bankingRoutes } from './routes/banking';
-import { payheroRoutes } from './routes/payhero';
+import { finoqRoutes } from './routes/finoq';
 import referralRoutes from './routes/referrals';
 import adminRoutes from './routes/admin';
 import userRoutes from './routes/user';
 import { bfxRoutes } from './routes/binaryFx';
 
-// ─── SUPABASE BACKEND CLIENT ───
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ SUPABASE BACKEND CLIENT Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 // Make sure you have SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in your .env file
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// ─── HOUSE RISK CACHE (Prevents DB Spam) ───
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ HOUSE RISK CACHE (Prevents DB Spam) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 const houseRiskCache: Record<string, { netLots: number; totalProfit: number }> = {};
 
 async function updateHouseRiskCache() {
   try {
     // 1. Fetch all open forex trades from the database
     const { data: openTrades, error } = await supabase
-      .from('forex_trades') // ⚠️ Change this if your table is named differently (e.g., 'positions' or 'trades')
+      .from('forex_trades') // Ã¢Å¡Â Ã¯Â¸Â Change this if your table is named differently (e.g., 'positions' or 'trades')
       .select('symbol, side, lots, entry_price')
       .eq('status', 'open');
 
@@ -84,7 +84,7 @@ async function updateHouseRiskCache() {
     logger.error(error, "Failed to update House Risk Cache");
   }
 }
-// ─────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 const startServer = async () => {
   try {
@@ -106,7 +106,7 @@ const startServer = async () => {
     server.register(mpesaRoutes);
     server.register(palplussRoutes);
     server.register(bankingRoutes);
-    server.register(payheroRoutes);
+    server.register(finoqRoutes);
     server.register(referralRoutes);
     server.register(adminRoutes);
     server.register(userRoutes);
@@ -133,7 +133,7 @@ const startServer = async () => {
     startUpDownRounds();
     initCronJobs();
 
-    // ─── FOREX ENGINE SETUP ───
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ FOREX ENGINE SETUP Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     const stopPersistence = await hydrateAndAttach(getEngine());
     
     // Inject the House Risk Logic into the Engine
@@ -152,7 +152,7 @@ const startServer = async () => {
     // Update the risk cache every 2 seconds so we don't spam the DB
     setInterval(updateHouseRiskCache, 2000);
     updateHouseRiskCache(); // Run once immediately on startup
-    // ──────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
     const shutdown = () => {
       logger.info('Shutting down PESAKI Forex engine');
@@ -165,7 +165,7 @@ const startServer = async () => {
     process.on('SIGINT', shutdown);
 
     await server.listen({ port: env.PORT, host: '0.0.0.0' });
-    logger.info(`✨ Pesaki Server listening at http://localhost:${env.PORT}`);
+    logger.info(`Ã¢Å“Â¨ Pesaki Server listening at http://localhost:${env.PORT}`);
   } catch (err) {
     logger.fatal(err, 'Failed to start server');
     process.exit(1);

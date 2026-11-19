@@ -5,8 +5,8 @@ import { SectionTitle } from "@/components/ui-bits";
 export const Route = createFileRoute("/cookies")({
   head: () => ({
     meta: [
-      { title: "Cookie Policy — PESAKI" },
-      { name: "description", content: "PESAKI Cookie Policy — what cookies we use and how to manage them." },
+      { title: "Cookie Policy Ã¢â‚¬â€ PESAKI" },
+      { name: "description", content: "PESAKI Cookie Policy Ã¢â‚¬â€ what cookies we use and how to manage them." },
     ],
   }),
   component: CookiesPage,
@@ -41,7 +41,7 @@ function CookiesPage() {
         </section>
 
         <p className="mt-8 px-5 text-center text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-          PESAKI · Earn. Invest. Grow.
+          PESAKI Ã‚Â· Earn. Invest. Grow.
         </p>
       </div>
     </AppShell>

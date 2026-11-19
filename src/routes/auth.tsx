@@ -93,7 +93,7 @@ function AuthPage() {
       removeLocalStorage("pendingReferralCode");
       removeLocalStorage("referralManualAt");
       setPendingRefCode("");
-      toast.warning("Signup successful — referral could not be applied.");
+      toast.warning("Signup successful Ã¢â‚¬â€ referral could not be applied.");
       return false;
     }
   }
@@ -102,7 +102,7 @@ function AuthPage() {
   const search = useRouterState({ select: (s) => s.location.search });
   const redirectParam = new URLSearchParams(search).get("redirect") || "/";
 
-  // ── On mount: capture ?ref=CODE from URL into localStorage ────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬ On mount: capture ?ref=CODE from URL into localStorage Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   useEffect(() => {
     const refParam = new URLSearchParams(window.location.search).get("ref");
     if (refParam) {
@@ -145,7 +145,7 @@ function AuthPage() {
 
         const adminEmail = "onlinebusinesses190@gmail.com";
         if (email === adminEmail && loginMethod === "email") {
-          setInfo("Account created! You are set up as admin — please sign in to access the admin panel.");
+          setInfo("Account created! You are set up as admin Ã¢â‚¬â€ please sign in to access the admin panel.");
         } else {
           setInfo("Account created! Check your phone/email and sign in.");
         }
@@ -173,7 +173,7 @@ function AuthPage() {
       const message = err instanceof Error ? err.message : "";
       if (message.includes("Invalid login credentials")) {
         setMode("signup");
-        setError("Account not found — create one to continue.");
+        setError("Account not found Ã¢â‚¬â€ create one to continue.");
         return;
       }
       setError(message || "Something went wrong.");
@@ -294,7 +294,7 @@ function AuthPage() {
                 required
                 minLength={6}
                 className="input"
-                placeholder="••••••••"
+                placeholder="Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢"
               />
             </div>
 
@@ -348,13 +348,13 @@ function AuthPage() {
 
           <div className="mt-5 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
             <ShieldCheck className="h-3 w-3 text-success" />
-            Bank-grade encryption · Your data is protected
+            Bank-grade encryption Ã‚Â· Your data is protected
           </div>
         </div>
 
         <p className="mt-5 text-center text-xs text-muted-foreground">
           <a href="/" className="font-semibold text-primary hover:underline">
-            ← Back to home
+            Ã¢â€ Â Back to home
           </a>
         </p>
       </div>

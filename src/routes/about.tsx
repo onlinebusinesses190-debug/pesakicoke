@@ -16,11 +16,11 @@ import {
 export const Route = createFileRoute("/about")({
   head: () => ({
     meta: [
-      { title: "About PESAKI — Digital Wealth Ecosystem" },
+      { title: "About PESAKI Ã¢â‚¬â€ Digital Wealth Ecosystem" },
       {
         name: "description",
         content:
-          "PESAKI is Africa's digital wealth ecosystem — jobs, business funding, banking and wallet in one app. Built in Nairobi, Kenya.",
+          "PESAKI is Africa's digital wealth ecosystem Ã¢â‚¬â€ jobs, business funding, banking and wallet in one app. Built in Nairobi, Kenya.",
       },
     ],
   }),
@@ -39,11 +39,11 @@ function AboutPage() {
             <PesakiLogo size={64} tone="light" className="glow-green-dark" />
             <h2 className="mt-4 font-display text-2xl font-bold tracking-tight">PESAKI</h2>
             <p className="mt-1 text-[8px] font-medium tracking-[0.22em] text-white/70">
-              WORK • GROW • BANK
+              WORK Ã¢â‚¬Â¢ GROW Ã¢â‚¬Â¢ BANK
             </p>
             <span className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-[10px] font-medium">
               <ShieldCheck className="h-3 w-3 text-brand-gold" />
-              PESAKI MARKETING · BN-6ASR2E26 · BRS, Kenya
+              PESAKI MARKETING Ã‚Â· BN-6ASR2E26 Ã‚Â· BRS, Kenya
             </span>
           </div>
         </section>
@@ -110,7 +110,7 @@ function AboutPage() {
           <Card className="!p-4">
             <p className="text-sm text-muted-foreground leading-relaxed">
               Our mission is to democratize access to financial services across Africa. We believe
-              that everyone — regardless of their background — should have the tools to earn, save,
+              that everyone Ã¢â‚¬â€ regardless of their background Ã¢â‚¬â€ should have the tools to earn, save,
               invest, and build wealth. By combining job matching, business funding, banking, and
               digital payments into one platform, we're creating pathways to financial inclusion for
               millions of Africans.
@@ -142,7 +142,7 @@ function AboutPage() {
               </li>
               <li>
                 <Link to="/compliance" className="font-semibold text-primary hover:underline">
-                  Compliance &amp; Trust Center →
+                  Compliance &amp; Trust Center Ã¢â€ â€™
                 </Link>
               </li>
             </ul>

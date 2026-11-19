@@ -3,9 +3,9 @@ import { supabase } from "../lib/supabase";
 import { logger } from "../utils/logger";
 
 export default async function userRoutes(server: FastifyInstance) {
-  logger.info("✅ userRoutes loaded");
+  logger.info("Ã¢Å“â€¦ userRoutes loaded");
 
-  // ─── DELETE /user/delete-account ───────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ DELETE /user/delete-account Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   // GDPR: Anonymize user data and ban the auth account.
   server.delete("/user/delete-account", async (request: FastifyRequest, reply: FastifyReply) => {
     const token = request.headers.authorization?.replace("Bearer ", "");

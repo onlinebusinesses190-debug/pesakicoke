@@ -67,7 +67,7 @@ function AdminSupport() {
   if (authLoading || loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <p className="text-muted-foreground">Loading tickets…</p>
+        <p className="text-muted-foreground">Loading ticketsÃ¢â‚¬Â¦</p>
       </div>
     );
   }
@@ -121,7 +121,7 @@ function AdminSupport() {
                 {tickets.map((t) => (
                   <tr key={t.id} className="border-b border-border/60 last:border-0">
                     <td className="py-3 pr-3 font-mono text-xs text-muted-foreground">
-                      {t.id.slice(0, 8)}…
+                      {t.id.slice(0, 8)}Ã¢â‚¬Â¦
                     </td>
                     <td className="py-3 pr-3 font-medium">{t.user}</td>
                     <td className="py-3 pr-3">{t.subject}</td>

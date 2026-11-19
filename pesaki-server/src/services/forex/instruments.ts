@@ -1,5 +1,5 @@
 /**
- * PESAKI Forex — instrument specifications.
+ * PESAKI Forex Ã¢â‚¬â€ instrument specifications.
  *
  * FX pairs do not all share the same precision. JPY pairs quote to 2 decimals,
  * most others to 4 (5 for fractional pairs). Pip size and contract size drive

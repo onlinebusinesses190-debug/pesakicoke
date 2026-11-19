@@ -201,7 +201,7 @@ const initiateSTKPush = async (
       TransactionType: 'CustomerBuyGoodsOnline',
       Amount: paymentAmount,
       PartyA: phoneNumber,
-      PartyB: tillNumber, // ✅ Now using correct Till
+      PartyB: tillNumber, // Ã¢Å“â€¦ Now using correct Till
       PhoneNumber: phoneNumber,
       CallBackURL: callbackUrl,
       AccountReference: accountReference,
@@ -513,7 +513,7 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
         if (depositError || !deposit) {
           logger.error(
             { requestId, checkoutRequestId, depositError: depositError?.message },
-            'M-Pesa callback: deposit record not found — money may have been received but cannot credit'
+            'M-Pesa callback: deposit record not found Ã¢â‚¬â€ money may have been received but cannot credit'
           );
           return reply.code(200).send({ ResultCode: 0, ResultDesc: 'Accepted' });
         }
@@ -597,7 +597,7 @@ export const mpesaRoutes = async (fastify: FastifyInstance) => {
           );
         }
 
-        // ─── Trigger referral processing (non-blocking) ─────────────────────
+        // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Trigger referral processing (non-blocking) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
         try {
           const { data: refResult, error: refError } = await supabase.rpc(
             "process_referral_deposit",

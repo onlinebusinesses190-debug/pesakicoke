@@ -60,7 +60,7 @@ export function AppShell({
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background">
-      {/* ✅ Main content – now scrollable */}
+      {/* Ã¢Å“â€¦ Main content Ã¢â‚¬â€œ now scrollable */}
       <main className="flex-1 overflow-y-auto pb-24">{children}</main>
 
       <nav

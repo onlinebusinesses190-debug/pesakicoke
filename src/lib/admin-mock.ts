@@ -35,9 +35,9 @@ export const adminTx = [
 ];
 
 export const adminJobs = [
-  { id: "JB-5021", title: "House Help — Karen",     poster: "N. Mwende",   loc: "Nairobi",  pay: 25000, status: "Active" },
+  { id: "JB-5021", title: "House Help Ã¢â‚¬â€ Karen",     poster: "N. Mwende",   loc: "Nairobi",  pay: 25000, status: "Active" },
   { id: "JB-5022", title: "Event Workers Expo",      poster: "Sarova Ltd", loc: "Nairobi",  pay: 3500,  status: "Active" },
-  { id: "JB-5023", title: "Driver — Personal",       poster: "K. Ouma",    loc: "Mombasa",  pay: 35000, status: "Pending" },
+  { id: "JB-5023", title: "Driver Ã¢â‚¬â€ Personal",       poster: "K. Ouma",    loc: "Mombasa",  pay: 35000, status: "Pending" },
   { id: "JB-5024", title: "Math Tutor (Form 4)",     poster: "Bright Aca.",loc: "Kisumu",   pay: 18000, status: "Filled" },
 ];
 
@@ -71,15 +71,15 @@ export const adminTickets = [
 ];
 
 export const adminNotifs = [
-  { title: "Maintenance window",  body: "Wallet maintenance Sun 02:00–03:00 EAT.", audience: "All users",  sent: "2 hrs ago" },
+  { title: "Maintenance window",  body: "Wallet maintenance Sun 02:00Ã¢â‚¬â€œ03:00 EAT.", audience: "All users",  sent: "2 hrs ago" },
   { title: "12% Savings launch",  body: "New high-yield plan now live.",            audience: "Verified",  sent: "Yesterday" },
   { title: "KYC reminder",        body: "Complete your KYC to unlock withdrawals.", audience: "Unverified",sent: "Jun 18"    },
 ];
 
 export const adminCommissions = [
-  { tier: "Bronze",   referrals: "1–10",   rate: "5%",  payout: 124000 },
-  { tier: "Silver",   referrals: "11–50",  rate: "7%",  payout: 482000 },
-  { tier: "Gold",     referrals: "51–200", rate: "10%", payout: 1240000 },
+  { tier: "Bronze",   referrals: "1Ã¢â‚¬â€œ10",   rate: "5%",  payout: 124000 },
+  { tier: "Silver",   referrals: "11Ã¢â‚¬â€œ50",  rate: "7%",  payout: 482000 },
+  { tier: "Gold",     referrals: "51Ã¢â‚¬â€œ200", rate: "10%", payout: 1240000 },
   { tier: "Platinum", referrals: "200+",   rate: "15%", payout: 3120000 },
 ];
 

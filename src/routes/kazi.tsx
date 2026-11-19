@@ -26,8 +26,8 @@ export const Route = createFileRoute("/kazi")({
   }),
   head: () => ({
     meta: [
-      { title: "KAZI Link — PESAKI" },
-      { name: "description", content: "Find work or hire trusted workers on KAZI Link — house helps, drivers, plumbers, tutors and more." },
+      { title: "KAZI Link Ã¢â‚¬â€ PESAKI" },
+      { name: "description", content: "Find work or hire trusted workers on KAZI Link Ã¢â‚¬â€ house helps, drivers, plumbers, tutors and more." },
     ],
   }),
   component: KaziPage,
@@ -37,7 +37,7 @@ const API_BASE = import.meta.env.VITE_PESAKI_API_URL || "https://pesaki-server.o
 
 type Tab = "find" | "hire" | "mine" | "profile";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Types Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 interface Job {
   id: string;
   title: string;
@@ -148,7 +148,7 @@ function KaziPage() {
     return data.session?.access_token;
   };
 
-  // ─── Public profile "Hire" handoff ─────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Public profile "Hire" handoff Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   useEffect(() => {
     if (!hireFor) return;
     if (handledHireFor.current === hireFor) return;
@@ -159,7 +159,7 @@ function KaziPage() {
     setPostJob(true);
   }, [hireFor, user]);
 
-  // ─── Data state ────────────────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Data state Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const [jobs, setJobs] = useState<Job[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
    const [notifications, setNotifications] = useState<any[]>([]);
@@ -167,7 +167,7 @@ function KaziPage() {
   const prevNotifCountRef = useRef(0);
   const [myPostedJobs, setMyPostedJobs] = useState<Job[]>([]);
   const [jobApplicants, setJobApplicants] = useState<Record<string, Application[]>>({});
-  // Track job IDs that have been hired/closed — permanently persisted via localStorage
+  // Track job IDs that have been hired/closed Ã¢â‚¬â€ permanently persisted via localStorage
   // so they never reappear in Find Work, even after refresh or reload
   const getPersistedRemovedJobs = () => {
     if (typeof window === 'undefined') return new Set<string>();
@@ -180,7 +180,7 @@ function KaziPage() {
   };
   const removedJobsRef = useRef<Set<string>>(getPersistedRemovedJobs());
 
-  // ─── Fetch all data from backend ─────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Fetch all data from backend Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const fetchData = async () => {
     if (!user) {
       setLoading(false);
@@ -335,14 +335,14 @@ function KaziPage() {
             }
           }
         } catch (err) {
-          // Silent — will retry on next interval
+          // Silent Ã¢â‚¬â€ will retry on next interval
         }
       }, 10000);
       return () => clearInterval(interval);
     }
   }, [user?.id]);
 
-  // ─── Filtered jobs ────────────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Filtered jobs Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const visibleJobs = useMemo(() => {
     const term = q.trim().toLowerCase();
     let list = jobs;
@@ -543,7 +543,7 @@ function KaziPage() {
             setPostJob(false);
             if (hireFor) navigate({ to: "/kazi", search: { hireFor: undefined } });
           }}
-          initialDescription={hireFor ? `Hiring ${hireFor}…` : undefined}
+          initialDescription={hireFor ? `Hiring ${hireFor}Ã¢â‚¬Â¦` : undefined}
           onSuccess={refreshData}
           user={user}
         />
@@ -570,7 +570,7 @@ function KaziPage() {
   );
 }
 
-// ─── Job Card ────────────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Job Card Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function JobCard({ job, onApply }: { job: Job; onApply: () => void }) {
   return (
     <Card className="!p-3.5">
@@ -601,7 +601,7 @@ function JobCard({ job, onApply }: { job: Job; onApply: () => void }) {
   );
 }
 
-// ─── Employer View ──────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Employer View Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function EmployerView({ postedJobs, jobApplicants, onChat, onHire, onRefresh }: any) {
   const [viewProfileApp, setViewProfileApp] = useState<Application | null>(null);
 
@@ -628,7 +628,7 @@ function EmployerView({ postedJobs, jobApplicants, onChat, onHire, onRefresh }: 
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-sm font-semibold">{job.title}</p>
-                    <p className="text-xs text-muted-foreground">{job.location} · {job.duration}</p>
+                    <p className="text-xs text-muted-foreground">{job.location} Ã‚Â· {job.duration}</p>
                     <p className="mt-1 text-sm font-bold text-primary">{job.pay}</p>
                   </div>
                   <Badge tone={job.status === 'open' ? 'success' : 'warning'}>
@@ -673,7 +673,7 @@ function EmployerView({ postedJobs, jobApplicants, onChat, onHire, onRefresh }: 
   );
 }
 
-// ─── Applicant Mini Card ──────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Applicant Mini Card Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function ApplicantMiniCard({ application, onChat, onHire, onViewProfile }: any) {
   return (
     <div className="flex items-center gap-3 rounded-xl border border-border p-2.5">
@@ -686,7 +686,7 @@ function ApplicantMiniCard({ application, onChat, onHire, onViewProfile }: any) 
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold truncate">{application.applicant_name}</p>
-        <p className="text-[10px] text-muted-foreground">{application.experience} yrs exp · {application.location}</p>
+        <p className="text-[10px] text-muted-foreground">{application.experience} yrs exp Ã‚Â· {application.location}</p>
       </div>
       <div className="flex gap-1.5">
         <button
@@ -714,7 +714,7 @@ function ApplicantMiniCard({ application, onChat, onHire, onViewProfile }: any) 
   );
 }
 
-// ─── Applicant Profile Modal ───────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Applicant Profile Modal Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function ApplicantProfileModal({ application, onClose }: any) {
   const [profile, setProfile] = useState<KaziProfileBundle | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -759,7 +759,7 @@ function ApplicantProfileModal({ application, onClose }: any) {
           <div className="flex justify-between"><span className="text-muted-foreground">Experience</span><span>{application.experience} years</span></div>
           <div className="flex justify-between"><span className="text-muted-foreground">Availability</span><span>{application.availability}</span></div>
           {profile?.profile?.is_verified && (
-            <div className="flex justify-between"><span className="text-muted-foreground">Verified</span><span className="text-success">✓ Verified</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Verified</span><span className="text-success">Ã¢Å“â€œ Verified</span></div>
           )}
           {profile && (
             <div className="flex justify-between"><span className="text-muted-foreground">Profile completeness</span><span>{profile.profile.completeness}%</span></div>
@@ -801,8 +801,8 @@ function ApplicantProfileModal({ application, onClose }: any) {
                 <div className="space-y-2 text-sm">
                   {profile.experience.map((e) => (
                     <div key={e.id} className="flex justify-between">
-                      <span>{e.job_title} {e.company && `· ${e.company}`}</span>
-                      <span className="text-muted-foreground">{e.start_date} – {e.is_current ? "Present" : e.end_date}</span>
+                      <span>{e.job_title} {e.company && `Ã‚Â· ${e.company}`}</span>
+                      <span className="text-muted-foreground">{e.start_date} Ã¢â‚¬â€œ {e.is_current ? "Present" : e.end_date}</span>
                     </div>
                   ))}
                 </div>
@@ -814,7 +814,7 @@ function ApplicantProfileModal({ application, onClose }: any) {
                 <p className="text-xs font-semibold text-muted-foreground mb-1">Education</p>
                 <div className="space-y-1 text-sm">
                   {profile.education.map((e) => (
-                    <div key={e.id}>{e.institution} — {e.qualification} {e.field_of_study}</div>
+                    <div key={e.id}>{e.institution} Ã¢â‚¬â€ {e.qualification} {e.field_of_study}</div>
                   ))}
                 </div>
               </div>
@@ -832,7 +832,7 @@ function ApplicantProfileModal({ application, onClose }: any) {
   );
 }
 
-// ─── My Panel ─────────────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ My Panel Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function MyPanel({ apps, postedJobs, jobApplicants, contracts, onChat, onHire, onRefresh, user, onOpenProfile }: any) {
   const [activeTab, setActiveTab] = useState<"applications" | "jobs" | "contracts">("applications");
 
@@ -893,7 +893,7 @@ function MyPanel({ apps, postedJobs, jobApplicants, contracts, onChat, onHire, o
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="text-sm font-semibold">{job.title}</p>
-                      <p className="text-xs text-muted-foreground">{job.location} · {job.duration}</p>
+                      <p className="text-xs text-muted-foreground">{job.location} Ã‚Â· {job.duration}</p>
                       <p className="mt-1 text-sm font-bold text-primary">{job.pay}</p>
                     </div>
                     <Badge tone={job.status === 'open' ? 'success' : 'warning'}>
@@ -901,7 +901,7 @@ function MyPanel({ apps, postedJobs, jobApplicants, contracts, onChat, onHire, o
                     </Badge>
                   </div>
                   {job.hired_worker_id && (
-                    <p className="mt-2 text-xs text-success">✓ Worker hired</p>
+                    <p className="mt-2 text-xs text-success">Ã¢Å“â€œ Worker hired</p>
                   )}
                   {pending.length > 0 && (
                     <div className="mt-3 space-y-2">
@@ -936,7 +936,7 @@ function MyPanel({ apps, postedJobs, jobApplicants, contracts, onChat, onHire, o
   );
 }
 
-// ─── Worker Applications ──────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Worker Applications Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function WorkerApplications({ apps, onChat, onRefresh, user }: any) {
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
 
@@ -994,7 +994,7 @@ function WorkerApplications({ apps, onChat, onRefresh, user }: any) {
                   <div className="mt-2 flex items-center gap-2">
                     <Badge tone="success">Hired</Badge>
                     <span className="text-[10px] text-muted-foreground">
-                      Accepted{a.contract?.worker_accepted ? ' ✓' : ' — awaiting your acceptance'}
+                      Accepted{a.contract?.worker_accepted ? ' Ã¢Å“â€œ' : ' Ã¢â‚¬â€ awaiting your acceptance'}
                     </span>
                   </div>
                 )}
@@ -1037,7 +1037,7 @@ function WorkerApplications({ apps, onChat, onRefresh, user }: any) {
   );
 }
 
-// ─── Active Contracts ────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Active Contracts Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function ActiveContracts({ contracts, onRefresh, user }: any) {
   const { requireAuth } = useRequireAuth();
   const [starting, setStarting] = useState<string | null>(null);
@@ -1184,7 +1184,7 @@ function ActiveContracts({ contracts, onRefresh, user }: any) {
               <div>
                 <p className="text-sm font-semibold">{c.job_title || 'Job'}</p>
                 <p className="text-xs text-muted-foreground">
-                  {isEmployer ? 'Employer' : 'Worker'} · {c.status}
+                  {isEmployer ? 'Employer' : 'Worker'} Ã‚Â· {c.status}
                 </p>
               </div>
               <Badge tone={c.status === 'active' ? 'success' : 'gold'}>
@@ -1203,7 +1203,7 @@ function ActiveContracts({ contracts, onRefresh, user }: any) {
             </div>
 
              <div className="mt-3 text-center text-xs text-muted-foreground">
-               KAZI Link is free — no payments or fees involved
+               KAZI Link is free Ã¢â‚¬â€ no payments or fees involved
              </div>
 
             {isEmployer && c.status === 'active' && !c.job_done && (
@@ -1220,7 +1220,7 @@ function ActiveContracts({ contracts, onRefresh, user }: any) {
                     {starting === c.job_id ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin inline" />
                     ) : (
-                      '▶ Start Job'
+                      'Ã¢â€“Â¶ Start Job'
                     )}
                   </button>
                 )}
@@ -1232,7 +1232,7 @@ function ActiveContracts({ contracts, onRefresh, user }: any) {
                   {confirming === c.job_id ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin inline" />
                   ) : (
-                    '✓ Confirm Job Done'
+                    'Ã¢Å“â€œ Confirm Job Done'
                   )}
                  </button>
                </div>
@@ -1254,13 +1254,13 @@ function ActiveContracts({ contracts, onRefresh, user }: any) {
 
             {!isEmployer && c.status === 'active' && c.worker_accepted && !c.job_done && (
               <p className="mt-3 text-xs text-muted-foreground">
-                ⏳ Waiting for employer to confirm the job is done.
+                Ã¢ÂÂ³ Waiting for employer to confirm the job is done.
               </p>
             )}
 
             {!isEmployer && c.job_done && (
               <p className="mt-3 text-xs text-success">
-                ✅ Job completed.
+                Ã¢Å“â€¦ Job completed.
               </p>
             )}
           </Card>
@@ -1318,7 +1318,7 @@ function ActiveContracts({ contracts, onRefresh, user }: any) {
   return null;
 }
 
-// ─── Sheets ──────────────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Sheets Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function SheetShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-[60] grid place-items-end sm:place-items-center">
@@ -1346,7 +1346,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 }
 const inputCls = "mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring";
 
-// ─── FileField ──────────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ FileField Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 export function FileField({
   label,
   accept,
@@ -1372,7 +1372,7 @@ export function FileField({
   );
 }
 
-// ─── PhotoUpload ─────────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ PhotoUpload Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function PhotoUpload({ onPhotoUrl }: { onPhotoUrl: (url: string | null) => void }) {
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -1455,7 +1455,7 @@ function PhotoUpload({ onPhotoUrl }: { onPhotoUrl: (url: string | null) => void 
           disabled={uploading}
           className="rounded-xl border border-border bg-card p-3 text-xs font-semibold flex flex-col items-center gap-1"
         >
-          <span className="text-lg">📷</span>
+          <span className="text-lg">Ã°Å¸â€œÂ·</span>
           <span>Take photo</span>
         </button>
       </div>
@@ -1496,7 +1496,7 @@ function PhotoUpload({ onPhotoUrl }: { onPhotoUrl: (url: string | null) => void 
   );
 }
 
-// ─── ApplyJobSheet ──────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ ApplyJobSheet Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
   const { requireAuth } = useRequireAuth();
   const [submitting, setSubmitting] = useState(false);
@@ -1552,7 +1552,7 @@ function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
       }
       if (!response.ok) throw new Error(result.error || result.message || `Failed to apply (HTTP ${response.status})`);
 
-       toast.success('Application submitted! Redirecting to My Applications…');
+       toast.success('Application submitted! Redirecting to My ApplicationsÃ¢â‚¬Â¦');
       onSuccess();
     } catch (err: any) {
       toast.error(err.message || 'Failed to apply');
@@ -1620,7 +1620,7 @@ function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
             onClick={() => setStep("review")}
             className="text-xs font-semibold text-primary underline"
           >
-            ← Back to job details
+            Ã¢â€ Â Back to job details
           </button>
           <div className="rounded-xl bg-primary/5 p-3 flex items-center justify-between">
             <div>
@@ -1655,7 +1655,7 @@ function ApplyJobSheet({ job, onClose, onSuccess, user }: any) {
   );
 }
 
-// ─── PostJobSheet ───────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ PostJobSheet Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function PostJobSheet({ onClose, onSuccess, user, initialDescription }: any) {
   const { requireAuth } = useRequireAuth();
   const [done, setDone] = useState(false);
@@ -1740,10 +1740,10 @@ function PostJobSheet({ onClose, onSuccess, user, initialDescription }: any) {
 
           <div><FieldLabel>Requirements</FieldLabel><div className="mt-1 grid grid-cols-2 gap-2">{requirements.map(r => <label key={r} className="flex items-center gap-2 rounded-lg border border-border p-2 text-xs"><input type="checkbox" className="h-4 w-4 accent-primary" checked={checked.includes(r)} onChange={e => setChecked(c => e.target.checked ? [...c, r] : c.filter(x => x !== r))} />{r}</label>)}</div></div>
 
-          <div><FieldLabel>Description</FieldLabel><textarea required rows={4} value={form.description} onChange={set("description")} className={inputCls} placeholder="Describe duties, working hours, expectations…" /></div>
+          <div><FieldLabel>Description</FieldLabel><textarea required rows={4} value={form.description} onChange={set("description")} className={inputCls} placeholder="Describe duties, working hours, expectationsÃ¢â‚¬Â¦" /></div>
 
           <div className="rounded-xl bg-primary/5 p-3 text-xs">
-            <p className="font-semibold">ℹ️ KAZI Link is completely free — no fees, no payments.</p>
+            <p className="font-semibold">Ã¢â€žÂ¹Ã¯Â¸Â KAZI Link is completely free Ã¢â‚¬â€ no fees, no payments.</p>
           </div>
 
           <button type="submit" disabled={loading} className="h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground disabled:opacity-50 flex items-center justify-center gap-2">
@@ -1756,7 +1756,7 @@ function PostJobSheet({ onClose, onSuccess, user, initialDescription }: any) {
   );
 }
 
-// ─── HireSheet ──────────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ HireSheet Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function HireSheet({ app, onClose, onHireSuccess, user }: any) {
   const { requireAuth } = useRequireAuth();
   const [loading, setLoading] = useState(false);
@@ -1810,10 +1810,10 @@ function HireSheet({ app, onClose, onHireSuccess, user }: any) {
             {app.applicant_name} has been hired for the job.
           </p>
           <p className="mt-2 text-xs text-muted-foreground">
-            💰 Pay: {app.jobs?.pay_label}
+            Ã°Å¸â€™Â° Pay: {app.jobs?.pay_label}
           </p>
           <p className="text-xs text-muted-foreground">
-            📊 KAZI Link is completely free — no fees or payments.
+            Ã°Å¸â€œÅ  KAZI Link is completely free Ã¢â‚¬â€ no fees or payments.
           </p>
           <button onClick={onClose} className="mt-4 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground">
             Done
@@ -1836,8 +1836,8 @@ function HireSheet({ app, onClose, onHireSuccess, user }: any) {
           </div>
           <div>
             <p className="text-base font-bold">{app.applicant_name}</p>
-            <p className="text-xs text-muted-foreground">{app.location} · {app.experience} yrs exp</p>
-            <p className="text-xs text-muted-foreground">📱 {app.phone} · ✉️ {app.email}</p>
+            <p className="text-xs text-muted-foreground">{app.location} Ã‚Â· {app.experience} yrs exp</p>
+            <p className="text-xs text-muted-foreground">Ã°Å¸â€œÂ± {app.phone} Ã‚Â· Ã¢Å“â€°Ã¯Â¸Â {app.email}</p>
           </div>
         </div>
 
@@ -1849,7 +1849,7 @@ function HireSheet({ app, onClose, onHireSuccess, user }: any) {
         </div>
 
         <div className="rounded-xl bg-primary/5 p-3 text-xs">
-          <p className="font-semibold">ℹ️ KAZI Link is completely free.</p>
+          <p className="font-semibold">Ã¢â€žÂ¹Ã¯Â¸Â KAZI Link is completely free.</p>
           <p>No payments, fees, or escrow required. Simply hire and work.</p>
         </div>
 
@@ -1865,7 +1865,7 @@ function HireSheet({ app, onClose, onHireSuccess, user }: any) {
   );
 }
 
-// ─── ChatSheet (WhatsApp-style) ─────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ ChatSheet (WhatsApp-style) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function ChatSheet({ application, job, onClose, user }: any) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -2054,7 +2054,7 @@ function ChatSheet({ application, job, onClose, user }: any) {
       callStatus: 'ringing',
       callDuration: 0,
     });
-    toast(`📞 ${type === 'audio' ? 'Voice' : 'Video'} call started — connecting...`);
+    toast(`Ã°Å¸â€œÅ¾ ${type === 'audio' ? 'Voice' : 'Video'} call started Ã¢â‚¬â€ connecting...`);
   };
 
   useEffect(() => {
@@ -2239,7 +2239,7 @@ function ChatSheet({ application, job, onClose, user }: any) {
   );
 }
 
-// ─── NotifSheet ────────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ NotifSheet Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function NotifSheet({ notifications, onClose }: any) {
   return (
     <SheetShell title="Notifications" onClose={onClose}>
@@ -2260,7 +2260,7 @@ function NotifSheet({ notifications, onClose }: any) {
   );
 }
 
-// ─── Helpers ───────────────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Helpers Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function EmptyState({ label }: { label: string }) {
   return (
     <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-6 text-center text-xs text-muted-foreground">

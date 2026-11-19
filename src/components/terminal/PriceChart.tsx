@@ -213,7 +213,7 @@ export function PriceChart({ engine, symbol, tf, zoom, showCrosshair = false, ch
 
       ctx.fillStyle = "#1565c0";
       ctx.font = "bold 12px Arial, sans-serif";
-      ctx.fillText(`${symbol} ▼ ${tf}`, 8, 15);
+      ctx.fillText(`${symbol} Ã¢â€“Â¼ ${tf}`, 8, 15);
       ctx.fillStyle = "#666";
       ctx.font = "11px Arial, sans-serif";
       ctx.fillText(spec.desc || "", 8, 30);

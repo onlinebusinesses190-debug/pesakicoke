@@ -10,7 +10,7 @@ const allocationSchema = z.object({
 });
 
 export const spinRoutes = async (fastify: FastifyInstance) => {
-  // GET /games/spin/prizes — returns outcomes for the frontend selector
+  // GET /games/spin/prizes Ã¢â‚¬â€ returns outcomes for the frontend selector
   fastify.get('/prizes', async (_, reply) => {
     try {
       const outcomes = await getOutcomes();

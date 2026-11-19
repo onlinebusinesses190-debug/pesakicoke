@@ -21,7 +21,7 @@ import { supabase } from "@/utils/supabase/client";
 
 const API_URL = import.meta.env.VITE_PESAKI_API_URL || "https://pesaki-server.onrender.com";
 
-// 🔴 ADJUST THIS: How much KSh is 1.00 Standard Lot?
+// Ã°Å¸â€Â´ ADJUST THIS: How much KSh is 1.00 Standard Lot?
 // E.g., If 1 lot = 100,000 KSh, set to 100000.
 // If 1 lot = 10,000 KSh, set to 10000.
 const LOT_SIZE_KSH = 10000; 
@@ -336,7 +336,7 @@ function TradingPage() {
           remainingSeconds: durationSec, expiresAt: expiresAtMs,
         } as FxMarker]);
         fetchOpenTrades();
-        toast.success(`${direction === "up" ? "UP" : "DOWN"} ${pairObj.label} · ${entryPrice.toFixed(pairObj!.digits)}`);
+        toast.success(`${direction === "up" ? "UP" : "DOWN"} ${pairObj.label} Ã‚Â· ${entryPrice.toFixed(pairObj!.digits)}`);
       } else {
         setTradeError(result.error || "Failed to place trade");
       }
@@ -382,7 +382,7 @@ function TradingPage() {
   return (
     <div className="flex flex-col min-h-screen bg-[#f8f9fa] text-[#1e293b] font-sans">
       
-      {/* ─── Top Header (MT5 Style) ─── */}
+      {/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Top Header (MT5 Style) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
       <div className="flex items-center justify-between px-3 py-2 bg-white border-b border-gray-300 shadow-sm">
         <div className="flex items-center gap-2">
           <Link to="/trading" className="text-gray-500 hover:text-black"><ArrowLeft size={20} /></Link>
@@ -398,7 +398,7 @@ function TradingPage() {
         <div className="flex items-center gap-4 text-xs font-mono">
           <div className="text-right">
             <div className="text-[9px] text-gray-500 uppercase tracking-wider">Balance</div>
-            <div className="font-semibold">{currentBalance !== null ? `${formatKes(currentBalance)}` : "—"}</div>
+            <div className="font-semibold">{currentBalance !== null ? `${formatKes(currentBalance)}` : "Ã¢â‚¬â€"}</div>
           </div>
           <div className="text-right">
             <div className="text-[9px] text-gray-500 uppercase tracking-wider">Equity</div>
@@ -409,7 +409,7 @@ function TradingPage() {
         </div>
       </div>
 
-      {/* ─── Top Action Bar (SELL | Lot | BUY) ─── */}
+      {/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Top Action Bar (SELL | Lot | BUY) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
       <div className="flex bg-white border-b border-gray-300 select-none">
         <button
           onClick={() => placeTrade("down")}
@@ -446,7 +446,7 @@ function TradingPage() {
         </button>
       </div>
 
-      {/* ─── Chart Section ─── */}
+      {/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Chart Section Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
       <div className="flex-1 flex flex-col bg-white">
         {/* Chart Header */}
         <div className="flex items-center justify-between px-2 py-1 bg-[#f1f3f4] border-b border-gray-300">
@@ -505,7 +505,7 @@ function TradingPage() {
         </div>
       </div>
 
-      {/* ─── Order Ticket (Bottom Sheet Style) ─── */}
+      {/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Order Ticket (Bottom Sheet Style) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
       <div className="bg-white border-t border-gray-300 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
         <div 
           className="flex items-center justify-between px-3 py-2 bg-[#f8f9fa] border-b border-gray-200 cursor-pointer"
@@ -568,7 +568,7 @@ function TradingPage() {
         )}
       </div>
 
-      {/* ─── Bottom Positions / History Tabs ─── */}
+      {/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Bottom Positions / History Tabs Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
       <div className="bg-white border-t border-gray-300">
         <div className="flex border-b border-gray-200 bg-[#f8f9fa]">
           <button

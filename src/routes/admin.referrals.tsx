@@ -94,7 +94,7 @@ function AdminReferrals() {
   if (authLoading || loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <p className="text-muted-foreground">Loading referrals…</p>
+        <p className="text-muted-foreground">Loading referralsÃ¢â‚¬Â¦</p>
       </div>
     );
   }
@@ -109,7 +109,7 @@ function AdminReferrals() {
             <form onSubmit={handleSearch} className="relative">
               <input
                 type="text"
-                placeholder="Search affiliates…"
+                placeholder="Search affiliatesÃ¢â‚¬Â¦"
                 className="h-9 w-56 rounded-lg border border-border bg-card pl-9 pr-3 text-sm outline-none focus:border-primary"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -195,7 +195,7 @@ function AdminReferrals() {
                     ) : (
                       affiliates.map((a) => (
                         <tr key={a.id} className="border-b border-border/60 last:border-0">
-                          <td className="py-3 pr-3 font-mono text-xs">{a.referral_code || "—"}</td>
+                          <td className="py-3 pr-3 font-mono text-xs">{a.referral_code || "Ã¢â‚¬â€"}</td>
                           <td className="py-3 pr-3 font-medium">
                             {a.full_name || a.email.split("@")[0]}
                           </td>
@@ -272,7 +272,7 @@ function AdminReferrals() {
                             {new Date(l.created_at).toLocaleDateString()}
                           </td>
                           <td className="py-3 pr-3 font-medium">{l.user_email}</td>
-                          <td className="py-3 pr-3">{l.referred_email || "—"}</td>
+                          <td className="py-3 pr-3">{l.referred_email || "Ã¢â‚¬â€"}</td>
                           <td className="py-3 pr-3">{l.level}</td>
                           <td className="py-3 pr-3 text-right font-semibold text-gold">
                             {fmtKES(l.commission)}

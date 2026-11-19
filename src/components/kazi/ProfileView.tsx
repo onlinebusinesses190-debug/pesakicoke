@@ -299,7 +299,7 @@ export function ExperienceSection({ bundle, heading = true }: { bundle: KaziProf
           <Card key={e.id} className="!p-3.5">
             <p className="text-sm font-semibold text-foreground">{e.job_title}</p>
             <p className="text-xs text-muted-foreground">
-              {[e.company, e.location].filter(Boolean).join(" · ") || "—"}
+              {[e.company, e.location].filter(Boolean).join(" Ã‚Â· ") || "Ã¢â‚¬â€"}
             </p>
             {formatKaziDateRange(e.start_date, e.end_date, e.is_current) && (
               <p className="mt-0.5 text-[11px] text-muted-foreground">
@@ -332,12 +332,12 @@ export function EducationSection({ bundle, heading = true }: { bundle: KaziProfi
         {bundle.education.map((e) => (
           <Card key={e.id} className="!p-3.5">
             <p className="text-sm font-semibold text-foreground">
-              {[e.qualification, e.field_of_study].filter(Boolean).join(" · ") || e.institution}
+              {[e.qualification, e.field_of_study].filter(Boolean).join(" Ã‚Â· ") || e.institution}
             </p>
             <p className="text-xs text-muted-foreground">{e.institution}</p>
             {(e.start_year || e.end_year) && (
               <p className="mt-0.5 text-[11px] text-muted-foreground">
-                {e.start_year ?? ""} – {e.end_year ?? "Present"}
+                {e.start_year ?? ""} Ã¢â‚¬â€œ {e.end_year ?? "Present"}
               </p>
             )}
           </Card>
@@ -424,7 +424,7 @@ export function ReviewsSection({
   );
 }
 
-/** Every section stacked, in order — used by the Profile tab preview. */
+/** Every section stacked, in order Ã¢â‚¬â€ used by the Profile tab preview. */
 export function ProfileSections({
   bundle,
   reviews = [],

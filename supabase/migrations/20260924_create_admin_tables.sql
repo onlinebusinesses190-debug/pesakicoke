@@ -4,7 +4,7 @@
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- ─── admin_users table ────────────────────────────────────────────────────────
+-- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ admin_users table Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 CREATE TABLE IF NOT EXISTS public.admin_users (
   user_id  uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   role     text NOT NULL DEFAULT 'admin' CHECK (role IN ('admin', 'super_admin')),
@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS public.admin_users (
 
 CREATE INDEX IF NOT EXISTS idx_admin_users_role ON public.admin_users(role);
 
--- ─── is_admin function ────────────────────────────────────────────────────────
+-- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ is_admin function Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 CREATE OR REPLACE FUNCTION public.is_admin(p_user_id uuid)
 RETURNS boolean
 LANGUAGE sql
@@ -23,13 +23,13 @@ AS $$
   )
 $$;
 
--- ─── Add banned column to profiles (tolerate if already present) ─────────────
+-- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Add banned column to profiles (tolerate if already present) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS banned boolean DEFAULT false NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_profiles_banned ON public.profiles(banned);
 
--- ─── support_tickets table ────────────────────────────────────────────────────
+-- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ support_tickets table Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 CREATE TABLE IF NOT EXISTS public.support_tickets (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id        uuid REFERENCES auth.users(id),
@@ -44,7 +44,7 @@ CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON public.support_tickets(
 CREATE INDEX IF NOT EXISTS idx_support_tickets_priority ON public.support_tickets(priority);
 CREATE INDEX IF NOT EXISTS idx_support_tickets_user ON public.support_tickets(user_id);
 
--- ─── Extend kazi_disputes for admin resolution ─────────────────────────────
+-- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Extend kazi_disputes for admin resolution Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 ALTER TABLE public.kazi_disputes
   ADD COLUMN IF NOT EXISTS resolution    text,
   ADD COLUMN IF NOT EXISTS resolved_at   timestamptz,
@@ -64,7 +64,7 @@ CREATE TRIGGER trg_support_tickets_updated_at
   BEFORE UPDATE ON public.support_tickets
   FOR EACH ROW EXECUTE FUNCTION public.touch_support_tickets_updated_at();
 
--- ─── notification_broadcasts table ────────────────────────────────────────────
+-- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ notification_broadcasts table Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 CREATE TABLE IF NOT EXISTS public.notification_broadcasts (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   title        text NOT NULL,
@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS public.notification_broadcasts (
 
 CREATE INDEX IF NOT EXISTS idx_notification_broadcasts_created_at ON public.notification_broadcasts(created_at DESC);
 
--- ─── admin_list_users RPC ─────────────────────────────────────────────────────
+-- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ admin_list_users RPC Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 -- Returns a paginated, searchable list of users joining auth.users, profiles, wallets.
 CREATE OR REPLACE FUNCTION public.admin_list_users(
   p_search  text DEFAULT '',
@@ -141,7 +141,7 @@ GRANT EXECUTE ON FUNCTION public.is_admin(uuid) TO service_role;
 REVOKE ALL ON FUNCTION public.admin_list_users(text, int, int) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.admin_list_users(text, int, int) TO service_role;
 
--- ─── count_unconfirmed_users RPC ──────────────────────────────────────────────
+-- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ count_unconfirmed_users RPC Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 CREATE OR REPLACE FUNCTION public.count_unconfirmed_users()
 RETURNS bigint
 LANGUAGE sql
@@ -153,7 +153,7 @@ $$;
 REVOKE ALL ON FUNCTION public.count_unconfirmed_users() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.count_unconfirmed_users() TO service_role;
 
--- ─── admin_revenue_series RPC ─────────────────────────────────────────────────
+-- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ admin_revenue_series RPC Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 CREATE OR REPLACE FUNCTION public.admin_revenue_series()
 RETURNS TABLE (
   m        text,
@@ -176,7 +176,7 @@ $$;
 REVOKE ALL ON FUNCTION public.admin_revenue_series() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.admin_revenue_series() TO service_role;
 
--- ─── admin_recent_transactions RPC ────────────────────────────────────────────
+-- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ admin_recent_transactions RPC Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 CREATE OR REPLACE FUNCTION public.admin_recent_transactions(p_limit int DEFAULT 10)
 RETURNS TABLE (
   id          text,

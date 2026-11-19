@@ -1,7 +1,7 @@
-// Pesaki FX market engine — deterministic, shared by server and browser.
+// Pesaki FX market engine Ã¢â‚¬â€ deterministic, shared by server and browser.
 // Price of every pair is a pure function of (pair, time): the same for all users,
 // survives refreshes, never "resets", yet is unpredictable to the eye.
-// It is built from 7 layers of smooth random noise (seconds → days), each seeded per pair.
+// It is built from 7 layers of smooth random noise (seconds Ã¢â€ â€™ days), each seeded per pair.
 
 export interface Pair {
   symbol: string; label: string; name: string;
@@ -108,7 +108,7 @@ export function dayChange(pair: Pair, now: number) {
 }
 
 export type Side = "buy" | "sell";
-/** Profit/loss in KSh: trade amount × price move %. Buy closes at bid, sell at ask. */
+/** Profit/loss in KSh: trade amount Ãƒâ€” price move %. Buy closes at bid, sell at ask. */
 export function calcPnl(t: { side: Side; amount: number; entry: number }, q: Quote) {
   const exit = t.side === "buy" ? q.bid : q.ask;
   const dir = t.side === "buy" ? 1 : -1;

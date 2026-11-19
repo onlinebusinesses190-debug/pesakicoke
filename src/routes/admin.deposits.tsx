@@ -85,7 +85,7 @@ function AdminDeposits() {
   if (authLoading || loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <p className="text-muted-foreground">Loading deposits…</p>
+        <p className="text-muted-foreground">Loading depositsÃ¢â‚¬Â¦</p>
       </div>
     );
   }
@@ -100,7 +100,7 @@ function AdminDeposits() {
             <form onSubmit={handleSearch} className="relative">
               <input
                 type="text"
-                placeholder="Search deposits…"
+                placeholder="Search depositsÃ¢â‚¬Â¦"
                 className="h-9 w-56 rounded-lg border border-border bg-card pl-9 pr-3 text-sm outline-none focus:border-primary"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -171,12 +171,12 @@ function AdminDeposits() {
                   deposits.map((d) => (
                     <tr key={d.id} className="border-b border-border/60 last:border-0">
                       <td className="py-3 pr-3 font-mono text-xs text-muted-foreground">
-                        {d.id.slice(0, 8)}…
+                        {d.id.slice(0, 8)}Ã¢â‚¬Â¦
                       </td>
                       <td className="py-3 pr-3 font-medium">{d.user_email}</td>
                       <td className="py-3 pr-3 text-right font-semibold">{fmtKES(d.amount)}</td>
                       <td className="py-3 pr-3 text-muted-foreground">{d.method}</td>
-                      <td className="py-3 pr-3 font-mono text-xs">{d.reference || "—"}</td>
+                      <td className="py-3 pr-3 font-mono text-xs">{d.reference || "Ã¢â‚¬â€"}</td>
                       <td className="py-3 pr-3">
                         <StatusPill status={d.status} />
                       </td>

@@ -5,8 +5,8 @@ import { SectionTitle } from "@/components/ui-bits";
 export const Route = createFileRoute("/refund")({
   head: () => ({
     meta: [
-      { title: "Refund Policy — PESAKI" },
-      { name: "description", content: "PESAKI Refund Policy — what can and cannot be refunded on our platform." },
+      { title: "Refund Policy Ã¢â‚¬â€ PESAKI" },
+      { name: "description", content: "PESAKI Refund Policy Ã¢â‚¬â€ what can and cannot be refunded on our platform." },
     ],
   }),
   component: RefundPage,
@@ -35,7 +35,7 @@ function RefundPage() {
           <SectionTitle title="2. Failed M-Pesa Deposits" />
           <div className="rounded-2xl border border-border bg-card p-4">
             <p className="text-sm text-muted-foreground">
-              If an M-Pesa deposit fails or is reversed, we will credit your wallet automatically once the funds are received from Safaricom. Duplicate charges are refunded within 3–5 business days.
+              If an M-Pesa deposit fails or is reversed, we will credit your wallet automatically once the funds are received from Safaricom. Duplicate charges are refunded within 3Ã¢â‚¬â€œ5 business days.
             </p>
           </div>
         </section>
@@ -59,7 +59,7 @@ function RefundPage() {
         </section>
 
         <p className="mt-8 px-5 text-center text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-          PESAKI · Earn. Invest. Grow.
+          PESAKI Ã‚Â· Earn. Invest. Grow.
         </p>
       </div>
     </AppShell>

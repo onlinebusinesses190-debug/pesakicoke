@@ -20,7 +20,7 @@ import { BUSINESS_FUNDING, COMPANY } from "@/lib/pesaki-facts";
 export const Route = createFileRoute("/business-funding")({
   head: () => ({
     meta: [
-      { title: "Business Hub Funding Model — PESAKI" },
+      { title: "Business Hub Funding Model Ã¢â‚¬â€ PESAKI" },
       {
         name: "description",
         content:
@@ -31,11 +31,11 @@ export const Route = createFileRoute("/business-funding")({
         content:
           "PESAKI Business Hub, PESAKI business funding Kenya, SME mentorship PESAKI, business profit share, PESAKI funding terms",
       },
-      { property: "og:title", content: "Business Hub Funding Model — PESAKI" },
+      { property: "og:title", content: "Business Hub Funding Model Ã¢â‚¬â€ PESAKI" },
       {
         property: "og:description",
         content:
-          "Mentorship, eligibility, the agreement, monitoring, and the agreed return. A share of monthly business profit — not company ownership.",
+          "Mentorship, eligibility, the agreement, monitoring, and the agreed return. A share of monthly business profit Ã¢â‚¬â€ not company ownership.",
       },
       { property: "og:type", content: "website" },
       { property: "og:url", content: `${COMPANY.website}/business-funding` },
@@ -66,7 +66,7 @@ function BusinessFundingPage() {
                   set out in the agreement signed by both parties.
                 </p>
                 <div className="mt-3">
-                  <Badge tone="gold">Profit share — not company ownership</Badge>
+                  <Badge tone="gold">Profit share Ã¢â‚¬â€ not company ownership</Badge>
                 </div>
               </div>
             </div>
@@ -280,7 +280,7 @@ function BusinessFundingPage() {
         </section>
 
         <p className="mt-8 text-center text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-          {COMPANY.legalName} · {COMPANY.registrationNumber}
+          {COMPANY.legalName} Ã‚Â· {COMPANY.registrationNumber}
         </p>
       </div>
     </AppShell>

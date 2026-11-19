@@ -40,7 +40,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 export const Route = createFileRoute("/profile")({
   head: () => ({
     meta: [
-      { title: "Profile — PESAKI" },
+      { title: "Profile Ã¢â‚¬â€ PESAKI" },
       {
         name: "description",
         content: "Manage your PESAKI account, security, referrals and support.",
@@ -133,7 +133,7 @@ const groups: {
   },
 ];
 
-// ── Helper: format currency ──────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Helper: format currency Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 const fmt = (amount: number) => {
   return new Intl.NumberFormat("en-KE", {
     style: "currency",
@@ -142,18 +142,18 @@ const fmt = (amount: number) => {
   }).format(amount);
 };
 
-// ── Main Component ────────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Main Component Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 function ProfilePage() {
   const navigate = useNavigate();
   const [modal, setModal] = useState<ModalKey>(null);
   const [loading, setLoading] = useState(true);
 
-  // ── Danger Zone: delete account (type-to-confirm) ─────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Danger Zone: delete account (type-to-confirm) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const [showDelete, setShowDelete] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleting, setDeleting] = useState(false);
 
-  // ── Data state ──────────────────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Data state Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const [profile, setProfile] = useState({
     name: "",
     phone: "",
@@ -269,7 +269,7 @@ function ProfilePage() {
     void fetchReferralData();
   }, [profile.guest, fetchReferralData]);
 
-  // ── Sign out ──────────────────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Sign out Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const signOut = async () => {
     try {
       await supabase.auth.signOut();
@@ -280,7 +280,7 @@ function ProfilePage() {
     }
   };
 
-  // ── Delete account ─────────────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Delete account Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   // Calls the existing DELETE /user/delete-account endpoint, which verifies the
   // Supabase session, anonymises the user's data and bans the auth account.
   const deleteAccount = async () => {
@@ -314,7 +314,7 @@ function ProfilePage() {
     }
   };
 
-  // ── Copy referral code ────────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Copy referral code Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const copyRef = async () => {
     if (!referrals.referralCode) {
       toast.error("Referral code is not available yet");
@@ -324,11 +324,11 @@ function ProfilePage() {
     if (ok) {
       toast.success("Referral code copied");
     } else {
-      toast.error(`Copy failed — select manually: ${referrals.referralCode}`);
+      toast.error(`Copy failed Ã¢â‚¬â€ select manually: ${referrals.referralCode}`);
     }
   };
 
-  // ── Copy referral link ──────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Copy referral link Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const copyRefLink = async () => {
     if (!referrals.referralLink) {
       toast.error("Referral link is not available yet");
@@ -338,21 +338,21 @@ function ProfilePage() {
     if (ok) {
       toast.success("Referral link copied");
     } else {
-      toast.error(`Copy failed — select manually: ${referrals.referralLink}`);
+      toast.error(`Copy failed Ã¢â‚¬â€ select manually: ${referrals.referralLink}`);
     }
   };
 
-  // ── WhatsApp share ──────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬ WhatsApp share Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const shareWhatsApp = () => {
     if (!referrals.referralCode) {
       toast.error("Referral code is not available yet");
       return;
     }
-    const text = `Join PESAKI with my code: ${referrals.referralCode} — ${referrals.referralLink}`;
+    const text = `Join PESAKI with my code: ${referrals.referralCode} Ã¢â‚¬â€ ${referrals.referralLink}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
   };
 
-  // ── Referral helpers ──────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Referral helpers Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const formatSource = (source?: string): string => {
     if (!source) return "Referral reward";
     return source
@@ -399,7 +399,7 @@ function ProfilePage() {
     referrals: referredUsers,
   } = referrals;
   const displayName = name || "Guest";
-  const displayEmail = email || "+254 7•• ••• 482";
+  const displayEmail = email || "+254 7Ã¢â‚¬Â¢Ã¢â‚¬Â¢ Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢ 482";
 
   return (
     <AppShell>
@@ -534,7 +534,7 @@ function ProfilePage() {
           <Card className="!p-2">
             {referredUsers.length === 0 ? (
               <p className="py-6 text-center text-sm text-muted-foreground">
-                No referrals yet — share your code to start earning.
+                No referrals yet Ã¢â‚¬â€ share your code to start earning.
               </p>
             ) : (
               <ul className="divide-y divide-border">
@@ -554,14 +554,14 @@ function ProfilePage() {
                                 month: "short",
                                 year: "numeric",
                               })
-                            : "—"}
+                            : "Ã¢â‚¬â€"}
                         </p>
                       </div>
                       <Badge tone={statusTone(user.status)}>{statusLabel(user.status)}</Badge>
                       <p
                         className={`text-sm font-bold ${earned > 0 ? "text-success" : "text-muted-foreground"}`}
                       >
-                        {earned > 0 ? `+${fmt(earned)}` : "—"}
+                        {earned > 0 ? `+${fmt(earned)}` : "Ã¢â‚¬â€"}
                       </p>
                     </li>
                   );
@@ -609,7 +609,7 @@ function ProfilePage() {
                     <p
                       className={`text-right text-sm font-bold ${entry.amount > 0 ? "text-success" : "text-muted-foreground"}`}
                     >
-                      {entry.amount > 0 ? `+${fmt(entry.amount)}` : "—"}
+                      {entry.amount > 0 ? `+${fmt(entry.amount)}` : "Ã¢â‚¬â€"}
                     </p>
                   </li>
                 ))}
@@ -702,7 +702,7 @@ function ProfilePage() {
         </section>
       )}
 
-      {/* ── Danger Zone ── Delete account lives here only, never as a primary
+      {/* Ã¢â€â‚¬Ã¢â€â‚¬ Danger Zone Ã¢â€â‚¬Ã¢â€â‚¬ Delete account lives here only, never as a primary
           profile item, on the homepage, or in any navigation. */}
       {!guest && (
         <section className="mt-6 px-5">
@@ -749,7 +749,7 @@ function ProfilePage() {
                     className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-destructive text-sm font-bold text-destructive-foreground disabled:opacity-60"
                   >
                     <Trash2 className="h-4 w-4" />
-                    {deleting ? "Deleting…" : "Permanently delete"}
+                    {deleting ? "DeletingÃ¢â‚¬Â¦" : "Permanently delete"}
                   </button>
                   <button
                     onClick={() => {
@@ -768,7 +768,7 @@ function ProfilePage() {
       )}
 
       <p className="mt-6 px-5 pb-4 text-center text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-        PESAKI v1.0 · Africa's Digital Wealth Ecosystem
+        PESAKI v1.0 Ã‚Â· Africa's Digital Wealth Ecosystem
       </p>
 
       {modal && (
@@ -916,7 +916,7 @@ function PersonalForm({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className={label}>ID number</label>
-          <input required className={inputCls} placeholder="1234••••" />
+          <input required className={inputCls} placeholder="1234Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢" />
         </div>
         <div>
           <label className={label}>Date of birth</label>
@@ -1029,7 +1029,7 @@ function PhoneForm({ onClose }: { onClose: () => void }) {
           value={otp}
           onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
           className={inputCls + " tracking-[0.4em] text-center text-lg"}
-          placeholder="••••••"
+          placeholder="Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢"
         />
         <button
           type="submit"
@@ -1067,7 +1067,7 @@ function PhoneForm({ onClose }: { onClose: () => void }) {
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           className={inputCls}
-          placeholder="+254 7•• ••• •••"
+          placeholder="+254 7Ã¢â‚¬Â¢Ã¢â‚¬Â¢ Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢ Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢"
         />
       </div>
       <button
@@ -1092,7 +1092,7 @@ function VerificationBlock() {
     <div className="space-y-3">
       <div className="rounded-xl bg-gold/10 p-3 text-xs">
         <p className="font-semibold text-gold-foreground">
-          Tier 1 verified — Upgrade to Tier 2 to unlock higher limits.
+          Tier 1 verified Ã¢â‚¬â€ Upgrade to Tier 2 to unlock higher limits.
         </p>
       </div>
       <ul className="divide-y divide-border rounded-xl border border-border">
@@ -1190,7 +1190,7 @@ function HelpBlock() {
     },
     {
       q: "How do I apply for business funding?",
-      a: "Go to Business Hub → Apply for Funding, and pick Startup or Existing business. Complete every section and submit.",
+      a: "Go to Business Hub Ã¢â€ â€™ Apply for Funding, and pick Startup or Existing business. Complete every section and submit.",
     },
     {
       q: "How do I post or apply for a job?",
@@ -1221,7 +1221,7 @@ function SupportBlock() {
   return (
     <div className="space-y-3">
       <p className="text-xs text-muted-foreground">
-        Our team is on WhatsApp 7 days a week, 7:00 AM – 10:00 PM EAT.
+        Our team is on WhatsApp 7 days a week, 7:00 AM Ã¢â‚¬â€œ 10:00 PM EAT.
       </p>
       <a
         href={WHATSAPP_URL}
@@ -1270,11 +1270,11 @@ function AboutBlock() {
       <div className="rounded-xl gradient-primary p-4 text-primary-foreground">
         <p className="text-[11px] uppercase tracking-widest opacity-80">PESAKI</p>
         <p className="mt-1 text-base font-bold">Africa's Digital Wealth Ecosystem</p>
-        <p className="mt-1 opacity-90">v1.0 · Nairobi, Kenya</p>
+        <p className="mt-1 opacity-90">v1.0 Ã‚Â· Nairobi, Kenya</p>
       </div>
       <p className="text-muted-foreground">
         PESAKI is an all-in-one platform that combines a mobile-first bank, curated trading
-        products, micro-work marketplace (KAZI Link) and a business funding hub — designed to help
+        products, micro-work marketplace (KAZI Link) and a business funding hub Ã¢â‚¬â€ designed to help
         Kenyans grow, save and earn in one secure app.
       </p>
       <div className="rounded-xl border border-border p-3">
@@ -1370,7 +1370,7 @@ const PRIVACY = [
   },
   {
     heading: "9. Contact",
-    text: "Data protection queries: privacy@pesaki.app · WhatsApp +254 140 399 389.",
+    text: "Data protection queries: privacy@pesaki.app Ã‚Â· WhatsApp +254 140 399 389.",
   },
 ];
 
@@ -1381,7 +1381,7 @@ const AGREEMENT = [
   },
   {
     heading: "2. Fair Use",
-    text: "You agree not to abuse the Service — no bot activity, scraping, multi-accounting, referral self-invites or attempts to circumvent limits, fees or verification.",
+    text: "You agree not to abuse the Service Ã¢â‚¬â€ no bot activity, scraping, multi-accounting, referral self-invites or attempts to circumvent limits, fees or verification.",
   },
   {
     heading: "3. Referrals",

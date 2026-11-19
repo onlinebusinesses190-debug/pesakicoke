@@ -7,13 +7,13 @@
 -- This column was introduced in commit fc37ccd but the migration
 -- that created kazi_profiles (20261005_kazi_profiles.sql) did not add it.
 
--- ── 1. Add the column (nullable so legacy profiles without a name are unaffected)
+-- Ã¢â€â‚¬Ã¢â€â‚¬ 1. Add the column (nullable so legacy profiles without a name are unaffected)
 ALTER TABLE public.kazi_profiles
   ADD COLUMN IF NOT EXISTS slug text UNIQUE;
 
 CREATE INDEX IF NOT EXISTS kazi_profiles_slug_idx ON public.kazi_profiles (slug);
 
--- ── 2. Backfill slugs for existing profiles that already have a full_name
+-- Ã¢â€â‚¬Ã¢â€â‚¬ 2. Backfill slugs for existing profiles that already have a full_name
 DO $$
 DECLARE
   rec  RECORD;
@@ -48,6 +48,6 @@ BEGIN
   END LOOP;
 END $$;
 
--- ── 3. Allow new profiles to auto-generate their slug on first save
---    (no NOT NULL constraint — slug is populated lazily by the PUT handler.)
--- ── 4. Refresh the Supabase type cache hint (no-op at runtime; for docs)
+-- Ã¢â€â‚¬Ã¢â€â‚¬ 3. Allow new profiles to auto-generate their slug on first save
+--    (no NOT NULL constraint Ã¢â‚¬â€ slug is populated lazily by the PUT handler.)
+-- Ã¢â€â‚¬Ã¢â€â‚¬ 4. Refresh the Supabase type cache hint (no-op at runtime; for docs)

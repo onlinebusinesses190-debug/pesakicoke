@@ -17,13 +17,13 @@ async function migrate() {
     sql: `ALTER TABLE public.predictions ADD COLUMN IF NOT EXISTS round_id uuid;`
   });
   if (colErr) {
-    // Supabase doesn't expose exec_sql — use the REST API workaround via insert
-    console.log('Note: exec_sql not available — please run this SQL manually in Supabase:');
+    // Supabase doesn't expose exec_sql Ã¢â‚¬â€ use the REST API workaround via insert
+    console.log('Note: exec_sql not available Ã¢â‚¬â€ please run this SQL manually in Supabase:');
     console.log('');
     console.log('ALTER TABLE public.predictions ADD COLUMN IF NOT EXISTS round_id uuid;');
     console.log('CREATE INDEX IF NOT EXISTS idx_predictions_round ON public.predictions (round_id, status);');
     console.log('');
-    console.log('Go to: https://supabase.com/dashboard → SQL Editor');
+    console.log('Go to: https://supabase.com/dashboard Ã¢â€ â€™ SQL Editor');
     return;
   }
 

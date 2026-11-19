@@ -1,4 +1,4 @@
--- KAZI Link — base tables (jobs, applications, job_contracts, notifications, messages)
+-- KAZI Link Ã¢â‚¬â€ base tables (jobs, applications, job_contracts, notifications, messages)
 --
 -- The escrow migration (20260915_kazi_link_escrow.sql) uses ALTER TABLE on these
 -- tables, which fails if they do not exist.  These tables were originally created
@@ -13,7 +13,7 @@
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- ─── jobs ─────────────────────────────────────────────────────────────────────
+-- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ jobs Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 CREATE TABLE IF NOT EXISTS public.jobs (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   employer_id       uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -59,7 +59,7 @@ CREATE INDEX IF NOT EXISTS idx_jobs_employer      ON public.jobs(employer_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_status        ON public.jobs(status);
 CREATE INDEX IF NOT EXISTS idx_jobs_hired_worker  ON public.jobs(hired_worker_id);
 
--- ─── applications ─────────────────────────────────────────────────────────────
+-- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ applications Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 CREATE TABLE IF NOT EXISTS public.applications (
   id                     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   job_id                 uuid NOT NULL REFERENCES public.jobs(id) ON DELETE CASCADE,
@@ -94,7 +94,7 @@ CREATE INDEX IF NOT EXISTS idx_applications_worker_id  ON public.applications(wo
 CREATE INDEX IF NOT EXISTS idx_applications_status     ON public.applications(status);
 CREATE INDEX IF NOT EXISTS idx_applications_applied_at  ON public.applications(applied_at DESC);
 
--- ─── job_contracts ────────────────────────────────────────────────────────────
+-- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ job_contracts Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 CREATE TABLE IF NOT EXISTS public.job_contracts (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   job_id            uuid NOT NULL REFERENCES public.jobs(id) ON DELETE CASCADE,
@@ -137,7 +137,7 @@ CREATE INDEX IF NOT EXISTS idx_job_contracts_worker_id     ON public.job_contrac
 CREATE INDEX IF NOT EXISTS idx_job_contracts_employer_id   ON public.job_contracts(employer_id);
 CREATE INDEX IF NOT EXISTS idx_job_contracts_status        ON public.job_contracts(status);
 
--- ─── notifications ────────────────────────────────────────────────────────────
+-- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ notifications Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 CREATE TABLE IF NOT EXISTS public.notifications (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -160,7 +160,7 @@ ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS created_at     timesta
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id      ON public.notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_created_at   ON public.notifications(created_at DESC);
 
--- ─── messages (chat) ──────────────────────────────────────────────────────────
+-- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ messages (chat) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 CREATE TABLE IF NOT EXISTS public.messages (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   job_id      uuid NOT NULL REFERENCES public.jobs(id) ON DELETE CASCADE,
@@ -191,7 +191,7 @@ CREATE INDEX IF NOT EXISTS idx_messages_sender    ON public.messages(sender_id);
 CREATE INDEX IF NOT EXISTS idx_messages_receiver  ON public.messages(receiver_id);
 CREATE INDEX IF NOT EXISTS idx_messages_created   ON public.messages(created_at);
 
--- ─── Storage bucket for applicant photos (used by POST /kazi/apply multipart) ─
+-- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Storage bucket for applicant photos (used by POST /kazi/apply multipart) Ã¢â€â‚¬
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('kazi-applicant-photos', 'kazi-applicant-photos', true)
 ON CONFLICT (id) DO NOTHING;

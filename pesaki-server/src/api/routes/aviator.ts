@@ -31,7 +31,7 @@ export const aviatorRoutes = async (fastify: FastifyInstance) => {
     }
   });
 
-  // Explicit REST cashout — mirrors the zero-latency socket path but lets the
+  // Explicit REST cashout Ã¢â‚¬â€ mirrors the zero-latency socket path but lets the
   // client specify which allocation slot to cash out.
   fastify.post("/cashout", { preHandler: [verifyAuth] }, async (request, reply) => {
     const body = request.body as { slot?: number };

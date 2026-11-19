@@ -52,7 +52,7 @@ function AdminActions() {
   if (authLoading || loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <p className="text-muted-foreground">Loading audit log…</p>
+        <p className="text-muted-foreground">Loading audit logÃ¢â‚¬Â¦</p>
       </div>
     );
   }
@@ -66,7 +66,7 @@ function AdminActions() {
           <div className="flex gap-2">
             <input
               type="text"
-              placeholder="Search actions…"
+              placeholder="Search actionsÃ¢â‚¬Â¦"
               className="h-9 w-56 rounded-lg border border-border bg-card px-3 text-sm outline-none focus:border-primary"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -122,9 +122,9 @@ function AdminActions() {
                       <td className="py-3 pr-3 font-medium">{a.admin_email}</td>
                       <td className="py-3 pr-3 uppercase">{a.action}</td>
                       <td className="py-3 pr-3">
-                        {a.target_type} #{a.target_id.slice(0, 8)}…
+                        {a.target_type} #{a.target_id.slice(0, 8)}Ã¢â‚¬Â¦
                       </td>
-                      <td className="py-3 text-muted-foreground">{a.details || "—"}</td>
+                      <td className="py-3 text-muted-foreground">{a.details || "Ã¢â‚¬â€"}</td>
                     </tr>
                   ))
                 )}

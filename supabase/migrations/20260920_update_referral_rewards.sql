@@ -9,7 +9,7 @@
 ALTER TABLE IF EXISTS public.referrals
   ADD COLUMN IF NOT EXISTS first_deposit_id text;
 
--- ─── Recreate process_referral_deposit with new reward model ───────────
+-- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Recreate process_referral_deposit with new reward model Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 CREATE OR REPLACE FUNCTION public.process_referral_deposit(
   p_referred_user_id uuid,
   p_deposit_amount numeric,
@@ -27,7 +27,7 @@ DECLARE
   referrer_bonus numeric;
   welcome_bonus numeric := 10;
 BEGIN
-  -- No minimum deposit threshold — fires on ANY deposit size
+  -- No minimum deposit threshold Ã¢â‚¬â€ fires on ANY deposit size
   IF p_deposit_amount IS NULL OR p_deposit_amount <= 0 THEN
     RETURN jsonb_build_object('processed', false, 'reason', 'invalid_amount');
   END IF;
@@ -107,18 +107,18 @@ BEGIN
     RETURN jsonb_build_object('processed', false, 'reason', 'already_paid');
   END IF;
 
-  -- ─── Calculate rewards ─────────────────────────────────────────────────
+  -- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Calculate rewards Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   -- 10% of deposit amount to referrer, KES 10 welcome bonus to referred user
   referrer_bonus := round(p_deposit_amount * 0.10, 2);
 
-  -- ─── Ensure wallets exist (DO NOT touch existing balances) ──────────────
+  -- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Ensure wallets exist (DO NOT touch existing balances) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   INSERT INTO public.wallets (user_id, balance, demo_balance, created_at, updated_at)
   VALUES
     (referrer_profile.id, 0, 10000, now(), now()),
     (referred_profile.id, 0, 10000, now(), now())
   ON CONFLICT (user_id) DO NOTHING;
 
-  -- ─── Credit referrer (10% of deposit) ───────────────────────────────────
+  -- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Credit referrer (10% of deposit) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   UPDATE public.wallets
   SET balance = COALESCE(balance, 0) + referrer_bonus,
       updated_at = now()
@@ -134,7 +134,7 @@ BEGIN
     now()
   );
 
-  -- ─── Credit referred user (KES 10 welcome bonus) ─────────────────────────
+  -- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Credit referred user (KES 10 welcome bonus) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   UPDATE public.wallets
   SET balance = COALESCE(balance, 0) + welcome_bonus,
       updated_at = now()
@@ -150,7 +150,7 @@ BEGIN
     now()
   );
 
-  -- ─── Update referral record ─────────────────────────────────────────────
+  -- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Update referral record Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   UPDATE public.referrals
   SET status = 'qualified',
       qualified_at = now(),
@@ -161,7 +161,7 @@ BEGIN
       updated_at = now()
   WHERE id = referral_record.id;
 
-  -- ─── Log earnings ───────────────────────────────────────────────────────
+  -- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Log earnings Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   INSERT INTO public.referral_earnings_log (
     referrer_id,
     referred_user_id,
@@ -188,7 +188,7 @@ BEGIN
       now()
     );
 
-  -- ─── Send notifications if the notifications table exists ──────────────
+  -- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Send notifications if the notifications table exists Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   IF to_regclass('public.notifications') IS NOT NULL THEN
     BEGIN
       EXECUTE

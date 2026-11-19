@@ -46,7 +46,7 @@ function AdminNotifications() {
   if (authLoading || loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">Loading notifications…</p>
+        <p className="text-muted-foreground">Loading notificationsÃ¢â‚¬Â¦</p>
       </div>
     );
   }
@@ -105,7 +105,7 @@ function AdminNotifications() {
                 name="message"
                 rows={5}
                 className="mt-1 w-full rounded-lg border border-border bg-background p-3 text-sm outline-none focus:border-primary"
-                placeholder="Write a clear, helpful message…"
+                placeholder="Write a clear, helpful messageÃ¢â‚¬Â¦"
               />
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -160,7 +160,7 @@ function AdminNotifications() {
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">{n.body}</p>
                 <p className="mt-2 text-[10px] uppercase tracking-wider text-primary">
-                  → {n.audience || "All users"}
+                  Ã¢â€ â€™ {n.audience || "All users"}
                 </p>
               </li>
             ))}

@@ -1,12 +1,12 @@
 -- Migration: Add is_demo and reference_id columns to wallet_ledger
 -- Also update RPC functions to track real vs demo transactions
 
--- ─── Add columns to wallet_ledger ──────────────────────────────────────
+-- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Add columns to wallet_ledger Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 ALTER TABLE public.wallet_ledger 
   ADD COLUMN IF NOT EXISTS is_demo boolean DEFAULT false,
   ADD COLUMN IF NOT EXISTS reference_id text;
 
--- ─── Update credit_wallet to set is_demo ─────────────────────────────────
+-- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Update credit_wallet to set is_demo Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 CREATE OR REPLACE FUNCTION public.credit_wallet(
   p_user_id uuid,
   p_amount numeric,
@@ -54,7 +54,7 @@ BEGIN
 END;
 $$ SECURITY DEFINER;
 
--- ─── Update debit_wallet to set is_demo ─────────────────────────────────
+-- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Update debit_wallet to set is_demo Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 CREATE OR REPLACE FUNCTION public.debit_wallet(
   p_user_id uuid,
   p_amount numeric,
@@ -117,7 +117,7 @@ BEGIN
 END;
 $$ SECURITY DEFINER;
 
--- ─── Update transfer_wallet to set is_demo ───────────────────────────────
+-- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Update transfer_wallet to set is_demo Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 CREATE OR REPLACE FUNCTION public.transfer_wallet(
   p_from_user_id uuid,
   p_to_user_id uuid,

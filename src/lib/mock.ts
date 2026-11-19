@@ -17,10 +17,10 @@ export const stats = [
 ];
 
 export const opportunities = [
-  { title: "Senior House Help — Karen", category: "KAZI Link", pay: "KES 25,000/mo", tag: "New" },
-  { title: "Agritech Startup — Series Seed", category: "Funding", pay: "Up to KES 2M", tag: "Hot" },
+  { title: "Senior House Help Ã¢â‚¬â€ Karen", category: "KAZI Link", pay: "KES 25,000/mo", tag: "New" },
+  { title: "Agritech Startup Ã¢â‚¬â€ Series Seed", category: "Funding", pay: "Up to KES 2M", tag: "Hot" },
   { title: "PESAKI Savings 12% APY", category: "Announcement", pay: "Limited time", tag: "Featured" },
-  { title: "Event Workers — Nairobi Expo", category: "KAZI Link", pay: "KES 3,500/day", tag: "Urgent" },
+  { title: "Event Workers Ã¢â‚¬â€ Nairobi Expo", category: "KAZI Link", pay: "KES 3,500/day", tag: "Urgent" },
 ];
 
 export const transactions = [
@@ -67,7 +67,7 @@ export const businessApps = [
 
 export const successStories = [
   { name: "Wanjiku's Bakery",  grew: "3x revenue", quote: "PESAKI funded our second oven and packaging line." },
-  { name: "Tech4Kids Academy", grew: "5 branches", quote: "From one classroom to five — funded in 18 months." },
+  { name: "Tech4Kids Academy", grew: "5 branches", quote: "From one classroom to five Ã¢â‚¬â€ funded in 18 months." },
 ];
 
 export function fmt(n: number) {

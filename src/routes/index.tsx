@@ -1,4 +1,4 @@
-﻿import { supabase } from "@/utils/supabase/client";
+import { supabase } from "@/utils/supabase/client";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ArrowDownToLine,
@@ -63,7 +63,7 @@ const fmt = (amount: number) => {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "PESAKI — One Platform. Work, Business & Financial Services." },
+      { title: "PESAKI â€” One Platform. Work, Business & Financial Services." },
       {
         name: "description",
         content:
@@ -221,7 +221,7 @@ function HomePage() {
         <div className="relative flex items-start justify-between">
           <div className="min-w-0">
             <p className="text-xs/4 opacity-80">Welcome back,</p>
-            <h1 className="truncate text-2xl font-bold">{userName} 👋</h1>
+            <h1 className="truncate text-2xl font-bold">{userName} ðŸ‘‹</h1>
           </div>
           <Link
             to="/profile"
@@ -239,16 +239,16 @@ function HomePage() {
             </button>
           </div>
           <p className="mt-1 font-display text-3xl font-bold tracking-tight">
-            {show ? fmt(balance) : "•••••••"}
+            {show ? fmt(balance) : "â€¢â€¢â€¢â€¢â€¢â€¢â€¢"}
           </p>
           <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
             <div className="rounded-xl bg-white/10 p-2.5">
               <p className="opacity-70">Total Earnings</p>
-              <p className="mt-0.5 font-semibold">{show ? fmt(totalEarnings) : "•••"}</p>
+              <p className="mt-0.5 font-semibold">{show ? fmt(totalEarnings) : "â€¢â€¢â€¢"}</p>
             </div>
             <div className="rounded-xl bg-white/10 p-2.5">
               <p className="opacity-70">Referral Earnings</p>
-              <p className="mt-0.5 font-semibold">{show ? fmt(referralEarnings) : "•••"}</p>
+              <p className="mt-0.5 font-semibold">{show ? fmt(referralEarnings) : "â€¢â€¢â€¢"}</p>
             </div>
           </div>
         </div>
@@ -289,7 +289,7 @@ function HomePage() {
       {/* Reminders */}
       <RemindersSection transactions={transactions} />
 
-      {/* Explore hubs — reordered: KAZI, Business, Banking, Trading last */}
+      {/* Explore hubs â€” reordered: KAZI, Business, Banking, Trading last */}
       <section className="mt-6 px-5">
         <SectionTitle title="Explore hubs" />
         <div className="grid grid-cols-2 gap-3">
@@ -314,7 +314,7 @@ function HomePage() {
               <Building2 className="h-4 w-4" />
             </span>
              <p className="text-sm font-bold">Business Hub</p>
-             <p className="mt-0.5 text-[11px] text-muted-foreground">Fund · Grow · Scale · Free to apply</p>
+             <p className="mt-0.5 text-[11px] text-muted-foreground">Fund Â· Grow Â· Scale Â· Free to apply</p>
             <ChevronRight className="absolute bottom-3 right-3 h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
           </Link>
           <Link
@@ -325,7 +325,7 @@ function HomePage() {
               <Landmark className="h-4 w-4" />
             </span>
             <p className="text-sm font-bold">Banking Hub</p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">Save · Lock · Borrow</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">Save Â· Lock Â· Borrow</p>
             <ChevronRight className="absolute bottom-3 right-3 h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
           </Link>
           <Link
@@ -334,7 +334,7 @@ function HomePage() {
           >
             <LineChart className="mb-6 h-5 w-5 opacity-90" />
             <p className="text-sm font-bold">Trading Floor</p>
-            <p className="mt-0.5 text-[11px] opacity-80">FX · Up/Down · Aviator</p>
+            <p className="mt-0.5 text-[11px] opacity-80">FX Â· Up/Down Â· Aviator</p>
             <ChevronRight className="absolute bottom-3 right-3 h-4 w-4 opacity-70 transition-transform group-hover:translate-x-0.5" />
           </Link>
         </div>
@@ -428,7 +428,7 @@ function HomePage() {
                           {t.type || t.description || "Transaction"}
                         </p>
                         <p className="truncate text-[11px] text-muted-foreground">
-                          {t.date || "Today"} · {t.status || "Completed"}
+                          {t.date || "Today"} Â· {t.status || "Completed"}
                         </p>
                       </div>
                     </div>
@@ -451,7 +451,7 @@ function HomePage() {
       </section>
 
       <p className="mt-8 px-5 text-center text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-        PESAKI · Earn. Invest. Grow.
+        PESAKI Â· Earn. Invest. Grow.
       </p>
     </AppShell>
   );
@@ -474,7 +474,7 @@ const HUB_CARDS = [
   },
   {
     title: "Banking Hub",
-    subtitle: "Save · Lock · Borrow",
+    subtitle: "Save Â· Lock Â· Borrow",
     to: "/banking",
     icon: Landmark,
     circle: "bg-brand-tint-green text-brand-ink",
@@ -536,14 +536,14 @@ const TRUST_ITEMS = [
 
 function PublicHome() {
   /* PublicHome only ever renders for signed-out visitors (see HomePage), so
-     hub cards always route to sign up — no session flash on first paint. */
+     hub cards always route to sign up â€” no session flash on first paint. */
   return (
     <div className="bg-brand-paper">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd()) }}
       />
-      {/* ───────────── Hero ───────────── */}
+      {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Hero â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="gradient-primary relative min-h-[40vh] overflow-hidden px-5 pb-6 pt-4 text-white">
         <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-brand-gold/20 blur-3xl" />
         <div className="pointer-events-none absolute -left-24 top-32 h-56 w-56 rounded-full bg-brand-gold/10 blur-3xl" />
@@ -627,7 +627,7 @@ function PublicHome() {
         </div>
       </section>
 
-      {/* ───────────── Everything in one app ───────────── */}
+      {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Everything in one app â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="px-[38px] pb-2 pt-7">
         <h2 className="font-display text-lg font-bold tracking-tight text-brand-deep">
           Everything in one app
@@ -673,7 +673,7 @@ function PublicHome() {
         </div>
       </section>
 
-      {/* ───────────── Registered business badge ───────────── */}
+      {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Registered business badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="px-5 pt-6">
         <Link
           to="/about"
@@ -690,14 +690,14 @@ function PublicHome() {
               Registered Business Name
             </span>
             <span className="mt-0.5 block text-[10px] text-muted-foreground/80">
-              BN-6ASR2E26 • BRS, Kenya
+              BN-6ASR2E26 â€¢ BRS, Kenya
             </span>
           </span>
           <ChevronRight className="h-4 w-4 shrink-0 text-brand-ink/60" />
         </Link>
       </section>
 
-      {/* ───────────── Why PESAKI? ───────────── */}
+      {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Why PESAKI? â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="px-5 pb-2 pt-8">
         <h2 className="font-display text-lg font-bold tracking-tight text-brand-deep">
           Why PESAKI?
@@ -733,7 +733,7 @@ function PublicHome() {
         </div>
       </section>
 
-      {/* ───────────── How PESAKI works ───────────── */}
+      {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ How PESAKI works â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="px-5 pb-2 pt-8">
         <h2 className="font-display text-lg font-bold tracking-tight text-brand-deep">
           How PESAKI works
@@ -763,7 +763,7 @@ function PublicHome() {
         </div>
       </section>
 
-      {/* ───────────── Business Hub funding model ───────────── */}
+      {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Business Hub funding model â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="px-5 pb-2 pt-8">
         <h2 className="font-display text-lg font-bold tracking-tight text-brand-deep">
           Business Hub
@@ -799,7 +799,7 @@ function PublicHome() {
         </Card>
       </section>
 
-      {/* ───────────── Referral ───────────── */}
+      {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Referral â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="px-5 pb-2 pt-8">
         <h2 className="font-display text-lg font-bold tracking-tight text-brand-deep">
           Refer and earn
@@ -820,7 +820,7 @@ function PublicHome() {
         </Card>
       </section>
 
-      {/* ───────────── Account visibility ───────────── */}
+      {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Account visibility â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="px-5 pb-2 pt-8">
         <h2 className="font-display text-lg font-bold tracking-tight text-brand-deep">
           Your account &amp; transaction visibility
@@ -851,7 +851,7 @@ function PublicHome() {
         </Card>
       </section>
 
-      {/* ───────────── Need clarification? ───────────── */}
+      {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Need clarification? â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="px-5 pb-2 pt-8">
         <h2 className="font-display text-lg font-bold tracking-tight text-brand-deep">
           Need clarification?
@@ -898,7 +898,7 @@ function PublicHome() {
                 <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-ink" />
                 <div className="min-w-0">
                   <p className="text-[11px] font-semibold text-foreground">
-                    {office.name} — {office.address}
+                    {office.name} â€” {office.address}
                   </p>
                   <p className="mt-0.5 text-[10px] leading-relaxed text-muted-foreground">
                     {office.note}
@@ -920,14 +920,14 @@ function PublicHome() {
         </Card>
       </section>
 
-      {/* ───────────── Why trust PESAKI? ───────────── */}
+      {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Why trust PESAKI? â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="px-5 py-8">
         <h2 className="font-display text-lg font-bold tracking-tight text-brand-deep">
           Why trust PESAKI?
         </h2>
         <span className="mt-2 block h-1 w-9 rounded-full bg-brand-gold" />
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-          Not a promise — verifiable information. Anyone can check the following.
+          Not a promise â€” verifiable information. Anyone can check the following.
         </p>
         <div className="mt-4 grid grid-cols-2 gap-3">
           {TRUST_ITEMS.map((item) => {
@@ -965,7 +965,7 @@ function PublicHome() {
           </Link>
         </Card>
         <p className="mt-6 text-center text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-          {COMPANY.legalName} · {COMPANY.registrationNumber} · Nairobi, Kenya
+          {COMPANY.legalName} Â· {COMPANY.registrationNumber} Â· Nairobi, Kenya
         </p>
       </section>
 
@@ -984,7 +984,7 @@ function RemindersSection({ transactions }: { transactions: any[] }) {
   if (pendingWithdrawal) {
     items.push({
       title: "Pending wallet activity",
-      body: `${pendingWithdrawal.type || "Transaction"} · ${pendingWithdrawal.date || "Today"}`,
+      body: `${pendingWithdrawal.type || "Transaction"} Â· ${pendingWithdrawal.date || "Today"}`,
       tone: "warning",
     });
   }

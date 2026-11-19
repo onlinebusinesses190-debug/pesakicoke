@@ -131,7 +131,7 @@ export const kaziStore = {
     if (!app) return { ok: false, error: "Applicant not found" };
     const job = state.jobs.find((j) => j.id === app.jobId);
     if (!job) return { ok: false, error: "Job not found" };
-    const res = balanceStore.transfer(`Escrow · ${app.applicantName}`, job.payAmount);
+    const res = balanceStore.transfer(`Escrow Ã‚Â· ${app.applicantName}`, job.payAmount);
     if (!res.ok) return { ok: false, error: res.error };
     const updatedApps = state.applications.map((a) =>
       a.id === applicationId ? { ...a, status: "Hired" as const, paidEscrow: true } : a

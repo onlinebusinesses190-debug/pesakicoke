@@ -1,4 +1,4 @@
--- PESAKI Forex — wallet reconciliation and settlement audit trail.
+-- PESAKI Forex Ã¢â‚¬â€ wallet reconciliation and settlement audit trail.
 --
 -- Purpose
 -- -------
@@ -7,10 +7,10 @@
 -- applied when it closes. That is the correct relationship, but it leaves a gap:
 -- the database had no record tying a position to the wallet movement it caused.
 --
--- If a settlement failed midway — a released lock without a credit, or a debit
--- that could not be applied — there was nothing to reconcile against. This adds:
+-- If a settlement failed midway Ã¢â‚¬â€ a released lock without a credit, or a debit
+-- that could not be applied Ã¢â‚¬â€ there was nothing to reconcile against. This adds:
 --
---   * `forex_wallet_settlements` — one row per wallet movement caused by forex,
+--   * `forex_wallet_settlements` Ã¢â‚¬â€ one row per wallet movement caused by forex,
 --     recording the amount, direction and whether it completed. This is the audit
 --     trail for reconciling `wallets` against `forex_positions`.
 --   * An idempotency guard so a retried settlement cannot double-credit.
@@ -24,7 +24,7 @@
 
 begin;
 
--- ─── Settlement audit trail ──────────────────────────────────────────────────
+-- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Settlement audit trail Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 create table if not exists public.forex_wallet_settlements (
   id             uuid primary key default gen_random_uuid(),
@@ -63,7 +63,7 @@ create policy "users read own forex settlements"
   on public.forex_wallet_settlements for select
   using (auth.uid() = user_id);
 
--- ─── Reconciliation helper ──────────────────────────────────────────────────
+-- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Reconciliation helper Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 -- Sum of completed wallet movements caused by forex for one user. Exposed so an
 -- operator can confirm the forex side and the wallet side agree:
@@ -93,7 +93,7 @@ $$;
 revoke all on function public.forex_wallet_net(uuid) from public, anon, authenticated;
 grant execute on function public.forex_wallet_net(uuid) to service_role;
 
--- ─── Backfill REAL forex rows from the wallet ────────────────────────────────
+-- Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Backfill REAL forex rows from the wallet Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 -- REAL balance is now read from `wallets`, so the forex row must not keep
 -- claiming a stale figure. Mirroring the wallet here keeps any legacy report
 -- honest without changing the wallet, which stays the source of truth.

@@ -5,10 +5,10 @@ import { SectionTitle } from "@/components/ui-bits";
 export const Route = createFileRoute("/privacy")({
   head: () => ({
     meta: [
-      { title: "Privacy Policy — PESAKI" },
+      { title: "Privacy Policy Ã¢â‚¬â€ PESAKI" },
       {
         name: "description",
-        content: "PESAKI Privacy Policy — how we collect, use and protect your data.",
+        content: "PESAKI Privacy Policy Ã¢â‚¬â€ how we collect, use and protect your data.",
       },
     ],
   }),
@@ -32,18 +32,18 @@ function PrivacyPage() {
           <div className="rounded-2xl border border-border bg-card p-4">
             <ul className="space-y-2 text-sm">
               <li>
-                <span className="font-semibold">Name</span> — your full name for account and KYC
+                <span className="font-semibold">Name</span> Ã¢â‚¬â€ your full name for account and KYC
                 verification.
               </li>
               <li>
-                <span className="font-semibold">Phone</span> — M-Pesa and account contact number.
+                <span className="font-semibold">Phone</span> Ã¢â‚¬â€ M-Pesa and account contact number.
               </li>
               <li>
-                <span className="font-semibold">Email</span> — for notifications and account
+                <span className="font-semibold">Email</span> Ã¢â‚¬â€ for notifications and account
                 recovery.
               </li>
               <li>
-                <span className="font-semibold">KYC data</span> — national ID, date of birth,
+                <span className="font-semibold">KYC data</span> Ã¢â‚¬â€ national ID, date of birth,
                 selfie/liveness where required for regulatory compliance.
               </li>
             </ul>
@@ -55,19 +55,19 @@ function PrivacyPage() {
           <div className="rounded-2xl border border-border bg-card p-4">
             <ul className="space-y-2 text-sm">
               <li>
-                <span className="font-semibold">Payments</span> — processing deposits, withdrawals
+                <span className="font-semibold">Payments</span> Ã¢â‚¬â€ processing deposits, withdrawals
                 and transfers.
               </li>
               <li>
-                <span className="font-semibold">Trading</span> — providing FX, prediction and market
+                <span className="font-semibold">Trading</span> Ã¢â‚¬â€ providing FX, prediction and market
                 products.
               </li>
               <li>
-                <span className="font-semibold">KAZI</span> — matching workers with employers and
+                <span className="font-semibold">KAZI</span> Ã¢â‚¬â€ matching workers with employers and
                 managing job contracts.
               </li>
               <li>
-                <span className="font-semibold">Compliance</span> — verifying identity, preventing
+                <span className="font-semibold">Compliance</span> Ã¢â‚¬â€ verifying identity, preventing
                 fraud and meeting Kenyan regulatory requirements.
               </li>
             </ul>
@@ -79,15 +79,15 @@ function PrivacyPage() {
           <div className="rounded-2xl border border-border bg-card p-4">
             <ul className="space-y-2 text-sm">
               <li>
-                <span className="font-semibold">Supabase</span> — database and authentication
+                <span className="font-semibold">Supabase</span> Ã¢â‚¬â€ database and authentication
                 infrastructure.
               </li>
               <li>
-                <span className="font-semibold">M-Pesa (Safaricom)</span> — mobile money deposit and
+                <span className="font-semibold">M-Pesa (Safaricom)</span> Ã¢â‚¬â€ mobile money deposit and
                 withdrawal processing.
               </li>
               <li>
-                <span className="font-semibold">Palpluss</span> — partner payment gateway services.
+                <span className="font-semibold">Palpluss</span> Ã¢â‚¬â€ partner payment gateway services.
               </li>
             </ul>
             <p className="mt-3 text-xs text-muted-foreground">
@@ -112,7 +112,7 @@ function PrivacyPage() {
         </section>
 
         <p className="mt-8 px-5 text-center text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-          PESAKI · Earn. Invest. Grow.
+          PESAKI Ã‚Â· Earn. Invest. Grow.
         </p>
       </div>
     </AppShell>

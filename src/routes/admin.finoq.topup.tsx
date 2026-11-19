@@ -26,11 +26,11 @@ interface TopUpStats {
   completedAmount: number;
 }
 
-export const Route = createFileRoute("/admin/payhero/topup")({
-  component: PayHeroTopUpPage,
+export const Route = createFileRoute("/admin/finoq/topup")({
+  component: FinoqTopUpPage,
 });
 
-function PayHeroTopUpPage() {
+function FinoqTopUpPage() {
   const { loading: authLoading } = useAdminAuth();
   const [topups, setTopups] = useState<TopUp[]>([]);
   const [stats, setStats] = useState<TopUpStats | null>(null);
@@ -44,8 +44,8 @@ function PayHeroTopUpPage() {
     if (authLoading) return;
 
     Promise.all([
-      apiRequest<{ success: boolean; data: { topups: TopUp[]; count: number } }>("/api/admin/payhero/topups"),
-      apiRequest<{ success: boolean; data: TopUpStats }>("/api/admin/payhero/topup/stats"),
+      apiRequest<{ success: boolean; data: { topups: TopUp[]; count: number } }>('/api/admin/finoq/topups'),
+      apiRequest<{ success: boolean; data: TopUpStats }>("/api/admin/finoq/topup/stats"),
     ])
       .then(([topupsRes, statsRes]) => {
         if (topupsRes.success) setTopups(topupsRes.data?.topups || []);
@@ -61,7 +61,7 @@ function PayHeroTopUpPage() {
   if (authLoading || loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <p className="text-muted-foreground">Loading top-ups…</p>
+        <p className="text-muted-foreground">Loading top-upsÃ¢â‚¬Â¦</p>
       </div>
     );
   }
@@ -86,16 +86,16 @@ function PayHeroTopUpPage() {
 
     setTopupLoading(true);
     try {
-      await apiRequest("/api/admin/payhero/topup", {
+      await apiRequest("/api/admin/finoq/topup", {
         method: "POST",
         body: JSON.stringify({ amount, phone_number: topupPhone }),
       });
       setTopupAmount("");
       setTopupPhone("");
-      toast.success("Top-up initiated — check your phone for STK Push");
+      toast.success("Top-up initiated Ã¢â‚¬â€ check your phone for STK Push");
       const [topupsRes, statsRes] = await Promise.all([
-        apiRequest<{ success: boolean; data: { topups: TopUp[] } }>("/api/admin/payhero/topups"),
-        apiRequest<{ success: boolean; data: TopUpStats }>("/api/admin/payhero/topup/stats"),
+        apiRequest<{ success: boolean; data: { topups: TopUp[] } }>("/api/admin/finoq/topups"),
+        apiRequest<{ success: boolean; data: TopUpStats }>("/api/admin/finoq/topup/stats"),
       ]);
       if (topupsRes.success) setTopups(topupsRes.data?.topups || []);
       if (statsRes.success) setStats(statsRes.data || null);
@@ -110,8 +110,8 @@ function PayHeroTopUpPage() {
   return (
     <>
       <AdminPageHeader
-        title="PayHero Wallet Top-Up"
-        subtitle="Fund the PayHero payout wallet via M-Pesa STK Push."
+        title="Finoq Wallet Top-Up"
+        subtitle="Fund the Finoq payout wallet via M-Pesa STK Push."
         actions={
           <button
             onClick={() => document.getElementById("topup-form")?.scrollIntoView({ behavior: "smooth" })}
@@ -133,7 +133,7 @@ function PayHeroTopUpPage() {
           <KPI
             label="Total Funded"
             value={fmtCompact(stats.totalAmount)}
-            hint="KES credited to PayHero wallet"
+            hint="KES credited to Finoq wallet"
             tone="success"
           />
           <KPI
@@ -151,7 +151,7 @@ function PayHeroTopUpPage() {
         </section>
       )}
 
-      <AdminCard title="Fund PayHero Wallet" action={
+      <AdminCard title="Fund Finoq Wallet" action={
         <span className="text-[10px] text-muted-foreground">
           M-Pesa STK Push required
         </span>
@@ -193,7 +193,7 @@ function PayHeroTopUpPage() {
             disabled={topupLoading}
             className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-br from-primary to-primary/70 text-sm font-semibold text-primary-foreground shadow hover:opacity-95 disabled:opacity-60"
           >
-            {topupLoading ? "Initiating…" : "Initiate Top-Up"}
+            {topupLoading ? "InitiatingÃ¢â‚¬Â¦" : "Initiate Top-Up"}
           </button>
           <p className="text-[10px] text-muted-foreground">
             After submitting, your phone will receive an M-Pesa STK Push. Enter your PIN to complete the top-up.
@@ -212,7 +212,7 @@ function PayHeroTopUpPage() {
                   <div>
                     <p className="font-semibold">{t.admin_name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {t.admin_email} · {t.phone_number} ·
+                      {t.admin_email} Ã‚Â· {t.phone_number} Ã‚Â·
                       {t.created_at ? new Date(t.created_at).toLocaleDateString("en-KE") : ""}
                     </p>
                   </div>
@@ -236,7 +236,7 @@ function PayHeroTopUpPage() {
                   <div>
                     <p className="font-semibold">{t.admin_name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {t.phone_number} ·
+                      {t.phone_number} Ã‚Â·
                       {t.created_at ? new Date(t.created_at).toLocaleDateString("en-KE") : ""}
                     </p>
                   </div>
@@ -270,7 +270,7 @@ function PayHeroTopUpPage() {
                 {topups.map((t) => (
                   <tr key={t.id} className="border-b border-border/60 last:border-0">
                     <td className="py-3 pr-3 font-mono text-xs text-muted-foreground">
-                      {t.id.slice(0, 8)}…
+                      {t.id.slice(0, 8)}Ã¢â‚¬Â¦
                     </td>
                     <td className="py-3 pr-3 font-medium">{t.admin_name}</td>
                     <td className="py-3 pr-3">{t.phone_number}</td>
@@ -278,7 +278,7 @@ function PayHeroTopUpPage() {
                       {fmtKES(t.amount)}
                     </td>
                     <td className="py-3 pr-3 text-muted-foreground">
-                      {t.reference_id || "—"}
+                      {t.reference_id || "Ã¢â‚¬â€"}
                     </td>
                     <td className="py-3 pr-3">
                       <StatusPill status={t.status} />

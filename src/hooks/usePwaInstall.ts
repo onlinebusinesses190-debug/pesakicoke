@@ -1,5 +1,5 @@
 /**
- * PESAKI — PWA installation state.
+ * PESAKI Ã¢â‚¬â€ PWA installation state.
  *
  * Wraps the browser's real installation mechanisms and nothing else. There is no
  * simulated download or fake "app" flow here: on Chromium the browser shows its
@@ -24,7 +24,7 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export type InstallState =
-  /** Not yet known — the browser has not said anything yet. */
+  /** Not yet known Ã¢â‚¬â€ the browser has not said anything yet. */
   | "checking"
   /** Running as an installed app. Installation must never be offered. */
   | "installed"

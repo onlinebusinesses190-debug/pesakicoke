@@ -133,11 +133,11 @@ export const settlePredictions = async () => {
     const closePrices = new Map<string, number>();
     for (const m of Array.from(markets)) {
         if (isNseSymbol(m)) {
-          // NSE Stock – Fetch via scraper
+          // NSE Stock Ã¢â‚¬â€œ Fetch via scraper
           const price = await fetchNsePrice(m);
           if (price) closePrices.set(m, price);
         } else {
-          // Real-time market (Crypto/FX) – Fetch via Redis
+          // Real-time market (Crypto/FX) Ã¢â‚¬â€œ Fetch via Redis
           const pStr = await redis.get(`market:${m}`);
           if (pStr) closePrices.set(m, parseFloat(String(pStr)));
         }

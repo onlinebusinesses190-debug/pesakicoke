@@ -52,7 +52,7 @@ navigate({ to: "/" });
   if (!ready || loading || isAdmin === null) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <p className="text-muted-foreground">Verify admin access…</p>
+        <p className="text-muted-foreground">Verify admin accessÃ¢â‚¬Â¦</p>
       </div>
     );
   }

@@ -1,4 +1,4 @@
-# PESAKI Platform — AI Agent Context & Developer Guide
+# PESAKI Platform Ã¢â‚¬â€ AI Agent Context & Developer Guide
 
 > **Notice for AI Agents**: Read this file first before inspecting or modifying the codebase. This document contains the full architecture, routing patterns, backend services, database schemas, and critical constraints for the **PESAKI** project.
 
@@ -22,54 +22,54 @@
 
 ```
 pesakicoke/
-├── CONTEXT.md                    # THIS FILE: Comprehensive project guide for AI agents
-├── AGENTS.md                     # Agent rules & Lovable connection instructions
-├── package.json                  # Frontend / TanStack Start root dependencies
-├── vite.config.ts                # Lovable TanStack Start Vite configuration
-├── scripts/
-│   └── run-migrations.mjs        # Database schema runner
-├── supabase/
-│   ├── config.toml               # Supabase CLI configuration & allowed origins
-│   ├── migrations/               # SQL migrations (wallets, transactions, games)
-│   └── functions/
-│       ├── mpesa-stk/            # Safaricom Daraja STK Push edge function
-│       └── transfer/             # P2P wallet transfer function
-├── pesaki-server/                # Standalone Node.js Fastify + Socket.io game server
-│   ├── src/                      # Game engines (Aviator, Spin, Predictions), Redis, DB RPCs
-│   └── README.md                 # Backend server documentation
-└── src/
-    ├── components/
-    │   ├── AppShell.tsx          # Mobile-first shell, header, bottom navigation bar
-    │   ├── ui-bits.tsx           # Standardized design tokens (Card, Stat, Badge, SectionTitle)
-    │   └── ui/                   # Radix UI + shadcn primitive components
-    ├── context/                  # Client-side React context providers
-    ├── hooks/                    # Reusable React hooks
-    ├── integrations/
-    │   └── supabase/             # Supabase client singleton, types, auth helpers
-    ├── lib/
-    │   ├── balance.ts            # Balance state management & updates
-    │   ├── error-page.ts         # Catastrophic SSR error page renderer
-    │   └── lovable-error-reporting.ts # Error tracking boundary for Lovable
-    ├── routes/                   # File-based TanStack Start routes (DO NOT use Next.js pages)
-    │   ├── __root.tsx            # Root app shell, HTML document, Providers, Scripts
-    │   ├── index.tsx             # Main dashboard (/)
-    │   ├── auth.tsx              # Login / Signup / OTP verification
-    │   ├── wallet.tsx            # Wallet dashboard, M-Pesa deposit, withdrawal, transfers
-    │   ├── trading.tsx           # Trading hub layout & subroutes
-    │   ├── trading.aviator.tsx   # Aviator crash game with live multipliers
-    │   ├── trading.spin.tsx      # Lucky spin wheel
-    │   ├── trading.up-down.tsx   # Forex / NSE market direction predictions
-    │   ├── trading.fx.tsx        # Currency exchange rates & trading
-    │   ├── trading.invest.tsx    # Investment plans & yield tracking
-    │   ├── kazi.tsx              # KAZI Link micro-jobs & freelance directory
-    │   ├── business.tsx          # Business funding proposals & investment
-    │   ├── banking.tsx           # Banking hub, Chama savings groups, micro-loans
-    │   ├── profile.tsx           # User profile & security settings
-    │   └── admin.*.tsx           # Administration portal & oversight
-    ├── router.tsx                # TanStack Router instance creation with QueryClient
-    ├── server.ts                 # Nitro / SSR server entry with error boundary
-    ├── start.ts                  # TanStack Start instance with Supabase auth middleware
-    └── styles.css                # Global stylesheet & Tailwind directives
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ CONTEXT.md                    # THIS FILE: Comprehensive project guide for AI agents
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ AGENTS.md                     # Agent rules & Lovable connection instructions
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ package.json                  # Frontend / TanStack Start root dependencies
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ vite.config.ts                # Lovable TanStack Start Vite configuration
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ scripts/
+Ã¢â€â€š   Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ run-migrations.mjs        # Database schema runner
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ supabase/
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ config.toml               # Supabase CLI configuration & allowed origins
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ migrations/               # SQL migrations (wallets, transactions, games)
+Ã¢â€â€š   Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ functions/
+Ã¢â€â€š       Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ mpesa-stk/            # Safaricom Daraja STK Push edge function
+Ã¢â€â€š       Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ transfer/             # P2P wallet transfer function
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ pesaki-server/                # Standalone Node.js Fastify + Socket.io game server
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ src/                      # Game engines (Aviator, Spin, Predictions), Redis, DB RPCs
+Ã¢â€â€š   Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ README.md                 # Backend server documentation
+Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ src/
+    Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ components/
+    Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ AppShell.tsx          # Mobile-first shell, header, bottom navigation bar
+    Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ ui-bits.tsx           # Standardized design tokens (Card, Stat, Badge, SectionTitle)
+    Ã¢â€â€š   Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ ui/                   # Radix UI + shadcn primitive components
+    Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ context/                  # Client-side React context providers
+    Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ hooks/                    # Reusable React hooks
+    Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ integrations/
+    Ã¢â€â€š   Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ supabase/             # Supabase client singleton, types, auth helpers
+    Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ lib/
+    Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ balance.ts            # Balance state management & updates
+    Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ error-page.ts         # Catastrophic SSR error page renderer
+    Ã¢â€â€š   Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ lovable-error-reporting.ts # Error tracking boundary for Lovable
+    Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ routes/                   # File-based TanStack Start routes (DO NOT use Next.js pages)
+    Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ __root.tsx            # Root app shell, HTML document, Providers, Scripts
+    Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ index.tsx             # Main dashboard (/)
+    Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ auth.tsx              # Login / Signup / OTP verification
+    Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ wallet.tsx            # Wallet dashboard, M-Pesa deposit, withdrawal, transfers
+    Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ trading.tsx           # Trading hub layout & subroutes
+    Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ trading.aviator.tsx   # Aviator crash game with live multipliers
+    Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ trading.spin.tsx      # Lucky spin wheel
+    Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ trading.up-down.tsx   # Forex / NSE market direction predictions
+    Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ trading.fx.tsx        # Currency exchange rates & trading
+    Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ trading.invest.tsx    # Investment plans & yield tracking
+    Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ kazi.tsx              # KAZI Link micro-jobs & freelance directory
+    Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ business.tsx          # Business funding proposals & investment
+    Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ banking.tsx           # Banking hub, Chama savings groups, micro-loans
+    Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ profile.tsx           # User profile & security settings
+    Ã¢â€â€š   Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ admin.*.tsx           # Administration portal & oversight
+    Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ router.tsx                # TanStack Router instance creation with QueryClient
+    Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ server.ts                 # Nitro / SSR server entry with error boundary
+    Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ start.ts                  # TanStack Start instance with Supabase auth middleware
+    Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ styles.css                # Global stylesheet & Tailwind directives
 ```
 
 ---

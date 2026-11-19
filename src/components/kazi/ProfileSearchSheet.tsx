@@ -108,7 +108,7 @@ export function ProfileSearchSheet({ onClose }: { onClose: () => void }) {
       if (!append) setLoading(true);
 
       const res = await searchProfiles(q, t, PAGE_SIZE, offset);
-      // A newer request already started — discard this stale response.
+      // A newer request already started Ã¢â‚¬â€ discard this stale response.
       if (id !== requestId.current) return;
 
       if (!res.success || !res.data) {
@@ -200,7 +200,7 @@ export function ProfileSearchSheet({ onClose }: { onClose: () => void }) {
         <div className="flex-1 overflow-y-auto px-5 pb-[calc(env(safe-area-inset-bottom)+2rem)] pt-4">
           {loading ? (
             <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> Searching…
+              <Loader2 className="h-4 w-4 animate-spin" /> SearchingÃ¢â‚¬Â¦
             </div>
           ) : error ? (
             <div className="py-10 text-center">

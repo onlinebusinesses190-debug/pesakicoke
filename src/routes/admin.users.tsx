@@ -83,7 +83,7 @@ function AdminUsers() {
   if (authLoading || loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <p className="text-muted-foreground">Loading users…</p>
+        <p className="text-muted-foreground">Loading usersÃ¢â‚¬Â¦</p>
       </div>
     );
   }
@@ -98,7 +98,7 @@ function AdminUsers() {
             <form onSubmit={handleSearch} className="relative">
               <input
                 type="text"
-                placeholder="Search users…"
+                placeholder="Search usersÃ¢â‚¬Â¦"
                 className="h-9 w-64 rounded-lg border border-border bg-card pl-9 pr-3 text-sm outline-none focus:border-primary"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -167,7 +167,7 @@ function AdminUsers() {
                   return (
                     <tr key={u.id} className="border-b border-border/60 last:border-0">
                       <td className="py-3 pr-3 font-mono text-xs text-muted-foreground">
-                        {u.id.slice(0, 8)}…
+                        {u.id.slice(0, 8)}Ã¢â‚¬Â¦
                       </td>
                       <td className="py-3 pr-3 font-medium">{name}</td>
                       <td className="py-3 pr-3 text-muted-foreground">{u.email}</td>

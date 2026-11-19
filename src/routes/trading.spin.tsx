@@ -1,4 +1,4 @@
-﻿import { supabase } from "@/utils/supabase/client";
+import { supabase } from "@/utils/supabase/client";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { Disc, Sparkles, Loader2, ArrowLeft, PlusCircle } from "lucide-react";
@@ -41,7 +41,7 @@ function MarketGrowthPage() {
   const [updatingBalance, setUpdatingBalance] = useState(false);
   const [showDeposit, setShowDeposit] = useState(false);
 
-  // ── Auth check ─────────────────────────────────────────────────────────────
+  // â”€â”€ Auth check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -56,7 +56,7 @@ function MarketGrowthPage() {
     checkAuth();
   }, [navigate]);
 
-  // ── Fetch balance ────────────────────────────────────────────────────────
+  // â”€â”€ Fetch balance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const fetchBalance = async () => {
     if (mode !== "real") return;
     try {
@@ -80,7 +80,7 @@ function MarketGrowthPage() {
     if (mode === "real") fetchBalance();
   }, [mode]);
 
-  // ── Fetch outcomes ──────────────────────────────────────────────────────
+  // â”€â”€ Fetch outcomes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     const fetchOutcomes = async () => {
       try {
@@ -95,7 +95,7 @@ function MarketGrowthPage() {
     fetchOutcomes();
   }, []);
 
-  // ── Execute spin ─────────────────────────────────────────────────────────
+  // â”€â”€ Execute spin â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const executeSelection = async () => {
     if (executing || outcomes.length === 0) return;
     if (mode !== "demo" && !requireAuth()) return;
@@ -148,7 +148,7 @@ function MarketGrowthPage() {
     return `conic-gradient(${stops.join(", ")})`;
   };
 
-  // ── Toggle mode with navigate ──────────────────────────────────────────
+  // â”€â”€ Toggle mode with navigate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const setMode = (newMode: "demo" | "real") => {
     navigate({
       search: (prev: any) => ({ ...prev, mode: newMode }),
@@ -212,7 +212,7 @@ function MarketGrowthPage() {
             <span className="font-bold text-white">
               {currentBalance !== null ? currentBalance.toFixed(2) : "0.00"} KES
             </span>
-            {updatingBalance && <span className="text-gray-400 text-[8px] animate-pulse">⋯</span>}
+            {updatingBalance && <span className="text-gray-400 text-[8px] animate-pulse">â‹¯</span>}
           </div>
           {!isDemo && (
             <button
@@ -223,7 +223,7 @@ function MarketGrowthPage() {
             </button>
           )}
           <span className="text-[8px] md:text-[10px] text-gray-400 hidden sm:inline">
-            {isDemo ? "🎮 FUN" : "🔴 REAL"}
+            {isDemo ? "ðŸŽ® FUN" : "ðŸ”´ REAL"}
           </span>
         </div>
       </div>
@@ -278,8 +278,8 @@ function MarketGrowthPage() {
                 }`}
               >
                 {lastAdjustment.amount > 0
-                  ? `🎉 GAIN: KSh ${lastAdjustment.amount}`
-                  : `${lastAdjustment.name} – Adjustment`}
+                  ? `ðŸŽ‰ GAIN: KSh ${lastAdjustment.amount}`
+                  : `${lastAdjustment.name} â€“ Adjustment`}
               </div>
             )}
             {!executing && lastAdjustment === null && (

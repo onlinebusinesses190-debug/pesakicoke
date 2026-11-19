@@ -1,5 +1,5 @@
 /**
- * PESAKI Forex — server-side position monitor.
+ * PESAKI Forex Ã¢â‚¬â€ server-side position monitor.
  *
  * Stop-losses and take-profits have to fire whether or not anybody has the app
  * open. A React effect cannot do that: close the tab and the user's stop simply
@@ -8,7 +8,7 @@
  * This monitor polls open positions, compares the engine's current price
  * against each position's stop and target, and closes through the same
  * settlement path a user-initiated close uses. It never computes an outcome of
- * its own — it only decides *when* to close, and the price it closes at is the
+ * its own Ã¢â‚¬â€ it only decides *when* to close, and the price it closes at is the
  * engine's real quote.
  *
  * Deliberately absent: any hidden win/loss probability or outcome bias. The

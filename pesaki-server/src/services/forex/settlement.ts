@@ -1,5 +1,5 @@
 /**
- * PESAKI Forex — authoritative position close / settlement logic.
+ * PESAKI Forex Ã¢â‚¬â€ authoritative position close / settlement logic.
  *
  * Both the HTTP close endpoint and the server-side SL/TP / stop-out monitor
  * route through this single function so every closure uses identical pricing,
@@ -148,9 +148,9 @@ export async function closePosition(input: CloseInput): Promise<CloseResult> {
     const netProfitAfterCommission = legs.profit - legs.loss - closingCommissionKes;
     const settlement = await settleReal(userId, Number(result.releasedMargin ?? 0), netProfitAfterCommission, `close:${positionId}`);
     if (!settlement.ok) {
-      logger.error({ err: settlement.reason, positionId }, "Live wallet settlement failed — needs reconciliation");
+      logger.error({ err: settlement.reason, positionId }, "Live wallet settlement failed Ã¢â‚¬â€ needs reconciliation");
       // DB transaction already committed; surface the error so it can be reconciled.
-      throw new Error("Settlement pending — DB updated, wallet needs reconciliation");
+      throw new Error("Settlement pending Ã¢â‚¬â€ DB updated, wallet needs reconciliation");
     }
   }
 

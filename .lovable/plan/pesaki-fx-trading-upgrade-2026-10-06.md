@@ -7,7 +7,7 @@
 
 ## Five-second rule and fees
 - Add an explicitly labelled **Demo risk simulation**, with rules shown before opening a trade. Never disguise timed deductions as market losses or apply them to real money.
-- Preserve 10× leverage: the proposed default deduction is **20% of reserved margin every five seconds while the price is unfavorable**, capped at the remaining margin. This differs from the document's 20% of the full amount, which would consume the entire 10% margin in the first interval.
+- Preserve 10Ãƒâ€” leverage: the proposed default deduction is **20% of reserved margin every five seconds while the price is unfavorable**, capped at the remaining margin. This differs from the document's 20% of the full amount, which would consume the entire 10% margin in the first interval.
 - Persist each deduction and final settlement atomically. Closing stops future deductions; exhausted margin closes the position; balances cannot go negative.
 - Charge the documented settlement fee: **KSh 5 for trades through KSh 1,000; 1% of the original amount above KSh 1,000**. Show estimated fees before execution, actual fees and net results in History; cap deductions at available settlement proceeds.
 - Make risk settings configurable on the backend and snapshot applicable rules on each trade for a reconstructable record.

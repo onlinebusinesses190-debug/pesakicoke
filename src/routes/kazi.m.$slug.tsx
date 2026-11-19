@@ -28,7 +28,7 @@ export const Route = createFileRoute("/kazi/m/$slug")({
   getParentRoute: () => rootRouteId,
   head: () => ({
     meta: [
-      { title: "Profile — KAZI Link — PESAKI" },
+      { title: "Profile Ã¢â‚¬â€ KAZI Link Ã¢â‚¬â€ PESAKI" },
       {
         name: "description",
         content: "A public KAZI Link worker or service provider profile.",
@@ -95,7 +95,7 @@ function KaziPublicProfileBySlug() {
 
   const isOwner = user && bundle && bundle.profile.user_id === user.id;
 
-  // ── JSON-LD Structured Data ──────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬ JSON-LD Structured Data Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   useEffect(() => {
     if (!bundle) return;
     const p = bundle.profile;
@@ -138,13 +138,13 @@ function KaziPublicProfileBySlug() {
     };
   }, [bundle, slug]);
 
-  // ── Dynamic Title & Meta Description ─────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Dynamic Title & Meta Description Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   useEffect(() => {
     if (!bundle) return;
     const p = bundle.profile;
     const name = p.full_name?.trim() || "KAZI member";
     const headline = p.headline?.trim() || "Worker";
-    document.title = `${name} — ${headline} | KAZI Link`;
+    document.title = `${name} Ã¢â‚¬â€ ${headline} | KAZI Link`;
 
     let metaDesc = document.querySelector('meta[name="description"]');
     if (!metaDesc) {
@@ -152,11 +152,11 @@ function KaziPublicProfileBySlug() {
       metaDesc.setAttribute("name", "description");
       document.head.appendChild(metaDesc);
     }
-    const desc = (p.bio?.trim() || `${name} — ${headline} on KAZI Link`).slice(0, 160);
+    const desc = (p.bio?.trim() || `${name} Ã¢â‚¬â€ ${headline} on KAZI Link`).slice(0, 160);
     metaDesc.setAttribute("content", desc);
   }, [bundle]);
 
-  // ── Robots Meta ──────────────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Robots Meta Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   useEffect(() => {
     let robots = document.querySelector('meta[name="robots"]');
     if (!robots) {
@@ -201,7 +201,7 @@ function KaziPublicProfileBySlug() {
     if (p?.headline) bits.push(p.headline);
     if (p?.category) bits.push(p.category);
     if (p?.location) bits.push(p.location);
-    const suffix = bits.length ? `\n${bits.join(" · ")}` : "";
+    const suffix = bits.length ? `\n${bits.join(" Ã‚Â· ")}` : "";
     return `Check out ${name} on KAZI Link${suffix}\n${shareUrl()}`;
   };
 
@@ -224,10 +224,10 @@ function KaziPublicProfileBySlug() {
     const name = bundle?.profile.full_name?.trim() || "KAZI profile";
     if (navigator.share) {
       try {
-        await navigator.share({ title: `${name} — KAZI Link`, text: shareText(), url });
+        await navigator.share({ title: `${name} Ã¢â‚¬â€ KAZI Link`, text: shareText(), url });
         return;
       } catch {
-        /* dismissed — copy instead */
+        /* dismissed Ã¢â‚¬â€ copy instead */
       }
     }
     try {
@@ -248,7 +248,7 @@ function KaziPublicProfileBySlug() {
       <AppShell>
         <PageHeader title="Profile" subtitle="KAZI Link" />
         <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading profile…
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading profileÃ¢â‚¬Â¦
         </div>
       </AppShell>
     );
@@ -332,7 +332,7 @@ right={
         <TabSection bundle={bundle} reviews={reviews} tab={tab} />
       </div>
 
-      {/* ── "Get discovered on Google" card (owner only) ───────────────────── */}
+      {/* Ã¢â€â‚¬Ã¢â€â‚¬ "Get discovered on Google" card (owner only) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
       {isOwner && bundle && (
         <Card className="bg-primary/5 border-primary/20">
           <div className="space-y-3">
@@ -357,7 +357,7 @@ right={
         </Card>
       )}
 
-      {/* ── Sticky CTA ─────────────────────────────────────────────────── */}
+      {/* Ã¢â€â‚¬Ã¢â€â‚¬ Sticky CTA Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 px-5 py-3 backdrop-blur">
         <div className="mx-auto flex max-w-md items-center gap-2">
           <button

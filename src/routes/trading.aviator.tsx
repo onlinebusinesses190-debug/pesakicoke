@@ -1,4 +1,4 @@
-﻿import { supabase } from "@/utils/supabase/client";
+import { supabase } from "@/utils/supabase/client";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect, useRef, Component, ReactNode } from "react";
 import { Plane, Loader2, PlusCircle, ArrowLeft } from "lucide-react";
@@ -16,7 +16,7 @@ const WS_URL = import.meta.env.VITE_WEBSOCKET_URL || "https://pesaki-server.onre
 const DEMO_BALANCE_KEY = "pesaki_aviator_demo_balance";
 const INITIAL_DEMO_BALANCE = 10000;
 
-// ── Error Boundary ──────────────────────────────────────────────────────────────
+// â”€â”€ Error Boundary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class ErrorBoundary extends Component<{ children: ReactNode }> {
   state = { error: null as Error | null };
   static getDerivedStateFromError(error: Error) {
@@ -61,22 +61,22 @@ function AviatorPage() {
   const [updatingBalance, setUpdatingBalance] = useState(false);
   const [showDeposit, setShowDeposit] = useState(false);
 
-  // ── Demo balance ──────────────────────────────────────────────────────────
+  // â”€â”€ Demo balance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [demoBalance, setDemoBalance] = useState<number>(() => {
     const saved = localStorage.getItem(DEMO_BALANCE_KEY);
     return saved ? parseFloat(saved) : INITIAL_DEMO_BALANCE;
   });
 
-  // ── Live countdown state ──────────────────────────────────────────────────
+  // â”€â”€ Live countdown state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [countdown, setCountdown] = useState<number | null>(null);
 
-  // ── Allocation 1 state ──────────────────────────────────────────────────────
+  // â”€â”€ Allocation 1 state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [betAmount1, setBetAmount1] = useState(10);
   const [isBetting1, setIsBetting1] = useState(false);
   const [cashedOut1, setCashedOut1] = useState(false);
   const [cashOutMultiplier1, setCashOutMultiplier1] = useState(0);
 
-  // ── Allocation 2 state ──────────────────────────────────────────────────────
+  // â”€â”€ Allocation 2 state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [betAmount2, setBetAmount2] = useState(10);
   const [isBetting2, setIsBetting2] = useState(false);
   const [cashedOut2, setCashedOut2] = useState(false);
@@ -87,13 +87,13 @@ function AviatorPage() {
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isFetchingBalanceRef = useRef(false);
 
-  // ── Update demo balance ──────────────────────────────────────────────────
+  // â”€â”€ Update demo balance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const updateDemoBalance = (newBalance: number) => {
     setDemoBalance(newBalance);
     localStorage.setItem(DEMO_BALANCE_KEY, String(newBalance));
   };
 
-  // ── Auth check ─────────────────────────────────────────────────────────────
+  // â”€â”€ Auth check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -110,7 +110,7 @@ function AviatorPage() {
     checkAuth();
   }, [navigate]);
 
-  // ── Fetch real balance ──────────────────────────────────────────────────
+  // â”€â”€ Fetch real balance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const fetchRealBalance = async () => {
     if (isFetchingBalanceRef.current) return;
     try {
@@ -127,21 +127,21 @@ function AviatorPage() {
     }
   };
 
-  // ── Fetch balance when mode changes ──────────────────────────────────────
+  // â”€â”€ Fetch balance when mode changes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (mode === "real") {
       fetchRealBalance();
     }
   }, [mode]);
 
-  // ── Initial balance fetch ─────────────────────────────────────────────────
+  // â”€â”€ Initial balance fetch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (mode === "real") {
       fetchRealBalance();
     }
   }, []);
 
-  // ── Place bet (Allocation 1) ──────────────────────────────────────────────
+  // â”€â”€ Place bet (Allocation 1) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const promptDeposit = () => {
     if (mode === "real") setShowDeposit(true);
   };
@@ -184,7 +184,7 @@ function AviatorPage() {
     }
   };
 
-  // ── Place bet (Allocation 2) ──────────────────────────────────────────────
+  // â”€â”€ Place bet (Allocation 2) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const placeBet2 = async () => {
     if (status !== "WAITING" || isBetting2) return;
     if (mode !== "demo" && !requireAuth()) return;
@@ -223,7 +223,7 @@ function AviatorPage() {
     }
   };
 
-  // ── Cash out 1 ─────────────────────────────────────────────────────────────
+  // â”€â”€ Cash out 1 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleCashOut1 = () => {
     if (status !== "FLYING" || cashedOut1 || !socketRef.current) return;
     if (mode !== "demo" && !requireAuth()) return;
@@ -241,7 +241,7 @@ function AviatorPage() {
     }
   };
 
-  // ── Cash out 2 ─────────────────────────────────────────────────────────────
+  // â”€â”€ Cash out 2 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleCashOut2 = () => {
     if (status !== "FLYING" || cashedOut2 || !socketRef.current) return;
     if (mode !== "demo" && !requireAuth()) return;
@@ -259,7 +259,7 @@ function AviatorPage() {
     }
   };
 
-  // ── Live countdown timer ──────────────────────────────────────────────────
+  // â”€â”€ Live countdown timer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (status === "WAITING" && waitTime > 0) {
       setCountdown(Math.ceil(waitTime));
@@ -289,7 +289,7 @@ function AviatorPage() {
     };
   }, [status, waitTime]);
 
-  // ── WebSocket connection ──────────────────────────────────────────────────
+  // â”€â”€ WebSocket connection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
 
     const initGame = async () => {
@@ -401,14 +401,14 @@ function AviatorPage() {
     };
   }, [mode]);
 
-  // ── Toggle mode using TanStack Router ──────────────────────────────────
+  // â”€â”€ Toggle mode using TanStack Router â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const setMode = (newMode: "demo" | "real") => {
     navigate({
       search: (prev: any) => ({ ...prev, mode: newMode }),
     });
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────────
+  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const recentHistory = history.slice(0, 6);
   const isFlying = status === "FLYING";
   const isWaiting = status === "WAITING";
@@ -419,7 +419,7 @@ function AviatorPage() {
 
   return (
     <div className="space-y-4 max-w-6xl mx-auto pb-8">
-      {/* ✅ Full header – everything fits in one row */}
+      {/* âœ… Full header â€“ everything fits in one row */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-1 md:gap-2">
           <Link
@@ -430,7 +430,7 @@ function AviatorPage() {
             <ArrowLeft size={20} />
           </Link>
           <Plane className="text-red-500 h-5 w-5" />
-          {/* Mode toggle – clearly visible on the left */}
+          {/* Mode toggle â€“ clearly visible on the left */}
           <div className="flex items-center gap-0.5 bg-[#181d29] p-0.5 rounded-lg text-[10px] md:text-xs font-medium">
             <button
               onClick={() => setMode("demo")}
@@ -461,7 +461,7 @@ function AviatorPage() {
             <span className="font-bold text-white">
               {currentBalance !== null ? currentBalance.toFixed(2) : "0.00"} KES
             </span>
-            {updatingBalance && <span className="text-gray-400 text-[8px] animate-pulse">⋯</span>}
+            {updatingBalance && <span className="text-gray-400 text-[8px] animate-pulse">â‹¯</span>}
           </div>
           {/* Deposit button (only for real mode) */}
           {!isDemo && (
@@ -473,12 +473,12 @@ function AviatorPage() {
             </button>
           )}
           <span className="text-[8px] md:text-[10px] text-gray-400 hidden sm:inline">
-            {isDemo ? "🎮 FUN" : "🔴 REAL"}
+            {isDemo ? "ðŸŽ® FUN" : "ðŸ”´ REAL"}
           </span>
         </div>
       </div>
 
-      {/* Main game area – unchanged */}
+      {/* Main game area â€“ unchanged */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 relative bg-[#0f0f1a] border border-white/10 rounded-3xl overflow-hidden">
           <div className="relative" style={{ height: "180px" }}>
@@ -506,7 +506,7 @@ function AviatorPage() {
                 >
                   <div className="bg-green-500/20 backdrop-blur-sm px-4 py-2 rounded-2xl border border-green-500/50">
                     <span className="text-2xl font-black text-green-400">
-                      🎉 +
+                      ðŸŽ‰ +
                       {(betAmount1 * cashOutMultiplier1 || betAmount2 * cashOutMultiplier2).toFixed(
                         2,
                       )}{" "}
@@ -529,10 +529,10 @@ function AviatorPage() {
               {isWaiting
                 ? displayCountdown > 0
                   ? `${displayCountdown}s`
-                  : "⏳"
+                  : "â³"
                 : isFlying
-                  ? "🔴 LIVE"
-                  : "💥 CRASHED"}
+                  ? "ðŸ”´ LIVE"
+                  : "ðŸ’¥ CRASHED"}
             </div>
           </div>
 

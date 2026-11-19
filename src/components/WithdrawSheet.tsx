@@ -141,7 +141,7 @@ export function WithdrawSheet({ onClose, user, balance, onSuccess }: WithdrawShe
   return (
     <SheetShell title="Withdraw Funds" onClose={onClose}>
       <p className="text-xs text-muted-foreground">
-        Withdraw to your M-Pesa account via PayHero B2C.
+        Withdraw to your M-Pesa account via Finoq.
       </p>
       <p className="mt-1 text-sm font-semibold">Available: {fmt(availableBalance)}</p>
       <form onSubmit={handleSubmit} className="mt-4 space-y-4">

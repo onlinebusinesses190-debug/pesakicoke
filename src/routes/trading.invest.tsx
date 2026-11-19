@@ -1,4 +1,4 @@
-﻿import { supabase } from "@/utils/supabase/client";
+import { supabase } from "@/utils/supabase/client";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect, useCallback } from "react";
 import {
@@ -23,7 +23,7 @@ import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { toast } from "sonner";
 import { DepositSheet } from "@/components/DepositSheet";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface NseStock {
   id: string;
   name: string;
@@ -38,7 +38,7 @@ interface NseStock {
   open?: number;
 }
 
-// ─── Skeleton Card ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Skeleton Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function SkeletonCard() {
   return (
     <div className="rounded-xl border border-border bg-card p-4 animate-pulse">
@@ -59,7 +59,7 @@ function SkeletonCard() {
   );
 }
 
-// ─── Stock Card ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Stock Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function StockCard({
   stock,
   selected,
@@ -140,7 +140,7 @@ function StockCard({
   );
 }
 
-// ─── Route ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Route â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const Route = createFileRoute("/trading/invest")({
   validateSearch: (search: Record<string, unknown>) => ({
     mode: (search.mode as string) === "real" ? "real" : "demo",
@@ -170,7 +170,7 @@ function InvestmentPage() {
   const [updatingBalance, setUpdatingBalance] = useState(false);
   const [showDeposit, setShowDeposit] = useState(false);
 
-  // ── Auth check ─────────────────────────────────────────────────────────────
+  // â”€â”€ Auth check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -187,7 +187,7 @@ function InvestmentPage() {
     checkAuth();
   }, [navigate]);
 
-  // ── Fetch balance ────────────────────────────────────────────────────────
+  // â”€â”€ Fetch balance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const fetchBalance = async () => {
     try {
       setUpdatingBalance(true);
@@ -210,7 +210,7 @@ function InvestmentPage() {
     if (mode === "real") fetchBalance();
   }, [mode]);
 
-  // ── Fetch stocks ──────────────────────────────────────────────────────────
+  // â”€â”€ Fetch stocks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const fetchStocks = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
@@ -244,7 +244,7 @@ function InvestmentPage() {
     fetchStocks();
   }, [fetchStocks]);
 
-  // ── Place prediction ──────────────────────────────────────────────────────
+  // â”€â”€ Place prediction â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handlePlacePrediction = async () => {
     if (!selectedStock || !prediction) return;
     if (mode !== "demo" && !requireAuth()) return;
@@ -291,14 +291,14 @@ function InvestmentPage() {
     }
   };
 
-  // ── Toggle mode ────────────────────────────────────────────────────────────
+  // â”€â”€ Toggle mode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const setMode = (newMode: "demo" | "real") => {
     navigate({
       search: (prev: any) => ({ ...prev, mode: newMode }),
     });
   };
 
-  // ── Derived ────────────────────────────────────────────────────────────────
+  // â”€â”€ Derived â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const filtered = stocks.filter(
     (s) =>
       s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -317,7 +317,7 @@ function InvestmentPage() {
   const isDemo = mode === "demo";
   const currentBalance = isDemo ? 10000 : balance; // demo balance fixed at 10k for this page
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
     <div className="space-y-6 max-w-7xl mx-auto px-4 pb-8">
       {/* Header with back arrow, mode toggle, balance, deposit */}
@@ -365,7 +365,7 @@ function InvestmentPage() {
             <span className="font-bold text-white">
               {currentBalance !== null ? currentBalance.toFixed(2) : "0.00"} KES
             </span>
-            {updatingBalance && <span className="text-gray-400 text-[8px] animate-pulse">⋯</span>}
+            {updatingBalance && <span className="text-gray-400 text-[8px] animate-pulse">â‹¯</span>}
           </div>
           {!isDemo && (
             <button
@@ -376,7 +376,7 @@ function InvestmentPage() {
             </button>
           )}
           <span className="text-[8px] md:text-[10px] text-gray-400 hidden sm:inline">
-            {isDemo ? "🎮 FUN" : "🔴 REAL"}
+            {isDemo ? "ðŸŽ® FUN" : "ðŸ”´ REAL"}
           </span>
         </div>
       </div>
@@ -455,8 +455,8 @@ function InvestmentPage() {
             <p className="font-semibold text-sm text-blue-300">NSE Market is Currently Closed</p>
             <p className="text-xs mt-0.5 text-blue-400/70 leading-relaxed">
               The Nairobi Securities Exchange trades{" "}
-              <strong>Monday – Friday, 9:00 AM – 3:00 PM EAT</strong>. Stock prices shown are the
-              most recent closing prices — some counters may not display if they had no activity on
+              <strong>Monday â€“ Friday, 9:00 AM â€“ 3:00 PM EAT</strong>. Stock prices shown are the
+              most recent closing prices â€” some counters may not display if they had no activity on
               the last trading day.
             </p>
             <div className="flex items-center gap-1.5 mt-2 text-xs text-blue-400/60">
@@ -525,7 +525,7 @@ function InvestmentPage() {
                     {selectedStock.name}
                   </div>
                   <div className="text-xs font-mono text-blue-400 mt-1">
-                    {selectedStock.symbol} • KES {selectedStock.price.toFixed(2)}
+                    {selectedStock.symbol} â€¢ KES {selectedStock.price.toFixed(2)}
                   </div>
                   <div
                     className={`text-xs mt-1.5 flex items-center gap-1 ${
@@ -623,7 +623,7 @@ function InvestmentPage() {
                   disabled={!prediction || Number(amount) < 10 || isPlacing || !marketOpen}
                   className="w-full py-4 text-base font-black rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:scale-100"
                 >
-                  {isPlacing ? "PLACING..." : !marketOpen ? "MARKET CLOSED" : "PLACE PREDICTION →"}
+                  {isPlacing ? "PLACING..." : !marketOpen ? "MARKET CLOSED" : "PLACE PREDICTION â†’"}
                 </button>
 
                 <p className="text-[11px] text-center text-muted-foreground leading-relaxed">

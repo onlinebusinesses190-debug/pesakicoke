@@ -221,7 +221,7 @@ export function formatKaziDate(value?: string | null): string {
 export function formatKaziDateRange(start?: string | null, end?: string | null, isCurrent?: boolean): string {
   const from = formatKaziDate(start);
   const to = isCurrent ? "Present" : formatKaziDate(end);
-  if (from && to) return `${from} – ${to}`;
+  if (from && to) return `${from} Ã¢â‚¬â€œ ${to}`;
   if (from) return from;
   if (to) return to;
   return "";

@@ -33,12 +33,12 @@ export function TradesTabs({ open, closed, now, closing, onClose, compact = fals
                     <span className={`rounded px-2 py-0.5 text-xs font-bold text-trade-foreground ${t.side === "buy" ? "bg-buy" : "bg-sell"}`}>{t.side.toUpperCase()}</span>
                     <span className="num font-semibold">{ksh(t.amount)}</span>
                     {t.mode === "real" && <span className="rounded bg-real px-1.5 text-xs font-bold text-real-foreground">REAL</span>}
-                    <span className="text-xs text-muted-foreground">entry <span className="num">{t.entry.toFixed(p.digits)}</span> → now <span className="num">{(t.side === "buy" ? q.bid : q.ask).toFixed(p.digits)}</span></span>
-                    <span className={`text-xs font-semibold ${shown >= 0 ? "text-up" : "text-down"}`}>{shown >= 0 ? "In profit" : `Losing · ${ksh(left)} of ${ksh(t.margin)} margin left`}</span>
+                    <span className="text-xs text-muted-foreground">entry <span className="num">{t.entry.toFixed(p.digits)}</span> Ã¢â€ â€™ now <span className="num">{(t.side === "buy" ? q.bid : q.ask).toFixed(p.digits)}</span></span>
+                    <span className={`text-xs font-semibold ${shown >= 0 ? "text-up" : "text-down"}`}>{shown >= 0 ? "In profit" : `Losing Ã‚Â· ${ksh(left)} of ${ksh(t.margin)} margin left`}</span>
                     <span className={`num ml-auto text-lg font-extrabold ${shown >= 0 ? "text-up" : "text-down"}`}>{ksh(shown, true)}</span>
                     <button onClick={() => onClose(t)} disabled={closing === t.id}
                       className="rounded-md border-2 border-foreground px-4 py-1 font-bold hover:bg-foreground hover:text-background disabled:opacity-40">
-                      {closing === t.id ? "Closing…" : "Close"}
+                      {closing === t.id ? "ClosingÃ¢â‚¬Â¦" : "Close"}
                     </button>
                   </li>
                 );
@@ -54,8 +54,8 @@ export function TradesTabs({ open, closed, now, closing, onClose, compact = fals
                   <span className="font-bold">{p.label}</span>
                   <span className={`text-xs font-bold ${t.side === "buy" ? "text-buy" : "text-sell"}`}>{t.side.toUpperCase()}</span>
                   <span className="num">{ksh(t.amount)}</span>
-                  <span className="text-xs uppercase text-muted-foreground">{t.mode}{t.reason === "stopout" ? " · auto-closed" : ""}</span>
-                  <span className="text-xs text-muted-foreground">{when(t.openedAt)} → {t.closedAt && when(t.closedAt)}</span>
+                  <span className="text-xs uppercase text-muted-foreground">{t.mode}{t.reason === "stopout" ? " Ã‚Â· auto-closed" : ""}</span>
+                  <span className="text-xs text-muted-foreground">{when(t.openedAt)} Ã¢â€ â€™ {t.closedAt && when(t.closedAt)}</span>
                   <span className={`num ml-auto font-extrabold ${(t.pnl ?? 0) >= 0 ? "text-up" : "text-down"}`}>{ksh(t.pnl ?? 0, true)}</span>
                 </li>
               );

@@ -4,7 +4,7 @@ import { verifyAuth } from '../../middleware/auth';
 import { placeNsePrediction } from '../../games/nse/engine';
 import { logger } from '../../utils/logger';
 
-// ─── NSE Stock definitions ────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ NSE Stock definitions Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 const TOP_NSE_STOCKS = [
   { symbol: 'SCOM', slug: 'scom', name: 'Safaricom Plc', sector: 'Telecommunications' },
@@ -105,8 +105,8 @@ const nsePredictSchema = z.object({
 
 export const nseRoutes = async (fastify: FastifyInstance) => {
 
-  // GET /games/nse/stocks — live NSE stock data (scraped from afx.kwayisi.org)
-  // No auth required — public market data
+  // GET /games/nse/stocks Ã¢â‚¬â€ live NSE stock data (scraped from afx.kwayisi.org)
+  // No auth required Ã¢â‚¬â€ public market data
   fastify.get('/stocks', async (_request, reply) => {
     try {
       const now = Date.now();

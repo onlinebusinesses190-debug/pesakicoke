@@ -25,7 +25,7 @@ export function TradePanel({ pair, raw, setRaw, mode, balance }: {
           <input value={raw} onChange={(e) => setRaw(e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal"
             className="num w-full bg-transparent px-2 py-2 text-lg font-bold outline-none" aria-label="Trade amount in KSh" />
         </div>
-        <span className="mt-1 block text-xs text-muted-foreground">Min {ksh(MIN_AMOUNT)} · Max {ksh(MAX_AMOUNT)}</span>
+        <span className="mt-1 block text-xs text-muted-foreground">Min {ksh(MIN_AMOUNT)} Ã‚Â· Max {ksh(MAX_AMOUNT)}</span>
       </label>
       <div className="flex flex-wrap gap-1.5">
         {CHIPS.map((c) => (

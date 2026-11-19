@@ -5,8 +5,8 @@ import { SectionTitle } from "@/components/ui-bits";
 export const Route = createFileRoute("/terms")({
   head: () => ({
     meta: [
-      { title: "Terms of Service — PESAKI" },
-      { name: "description", content: "PESAKI Terms of Service — the rules that govern use of our platform." },
+      { title: "Terms of Service Ã¢â‚¬â€ PESAKI" },
+      { name: "description", content: "PESAKI Terms of Service Ã¢â‚¬â€ the rules that govern use of our platform." },
     ],
   }),
   component: TermsPage,
@@ -35,7 +35,7 @@ function TermsPage() {
           <SectionTitle title="2. Account Rules" />
           <div className="rounded-2xl border border-border bg-card p-4">
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>One account per person — no multi-accounting.</li>
+              <li>One account per person Ã¢â‚¬â€ no multi-accounting.</li>
               <li>You are responsible for all activity under your account.</li>
               <li>You must keep your credentials and phone secure.</li>
               <li>You warrant that all funds moved through PESAKI are lawfully sourced.</li>
@@ -71,7 +71,7 @@ function TermsPage() {
         </section>
 
         <p className="mt-8 px-5 text-center text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-          PESAKI · Earn. Invest. Grow.
+          PESAKI Ã‚Â· Earn. Invest. Grow.
         </p>
       </div>
     </AppShell>

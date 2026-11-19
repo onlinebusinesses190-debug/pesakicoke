@@ -1,5 +1,5 @@
 /**
- * PESAKI Forex — pricing and risk engine.
+ * PESAKI Forex Ã¢â‚¬â€ pricing and risk engine.
  *
  * FX P/L is small relative to position size, so every monetary result is rounded
  * explicitly at a defined point rather than relying on float behaviour. Position

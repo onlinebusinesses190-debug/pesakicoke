@@ -1,5 +1,5 @@
 import { FastifyInstance } from "fastify";
-// wallet removed – now registered directly in main index.ts
+// wallet removed Ã¢â‚¬â€œ now registered directly in main index.ts
 import { aviatorRoutes } from "./routes/aviator";
 import { spinRoutes } from "./routes/spin";
 import { predictionRoutes } from "./routes/prediction";
@@ -12,7 +12,7 @@ import { forexRoutes } from "./routes/forex";
 export const registerRoutes = (fastify: FastifyInstance) => {
   fastify.register(healthRoutes); // /health is global
   fastify.register(marketRoutes, { prefix: "/market" });
-  // wallet removed – registered in main index.ts to support optional 'mode'
+  // wallet removed Ã¢â‚¬â€œ registered in main index.ts to support optional 'mode'
   fastify.register(aviatorRoutes, { prefix: "/games/aviator" });
   fastify.register(spinRoutes, { prefix: "/games/spin" });
   fastify.register(predictionRoutes, { prefix: "/games/prediction" });

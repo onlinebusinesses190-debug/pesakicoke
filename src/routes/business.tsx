@@ -16,7 +16,7 @@ import { useRequireAuth } from "@/hooks/useRequireAuth";
 export const Route = createFileRoute("/business")({
   head: () => ({
     meta: [
-      { title: "Business Hub — PESAKI" },
+      { title: "Business Hub Ã¢â‚¬â€ PESAKI" },
       { name: "description", content: "Apply for funding, manage applications, and grow your business through PESAKI Business Hub." },
     ],
   }),
@@ -66,7 +66,7 @@ function BusinessPage() {
   const [mode, setMode] = useState<"none" | "picker" | "startup" | "existing">("none");
   const [info, setInfo] = useState<null | "invest" | "guide">(null);
   const [loading, setLoading] = useState(true);
-  const hasFetched = useRef(false); // ✅ prevent infinite loops
+  const hasFetched = useRef(false); // Ã¢Å“â€¦ prevent infinite loops
 
   const [applications, setApplications] = useState<BusinessApplication[]>([]);
   const [investments, setInvestments] = useState<BusinessInvestment[]>([]);
@@ -79,21 +79,21 @@ function BusinessPage() {
   const [repaymentStatus, setRepaymentStatus] = useState("On time");
 
   const fetchData = async () => {
-    // ✅ If no user, stop loading and return
+    // Ã¢Å“â€¦ If no user, stop loading and return
     if (!user) {
-      console.log("🟡 No user – setting loading false");
+      console.log("Ã°Å¸Å¸Â¡ No user Ã¢â‚¬â€œ setting loading false");
       setLoading(false);
       return;
     }
 
-    // ✅ Prevent multiple simultaneous fetches (guard for manual calls like onSuccess)
+    // Ã¢Å“â€¦ Prevent multiple simultaneous fetches (guard for manual calls like onSuccess)
     if (hasFetched.current) {
-      console.log("⏭️ Already fetched – skipping");
+      console.log("Ã¢ÂÂ­Ã¯Â¸Â Already fetched Ã¢â‚¬â€œ skipping");
       return;
     }
 
     try {
-      console.log("🟢 Fetching applications...");
+      console.log("Ã°Å¸Å¸Â¢ Fetching applications...");
       const { data: appsData, error: appsErr } = await supabase
         .from('business_applications')
         .select('*')
@@ -103,7 +103,7 @@ function BusinessPage() {
       if (appsErr) throw appsErr;
       setApplications((appsData || []) as BusinessApplication[]);
 
-      console.log("🟢 Fetching investments...");
+      console.log("Ã°Å¸Å¸Â¢ Fetching investments...");
       const { data: invData, error: invErr } = await (supabase
         .from('business_investments') as any)
         .select('*')
@@ -113,7 +113,7 @@ function BusinessPage() {
       if (invErr) throw invErr;
       setInvestments((invData || []) as unknown as BusinessInvestment[]);
 
-      console.log("🟢 Fetching success stories...");
+      console.log("Ã°Å¸Å¸Â¢ Fetching success stories...");
       const { data: storyData, error: storyErr } = await supabase
         .from('success_stories')
         .select('*')
@@ -131,26 +131,26 @@ function BusinessPage() {
       setApprovedApps(approved);
 
     } catch (err) {
-      console.error("🔴 Error fetching business data:", err);
+      console.error("Ã°Å¸â€Â´ Error fetching business data:", err);
       toast.error('Could not load Business Hub data');
     } finally {
-      console.log("🟣 Setting loading false");
+      console.log("Ã°Å¸Å¸Â£ Setting loading false");
       setLoading(false);
     }
   };
 
-  // ─── Effect with proper dependencies ──────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Effect with proper dependencies Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   useEffect(() => {
-    // ✅ Only fetch if user exists and we haven't fetched yet
+    // Ã¢Å“â€¦ Only fetch if user exists and we haven't fetched yet
     if (user && !hasFetched.current) {
       hasFetched.current = true; // Set synchronously BEFORE async call to prevent StrictMode double-fetch
       fetchData();
     }
-    // ✅ If no user, make sure loading is false
+    // Ã¢Å“â€¦ If no user, make sure loading is false
     if (!user) {
       setLoading(false);
     }
-  }, [user?.id]); // ✅ Use user.id, not the whole user object
+  }, [user?.id]); // Ã¢Å“â€¦ Use user.id, not the whole user object
 
   const onAction = (k: ActionKey) => {
     if (k === "apply") { if (!requireAuth()) return; return setMode("picker"); }
@@ -285,7 +285,7 @@ function BusinessPage() {
   );
 }
 
-// ─── Sheet Components ────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Sheet Components Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 function SheetShell({ title, onBack, onClose, children }: { title: string; onBack?: () => void; onClose: () => void; children: React.ReactNode }) {
   return (
@@ -413,7 +413,7 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     <SheetShell title="Startup funding" onBack={onBack} onClose={onClose}>
       <div className="rounded-xl bg-primary/5 p-3">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">Startup track</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">Fill in each section — a training session is required after review.</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">Fill in each section Ã¢â‚¬â€ a training session is required after review.</p>
       </div>
       <form onSubmit={handleSubmit}>
         <SectionHeader n={1} title="Business details" />
@@ -450,7 +450,7 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         <div className="mt-3 rounded-xl bg-gold/10 p-3 text-xs"><p className="font-semibold text-gold-foreground">You must attend a free one-time physical training to get funds for startup.</p></div>
         <div className="mt-3 space-y-3">
           <div><FieldLabel>Preferred training date</FieldLabel><div className="relative"><Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><input required type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls + " pl-9"} /></div></div>
-          <div><FieldLabel>Preferred time</FieldLabel><div className="mt-1 grid grid-cols-2 gap-2">{([{key:"morning",label:"8:00 AM – 11:00 AM"},{key:"afternoon",label:"2:00 PM – 5:00 PM"}]).map(s => <button type="button" key={s.key} onClick={() => setSlot(s.key as "morning" | "afternoon")} className={`flex items-center justify-center gap-1.5 rounded-xl border py-2.5 text-xs font-semibold ${slot === s.key ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"}`}><Clock className="h-3.5 w-3.5" /> {s.label}</button>)}</div></div>
+          <div><FieldLabel>Preferred time</FieldLabel><div className="mt-1 grid grid-cols-2 gap-2">{([{key:"morning",label:"8:00 AM Ã¢â‚¬â€œ 11:00 AM"},{key:"afternoon",label:"2:00 PM Ã¢â‚¬â€œ 5:00 PM"}]).map(s => <button type="button" key={s.key} onClick={() => setSlot(s.key as "morning" | "afternoon")} className={`flex items-center justify-center gap-1.5 rounded-xl border py-2.5 text-xs font-semibold ${slot === s.key ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"}`}><Clock className="h-3.5 w-3.5" /> {s.label}</button>)}</div></div>
         </div>
         <SectionHeader n={6} title="Terms" />
         <label className="mt-3 flex items-start gap-2 rounded-xl border border-border p-3 text-xs"><input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" /><span>I agree to return a percentage of my monthly profit to PESAKI until the full amount is repaid.</span></label>
@@ -513,7 +513,7 @@ function ExistingForm({ onBack, onClose, user, onSuccess }: any) {
         <div className="mt-5 rounded-2xl border border-border bg-primary/5 p-5 text-center">
           <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-primary/15 text-primary"><CheckCircle2 className="h-6 w-6" /></div>
           <p className="mt-3 text-base font-bold">Your application is under review</p>
-          <p className="mt-1 text-xs text-muted-foreground">Our team will assess your documents and financials. Expect a decision within 3–5 business days.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Our team will assess your documents and financials. Expect a decision within 3Ã¢â‚¬â€œ5 business days.</p>
           <button onClick={onClose} className="mt-4 h-11 w-full rounded-xl gradient-primary text-sm font-semibold text-primary-foreground">Done</button>
         </div>
       ) : (
@@ -570,7 +570,7 @@ function InfoSheet({ which, onClose }: { which: "invest" | "guide"; onClose: () 
           <div className="rounded-2xl gradient-primary p-4 text-primary-foreground">
             <p className="text-[11px] uppercase tracking-widest opacity-80">Total invested</p>
             <p className="mt-1 text-2xl font-bold">KES 175,000</p>
-            <p className="mt-1 text-xs opacity-90">Avg. return · +14.2% p.a.</p>
+            <p className="mt-1 text-xs opacity-90">Avg. return Ã‚Â· +14.2% p.a.</p>
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between rounded-xl border border-border p-3">
@@ -591,15 +591,15 @@ function InfoSheet({ which, onClose }: { which: "invest" | "guide"; onClose: () 
           </div>
           <div className="rounded-xl border border-border p-3">
             <p className="text-sm font-bold text-foreground">Funding range</p>
-            <p className="mt-1">Startup: KES 20,000 – 250,000 · Existing: KES 50,000 – 2,000,000.</p>
+            <p className="mt-1">Startup: KES 20,000 Ã¢â‚¬â€œ 250,000 Ã‚Â· Existing: KES 50,000 Ã¢â‚¬â€œ 2,000,000.</p>
           </div>
           <div className="rounded-xl border border-border p-3">
             <p className="text-sm font-bold text-foreground">Repayment</p>
-            <p className="mt-1">A negotiated share of monthly profit until the funded amount is fully repaid — no compounding interest.</p>
+            <p className="mt-1">A negotiated share of monthly profit until the funded amount is fully repaid Ã¢â‚¬â€ no compounding interest.</p>
           </div>
           <div className="rounded-xl border border-border p-3">
             <p className="text-sm font-bold text-foreground">Timeline</p>
-            <p className="mt-1">Startup: 7–10 business days including training. Existing: 3–5 business days after documents are verified.</p>
+            <p className="mt-1">Startup: 7Ã¢â‚¬â€œ10 business days including training. Existing: 3Ã¢â‚¬â€œ5 business days after documents are verified.</p>
           </div>
           <div className="rounded-xl border border-border p-3">
             <p className="text-sm font-bold text-foreground">Required documents</p>

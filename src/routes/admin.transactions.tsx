@@ -83,7 +83,7 @@ function AdminTransactions() {
   if (authLoading || loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <p className="text-muted-foreground">Loading transactions…</p>
+        <p className="text-muted-foreground">Loading transactionsÃ¢â‚¬Â¦</p>
       </div>
     );
   }
@@ -98,7 +98,7 @@ function AdminTransactions() {
             <form onSubmit={handleSearch} className="relative">
               <input
                 type="text"
-                placeholder="Search transactions…"
+                placeholder="Search transactionsÃ¢â‚¬Â¦"
                 className="h-9 w-56 rounded-lg border border-border bg-card pl-9 pr-3 text-sm outline-none focus:border-primary"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -177,7 +177,7 @@ function AdminTransactions() {
                     {transactions.map((t) => (
                       <tr key={t.id} className="border-b border-border/60 last:border-0">
                         <td className="py-3 pr-3 font-mono text-xs text-muted-foreground">
-                          {t.id.slice(0, 8)}…
+                          {t.id.slice(0, 8)}Ã¢â‚¬Â¦
                         </td>
                         <td className="py-3 pr-3 font-medium">{t.user_email}</td>
                         <td className="py-3 pr-3 capitalize">{t.type}</td>

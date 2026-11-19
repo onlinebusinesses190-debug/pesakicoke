@@ -115,14 +115,14 @@ export function KaziProfileTab() {
     const url = publicUrl();
     if (!url) return;
     const name = bundle?.profile.full_name?.trim() || "My KAZI profile";
-    const shareData = { title: `${name} — KAZI Link`, text: `Check out my KAZI Link profile`, url };
+    const shareData = { title: `${name} Ã¢â‚¬â€ KAZI Link`, text: `Check out my KAZI Link profile`, url };
 
     if (navigator.share) {
       try {
         await navigator.share(shareData);
         return;
       } catch {
-        /* user dismissed the share sheet — fall back to copying */
+        /* user dismissed the share sheet Ã¢â‚¬â€ fall back to copying */
       }
     }
     const ok = await copyText(url);
@@ -151,7 +151,7 @@ export function KaziProfileTab() {
       <section className="mt-5 px-5">
         <div className="flex items-center justify-center gap-2 py-12 text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
-          <span className="text-sm">Loading your profile…</span>
+          <span className="text-sm">Loading your profileÃ¢â‚¬Â¦</span>
         </div>
       </section>
     );
@@ -282,7 +282,7 @@ export function MyProfileShortcut({ onClick }: { onClick: () => void }) {
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-foreground">My Profile</p>
         <p className="truncate text-[11px] text-muted-foreground">
-          {pct > 0 ? `${pct}% complete · ` : ""}
+          {pct > 0 ? `${pct}% complete Ã‚Â· ` : ""}
           {bundle && isProfileEmpty(bundle) ? "Get started" : "View your public profile"}
         </p>
       </div>

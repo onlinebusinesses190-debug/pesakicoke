@@ -149,7 +149,7 @@ function CompliancePage() {
                 <div className="min-w-0">
                   <p className="text-sm font-semibold">Hans Jaoko</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    Director, PESAKI MARKETING — Founder, Stratum Energy Ventures Ltd
+                    Director, PESAKI MARKETING Ã¢â‚¬â€ Founder, Stratum Energy Ventures Ltd
                   </p>
                 </div>
               </div>
@@ -345,7 +345,7 @@ function CompliancePage() {
         </section>
 
         <p className="mt-8 text-center text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-          PESAKI MARKETING · BN-6ASR2E26 · Nairobi, Kenya
+          PESAKI MARKETING Ã‚Â· BN-6ASR2E26 Ã‚Â· Nairobi, Kenya
         </p>
       </div>
     </AppShell>

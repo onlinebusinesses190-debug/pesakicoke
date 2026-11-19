@@ -95,7 +95,7 @@ function AdminFinance() {
   if (authLoading || loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <p className="text-muted-foreground">Loading finance data…</p>
+        <p className="text-muted-foreground">Loading finance dataÃ¢â‚¬Â¦</p>
       </div>
     );
   }
@@ -146,7 +146,7 @@ function AdminFinance() {
                   <div>
                     <p className="font-semibold">{w.user}</p>
                     <p className="text-xs text-muted-foreground">
-                      {w.reference} · {w.phone} ·
+                      {w.reference} Ã‚Â· {w.phone} Ã‚Â·
                       {w.created_at ? new Date(w.created_at).toLocaleDateString("en-KE") : ""}
                     </p>
                   </div>
@@ -214,7 +214,7 @@ function AdminFinance() {
                 {adminTx.map((t) => (
                   <tr key={t.id} className="border-b border-border/60 last:border-0">
                     <td className="py-3 pr-3 font-mono text-xs text-muted-foreground">
-                      {t.id.slice(0, 8)}…
+                      {t.id.slice(0, 8)}Ã¢â‚¬Â¦
                     </td>
                     <td className="py-3 pr-3 font-medium">{t.user}</td>
                     <td className="py-3 pr-3 capitalize">{t.type}</td>

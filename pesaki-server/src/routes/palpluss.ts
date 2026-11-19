@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { env } from '../config/env';
 import { getBalance, reserveLockedFunds, releaseLockedFunds } from '../wallet/service';
 import { calculateWithdrawalFee, MIN_WITHDRAWAL } from '../utils/fees';
-import { sasaPayWithdrawToMobile, networkCodeForPhone, buildPayHeroCallbackUrl } from '../payhero/service';
+import { finoqWithdrawToMobile, networkCodeForPhone, buildFinoqCallbackUrl } from '../finoq/service';
 
 const MIN_WITHDRAWAL_AMOUNT = MIN_WITHDRAWAL;
 
@@ -26,7 +26,7 @@ const formatPhoneForPalpluss = (value: string) => {
   return digits;
 };
 
-// ─── Helper: call Palpluss B2C API ──────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Helper: call Palpluss B2C API Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 const callPalplussB2C = async (
   amount: number,
   phone: string,
@@ -118,7 +118,7 @@ const callPalplussB2C = async (
 };
 
 export const palplussRoutes = async (fastify: FastifyInstance) => {
-  // ─── Webhook ──────────────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Webhook Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   fastify.post(
     '/api/webhooks/palpluss',
     async (request: FastifyRequest, reply: FastifyReply) => {
@@ -271,7 +271,7 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
     }
   );
 
-  // ─── Initiate B2C withdrawal ──────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Initiate B2C withdrawal Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   fastify.post(
     '/wallet/withdraw/b2c',
     async (request: FastifyRequest, reply: FastifyReply) => {
@@ -374,12 +374,12 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
           'WITHDRAWAL_REQUESTED | FUNDS_RESERVED'
         );
 
-        const callbackBase = env.USE_PAYHERO_FOR_WITHDRAWALS
-          ? (env.PAYHERO_CALLBACK_URL || env.MPESA_CALLBACK_URL || 'https://pesaki-server.onrender.com')
+        const callbackBase = env.USE_FINOQ_FOR_WITHDRAWALS
+          ? (env.FINOQ_CALLBACK_URL || env.MPESA_CALLBACK_URL || 'https://pesaki-server.onrender.com')
           : (env.MPESA_CALLBACK_URL || 'https://pesaki-server.onrender.com');
-        const providerPath = env.USE_PAYHERO_FOR_WITHDRAWALS ? 'payhero' : 'palpluss';
-        const callbackUrl = env.USE_PAYHERO_FOR_WITHDRAWALS
-          ? buildPayHeroCallbackUrl(callbackBase)
+        const providerPath = env.USE_FINOQ_FOR_WITHDRAWALS ? 'finoq' : 'palpluss';
+        const callbackUrl = env.USE_FINOQ_FOR_WITHDRAWALS
+          ? buildFinoqCallbackUrl(callbackBase)
           : `${callbackBase.replace(/\/+$/, '')}/api/webhooks/${providerPath}`;
 
         let providerResponse: any;
@@ -388,34 +388,21 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
         let providerMetadataKey: string;
 
         try {
-          if (env.USE_PAYHERO_FOR_WITHDRAWALS) {
+          if (env.USE_FINOQ_FOR_WITHDRAWALS) {
             const networkCode = networkCodeForPhone(cleanPhone);
-            providerResponse = await sasaPayWithdrawToMobile(
+            providerResponse = await finoqWithdrawToMobile(
               payoutAmount,
               cleanPhone,
-              networkCode,
               reference,
               callbackUrl
             );
-            providerTransactionId =
-              providerResponse?.transaction_id ||
-              providerResponse?.transactionId ||
-              null;
-            providerCheckoutId =
-              providerResponse?.provider_checkout_id ||
-              providerResponse?.providerCheckoutId ||
-              null;
-            providerMetadataKey = 'payhero_response';
+            providerTransactionId = providerResponse?.transactionId || providerResponse?.transaction_id || null;
+            providerCheckoutId = providerResponse?.providerCheckoutId || providerResponse?.provider_checkout_id || null;
+            providerMetadataKey = 'finoq_response';
 
             logger.info(
-              {
-                reference,
-                userId: user.id,
-                networkCode,
-                transactionId: providerTransactionId,
-                response: providerResponse,
-              },
-              'WITHDRAWAL_REQUESTED | PAYHERO_RESPONSE'
+              { reference, userId: user.id, networkCode, transactionId: providerTransactionId, response: providerResponse },
+              'WITHDRAWAL_REQUESTED | FINOQ_RESPONSE'
             );
           } else {
             providerResponse = await callPalplussB2C(payoutAmount, cleanPhone, reference, callbackUrl);
@@ -527,7 +514,7 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
     }
   );
 
-  // ─── Get withdrawal status ────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Get withdrawal status Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   fastify.get(
     '/wallet/withdrawals/status/:reference',
     async (request: FastifyRequest, reply: FastifyReply) => {

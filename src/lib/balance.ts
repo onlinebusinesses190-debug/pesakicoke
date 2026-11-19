@@ -118,15 +118,15 @@ export const balanceStore = {
   deposit(amount: number, method: string) {
     if (amount <= 0) return;
     set({ ...state, available: state.available + amount });
-    addTxn(`Deposit · ${method}`, amount);
+    addTxn(`Deposit Ã‚Â· ${method}`, amount);
   },
   withdraw(amount: number, method: "M-Pesa" | "Bank"): { ok: boolean; error?: string } {
     const fee = withdrawFee(amount, method);
     const total = amount + fee;
     if (total > state.available) return { ok: false, error: "Insufficient balance" };
     set({ ...state, available: state.available - total });
-    addTxn(`Withdrawal · ${method}`, -amount);
-    if (fee > 0) addTxn(`Withdrawal fee · ${method}`, -fee);
+    addTxn(`Withdrawal Ã‚Â· ${method}`, -amount);
+    if (fee > 0) addTxn(`Withdrawal fee Ã‚Â· ${method}`, -fee);
     return { ok: true };
   },
   transfer(phone: string, amount: number): { ok: boolean; error?: string } {
@@ -149,7 +149,7 @@ export const balanceStore = {
       total: totalDays,
     };
     set({ ...state, available: state.available - amount, locked: [deposit, ...state.locked] });
-    addTxn(`Locked · ${name}`, -amount);
+    addTxn(`Locked Ã‚Â· ${name}`, -amount);
     return { ok: true };
   },
 };

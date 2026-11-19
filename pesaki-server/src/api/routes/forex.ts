@@ -1,5 +1,5 @@
 /**
- * PESAKI Forex — HTTP API.
+ * PESAKI Forex Ã¢â‚¬â€ HTTP API.
  */
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";

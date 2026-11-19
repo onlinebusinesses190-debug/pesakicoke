@@ -21,7 +21,7 @@ export interface EngineConfig {
   initialPrices: Record<string, number>;
 }
 
-// ─── HOUSE LEDGER ───
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ HOUSE LEDGER Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 export interface HouseLedger {
   totalStakes: number;
   totalPayouts: number;
@@ -453,7 +453,7 @@ export class MarketEngine {
   }
 }
 
-// ─── EXPORTS ───
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ EXPORTS Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 let engine: MarketEngine | null = null;
 
 export function getEngine(): MarketEngine {

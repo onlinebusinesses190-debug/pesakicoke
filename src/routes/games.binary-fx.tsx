@@ -74,7 +74,7 @@ function BinaryFxPage() {
   const markerCoordsRef = useRef<{ id: string; x: number; y: number }[]>([]);
   const lastSettleScanRef = useRef(0);
 
-  // ── Fairness refs ──
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Fairness refs Ã¢â€â‚¬Ã¢â€â‚¬
   // Latest known price per asset from the frontend's own live feed.
   const lastPriceByAssetRef = useRef<Record<string, number>>({});
   // Trades already being settled (prevents double-settle spam).
@@ -177,7 +177,7 @@ function BinaryFxPage() {
     fetchSettledTrades();
   }, [fetchConfig, fetchBalance, fetchOpenTrades, fetchSettledTrades]);
 
-  // ─── Fairness-aware settlement ──────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Fairness-aware settlement Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const settleTrade = useCallback(
     async (tradeId: string) => {
       // Guard: don't settle the same trade twice
@@ -245,7 +245,7 @@ function BinaryFxPage() {
               second: "2-digit",
             });
 
-            // ── Client-side fairness sanity check ──────────────────────────
+            // Ã¢â€â‚¬Ã¢â€â‚¬ Client-side fairness sanity check Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
             // If the backend says "win" but the frontend's own price feed
             // shows the opposite, log a warning so it can be investigated.
             if (
@@ -275,17 +275,17 @@ function BinaryFxPage() {
               }
             }
 
-            // ── Fairness receipt ───────────────────────────────────────────
+            // Ã¢â€â‚¬Ã¢â€â‚¬ Fairness receipt Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
             const receipt =
-              `Entry: ${entryStr} @ ${entryT} → Exit: ${exitStr} @ ${exitT}` +
-              ` · ${dir?.toUpperCase()} · ${asset}`;
+              `Entry: ${entryStr} @ ${entryT} Ã¢â€ â€™ Exit: ${exitStr} @ ${exitT}` +
+              ` Ã‚Â· ${dir?.toUpperCase()} Ã‚Â· ${asset}`;
 
             if (result.status === "win") {
-              toast.success(`🎉 WON! +KSh ${formatKes(profit)}\n${receipt}`, {
+              toast.success(`Ã°Å¸Å½â€° WON! +KSh ${formatKes(profit)}\n${receipt}`, {
                 duration: 7000,
               });
             } else {
-              toast.error(`💀 LOST! -KSh ${formatKes(stakeAmount)}\n${receipt}`, {
+              toast.error(`Ã°Å¸â€™â‚¬ LOST! -KSh ${formatKes(stakeAmount)}\n${receipt}`, {
                 duration: 7000,
               });
             }
@@ -388,7 +388,7 @@ function BinaryFxPage() {
     window.location.href = `/games/binary-fx?mode=${newMode}`;
   };
 
-  // ── Timers ──
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Timers Ã¢â€â‚¬Ã¢â€â‚¬
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
@@ -399,7 +399,7 @@ function BinaryFxPage() {
     return () => clearInterval(id);
   }, []);
 
-  // ── Initial loads ──
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Initial loads Ã¢â€â‚¬Ã¢â€â‚¬
   useEffect(() => {
     fetchConfig();
     fetchPrice(selectedAsset);
@@ -420,7 +420,7 @@ function BinaryFxPage() {
     return () => document.removeEventListener("visibilitychange", handleVisibility);
   }, [refreshAll]);
 
-  // ── Auto-settle expired trades (fairness-critical) ──
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Auto-settle expired trades (fairness-critical) Ã¢â€â‚¬Ã¢â€â‚¬
   // Runs a scan every second. Only trades whose expires_at has passed AND
   // which are not already being settled get queued.
   useEffect(() => {
@@ -440,7 +440,7 @@ function BinaryFxPage() {
     expired.forEach((t) => settleTrade(t.id));
   }, [openTrades, now, settleTrade]);
 
-  // ── Derived values ──
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Derived values Ã¢â€â‚¬Ã¢â€â‚¬
   const sentimentTrades: SentimentTrade[] = [...settledTrades, ...openTrades].map((t) => ({
     direction: t.direction,
   }));
@@ -478,19 +478,19 @@ function BinaryFxPage() {
 
   const expiryTime = activeMarker ? new Date(activeMarker.expires_at).getTime() : null;
 
-  // ── Loading ──
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Loading Ã¢â€â‚¬Ã¢â€â‚¬
   if (!authReady || !config) {
     return (
       <div className="min-h-screen bg-[#0a0e27] text-white flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#4a9eff] mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading Binary FX…</p>
+          <p className="text-gray-400">Loading Binary FXÃ¢â‚¬Â¦</p>
         </div>
       </div>
     );
   }
 
-  // ── Computed values ──
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Computed values Ã¢â€â‚¬Ã¢â€â‚¬
   const isRealMode = defaultMode === "real";
   const stakeNum = parseFloat(stake) || 0;
   const payout = config.payout;
@@ -502,11 +502,11 @@ function BinaryFxPage() {
     connected;
   const insufficientFunds = isRealMode && balance !== null && balance < stakeNum;
 
-  // ── Render ──
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Render Ã¢â€â‚¬Ã¢â€â‚¬
   return (
     <div className="min-h-screen bg-[#0a0e27] text-white pb-6">
       <div className="max-w-md mx-auto px-3 pt-4 space-y-3">
-        {/* ── Top Bar ── */}
+        {/* Ã¢â€â‚¬Ã¢â€â‚¬ Top Bar Ã¢â€â‚¬Ã¢â€â‚¬ */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <button
@@ -518,7 +518,7 @@ function BinaryFxPage() {
             <div>
               <div className="text-[10px] uppercase text-gray-500">Balance</div>
               <div className="font-bold text-sm text-gold">
-                KSh {displayBalance !== null ? formatKes(displayBalance) : "—"}
+                KSh {displayBalance !== null ? formatKes(displayBalance) : "Ã¢â‚¬â€"}
               </div>
             </div>
           </div>
@@ -576,7 +576,7 @@ function BinaryFxPage() {
           </div>
         </div>
 
-        {/* ── Asset Selector + Sentiment ── */}
+        {/* Ã¢â€â‚¬Ã¢â€â‚¬ Asset Selector + Sentiment Ã¢â€â‚¬Ã¢â€â‚¬ */}
         <div className="flex items-end gap-3">
           <AssetSelector
             value={selectedAsset}
@@ -589,7 +589,7 @@ function BinaryFxPage() {
           <SentimentBar trades={sentimentTrades} />
         </div>
 
-        {/* ── Chart ── */}
+        {/* Ã¢â€â‚¬Ã¢â€â‚¬ Chart Ã¢â€â‚¬Ã¢â€â‚¬ */}
         <div className="relative rounded-xl overflow-hidden border border-[#2b313f]">
           <BfxLineChart
             pair={selectedAsset}
@@ -678,7 +678,7 @@ function BinaryFxPage() {
           )}
         </div>
 
-        {/* ── Trade Panel ── */}
+        {/* Ã¢â€â‚¬Ã¢â€â‚¬ Trade Panel Ã¢â€â‚¬Ã¢â€â‚¬ */}
         <div className="rounded-xl border border-[#2b313f] bg-[#0b0e14] p-3">
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div>
@@ -698,7 +698,7 @@ function BinaryFxPage() {
             <div>
               <div className="text-[10px] uppercase text-gray-500">Price</div>
               <div className="font-mono font-semibold text-gold text-base">
-                {price?.toFixed(priceDecimals(selectedAsset)) ?? "—"}
+                {price?.toFixed(priceDecimals(selectedAsset)) ?? "Ã¢â‚¬â€"}
               </div>
             </div>
             <div>
@@ -717,7 +717,7 @@ function BinaryFxPage() {
             <div>
               <div className="text-[10px] uppercase text-gray-500">Potential Payout</div>
               <div className="font-bold text-emerald-400 text-sm">
-                {stakeNum >= config.minStake ? `KSh ${formatKes(potentialWin)}` : "—"}
+                {stakeNum >= config.minStake ? `KSh ${formatKes(potentialWin)}` : "Ã¢â‚¬â€"}
                 <span className="text-[10px] text-gray-500 ml-1">
                   ({Math.round(payout * 100)}%)
                 </span>
@@ -740,7 +740,7 @@ function BinaryFxPage() {
           )}
         </div>
 
-        {/* ── BUY / SELL ── */}
+        {/* Ã¢â€â‚¬Ã¢â€â‚¬ BUY / SELL Ã¢â€â‚¬Ã¢â€â‚¬ */}
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={() => placeTrade("up")}
@@ -770,9 +770,9 @@ function BinaryFxPage() {
           </button>
         </div>
 
-        {placing && <div className="text-center text-xs text-gray-400">Placing trade…</div>}
+        {placing && <div className="text-center text-xs text-gray-400">Placing tradeÃ¢â‚¬Â¦</div>}
 
-        {/* ── Open Trades ── */}
+        {/* Ã¢â€â‚¬Ã¢â€â‚¬ Open Trades Ã¢â€â‚¬Ã¢â€â‚¬ */}
         <div className="space-y-2">
           <h3 className="text-[10px] uppercase text-gray-500 font-semibold">
             Open Trades ({openTrades.length})
@@ -788,7 +788,7 @@ function BinaryFxPage() {
                 const remaining = Math.max(0, Math.ceil((expiresAt - now) / 1000));
                 const mins = Math.floor(remaining / 60);
                 const secs = remaining % 60;
-                // Use the trade's OWN asset price — not the globally selected one.
+                // Use the trade's OWN asset price Ã¢â‚¬â€ not the globally selected one.
                 const tradeAssetPrice = lastPriceByAssetRef.current[t.asset] ?? t.entry_price;
                 const isWinning =
                   t.direction === "up"
@@ -812,7 +812,7 @@ function BinaryFxPage() {
                       <div>
                         <div className="font-semibold text-sm">{t.asset}</div>
                         <div className="text-[10px] text-gray-500 font-mono">
-                          Entry: {t.entry_price.toFixed(priceDecimals(t.asset))} · Now:{" "}
+                          Entry: {t.entry_price.toFixed(priceDecimals(t.asset))} Ã‚Â· Now:{" "}
                           {tradeAssetPrice.toFixed(priceDecimals(t.asset))}
                         </div>
                       </div>
@@ -824,7 +824,7 @@ function BinaryFxPage() {
                         {mins}:{String(secs).padStart(2, "0")}
                       </div>
                       <div className="text-[10px] text-gray-500">
-                        KSh {formatKes(t.stake)} → KSh {formatKes(t.stake * (1 + payout))}
+                        KSh {formatKes(t.stake)} Ã¢â€ â€™ KSh {formatKes(t.stake * (1 + payout))}
                       </div>
                     </div>
                   </div>
@@ -834,7 +834,7 @@ function BinaryFxPage() {
           )}
         </div>
 
-        {/* ── Recent Results ── */}
+        {/* Ã¢â€â‚¬Ã¢â€â‚¬ Recent Results Ã¢â€â‚¬Ã¢â€â‚¬ */}
         <div className="space-y-2">
           <h3 className="text-[10px] uppercase text-gray-500 font-semibold">Recent Results</h3>
           {settledTrades.length === 0 ? (
@@ -875,11 +875,11 @@ function BinaryFxPage() {
                           ? `+KSh ${formatKes(t.profit)}`
                           : t.profit < 0
                             ? `-KSh ${formatKes(Math.abs(t.profit))}`
-                            : "—"}
+                            : "Ã¢â‚¬â€"}
                       </div>
                       <div className="text-[9px] text-gray-600 dark:text-gray-500 font-mono">
-                        Entry: {t.entry_price.toFixed(priceDecimals(t.asset))} → Exit:{" "}
-                        {(t.expiry_price ?? 0).toFixed(priceDecimals(t.asset))} •{" "}
+                        Entry: {t.entry_price.toFixed(priceDecimals(t.asset))} Ã¢â€ â€™ Exit:{" "}
+                        {(t.expiry_price ?? 0).toFixed(priceDecimals(t.asset))} Ã¢â‚¬Â¢{" "}
                         {t.direction.toUpperCase()}
                       </div>
                       <div className="text-[10px] text-gray-500">

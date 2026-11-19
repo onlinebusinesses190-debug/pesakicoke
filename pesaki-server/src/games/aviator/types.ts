@@ -10,7 +10,7 @@ export interface AviatorRound {
 
 export interface AviatorBet {
   userId: string;
-  slot: number; // 1 or 2 — the two allocation slots per round
+  slot: number; // 1 or 2 Ã¢â‚¬â€ the two allocation slots per round
   amount: number;
   mode: "real" | "demo";
   cashedOut: boolean;

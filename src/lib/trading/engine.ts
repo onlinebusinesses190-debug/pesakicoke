@@ -268,7 +268,7 @@ export class Engine {
     this.save(); this.emit(); return { ok: true };
   }
 
-  // ─── LIVE MODE: BACKEND SYNC ───
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ LIVE MODE: BACKEND SYNC Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   async fetchLiveBalance(): Promise<void> {
     if (this.isTrading) return;
     try {
@@ -320,7 +320,7 @@ export class Engine {
 
             // Entry price: backend average_entry_price takes precedence, then
             // existing frontend entry price, then cached entry price. Never fall
-            // back to 0 — that would create fictitious P/L.
+            // back to 0 Ã¢â‚¬â€ that would create fictitious P/L.
             const backendPrice = Number(p.average_entry_price) || Number(p.open_price) || 0;
             const cached = (this._liveEntryPrices && typeof this._liveEntryPrices.get === 'function') 
               ? (this._liveEntryPrices.get(`${finalSymbol}_${p.side}_${lots}`) || 0) 
@@ -432,7 +432,7 @@ export class Engine {
       await this.fetchLiveHistory();
     };
     tick();
-    this.livePollInterval = window.setInterval(tick, 120000); // 2 min — reduces position churn
+    this.livePollInterval = window.setInterval(tick, 120000); // 2 min Ã¢â‚¬â€ reduces position churn
   }
 
   private stopLiveBalancePolling(): void {
@@ -442,7 +442,7 @@ export class Engine {
     }
   }
 
-  // ─── REALTIME SUBSCRIPTIONS ───
+  // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ REALTIME SUBSCRIPTIONS Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   /** Set a callback fired when a position is closed (by SL/TP/stop-out/manual via backend). */
   setPositionClosedCallback(cb: (side: string, lots: number, pnl: number, reason: string) => void): void {
     this._onPositionClosed = cb;
