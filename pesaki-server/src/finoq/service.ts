@@ -33,8 +33,8 @@ export const buildFinoqCallbackUrl = (configuredBase: string): string => {
 };
 
 const getHeaders = (): Record<string, string> => {
-  const key = env.FINOQ_KEY;
-  const secret = env.FINOQ_SECRET;
+  const key = env.FINOQ_KEY?.trim();
+  const secret = env.FINOQ_SECRET?.trim();
   if (!key || !secret) {
     throw new Error('FINOQ_KEY / FINOQ_SECRET environment variables are not set');
   }
