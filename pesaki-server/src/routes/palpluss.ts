@@ -315,10 +315,13 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
         } catch (apiError: any) {
           await releaseLockedFunds(user.id, amount, true);
 
+          const isNetworkError = apiError?.isNetworkError === true;
+          const withdrawalStatus = isNetworkError ? 'PENDING_VERIFICATION' : 'failed';
+
           await supabase
             .from('b2c_withdrawals')
             .update({
-              status: 'failed',
+              status: withdrawalStatus,
               provider_transaction_id: apiError.providerTransactionId || null,
               provider_checkout_id: apiError.providerCheckoutId || null,
               metadata: {
@@ -327,6 +330,8 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
                 provider_message: apiError.providerMessage,
                 http_status: apiError.status,
                 response_body: apiError.responseBody,
+                error_info: apiError.errorInfo || null,
+                is_network_error: isNetworkError,
               },
             })
             .eq('id', withdrawal.id);
@@ -339,17 +344,24 @@ export const palplussRoutes = async (fastify: FastifyInstance) => {
               providerMessage: apiError.providerMessage,
               status: apiError.status,
               responseBody: apiError.responseBody,
+              errorInfo: apiError.errorInfo,
+              isNetworkError: isNetworkError,
             },
-            'WITHDRAWAL_FAILED | WITHDRAWAL_PROVIDER_REQUEST_FAILED'
+            isNetworkError
+              ? 'WITHDRAWAL_PENDING_VERIFICATION | FINOQ_CONNECTION_TERMINATED'
+              : 'WITHDRAWAL_FAILED | WITHDRAWAL_PROVIDER_REQUEST_FAILED'
           );
 
           return reply.status(500).send({
             success: false,
-            error: 'Withdrawal provider rejected the payout',
+            error: isNetworkError
+              ? 'Withdrawal connection terminated without provider response - pending verification'
+              : 'Withdrawal provider rejected the payout',
             status: apiError.status,
             providerCode: apiError.providerCode,
             providerMessage: apiError.providerMessage,
             responseBody: apiError.responseBody,
+            requiresVerification: isNetworkError,
           });
         }
 

@@ -10,8 +10,6 @@ export interface FinoqResponse {
   [key: string]: any;
 }
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
 export const formatFinoqPhone = (phone: string): string => {
   const digits = phone.replace(/\D/g, '');
   if (digits.startsWith('254') && digits.length === 12) return digits;
@@ -60,52 +58,66 @@ const postToFinoq = async (endpoint: string, payload: any, operation: string): P
   let response!: Response;
   let responseText = '';
 
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 120000);
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 120000);
-      try {
-        logger.info({ url: endpoint, reference: payload.externalReference, attempt }, `${operation}_REQUEST`);
-        response = await fetch(endpoint, { method: 'POST', headers: getHeaders(), body: JSON.stringify(payload), signal: controller.signal });
-      } finally {
-        clearTimeout(timeout);
-      }
-      responseText = await response.text();
-      logger.info({ status: response.status, reference: payload.externalReference, attempt }, `${operation}_RESPONSE`);
-      if (response.status !== 404 && response.status < 500) break;
-      if (attempt < 3) await sleep(1000);
-    } catch (error: any) {
-      if (attempt >= 3) {
-        const err = new Error('Finoq request failed after retries') as any;
-        err.status = 502;
-        err.providerMessage = error?.message === 'fetch failed'
-          ? 'Unable to reach Finoq. Verify FINOQ_BASE_URL and outbound network access.'
-          : error?.message || 'Request timed out or failed';
-        err.providerCode = 'FINOQ_NETWORK_ERROR';
-        throw err;
-      }
-      await sleep(1000);
+      logger.info({ url: endpoint, reference: payload.externalReference }, `${operation}_REQUEST`);
+      response = await fetch(endpoint, { method: 'POST', headers: getHeaders(), body: JSON.stringify(payload), signal: controller.signal });
+    } finally {
+      clearTimeout(timeout);
     }
-  }
+    responseText = await response.text();
+    logger.info({ status: response.status, reference: payload.externalReference }, `${operation}_RESPONSE`);
 
-  let data: any;
-  try { data = JSON.parse(responseText); } catch {
-    const err = new Error('Invalid JSON response from Finoq') as any;
-    err.status = response.status;
-    err.responseBody = responseText;
-    throw err;
-  }
+    let data: any;
+    try { data = JSON.parse(responseText); } catch {
+      const err = new Error('Invalid JSON response from Finoq') as any;
+      err.status = response.status;
+      err.responseBody = responseText;
+      throw err;
+    }
 
-  if (!response.ok || data.success === false) {
-    const providerMessage = data.message || data.errorMessage || data.error_message || data.description || 'Finoq request rejected';
-    const err = new Error(providerMessage) as any;
-    err.status = response.status;
-    err.providerCode = data.code || data.errorCode || data.error_code;
-    err.providerMessage = providerMessage;
-    err.responseBody = data;
-    throw err;
+    if (!response.ok || data.success === false) {
+      const providerMessage = data.message || data.errorMessage || data.error_message || data.description || 'Finoq request rejected';
+      const err = new Error(providerMessage) as any;
+      err.status = response.status;
+      err.providerCode = data.code || data.errorCode || data.error_code;
+      err.providerMessage = providerMessage;
+      err.responseBody = data;
+      throw err;
+    }
+    return data;
+  } catch (error: any) {
+    const errorInfo = {
+      name: error?.name,
+      message: error?.message,
+      cause: error?.cause,
+      code: error?.code,
+      stack: error?.stack,
+    };
+    logger.error({ ...errorInfo, reference: payload.externalReference }, 'FINOQ_REQUEST_ERROR');
+
+    const isNetworkError = error?.name === 'AbortError' ||
+      error?.code === 'ECONNREFUSED' ||
+      error?.code === 'ETIMEDOUT' ||
+      error?.code === 'ENOTFOUND' ||
+      error?.code === 'ECONNRESET' ||
+      error?.message === 'fetch failed';
+
+    if (isNetworkError) {
+      const err = new Error('Finoq connection terminated without provider response') as any;
+      err.status = 502;
+      err.providerCode = 'FINOQ_NETWORK_ERROR';
+      err.providerMessage = 'Connection terminated without confirmed provider response';
+      err.responseBody = null;
+      err.errorInfo = errorInfo;
+      err.isNetworkError = true;
+      throw err;
+    }
+
+    throw error;
   }
-  return data;
 };
 
 export const finoqWithdrawToMobile = async (amount: number, phone: string, externalReference: string, callbackUrl: string): Promise<FinoqResponse> => {

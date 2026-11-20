@@ -829,13 +829,35 @@ export const bankingRoutes = async (fastify: FastifyInstance) => {
           'BANKING_WITHDRAWAL_REQUESTED | FINOQ'
         );
       } catch (apiError: any) {
+        const isNetworkError = apiError?.isNetworkError === true;
+
+        logger.error(
+          {
+            reference,
+            userId: user.id,
+            error: apiError.message,
+            providerCode: apiError.providerCode,
+            providerMessage: apiError.providerMessage,
+            status: apiError.status,
+            responseBody: apiError.responseBody,
+            errorInfo: apiError.errorInfo,
+            isNetworkError: isNetworkError,
+          },
+          isNetworkError
+            ? 'BANKING_WITHDRAWAL_PENDING_VERIFICATION | FINOQ_CONNECTION_TERMINATED'
+            : 'BANKING_WITHDRAWAL_FAILED | WITHDRAWAL_PROVIDER_REQUEST_FAILED'
+        );
+
         return reply.status(500).send({
           success: false,
-          error: 'Withdrawal provider rejected the payout',
+          error: isNetworkError
+            ? 'Withdrawal connection terminated without provider response - pending verification'
+            : 'Withdrawal provider rejected the payout',
           status: apiError.status,
           providerCode: apiError.providerCode,
           providerMessage: apiError.providerMessage,
           responseBody: apiError.responseBody,
+          requiresVerification: isNetworkError,
         });
       }
       await adminSupabase.from('banking_wallets').update({ balance: bankingBalance - amount }).eq('user_id', user.id);
