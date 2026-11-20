@@ -99,15 +99,15 @@ const postToFinoq = async (endpoint: string, payload: any, operation: string): P
 export const finoqWithdrawToMobile = async (amount: number, phone: string, externalReference: string, callbackUrl: string): Promise<FinoqResponse> => {
   const baseUrl = env.FINOQ_BASE_URL?.replace(/\/$/, '');
   if (!baseUrl) throw new Error('FINOQ_BASE_URL environment variable is not set');
-  const withdrawPath = env.FINOQ_WITHDRAW_ENDPOINT || '/v1/payments';
+  const withdrawPath = env.FINOQ_WITHDRAW_ENDPOINT || '/api/v2/withdraw';
   const endpoint = `${baseUrl}${withdrawPath.startsWith('/') ? withdrawPath : `/${withdrawPath}`}`;
   const formattedPhone = formatFinoqPhone(phone);
   return postToFinoq(endpoint, {
     amount: Number(amount),
     currency: 'KES',
-    channel: 'mpesa',
-    phone: `+${formattedPhone}`,
-    reference: externalReference,
+    recipient_type: 'MSISDN',
+    account_number: formattedPhone,
+    external_reference: externalReference,
     callback_url: callbackUrl,
   }, 'FINOQ_WITHDRAW');
 };
