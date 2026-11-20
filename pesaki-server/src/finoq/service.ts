@@ -128,12 +128,10 @@ export const finoqWithdrawToMobile = async (amount: number, phone: string, exter
   const withdrawPath = env.FINOQ_WITHDRAW_ENDPOINT || '/api/v2/withdraw';
   const endpoint = `${baseUrl}${withdrawPath.startsWith('/') ? withdrawPath : `/${withdrawPath}`}`;
   const formattedPhone = formatFinoqPhone(phone);
-  const networkCode = networkCodeForPhone(formattedPhone);
   return postToFinoq(endpoint, {
     account_id: Number(accountId),
     amount: Number(amount),
     phone_number: formattedPhone,
-    network_code: networkCode,
     channel: 'mobile',
     external_reference: externalReference,
     callback_url: callbackUrl,
