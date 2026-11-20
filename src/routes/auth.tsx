@@ -294,7 +294,8 @@ function AuthPage() {
                 required
                 minLength={6}
                 className="input"
-                placeholder="Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢"
+                style={{ fontFamily: "ui-sans-serif, system-ui, sans-serif" }}
+                placeholder="••••••••••••"
               />
             </div>
 

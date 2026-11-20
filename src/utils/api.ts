@@ -40,7 +40,7 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
   if (session?.access_token) {
     headers.set("Authorization", `Bearer ${session.access_token}`);
   }
-  headers.set("Content-Type", "application/json");
+  headers.set("Content-Type", "application/json; charset=utf-8");
 
   const fetchUrl = path.startsWith("http") ? path : `${API_URL}${path}`;
 

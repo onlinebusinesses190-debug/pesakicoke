@@ -99,6 +99,14 @@ const startServer = async () => {
     await server.register(multipart);
     await setupRateLimit(server);
 
+    // Ensure all JSON responses include charset=utf-8
+    server.addHook('onSend', async (request, reply, payload) => {
+      const ct = reply.getHeader('content-type') || reply.headers['content-type'];
+      if (ct && String(ct).includes('application/json')) {
+        reply.header('Content-Type', 'application/json; charset=utf-8');
+      }
+    });
+
     registerRoutes(server);
 
     server.register(walletRoutes);
