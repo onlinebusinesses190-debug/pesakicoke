@@ -17,7 +17,7 @@ export const calculateTransferFee = (_amount: number): number => {
 export const calculateWithdrawalFee = (amount: number): number => {
   if (!Number.isFinite(amount) || amount <= 0) return 0;
   if (amount <= 10) return 0;
-  if (amount <= 49) return 1;
+  if (amount <= 50) return 1;
   if (amount <= 499) return 6;
   if (amount <= 999) return 10;
   if (amount <= 1499) return 15;
