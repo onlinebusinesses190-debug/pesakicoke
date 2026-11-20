@@ -63,7 +63,7 @@ const postToFinoq = async (endpoint: string, payload: any, operation: string): P
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000);
+      const timeout = setTimeout(() => controller.abort(), 120000);
       try {
         logger.info({ url: endpoint, reference: payload.externalReference, attempt }, `${operation}_REQUEST`);
         response = await fetch(endpoint, { method: 'POST', headers: getHeaders(), body: JSON.stringify(payload), signal: controller.signal });
