@@ -44,6 +44,18 @@ const getHeaders = (): Record<string, string> => {
   };
 };
 
+// ─── Startup validation: confirm Finoq auth env vars are present ─────────────
+export const validateFinoqAuth = (): void => {
+  const key = env.FINOQ_KEY?.trim();
+  const secret = env.FINOQ_SECRET?.trim();
+  const baseUrl = env.FINOQ_BASE_URL?.trim();
+  console.log(
+    `[FINOQ_AUTH] configured=${!!key && !!secret && !!baseUrl} key_len=${key ? key.length : 0} secret_len=${secret ? secret.length : 0} base_url=${baseUrl ? baseUrl.slice(0, 30) : 'missing'}`
+  );
+};
+
+validateFinoqAuth();
+
 const postToFinoq = async (endpoint: string, payload: any, operation: string): Promise<FinoqResponse> => {
   let response!: Response;
   let responseText = '';
