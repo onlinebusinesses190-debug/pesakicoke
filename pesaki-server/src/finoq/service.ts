@@ -123,14 +123,18 @@ const postToFinoq = async (endpoint: string, payload: any, operation: string): P
 export const finoqWithdrawToMobile = async (amount: number, phone: string, externalReference: string, callbackUrl: string): Promise<FinoqResponse> => {
   const baseUrl = env.FINOQ_BASE_URL?.replace(/\/$/, '');
   if (!baseUrl) throw new Error('FINOQ_BASE_URL environment variable is not set');
+  const accountId = env.FINOQ_ACCOUNT_ID?.trim();
+  if (!accountId) throw new Error('FINOQ_ACCOUNT_ID environment variable is not set');
   const withdrawPath = env.FINOQ_WITHDRAW_ENDPOINT || '/api/v2/withdraw';
   const endpoint = `${baseUrl}${withdrawPath.startsWith('/') ? withdrawPath : `/${withdrawPath}`}`;
   const formattedPhone = formatFinoqPhone(phone);
+  const networkCode = networkCodeForPhone(formattedPhone);
   return postToFinoq(endpoint, {
+    account_id: Number(accountId),
     amount: Number(amount),
-    currency: 'KES',
-    recipient_type: 'MSISDN',
-    account_number: formattedPhone,
+    phone_number: formattedPhone,
+    network_code: networkCode,
+    channel: 'mobile',
     external_reference: externalReference,
     callback_url: callbackUrl,
   }, 'FINOQ_WITHDRAW');

@@ -17,6 +17,7 @@ const envSchema = z.object({
   PALPLUSS_API_KEY: z.string().optional(),
   PALPLUSS_API_URL: z.string().url().optional(),
 
+  FINOQ_ACCOUNT_ID: z.string().optional(),
   FINOQ_KEY: z.string().optional(),
   FINOQ_SECRET: z.string().optional(),
   FINOQ_BASE_URL: z.string().url().optional(),
